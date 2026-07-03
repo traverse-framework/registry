@@ -28,22 +28,84 @@ jobs:
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: bash scripts/ci/spec_alignment_check.sh /tmp/pr_body.txt
 
-  # Placeholder: real capability schema/semver/digest/namespace/dependency
-  # validation ships once the contract schema is finalized in code
-  # (registry repo ticket #4, needs-spec). Until then this job only checks
-  # that any files under capabilities/ are valid JSON, as a minimal guard.
-  capability-structure-check:
+  # Deterministic capability validation gate (specs/002-capability-validation):
+  # schema, path-matching, semver format, semver-bump-vs-diff-class,
+  # digest-format, namespace-path-collision (via immutability check),
+  # dependency resolvability, and yank-immutability (specs/005-yank-deprecation).
+  capability-validation:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Run capability validation
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            python3 scripts/ci/capability_validation.py "$BASE_SHA" "$HEAD_SHA"
+          else
+            python3 scripts/ci/capability_validation.py
+          fi
+
+  # Advisory (non-blocking) AI review (specs/004-ai-advisory-review).
+  # Runs only on PRs that touch capabilities/, and only posts a comment --
+  # never fails the run, and is intentionally not a required check.
+  ai-advisory-review:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Find changed contract.json files
+        id: changed
+        run: |
+          git fetch origin ${{ github.event.pull_request.base.sha }} --depth=1 || true
+          changed=$(git diff --name-only ${{ github.event.pull_request.base.sha }} ${{ github.event.pull_request.head.sha }} -- 'capabilities/**/contract.json' | head -1)
+          echo "path=$changed" >> "$GITHUB_OUTPUT"
+
+      - name: Run AI-advisory review
+        if: steps.changed.outputs.path != ''
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: python3 scripts/ci/ai_advisory_review.py "${{ steps.changed.outputs.path }}" /tmp/advisory_comment.md
+
+      - name: Post advisory comment
+        if: steps.changed.outputs.path != ''
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh pr comment ${{ github.event.pull_request.number }} --body-file /tmp/advisory_comment.md
+
+  # Index/release publishing pipeline (specs/003-index-release-pipeline).
+  # Only runs on merge to main, not on PRs.
+  publish-index:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Validate any contract.json files are well-formed JSON
+      - name: Determine previous index version
+        id: prev
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          set -euo pipefail
-          shopt -s globstar nullglob
-          for f in capabilities/**/contract.json; do
-            echo "Checking $f"
-            python3 -c "import json,sys; json.load(open(sys.argv[1]))" "$f"
-          done
-          echo "No malformed contract.json files found."
+          prev=$(gh release list --repo ${{ github.repository }} 2>/dev/null | grep -oE 'index-v[0-9]+' | grep -oE '[0-9]+' | sort -n | tail -1)
+          echo "version=${prev:-0}" >> "$GITHUB_OUTPUT"
+
+      - name: Build index
+        run: python3 scripts/ci/build_index.py "${{ steps.prev.outputs.version }}" "${{ github.sha }}" /tmp/index.json
+
+      - name: Publish index as GitHub Release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          new_version=$(( ${{ steps.prev.outputs.version }} + 1 ))
+          tag="index-v${new_version}"
+          gh release create "$tag" /tmp/index.json --repo ${{ github.repository }} --title "$tag" --notes "Automated index publish for $tag" || \
+          gh release upload "$tag" /tmp/index.json --repo ${{ github.repository }} --clobber
