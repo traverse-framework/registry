@@ -1,4 +1,18 @@
 {
   "schema_version": "1.0.0",
-  "specs": []
+  "specs": [
+    {
+      "id": "001-registry-foundation",
+      "version": "1.0.0",
+      "status": "approved",
+      "immutable": true,
+      "path": "specs/001-registry-foundation/spec.md",
+      "governs": [
+        "capabilities/",
+        "scripts/ci/",
+        ".github/workflows/",
+        "specs/governance/"
+      ]
+    }
+  ]
 }

@@ -2,7 +2,7 @@
 
 **Feature Branch**: `001-registry-foundation`
 **Created**: 2026-07-03
-**Status**: Draft
+**Status**: Approved
 **Input**: Brainstorm session establishing `traverse-framework/registry` as the public capability registry for Traverse, extracted from `traverse-framework/traverse`'s `crates/traverse-registry`. Full narrative record: `docs/decision-log.md`. Companion migration record: `traverse-framework/traverse` `specs/051-registry-extraction/spec.md`.
 
 ## Purpose
