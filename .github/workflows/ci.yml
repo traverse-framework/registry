@@ -1,0 +1,49 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  spec-alignment:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Write PR body to file
+        if: github.event_name == 'pull_request'
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: printf '%s' "$PR_BODY" > /tmp/pr_body.txt
+
+      - name: Run spec alignment check
+        if: github.event_name == 'pull_request'
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: bash scripts/ci/spec_alignment_check.sh /tmp/pr_body.txt
+
+  # Placeholder: real capability schema/semver/digest/namespace/dependency
+  # validation ships once the contract schema is finalized in code
+  # (registry repo ticket #4, needs-spec). Until then this job only checks
+  # that any files under capabilities/ are valid JSON, as a minimal guard.
+  capability-structure-check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate any contract.json files are well-formed JSON
+        run: |
+          set -euo pipefail
+          shopt -s globstar nullglob
+          for f in capabilities/**/contract.json; do
+            echo "Checking $f"
+            python3 -c "import json,sys; json.load(open(sys.argv[1]))" "$f"
+          done
+          echo "No malformed contract.json files found."
