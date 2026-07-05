@@ -75,20 +75,10 @@ jobs:
           changed=$(git diff --name-only ${{ github.event.pull_request.base.sha }} ${{ github.event.pull_request.head.sha }} -- 'capabilities/**/contract.json' | head -1)
           echo "path=$changed" >> "$GITHUB_OUTPUT"
 
-      - name: Set up Node.js
-        if: steps.changed.outputs.path != ''
-        uses: actions/setup-node@v4
-        with:
-          node-version: "22"
-
-      - name: Install Claude Code CLI
-        if: steps.changed.outputs.path != ''
-        run: npm install -g @anthropic-ai/claude-code
-
-      - name: Run AI-advisory review (capability-review skill, subscription auth)
+      - name: Run AI-advisory review
         if: steps.changed.outputs.path != ''
         env:
-          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         run: python3 scripts/ci/ai_advisory_review.py "${{ steps.changed.outputs.path }}" /tmp/advisory_comment.md
 
       - name: Post advisory comment
