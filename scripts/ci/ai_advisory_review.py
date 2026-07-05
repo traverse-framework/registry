@@ -2,27 +2,31 @@
 """AI-advisory PR review pass (non-blocking).
 
 Implements specs/004-ai-advisory-review/spec.md. Flags likely semantic
-duplicates and capability-boundary quality concerns as a PR comment,
-via the `claude` CLI (Claude Code) running the .claude/skills/capability-review
-skill, authenticated with a subscription token (CLAUDE_CODE_OAUTH_TOKEN) rather
-than a metered ANTHROPIC_API_KEY. Never fails the CI run on its own -- a
-missing token, missing CLI, or any tooling error degrades to a
+duplicates and capability-boundary quality concerns as a PR comment.
+Never fails the CI run on its own -- an API error degrades to a
 "review didn't run" comment per FR-003.
+
+Uses a metered ANTHROPIC_API_KEY (Claude Console workspace key), not a
+subscription OAuth token -- CI usage is billed and isolated separately
+from any personal Claude Code/Pro-Max usage. See docs/decision-log.md
+item 18 for why the subscription-auth alternative was reverted.
 
 Usage: ai_advisory_review.py <changed-contract-json-path> <output-comment-path>
 """
 
 import json
-import shutil
-import subprocess
+import os
 import sys
+import urllib.request
 from pathlib import Path
+
+ANTHROPIC_API_URL = "https://api.anthropic.com/v1/messages"
+MODEL = "claude-sonnet-4-5"
 
 DEGRADED_COMMENT = (
     "## AI-Advisory Review (non-blocking)\n\n"
-    "This pass did not run (claude CLI unavailable, CLAUDE_CODE_OAUTH_TOKEN not "
-    "configured, or the call failed). This does not block merge -- see "
-    "specs/004-ai-advisory-review/spec.md FR-003."
+    "This pass did not run (API call failed or no credential configured). "
+    "This does not block merge -- see specs/004-ai-advisory-review/spec.md FR-003."
 )
 
 
@@ -39,29 +43,75 @@ def load_existing_summaries(index_path: Path) -> list:
     ]
 
 
-def run_capability_review_skill(new_contract: dict, existing_summaries: list) -> str:
-    claude_bin = shutil.which("claude")
-    if not claude_bin:
-        raise RuntimeError("claude CLI not found on PATH")
+def call_claude(new_contract: dict, existing_summaries: list) -> dict:
+    api_key = os.environ.get("ANTHROPIC_API_KEY")
+    if not api_key:
+        raise RuntimeError("ANTHROPIC_API_KEY not set")
 
     prompt = (
-        "/capability-review\n\n"
+        "You are reviewing a new capability contract being published to a governed "
+        "capability registry. A valid capability represents ONE meaningful business "
+        "action, not a CRUD wrapper or utility function.\n\n"
         f"New contract:\n{json.dumps(new_contract, indent=2)}\n\n"
-        f"Existing published capabilities (summary only):\n{json.dumps(existing_summaries, indent=2)}"
+        f"Existing published capabilities (summary only):\n{json.dumps(existing_summaries, indent=2)}\n\n"
+        "Respond with JSON only, matching this shape:\n"
+        '{"likely_duplicates": [{"namespace": "", "id": "", "version": "", "reason": ""}], '
+        '"boundary_concerns": [""]}'
     )
 
-    # CLAUDE_CODE_OAUTH_TOKEN (subscription auth) is read from the environment
-    # by the CLI itself -- not passed as a CLI argument. See
-    # specs/004-ai-advisory-review/spec.md and the registry decision log for
-    # why this uses subscription auth instead of a metered API key.
-    result = subprocess.run(
-        [claude_bin, "-p", prompt],
-        capture_output=True,
-        text=True,
-        timeout=120,
-        check=True,
+    body = json.dumps(
+        {
+            "model": MODEL,
+            "max_tokens": 1024,
+            "messages": [{"role": "user", "content": prompt}],
+        }
+    ).encode("utf-8")
+
+    request = urllib.request.Request(
+        ANTHROPIC_API_URL,
+        data=body,
+        headers={
+            "content-type": "application/json",
+            "x-api-key": api_key,
+            "anthropic-version": "2023-06-01",
+        },
+        method="POST",
     )
-    return result.stdout.strip()
+    with urllib.request.urlopen(request, timeout=30) as response:
+        payload = json.loads(response.read())
+
+    text = payload["content"][0]["text"]
+    return json.loads(text)
+
+
+def format_comment(result: dict) -> str:
+    lines = ["## AI-Advisory Review (non-blocking)", ""]
+    lines.append(
+        "This is advisory only. It does not block merge -- human review is always the final gate "
+        "(see specs/004-ai-advisory-review/spec.md FR-002, FR-004)."
+    )
+    lines.append("")
+
+    duplicates = result.get("likely_duplicates") or []
+    if duplicates:
+        lines.append("### Likely duplicates")
+        for dup in duplicates:
+            lines.append(
+                f"- `{dup.get('namespace')}/{dup.get('id')}@{dup.get('version')}` -- {dup.get('reason')}"
+            )
+    else:
+        lines.append("### Likely duplicates\nNone flagged.")
+
+    lines.append("")
+    concerns = result.get("boundary_concerns") or []
+    if concerns:
+        lines.append("### Capability-boundary concerns")
+        for concern in concerns:
+            lines.append(f"- {concern}")
+    else:
+        lines.append("### Capability-boundary concerns\nNone flagged.")
+
+    return "\n".join(lines) + "\n"
 
 
 def main() -> int:
@@ -75,11 +125,10 @@ def main() -> int:
     try:
         new_contract = json.loads(contract_path.read_text())
         existing_summaries = load_existing_summaries(Path("index.json"))
-        comment = run_capability_review_skill(new_contract, existing_summaries)
-        if not comment:
-            raise RuntimeError("claude CLI returned empty output")
+        result = call_claude(new_contract, existing_summaries)
+        comment = format_comment(result)
     except Exception as exc:
-        # FR-003: never fail the CI run on CLI/tooling/auth failure.
+        # FR-003: never fail the CI run on API/tooling failure.
         comment = DEGRADED_COMMENT + f"\n\n(diagnostic: {exc})"
 
     output_path.write_text(comment)
