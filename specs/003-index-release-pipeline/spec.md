@@ -2,7 +2,7 @@
 
 **Feature Branch**: `003-index-release-pipeline`
 **Created**: 2026-07-03
-**Status**: Draft
+**Status**: Approved
 **Input**: Registry ticket #6 — implement the CI job described in `001-registry-foundation` FR-006: build a versioned aggregated index artifact on merge to `main` and publish it as a GitHub Release.
 
 ## Purpose
