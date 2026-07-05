@@ -2,7 +2,7 @@
 
 **Feature Branch**: `004-ai-advisory-review`
 **Created**: 2026-07-03
-**Status**: Draft
+**Status**: Approved
 **Input**: Registry ticket #7 — implement the advisory (non-blocking) AI review pass described in `001-registry-foundation` User Story 2 / FR-004.
 
 ## Purpose

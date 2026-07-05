@@ -2,7 +2,7 @@
 
 **Feature Branch**: `002-capability-validation`
 **Created**: 2026-07-03
-**Status**: Draft
+**Status**: Approved
 **Input**: Registry ticket #5 — implement the deterministic CI validation job described in `001-registry-foundation` FR-003, replacing the placeholder JSON-well-formedness-only check.
 
 ## Purpose

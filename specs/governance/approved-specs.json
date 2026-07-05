@@ -13,6 +13,46 @@
         ".github/workflows/",
         "specs/governance/"
       ]
+    },
+    {
+      "id": "002-capability-validation",
+      "version": "1.0.0",
+      "status": "approved",
+      "immutable": true,
+      "path": "specs/002-capability-validation/spec.md",
+      "governs": [
+        "scripts/ci/capability_validation.py"
+      ]
+    },
+    {
+      "id": "003-index-release-pipeline",
+      "version": "1.0.0",
+      "status": "approved",
+      "immutable": true,
+      "path": "specs/003-index-release-pipeline/spec.md",
+      "governs": [
+        "scripts/ci/build_index.py"
+      ]
+    },
+    {
+      "id": "004-ai-advisory-review",
+      "version": "1.0.0",
+      "status": "approved",
+      "immutable": true,
+      "path": "specs/004-ai-advisory-review/spec.md",
+      "governs": [
+        "scripts/ci/ai_advisory_review.py"
+      ]
+    },
+    {
+      "id": "005-yank-deprecation",
+      "version": "1.0.0",
+      "status": "approved",
+      "immutable": true,
+      "path": "specs/005-yank-deprecation/spec.md",
+      "governs": [
+        "capabilities/"
+      ]
     }
   ]
 }

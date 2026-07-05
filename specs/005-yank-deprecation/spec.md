@@ -2,7 +2,7 @@
 
 **Feature Branch**: `005-yank-deprecation`
 **Created**: 2026-07-03
-**Status**: Draft
+**Status**: Approved
 **Input**: Registry ticket #8 — implement the deprecation ("yank") mechanism described in `001-registry-foundation` User Story 4 / FR-009.
 
 ## Purpose
