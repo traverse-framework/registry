@@ -42,9 +42,10 @@ Traverse (the runtime) already had an in-repo registry engine (`crates/traverse-
 
 16. **Governance consolidation**: constitution, NFRs, quality standards, antipatterns, compatibility policy, exception process, CLA, and the spec-alignment CI script were pulled out of `traverse-framework/traverse` into a new shared repo, `traverse-framework/.github`, rather than copied into this repo. Every repo (including this one) keeps a thin pointer to a pinned governance version instead of a duplicated copy — see `.specify/memory/constitution.md` in this repo.
 
+17. **AI-advisory review tooling refinement**: the pass runs as a `.claude/skills/capability-review` Claude Code skill invoked via `claude -p` in CI, authenticated with a subscription token (`CLAUDE_CODE_OAUTH_TOKEN`, from `claude setup-token`) rather than a raw Anthropic Messages API call billed against a metered `ANTHROPIC_API_KEY`. This is cheaper when the org already carries a Claude subscription, and reuses the skill abstraction instead of a bespoke prompt embedded in a script. Spec 004's FR-001–004 (advisory-only, never blocks merge, degrades cleanly on failure) are unchanged — this only changes *how* the LLM call is made, which spec 004's own Assumptions section already left open ("ANTHROPIC_API_KEY or equivalent"). Not re-approved as a spec amendment since no normative requirement changed.
+
 ## What Was Explicitly Deferred, Not Decided
 
 - The exact schema field names/types for `owner`/`namespace` (reserved conceptually, not yet finalized in code)
-- The AI-advisory review pass's actual prompt/model/tooling
 - The hosted API layer's concrete implementation (deferred until real usage justifies it)
 - Third-party publisher onboarding flow (namespace claiming, identity verification)
