@@ -2,7 +2,7 @@
 
 **Feature Branch**: `007-artifact-hosting`
 **Created**: 2026-07-06
-**Status**: Draft
+**Status**: Approved
 **Input**: Registry issue #19 — resolve `docs/cross-repo-context.md` open question 3 (seed content) and the gap `001-registry-foundation` FR-007 left open: WASM artifacts live "as GitHub Release assets," but no spec says *which* releases, under what tags, uploaded when, by whom. Full reasoning: `docs/decision-log.md` entry 22.
 
 ## Purpose

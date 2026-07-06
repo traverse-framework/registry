@@ -2,7 +2,7 @@
 
 **Feature Branch**: `006-public-scope-and-identity`
 **Created**: 2026-07-06
-**Status**: Draft
+**Status**: Approved
 **Input**: Registry issue #19 — resolve `docs/cross-repo-context.md` open question 1 (does this registry's scoping collide with the `traverse-registry` crate's bundle-level `scope: public/private`?). Companion normative spec: traverse-side, tracked by `traverse-framework/Traverse#548`. Full reasoning: `docs/decision-log.md` entries 20-21.
 
 ## Purpose

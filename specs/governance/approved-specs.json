@@ -53,28 +53,28 @@
       "governs": [
         "capabilities/"
       ]
-    }
-  ],
-  "draft_specs": [
+    },
     {
       "id": "006-public-scope-and-identity",
       "version": "1.0.0",
-      "status": "draft",
+      "status": "approved",
+      "immutable": true,
       "path": "specs/006-public-scope-and-identity/spec.md",
-      "will_govern": [
+      "governs": [
         "capabilities/",
         "scripts/ci/capability_validation.py"
-      ],
-      "note": "Drafts live in this separate array because the spec-alignment gate requires every specs[] entry to be status=approved. Approval = the repo owner moving a record into specs[] with status=approved and immutable=true (see docs/decision-log.md entry 23). Agents must never perform that move."
+      ]
     },
     {
       "id": "007-artifact-hosting",
       "version": "1.0.0",
-      "status": "draft",
+      "status": "approved",
+      "immutable": true,
       "path": "specs/007-artifact-hosting/spec.md",
-      "will_govern": [
+      "governs": [
         "capabilities/"
       ]
     }
-  ]
+  ],
+  "draft_specs": []
 }
