@@ -74,6 +74,20 @@
       "governs": [
         "capabilities/"
       ]
+    },
+    {
+      "id": "008-reference-capability-publication",
+      "version": "1.0.0",
+      "status": "approved",
+      "immutable": true,
+      "path": "specs/008-reference-capability-publication/spec.md",
+      "governs": [
+        "capabilities/traverse-starter/",
+        "capabilities/doc-approval/",
+        "capabilities/meeting-notes/",
+        "scripts/ci/",
+        "specs/governance/"
+      ]
     }
   ],
   "draft_specs": []
