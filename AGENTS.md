@@ -95,7 +95,7 @@ Read `.specify/memory/constitution.md` before any implementation work.
 - **Spec-first**: every feature needs an approved spec in `specs/` before code
 - **Contract-first**: contracts are source of truth; code conforms to contracts
 - **Spec-alignment gate**: CI blocks PRs that drift from `specs/governance/approved-specs.json`
-- **No self-approval**: an agent must never mark a spec `approved` in `specs/governance/approved-specs.json` on its own judgment -- that requires the repo owner's explicit sign-off
+- **No self-approval**: an agent must never mark a spec `approved` in `specs/governance/approved-specs.json` on its own judgment -- that requires the repo owner's explicit sign-off. For specs whose design the owner settled in a joint brainstorm session, that sign-off is given in-session (decision-log entry 24); specs drafted without the owner's in-session participation go into `draft_specs` and wait (entry 23)
 - **Immutability**: a published `capabilities/<namespace>/<id>/<version>/contract.json` is never edited once merged -- fix problems via the yank/deprecation process (`specs/005-yank-deprecation`), never by editing
 - **Traceability**: all work must have a GitHub issue + Project 3 item + PR
 <!-- MANUAL ADDITIONS END -->

@@ -53,6 +53,42 @@
       "governs": [
         "capabilities/"
       ]
+    },
+    {
+      "id": "006-public-scope-and-identity",
+      "version": "1.0.0",
+      "status": "approved",
+      "immutable": true,
+      "path": "specs/006-public-scope-and-identity/spec.md",
+      "governs": [
+        "capabilities/",
+        "scripts/ci/capability_validation.py"
+      ]
+    },
+    {
+      "id": "007-artifact-hosting",
+      "version": "1.0.0",
+      "status": "approved",
+      "immutable": true,
+      "path": "specs/007-artifact-hosting/spec.md",
+      "governs": [
+        "capabilities/"
+      ]
+    },
+    {
+      "id": "008-reference-capability-publication",
+      "version": "1.0.0",
+      "status": "approved",
+      "immutable": true,
+      "path": "specs/008-reference-capability-publication/spec.md",
+      "governs": [
+        "capabilities/traverse-starter/",
+        "capabilities/doc-approval/",
+        "capabilities/meeting-notes/",
+        "scripts/ci/",
+        "specs/governance/"
+      ]
     }
-  ]
+  ],
+  "draft_specs": []
 }
