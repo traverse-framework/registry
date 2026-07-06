@@ -13,6 +13,8 @@ This repo's own docs (`docs/decision-log.md`, `specs/`) fully explain *this repo
 
 ## Open question 1: does this registry's "public" collide with the existing bundle `scope: public/private`?
 
+> **Resolved 2026-07-06**: the two are orthogonal axes that both stay — bundle `scope` is a resolution tier, this repo's `namespace`/`owner` are publisher identity — with "public" pinned to exactly one meaning: populated by `registry sync` from this repo. See `specs/006-public-scope-and-identity` (Draft), `docs/decision-log.md` entry 20, and the traverse-side normative spec ticket [`traverse-framework/Traverse#548`](https://github.com/traverse-framework/Traverse/issues/548).
+
 The **existing, in-repo** `traverse-registry` crate (in `traverse-framework/traverse`, pending extraction into this repo per issue #9) already has its own notion of bundle visibility, documented in `traverse`'s [`docs/registry-bundle-authoring-guide.md`](https://github.com/traverse-framework/traverse/blob/main/docs/registry-bundle-authoring-guide.md):
 
 > `scope` | Yes | `public` or `private`. Public bundles are visible to all consumers; private bundles are registry-scoped.
@@ -27,6 +29,8 @@ This repo's own schema separately reserves `owner`/`namespace` fields (decision 
 
 ## Open question 2: nothing consumes from this registry yet
 
+> **Resolved 2026-07-06** (design; implementation still traverse-side): component manifests go dual-mode — `contract_path` stays valid (component-bundled capability → private overlay) and a new mutually exclusive `registry_ref: {namespace, id, version_range}` resolves from the sync-populated public tier; artifacts fetch at app-registration time into a digest-verified local cache, never at execution time. See `docs/decision-log.md` entry 21 and [`traverse-framework/Traverse#548`](https://github.com/traverse-framework/Traverse/issues/548) (feeds #542/#543).
+
 Two CLI commands were decided during this repo's original brainstorm (decision log items 6 and 9) but, until 2026-07-05, had no ticket anywhere:
 
 - `traverse-cli registry sync` -- fetch the published index, write local durable state. Now tracked: [`traverse` issue #542](https://github.com/traverse-framework/traverse/issues/542).
@@ -35,6 +39,8 @@ Two CLI commands were decided during this repo's original brainstorm (decision l
 Both are `needs-spec` and unstarted. Until at least `sync` exists, this repo's entire pipeline (publish -> validate -> index -> release) has no consumer.
 
 ## Open question 3: reference apps don't reference this registry today
+
+> **Resolved 2026-07-06**: the seed content is `traverse-starter.process` 1.0.0 published as-is (trace-explorer has no contracts — it is a React client only), via a manual PR with the WASM hosted as a release asset in this repo. reference-apps changes nothing until sync + dual-mode loading land, then flips the process component to `registry_ref` as the end-to-end demo ([`reference-apps#97`](https://github.com/traverse-framework/reference-apps/issues/97)). See `specs/007-artifact-hosting` (Draft) and `docs/decision-log.md` entry 22.
 
 Real, working capability contracts already exist and would pass this repo's validation as-is -- e.g. `traverse`'s [`contracts/examples/traverse-starter/capabilities/process/contract.json`](https://github.com/traverse-framework/traverse/blob/main/contracts/examples/traverse-starter/capabilities/process/contract.json) has real `namespace`/`id`/`version`/`owner` fields, not placeholders.
 
