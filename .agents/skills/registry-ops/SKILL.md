@@ -15,8 +15,8 @@ REGISTRY OPS
 
 ## Workflow
 
-1. Read `.specify/memory/constitution.md` (a pointer to `traverse-framework/.github`, governance version 1.0.0) before implementation work.
-2. Read `AGENTS.md` and follow the agent coordination rules.
+1. Read `AGENTS.md` and follow the agent coordination rules.
+2. Read the constitution (via `traverse-framework/.github`, at the version in `.governance-version` — never a hardcoded number) only when the ticket touches architecture, contracts, or versioned surfaces; lazy-read map in the org's `docs/ai-agent-hardening.md`.
 3. Inspect current GitHub and Project 3 state.
 4. Prefer finishing existing open PRs before claiming new Ready work.
 5. If no active PR needs attention, pick one Ready Project 3 issue.
@@ -28,7 +28,7 @@ REGISTRY OPS
    - set Project 3 `Status` to `In Progress` (Project 3 has no separate `Agent` field -- unlike `traverse`'s Project 1 -- so the label alone signals ownership)
 8. Use a dedicated `<agent>/issue-NNN-*` branch (e.g. `claude/issue-12-*`).
 9. Keep work scoped to the claimed issue and governing spec.
-10. Open a dedicated PR with validation evidence, declaring the governing spec in `## Governing Spec`.
+10. Open a dedicated PR using the org body superset (`## Summary`, `## Governing Spec`, `## Project Item`, `## Definition of Done`, `## Validation`), declaring the governing spec, then immediately queue it: `gh pr merge <N> --squash --auto`. Do not poll checks — continue the loop and release on a later pass once merged.
 
 ## Registry-Specific Rules
 
@@ -37,16 +37,19 @@ REGISTRY OPS
 - **Publishing is PR-only**: capability publishing happens by `traverse-cli capability publish` (in the `traverse` repo) opening a PR here, or by a manually-opened PR following the same shape. Deterministic CI checks (`capability_validation.py`) plus an advisory AI pass gate it; only a human merge is final.
 - **Cross-repo actions need explicit, standalone confirmation**: repo renames, deleting/disabling org-level Project automations, and crate-extraction work spanning `traverse` + `registry` are the kind of action that must not proceed on an ambiguous or bundled "ok" -- ask for (or wait for) a direct, unambiguous instruction naming the action.
 
+## Gates & Failure Playbook
+
+Every PR must pass the org gates `cla / cla` and `baseline / governance-baseline` plus this repo's CI. When a governance gate fails, use the failure playbook in `traverse-framework/.github` `docs/runbook.md` (CLA `recheck` comment; re-runs pin stale gate snapshots, push a commit instead; secret-visibility check). Dependabot PRs: comment `@dependabot rebase`, queue `gh pr merge --squash --auto`, and let CI decide — never hand-write their bodies.
+
 ## Token Discipline
 
-Same lean-by-default style as `traverse-ops`:
+Org-canon token rules live in `traverse-framework/.github` `docs/ai-agent-hardening.md`
+(pinned via `.governance-version`): bounded `--limit` queries with server-side `--jq`,
+no raw board/CI/test log dumps, targeted diffs, short progress updates.
+Registry-specific addition:
 
-- Prefer targeted GitHub queries over full board dumps: `gh project item-list 3 --owner traverse-framework --format json --limit 100 --jq '...'`, returning only issue number, title, labels, and item id.
-- Do not paste full `gh project item-list`, `gh pr checks --watch`, test, or CI logs into the conversation. Summarize pass/fail and quote only the failing lines needed to fix the issue.
-- Use `git diff --stat` / `git diff --name-only` before large diffs.
-- Keep progress updates short: current action, discovered blocker if any, next action.
-- After CI starts, poll with bounded output; on failure, fetch only that job's log and extract the actionable failure.
-- Prefer local reproduction of a failing gate (e.g. `python3 scripts/ci/capability_validation.py`) before fetching remote logs.
+- Prefer local reproduction of a failing gate (`python3 scripts/ci/capability_validation.py`,
+  `bash scripts/ci/spec_alignment_check.sh`) before fetching remote logs.
 
 ## Minimality Ladder
 
