@@ -34,7 +34,8 @@ jobs:
   # Deterministic capability validation gate (specs/002-capability-validation):
   # schema, path-matching, semver format, semver-bump-vs-diff-class,
   # digest-format, namespace-path-collision (via immutability check),
-  # dependency resolvability, and yank-immutability (specs/005-yank-deprecation).
+  # dependency resolvability, yank-immutability (specs/005-yank-deprecation),
+  # and owner/namespace/scope field shapes (specs/006-public-scope-and-identity).
   capability-validation:
     runs-on: ubuntu-latest
     steps:
@@ -42,6 +43,9 @@ jobs:
         uses: actions/checkout@v7
         with:
           fetch-depth: 0
+
+      - name: Run capability validation unit tests
+        run: python3 -m unittest scripts/ci/tests/test_capability_validation.py -v
 
       - name: Run capability validation
         env:

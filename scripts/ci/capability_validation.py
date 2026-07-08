@@ -5,7 +5,9 @@ Implements specs/002-capability-validation/spec.md FR-001 through FR-005.
 Walks capabilities/**/contract.json, validates schema/path/semver, checks
 namespace-collision-safe immutability (no PR may modify an existing
 contract.json), and checks yank records (specs/005-yank-deprecation)
-never accompany a modified contract.json.
+never accompany a modified contract.json. Also enforces the finalized
+owner/namespace/scope field shapes from specs/006-public-scope-and-identity
+FR-002 through FR-004.
 """
 
 import json
@@ -53,12 +55,40 @@ def validate_contract(path: Path, errors: list) -> None:
         fail(errors, "contract.bad_path", str(path), "Path does not match capabilities/<namespace>/<id>/<version>/contract.json")
         return
 
-    if contract.get("namespace") and contract.get("namespace") != namespace_seg:
+    namespace = contract.get("namespace")
+    if namespace is not None and (not isinstance(namespace, str) or not namespace.strip()):
+        fail(
+            errors,
+            "contract.invalid_namespace",
+            str(path),
+            "namespace must be a non-empty string (spec 006 FR-002)",
+        )
+    elif namespace and namespace != namespace_seg:
         fail(
             errors,
             "contract.namespace_mismatch",
             str(path),
-            f"contract.json namespace '{contract.get('namespace')}' does not match path segment '{namespace_seg}'",
+            f"contract.json namespace '{namespace}' does not match path segment '{namespace_seg}'",
+        )
+
+    owner = contract.get("owner")
+    if owner is not None and (
+        not isinstance(owner, dict) or not isinstance(owner.get("team"), str) or not owner.get("team").strip()
+    ):
+        fail(
+            errors,
+            "contract.invalid_owner",
+            str(path),
+            "owner must be an object with a non-empty 'team' string (spec 006 FR-003)",
+        )
+
+    if "scope" in contract:
+        fail(
+            errors,
+            "contract.forbidden_scope_field",
+            str(path),
+            "contract.json must not declare a top-level 'scope' field -- resolution tier is a "
+            "consumer-side concept, not part of a published record (spec 006 FR-004)",
         )
 
     if contract.get("id") and contract.get("id") != id_seg:
