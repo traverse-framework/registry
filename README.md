@@ -11,8 +11,8 @@ Read [`specs/001-registry-foundation/spec.md`](specs/001-registry-foundation/spe
 ## How Publishing Works
 
 1. A capability author runs `traverse-cli capability publish` (in the `traverse` repo), which validates the contract locally and opens a PR here automatically.
-2. CI runs deterministic checks (schema, semver-bump-vs-diff, digest integrity, namespace collisions, dependency resolvability) and an advisory AI pass (duplicate/boundary-quality flags).
-3. A human reviews and approves — automated checks alone can never merge a publish.
+2. CI runs deterministic checks (schema, semver-bump-vs-diff, digest integrity, namespace collisions, dependency resolvability). The advisory AI pass (duplicate/boundary-quality flags) runs in-chat via the `capability-review` skill (`.agents/skills/capability-review/`) during the owner's review — the CI job for it is intentionally dormant (no API key; see `docs/decision-log.md` entries 19 and 25) and posts a degraded-mode notice.
+3. A human reviews and approves — automated checks alone can never merge a publish, and the advisory pass never blocks one.
 4. Merging to `main` builds a versioned index artifact and publishes it as a GitHub Release.
 5. Anyone running `traverse-cli registry sync` fetches that release into local workspace state — the runtime never talks to this repo live.
 
