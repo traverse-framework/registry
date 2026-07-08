@@ -2,7 +2,7 @@
 
 ## Governance
 
-This repo's constitution, NFRs, quality standards, antipatterns, compatibility policy, exception process, and CLA are **not** duplicated here — they live in [`traverse-framework/.github`](https://github.com/traverse-framework/.github), pinned at **governance version 1.0.0** (see `.specify/memory/constitution.md`).
+This repo's constitution, NFRs, quality standards, antipatterns, compatibility policy, exception process, and CLA are **not** duplicated here — they live in [`traverse-framework/.github`](https://github.com/traverse-framework/.github), pinned at the version recorded in `.governance-version`.
 
 Read `specs/001-registry-foundation/spec.md` before any implementation work — it's this repo's own foundational spec, and it explicitly inherits semver/immutability rules from `traverse-framework/traverse`'s specs 005/037/043 rather than redefining them.
 
@@ -20,6 +20,8 @@ scripts/ci/                                              # CI gate scripts (vend
 
 ```bash
 bash scripts/ci/spec_alignment_check.sh <pr-body-file>   # spec-alignment gate (requires BASE_SHA/HEAD_SHA env)
+python3 scripts/ci/capability_validation.py               # deterministic capability checks
+python3 scripts/ci/build_index.py <prev_version> <sha> <out>  # index build
 ```
 
 No build/test commands yet — this repo has no executable code until the `traverse-registry` crate extraction (`traverse` spec 051) lands.
