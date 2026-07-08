@@ -34,5 +34,5 @@ Inherited from `traverse-framework/.github`'s `docs/ai-agent-hardening.md`: no `
 
 1. `capabilities/<namespace>/<id>/<version>/contract.json` is immutable once merged — never edit an existing version, only add new ones.
 2. WASM/source artifacts are never committed directly — reference by digest + GitHub Release URL.
-3. Publishing is PR-only; CI's deterministic checks + advisory AI review both run, but only human approval actually gates merge.
+3. Publishing is PR-only; CI runs the deterministic checks, the advisory AI review runs in-chat via the `capability-review` skill (`.agents/skills/capability-review/` — CI's version is intentionally dormant, decision-log entries 19/25), and only human approval actually gates merge.
 4. Deprecation is additive (a yank record), never an edit or deletion of the original contract.
