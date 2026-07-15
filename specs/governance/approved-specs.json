@@ -90,5 +90,16 @@
       ]
     }
   ],
-  "draft_specs": []
+  "draft_specs": [
+    {
+      "id": "009-contract-metadata-in-index",
+      "version": "0.1.0",
+      "status": "draft",
+      "immutable": false,
+      "path": "specs/009-contract-metadata-in-index/spec.md",
+      "will_govern": [
+        "scripts/ci/build_index.py"
+      ]
+    }
+  ]
 }

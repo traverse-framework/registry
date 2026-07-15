@@ -115,8 +115,11 @@ jobs:
           prev=$(gh release list --repo ${{ github.repository }} 2>/dev/null | grep -oE 'index-v[0-9]+' | grep -oE '[0-9]+' | sort -n | tail -1)
           echo "version=${prev:-0}" >> "$GITHUB_OUTPUT"
 
+      - name: Run build_index unit tests
+        run: python3 -m unittest scripts/ci/tests/test_build_index.py -v
+
       - name: Build index
-        run: python3 scripts/ci/build_index.py "${{ steps.prev.outputs.version }}" "${{ github.sha }}" /tmp/index.json
+        run: python3 scripts/ci/build_index.py "${{ steps.prev.outputs.version }}" "${{ github.sha }}" /tmp/index.json "${{ github.repository }}"
 
       - name: Publish index as GitHub Release
         env:
