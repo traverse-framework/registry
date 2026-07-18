@@ -111,6 +111,36 @@
         ".github/workflows/publish-crate.yml",
         "scripts/ci/publish_crate.sh"
       ]
+    },
+    {
+      "id": "011-capability-registry-adoption",
+      "version": "1.0.0",
+      "status": "approved",
+      "immutable": true,
+      "path": "specs/011-capability-registry-adoption/spec.md",
+      "governs": [
+        "crates/traverse-registry/"
+      ]
+    },
+    {
+      "id": "012-event-registry-adoption",
+      "version": "1.0.0",
+      "status": "approved",
+      "immutable": true,
+      "path": "specs/012-event-registry-adoption/spec.md",
+      "governs": [
+        "crates/traverse-registry/"
+      ]
+    },
+    {
+      "id": "013-inherited-registry-governance",
+      "version": "1.0.0",
+      "status": "approved",
+      "immutable": true,
+      "path": "specs/013-inherited-registry-governance/spec.md",
+      "governs": [
+        "crates/traverse-registry/"
+      ]
     }
   ],
   "draft_specs": []
