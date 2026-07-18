@@ -1,0 +1,43 @@
+# Crate publish pipeline (specs/010-crate-publish-pipeline).
+#
+# Triggered only on a version tag push, mirroring traverse-framework/traverse's
+# own tag-triggered `publish` job shape (decision log entry 29) rather than
+# inventing a new mechanism. Not a `workflow_dispatch` and not every merge.
+name: publish-crate
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    name: Publish traverse-registry to crates.io
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: "1.94.0"
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+
+      # Deterministic build gate (FR-003): a broken build blocks publish
+      # rather than racing it. spec-alignment already gated the PR that
+      # merged this code to main; it is PR-diff-based and has no meaning
+      # replayed against a tag push, so it is not re-invoked here.
+      - name: Build traverse-registry
+        run: cargo build --locked -p traverse-registry
+
+      - name: Publish to crates.io
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+        run: bash scripts/ci/publish_crate.sh
