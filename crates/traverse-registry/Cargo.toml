@@ -1,0 +1,11 @@
+[package]
+name = "traverse-registry"
+version = "0.0.1"
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+description = "Name-reservation placeholder for the traverse-registry crate, pending extraction from traverse-framework/traverse (see traverse-framework/registry#9)."
+
+[lints]
+workspace = true
