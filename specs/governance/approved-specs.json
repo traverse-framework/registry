@@ -98,6 +98,19 @@
       "governs": [
         "scripts/ci/build_index.py"
       ]
+    },
+    {
+      "id": "010-crate-publish-pipeline",
+      "version": "1.0.0",
+      "status": "approved",
+      "immutable": true,
+      "path": "specs/010-crate-publish-pipeline/spec.md",
+      "governs": [
+        "Cargo.toml",
+        "crates/traverse-registry/",
+        ".github/workflows/publish-crate.yml",
+        "scripts/ci/publish_crate.sh"
+      ]
     }
   ],
   "draft_specs": []
