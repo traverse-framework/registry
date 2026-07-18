@@ -2,7 +2,7 @@
 
 **Feature Branch**: `claude/issue-44-contract-metadata-index`
 **Created**: 2026-07-14
-**Status**: Draft
+**Status**: Approved
 **Input**: Registry ticket #44 — publish immutable capability-contract metadata
 in every public Registry release index, per `traverse-framework/traverse`
 spec `063-registry-contract-materialization` FR-001 and FR-002.
@@ -126,7 +126,7 @@ happens consumer-side, not in the index.
 
 Drafted by an agent from registry ticket #44's Definition of Done, which
 itself derives from the already-approved `traverse-framework/traverse` spec
-`063-registry-contract-materialization`. Per this repo's no-self-approval
-rule (`AGENTS.md`), this spec stays `Draft` — moving it to `Approved` in
-`specs/governance/approved-specs.json` requires the repo owner's explicit,
-standalone sign-off.
+`063-registry-contract-materialization`. Approved by the repo owner via
+registry ticket #48 (explicit, standalone sign-off, 2026-07-18) — moved from
+`draft_specs` to `specs[]` in `specs/governance/approved-specs.json` with
+`status: approved`, `immutable: true`.
