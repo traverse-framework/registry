@@ -7,6 +7,8 @@
 
 **Enforcement note**: `crates/traverse-registry/` now physically exists in this repo (the `010-crate-publish-pipeline` scaffold, #52), so this spec registers directly in `specs/governance/approved-specs.json` alongside `011`/`012` rather than waiting -- decision log entry 26(f)'s concern was specifically about declaring governance over a path that doesn't exist yet; that no longer applies.
 
+**Amendment (2026-07-21, licensed by this spec's own FR-003)**: a full audit of the crate's compiled source, done while writing `014-extraction-compatibility`, found `002-capability-contracts` also governs `crates/traverse-registry/` -- a 20th spec, missed in the original 2026-07-18 audit of 19. Added to the source-specs table below per FR-003's explicit re-verification requirement. Full reasoning: `docs/decision-log.md` entry 33.
+
 ## Purpose
 
 Nineteen `traverse` specs govern `crates/traverse-registry/` alongside at least one other crate that is **not** moving (`traverse-runtime`, `traverse-cli`, or `traverse-contracts`). None of them is primarily "about" the registry in the way `005-capability-registry` and `011-event-registry` were -- each describes behavior that spans the registry and its consumers together, and splitting out only the registry-relevant requirements from each would require real synthesis work with no clean seams (several FRs describe a registry/runtime or registry/CLI interaction as a single requirement).
@@ -27,6 +29,7 @@ At the time of extraction, the following `traverse-framework/traverse` specs gov
 
 | Spec | Title |
 |---|---|
+| `002-capability-contracts` | Capability Contracts (added 2026-07-21, see Amendment above) |
 | `007-workflow-registry-traversal` | Workflow Registry and Deterministic Traversal |
 | `018-event-driven-composition` | Event-Driven Composition |
 | `034-programmatic-registration` | Programmatic Registration API |
