@@ -134,10 +134,121 @@
     },
     {
       "id": "013-inherited-registry-governance",
-      "version": "1.0.0",
+      "version": "1.1.0",
       "status": "approved",
       "immutable": true,
       "path": "specs/013-inherited-registry-governance/spec.md",
+      "governs": [
+        "crates/traverse-registry/"
+      ]
+    },
+    {
+      "id": "014-extraction-compatibility",
+      "version": "1.0.0",
+      "status": "approved",
+      "immutable": true,
+      "path": "specs/014-extraction-compatibility/spec.md",
+      "governs": [
+        "crates/traverse-registry/",
+        "contracts/"
+      ]
+    },
+    {
+      "id": "002-capability-contracts",
+      "version": "1.0.0",
+      "status": "approved",
+      "immutable": true,
+      "path": "specs/014-extraction-compatibility/legacy-ids/002-capability-contracts.md",
+      "governs": [
+        "crates/traverse-registry/"
+      ]
+    },
+    {
+      "id": "005-capability-registry",
+      "version": "1.0.0",
+      "status": "approved",
+      "immutable": true,
+      "path": "specs/014-extraction-compatibility/legacy-ids/005-capability-registry.md",
+      "governs": [
+        "crates/traverse-registry/"
+      ]
+    },
+    {
+      "id": "007-workflow-registry-traversal",
+      "version": "1.0.0",
+      "status": "approved",
+      "immutable": true,
+      "path": "specs/014-extraction-compatibility/legacy-ids/007-workflow-registry-traversal.md",
+      "governs": [
+        "crates/traverse-registry/"
+      ]
+    },
+    {
+      "id": "011-event-registry",
+      "version": "1.0.0",
+      "status": "approved",
+      "immutable": true,
+      "path": "specs/014-extraction-compatibility/legacy-ids/011-event-registry.md",
+      "governs": [
+        "crates/traverse-registry/"
+      ]
+    },
+    {
+      "id": "037-semver-range-resolution",
+      "version": "1.0.0",
+      "status": "approved",
+      "immutable": true,
+      "path": "specs/014-extraction-compatibility/legacy-ids/037-semver-range-resolution.md",
+      "governs": [
+        "crates/traverse-registry/"
+      ]
+    },
+    {
+      "id": "039-connector-plugin-architecture",
+      "version": "1.0.0",
+      "status": "approved",
+      "immutable": true,
+      "path": "specs/014-extraction-compatibility/legacy-ids/039-connector-plugin-architecture.md",
+      "governs": [
+        "crates/traverse-registry/"
+      ]
+    },
+    {
+      "id": "043-module-dependency-management",
+      "version": "1.0.0",
+      "status": "approved",
+      "immutable": true,
+      "path": "specs/014-extraction-compatibility/legacy-ids/043-module-dependency-management.md",
+      "governs": [
+        "crates/traverse-registry/"
+      ]
+    },
+    {
+      "id": "044-application-bundle-manifest",
+      "version": "1.0.0",
+      "status": "approved",
+      "immutable": true,
+      "path": "specs/014-extraction-compatibility/legacy-ids/044-application-bundle-manifest.md",
+      "governs": [
+        "crates/traverse-registry/"
+      ]
+    },
+    {
+      "id": "046-public-cli-app-registration",
+      "version": "1.0.0",
+      "status": "approved",
+      "immutable": true,
+      "path": "specs/014-extraction-compatibility/legacy-ids/046-public-cli-app-registration.md",
+      "governs": [
+        "crates/traverse-registry/"
+      ]
+    },
+    {
+      "id": "055-registry-sync",
+      "version": "1.0.0",
+      "status": "approved",
+      "immutable": true,
+      "path": "specs/014-extraction-compatibility/legacy-ids/055-registry-sync.md",
       "governs": [
         "crates/traverse-registry/"
       ]
