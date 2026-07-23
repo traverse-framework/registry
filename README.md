@@ -16,6 +16,8 @@ Read [`specs/001-registry-foundation/spec.md`](specs/001-registry-foundation/spe
 4. Merging to `main` builds a versioned index artifact and publishes it as a GitHub Release.
 5. Anyone running `traverse-cli registry sync` fetches that release into local workspace state — the runtime never talks to this repo live.
 
+Building with an AI coding agent? [traverse-framework/claude-skills](https://github.com/traverse-framework/claude-skills) hosts a Claude Skill that checks this registry before authoring a new capability, so you don't duplicate something that's already published.
+
 ## Layout
 
 ```text
