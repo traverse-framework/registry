@@ -1,0 +1,1 @@
+fixture component bytes; this is intentionally not a distributable WASM artifact.

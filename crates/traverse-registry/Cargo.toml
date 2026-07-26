@@ -1,11 +1,19 @@
 [package]
 name = "traverse-registry"
-version = "0.0.1"
+version.workspace = true
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
 rust-version.workspace = true
-description = "Name-reservation placeholder for the traverse-registry crate, pending extraction from traverse-framework/traverse (see traverse-framework/registry#9)."
+description = "Capability and event registries for the Traverse capability runtime."
 
+[dependencies]
+traverse-contracts = { workspace = true }
+semver = "1.0.27"
+serde = { version = "1.0.228", features = ["derive"] }
+serde_json = "1.0.145"
+sha2 = "0.11"
+
+[dev-dependencies]
 [lints]
 workspace = true

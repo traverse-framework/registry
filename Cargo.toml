@@ -5,10 +5,17 @@ members = [
 resolver = "3"
 
 [workspace.package]
+version = "0.0.1"
 edition = "2024"
 license = "Apache-2.0"
 repository = "https://github.com/traverse-framework/registry"
 rust-version = "1.94"
+
+[workspace.dependencies]
+# The extracted crate keeps the public contract surface on the published,
+# exact version that matches the source snapshot. The release ticket will
+# replace the placeholder package version only after its human approval.
+traverse-contracts = { version = "=0.8.1" }
 
 [workspace.lints.rust]
 unsafe_code = "forbid"
