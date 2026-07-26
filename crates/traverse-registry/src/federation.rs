@@ -20,9 +20,18 @@ use std::fs;
 use std::sync::OnceLock;
 use traverse_contracts::{ErrorSeverity, Lifecycle};
 
+// Bundled inside the crate (not read from `../../specs/governance/` in the
+// enclosing workspace) so governing-spec validation works identically for an
+// in-repo build and for this crate downloaded as an external dependency --
+// `CARGO_MANIFEST_DIR` for the latter points at wherever cargo unpacked the
+// published package, which has no sibling `specs/` directory at all. Keep
+// `crates/traverse-registry/governance/approved-specs.json` in sync with the
+// workspace's `specs/governance/approved-specs.json`; the
+// `bundled_approved_specs_matches_workspace_source` test enforces that
+// in-repo.
 const APPROVED_SPECS_REGISTRY_PATH: &str = concat!(
     env!("CARGO_MANIFEST_DIR"),
-    "/../../specs/governance/approved-specs.json"
+    "/governance/approved-specs.json"
 );
 
 static APPROVED_SPEC_IDS: OnceLock<BTreeSet<String>> = OnceLock::new();
@@ -2085,6 +2094,31 @@ mod tests {
                 .conflicts
                 .iter()
                 .any(|conflict| { conflict.conflict_reason.contains("approved spec registry") })
+        );
+    }
+
+    #[test]
+    fn bundled_approved_specs_matches_workspace_source_when_present() {
+        // The crate ships its own copy of approved-specs.json (see
+        // APPROVED_SPECS_REGISTRY_PATH's doc comment) so governing-spec
+        // validation works for an externally-consumed published package,
+        // which has no sibling `specs/` directory to read at runtime. That
+        // sibling directory only exists for an in-repo build -- when it's
+        // present, assert the bundled copy hasn't drifted from the
+        // workspace's own source of truth.
+        let workspace_source = concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../specs/governance/approved-specs.json"
+        );
+        let Ok(workspace_contents) = fs::read_to_string(workspace_source) else {
+            return;
+        };
+        let bundled_contents = fs::read_to_string(APPROVED_SPECS_REGISTRY_PATH)
+            .expect("bundled approved-specs.json should read");
+        assert_eq!(
+            bundled_contents, workspace_contents,
+            "crates/traverse-registry/governance/approved-specs.json has drifted from \
+             specs/governance/approved-specs.json -- keep the bundled copy in sync"
         );
     }
 

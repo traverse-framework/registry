@@ -1,0 +1,258 @@
+{
+  "schema_version": "1.0.0",
+  "specs": [
+    {
+      "id": "001-registry-foundation",
+      "version": "1.0.0",
+      "status": "approved",
+      "immutable": true,
+      "path": "specs/001-registry-foundation/spec.md",
+      "governs": [
+        "capabilities/",
+        "scripts/ci/",
+        ".github/workflows/",
+        "specs/governance/"
+      ]
+    },
+    {
+      "id": "002-capability-validation",
+      "version": "1.0.0",
+      "status": "approved",
+      "immutable": true,
+      "path": "specs/002-capability-validation/spec.md",
+      "governs": [
+        "scripts/ci/capability_validation.py"
+      ]
+    },
+    {
+      "id": "003-index-release-pipeline",
+      "version": "1.0.0",
+      "status": "approved",
+      "immutable": true,
+      "path": "specs/003-index-release-pipeline/spec.md",
+      "governs": [
+        "scripts/ci/build_index.py"
+      ]
+    },
+    {
+      "id": "004-ai-advisory-review",
+      "version": "1.0.0",
+      "status": "approved",
+      "immutable": true,
+      "path": "specs/004-ai-advisory-review/spec.md",
+      "governs": [
+        "scripts/ci/ai_advisory_review.py"
+      ]
+    },
+    {
+      "id": "005-yank-deprecation",
+      "version": "1.0.0",
+      "status": "approved",
+      "immutable": true,
+      "path": "specs/005-yank-deprecation/spec.md",
+      "governs": [
+        "capabilities/"
+      ]
+    },
+    {
+      "id": "006-public-scope-and-identity",
+      "version": "1.0.0",
+      "status": "approved",
+      "immutable": true,
+      "path": "specs/006-public-scope-and-identity/spec.md",
+      "governs": [
+        "capabilities/",
+        "scripts/ci/capability_validation.py"
+      ]
+    },
+    {
+      "id": "007-artifact-hosting",
+      "version": "1.0.0",
+      "status": "approved",
+      "immutable": true,
+      "path": "specs/007-artifact-hosting/spec.md",
+      "governs": [
+        "capabilities/"
+      ]
+    },
+    {
+      "id": "008-reference-capability-publication",
+      "version": "1.0.0",
+      "status": "approved",
+      "immutable": true,
+      "path": "specs/008-reference-capability-publication/spec.md",
+      "governs": [
+        "capabilities/traverse-starter/",
+        "capabilities/doc-approval/",
+        "capabilities/meeting-notes/",
+        "scripts/ci/",
+        "specs/governance/"
+      ]
+    },
+    {
+      "id": "009-contract-metadata-in-index",
+      "version": "0.1.0",
+      "status": "approved",
+      "immutable": true,
+      "path": "specs/009-contract-metadata-in-index/spec.md",
+      "governs": [
+        "scripts/ci/build_index.py"
+      ]
+    },
+    {
+      "id": "010-crate-publish-pipeline",
+      "version": "1.0.0",
+      "status": "approved",
+      "immutable": true,
+      "path": "specs/010-crate-publish-pipeline/spec.md",
+      "governs": [
+        "Cargo.toml",
+        "crates/traverse-registry/",
+        ".github/workflows/publish-crate.yml",
+        "scripts/ci/publish_crate.sh"
+      ]
+    },
+    {
+      "id": "011-capability-registry-adoption",
+      "version": "1.0.0",
+      "status": "approved",
+      "immutable": true,
+      "path": "specs/011-capability-registry-adoption/spec.md",
+      "governs": [
+        "crates/traverse-registry/"
+      ]
+    },
+    {
+      "id": "012-event-registry-adoption",
+      "version": "1.0.0",
+      "status": "approved",
+      "immutable": true,
+      "path": "specs/012-event-registry-adoption/spec.md",
+      "governs": [
+        "crates/traverse-registry/"
+      ]
+    },
+    {
+      "id": "013-inherited-registry-governance",
+      "version": "1.1.0",
+      "status": "approved",
+      "immutable": true,
+      "path": "specs/013-inherited-registry-governance/spec.md",
+      "governs": [
+        "crates/traverse-registry/"
+      ]
+    },
+    {
+      "id": "014-extraction-compatibility",
+      "version": "1.0.0",
+      "status": "approved",
+      "immutable": true,
+      "path": "specs/014-extraction-compatibility/spec.md",
+      "governs": [
+        "crates/traverse-registry/",
+        "contracts/"
+      ]
+    },
+    {
+      "id": "002-capability-contracts",
+      "version": "1.0.0",
+      "status": "approved",
+      "immutable": true,
+      "path": "specs/014-extraction-compatibility/legacy-ids/002-capability-contracts.md",
+      "governs": [
+        "crates/traverse-registry/"
+      ]
+    },
+    {
+      "id": "005-capability-registry",
+      "version": "1.0.0",
+      "status": "approved",
+      "immutable": true,
+      "path": "specs/014-extraction-compatibility/legacy-ids/005-capability-registry.md",
+      "governs": [
+        "crates/traverse-registry/"
+      ]
+    },
+    {
+      "id": "007-workflow-registry-traversal",
+      "version": "1.0.0",
+      "status": "approved",
+      "immutable": true,
+      "path": "specs/014-extraction-compatibility/legacy-ids/007-workflow-registry-traversal.md",
+      "governs": [
+        "crates/traverse-registry/"
+      ]
+    },
+    {
+      "id": "011-event-registry",
+      "version": "1.0.0",
+      "status": "approved",
+      "immutable": true,
+      "path": "specs/014-extraction-compatibility/legacy-ids/011-event-registry.md",
+      "governs": [
+        "crates/traverse-registry/"
+      ]
+    },
+    {
+      "id": "037-semver-range-resolution",
+      "version": "1.0.0",
+      "status": "approved",
+      "immutable": true,
+      "path": "specs/014-extraction-compatibility/legacy-ids/037-semver-range-resolution.md",
+      "governs": [
+        "crates/traverse-registry/"
+      ]
+    },
+    {
+      "id": "039-connector-plugin-architecture",
+      "version": "1.0.0",
+      "status": "approved",
+      "immutable": true,
+      "path": "specs/014-extraction-compatibility/legacy-ids/039-connector-plugin-architecture.md",
+      "governs": [
+        "crates/traverse-registry/"
+      ]
+    },
+    {
+      "id": "043-module-dependency-management",
+      "version": "1.0.0",
+      "status": "approved",
+      "immutable": true,
+      "path": "specs/014-extraction-compatibility/legacy-ids/043-module-dependency-management.md",
+      "governs": [
+        "crates/traverse-registry/"
+      ]
+    },
+    {
+      "id": "044-application-bundle-manifest",
+      "version": "1.0.0",
+      "status": "approved",
+      "immutable": true,
+      "path": "specs/014-extraction-compatibility/legacy-ids/044-application-bundle-manifest.md",
+      "governs": [
+        "crates/traverse-registry/"
+      ]
+    },
+    {
+      "id": "046-public-cli-app-registration",
+      "version": "1.0.0",
+      "status": "approved",
+      "immutable": true,
+      "path": "specs/014-extraction-compatibility/legacy-ids/046-public-cli-app-registration.md",
+      "governs": [
+        "crates/traverse-registry/"
+      ]
+    },
+    {
+      "id": "055-registry-sync",
+      "version": "1.0.0",
+      "status": "approved",
+      "immutable": true,
+      "path": "specs/014-extraction-compatibility/legacy-ids/055-registry-sync.md",
+      "governs": [
+        "crates/traverse-registry/"
+      ]
+    }
+  ],
+  "draft_specs": []
+}
