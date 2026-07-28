@@ -16,24 +16,30 @@ Artifact binaries (WASM, etc.) are **not** committed here — they're referenced
 
 ## Current content (as of 2026-07-28)
 
-Six reference-app capabilities are published, across three namespaces:
+Six reference-app capabilities are published, across three namespaces. Each has two
+versions: the original `1.0.0` (a 36-byte placeholder, **deprecated**, kept only for
+immutability/provenance — never resolve it deliberately) and `1.0.1` (current):
 
-| namespace | id | version |
+| namespace | id | current version |
 |---|---|---|
-| `traverse-starter` | `traverse-starter.process` | 1.0.0 |
-| `traverse-starter` | `traverse-starter.validate` | 1.0.0 |
-| `traverse-starter` | `traverse-starter.summarize` | 1.0.0 |
-| `doc-approval` | `doc-approval.analyze` | 1.0.0 |
-| `doc-approval` | `doc-approval.recommend` | 1.0.0 |
-| `meeting-notes` | `meeting-notes.process` | 1.0.0 |
+| `traverse-starter` | `traverse-starter.process` | 1.0.1 |
+| `traverse-starter` | `traverse-starter.validate` | 1.0.1 |
+| `traverse-starter` | `traverse-starter.summarize` | 1.0.1 |
+| `doc-approval` | `doc-approval.analyze` | 1.0.1 |
+| `doc-approval` | `doc-approval.recommend` | 1.0.1 |
+| `meeting-notes` | `meeting-notes.process` | 1.0.1 |
 
-**Known gap, not yet resolved**: every artifact above resolves to the identical digest
-`sha256:5647c39a1d25d8728350f9619025292a62e78a602068a2ad9b6f075751c93d99` — a 36-byte
-placeholder, not six distinct real agent binaries. `contract.json`'s own digest field is
-correct (it matches what was actually released), so digest verification passes as designed
-— but a consumer resolving any of these six IDs today gets a stub, not production logic.
-Tracked in [#69](https://github.com/traverse-framework/registry/issues/69) section 1.1
-as the top-priority gap; each of these versions is immutable once published (spec 007),
-so replacing the stub requires a new semver version plus, per spec 005, yanking or
-otherwise marking the `1.0.0` stub excluded from range resolution once a real successor
-exists — not an edit to the existing release.
+**Resolved (2026-07-28)**: the original `1.0.0`s all shared one identical 36-byte stub
+digest — concrete proof no real content had ever been built. Each `1.0.1` uses a real,
+distinct, source-backed WASM artifact (sourced from `traverse-framework/traverse`'s
+`examples/` tree) and each `1.0.0` is now marked `deprecated` (spec 005 — additive record,
+the original `contract.json` files are untouched, immutability preserved).
+
+**Known gap, still open**: the `1.0.1` artifacts are genuine, distinct WASI binaries, but
+each is a fixed-output fixture — none of them actually read their input; every call to a
+given capability returns the same hardcoded response regardless of what's passed in. Each
+`1.0.1` contract's `description` says this plainly rather than implying real per-input
+analysis. Writing real, input-dependent deterministic logic is tracked separately as
+[#79](https://github.com/traverse-framework/registry/issues/79) — not blocking, not
+bundled into the artifact-hosting fix above. Full history: `#69` section 1.1,
+`docs/decision-log.md` entries 34-35.
