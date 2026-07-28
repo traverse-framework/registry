@@ -1,0 +1,134 @@
+{
+  "kind": "capability_contract",
+  "schema_version": "1.0.0",
+  "id": "doc-approval.analyze",
+  "namespace": "doc-approval",
+  "name": "analyze",
+  "version": "1.0.1",
+  "lifecycle": "active",
+  "owner": {
+    "team": "traverse-core",
+    "contact": "enrico.piovesan10@gmail.com"
+  },
+  "summary": "Deterministic document-approval fixture: returns fixed analysis fields, does not read the submitted document.",
+  "description": "Reference/fixture implementation for doc-approval reference clients. IMPORTANT: this artifact is a fixed-output deterministic fixture -- it does not read or process the `document` input at all; every call returns the same hardcoded docType/parties/amounts/confidence/recommendation values regardless of what document is submitted. It is a genuine, real WASI binary (not a placeholder stub sharing a digest with unrelated capabilities), useful for proving the registry/artifact-hosting/execution pipeline end-to-end, but it does not perform real document analysis. Tracked follow-up for real per-input logic: registry#79.",
+  "inputs": {
+    "schema": {
+      "type": "object",
+      "required": [
+        "document"
+      ],
+      "properties": {
+        "document": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "outputs": {
+    "schema": {
+      "type": "object",
+      "required": [
+        "docType",
+        "parties",
+        "amounts",
+        "confidence",
+        "recommendation"
+      ],
+      "properties": {
+        "docType": {
+          "type": "string"
+        },
+        "parties": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "amounts": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "confidence": {
+          "type": "string"
+        },
+        "recommendation": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "preconditions": [
+    {
+      "id": "document-provided",
+      "description": "The caller provides a document string. It is accepted but not read by this fixture implementation."
+    }
+  ],
+  "postconditions": [
+    {
+      "id": "analysis-fields-produced",
+      "description": "The capability returns a fixed docType, parties, amounts, confidence, and recommendation value, identical for every call regardless of the input document."
+    }
+  ],
+  "side_effects": [
+    {
+      "kind": "memory_only",
+      "description": "Produces one fixed, deterministic output payload; does not depend on the provided document."
+    }
+  ],
+  "emits": [],
+  "consumes": [],
+  "permissions": [
+    {
+      "id": "doc-approval.analyze"
+    }
+  ],
+  "execution": {
+    "binary_format": "wasm",
+    "entrypoint": {
+      "kind": "wasi-command",
+      "command": "run"
+    },
+    "preferred_targets": [
+      "local"
+    ],
+    "constraints": {
+      "host_api_access": "none",
+      "network_access": "forbidden",
+      "filesystem_access": "none"
+    }
+  },
+  "policies": [
+    {
+      "id": "manual-approval-required"
+    }
+  ],
+  "dependencies": [],
+  "provenance": {
+    "source": "greenfield",
+    "author": "enricopiovesan",
+    "created_at": "2026-07-28T00:00:00Z",
+    "spec_ref": "058-workflow-pipeline-execution@1.0.0",
+    "adr_refs": [
+      "0001-rust-wasm-foundation"
+    ],
+    "exception_refs": []
+  },
+  "evidence": [],
+  "service_type": "stateless",
+  "permitted_targets": [
+    "local",
+    "cloud",
+    "edge",
+    "device"
+  ],
+  "artifact_type": "native",
+  "artifact": {
+    "digest": "sha256:00d5abd218395f58fe876dc513bae1ac387f9aad60be39bfd08eb8952de50607",
+    "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/doc-approval.analyze-1.0.1/analyze-agent.wasm"
+  }
+}
