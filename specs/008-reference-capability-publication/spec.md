@@ -39,9 +39,11 @@ Reference capabilities MUST use `scope: public` and MUST NOT publish private-sco
 | `traverse-starter.validate` | #25 | Traverse #554 |
 | `traverse-starter.summarize` | #26 | Traverse #554 |
 | `doc-approval.analyze` | #27 | Traverse #556 |
-| `doc-approval.extract` | #28 | Traverse #538 |
+| ~~`doc-approval.extract`~~ | ~~#28~~ | **Not built — superseded, see note below** |
 | `doc-approval.recommend` | #29 | Traverse #555 |
 | `meeting-notes.process` | #30 | Traverse #532 |
+
+**Note (2026-07-28)**: `doc-approval.extract` will not be published under this seed set. Its real upstream blocker (Traverse #538) closed without ever landing an `extract` contract, and a distinct `doc-approval.extract` capability would have duplicated the already-published `doc-approval.analyze@1.0.0` public surface. Closed as superseded by `doc-approval.analyze` — see `docs/decision-log.md` entry 28 for the full reasoning. This annotation only corrects this table to match that already-made decision; it changes no functional requirement.
 
 ## Functional Requirements
 
