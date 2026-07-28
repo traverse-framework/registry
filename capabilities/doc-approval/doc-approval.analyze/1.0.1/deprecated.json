@@ -1,0 +1,5 @@
+{
+  "deprecated": true,
+  "reason": "Fixed-output fixture: did not read or process its input document at all, always returning the same hardcoded fields. Superseded by 1.1.0, which genuinely reads and analyzes the input via deterministic heuristics. See registry#79 and docs/decision-log.md.",
+  "deprecated_at": "2026-07-28T00:00:00Z"
+}
