@@ -1,0 +1,134 @@
+{
+  "kind": "capability_contract",
+  "schema_version": "1.0.0",
+  "id": "traverse-starter.summarize",
+  "namespace": "traverse-starter",
+  "name": "summarize",
+  "version": "1.0.1",
+  "lifecycle": "active",
+  "owner": {
+    "team": "traverse-core",
+    "contact": "enrico.piovesan10@gmail.com"
+  },
+  "summary": "Fixed-output deterministic fixture: summarize processed starter note metadata into a deterministic one-line summary.",
+  "description": "Reference app capability for the traverse-starter multi-capability pipeline showcase (spec 058-workflow-pipeline-execution). Consumes the traverse-starter.process output fields and produces a deterministic summary string plus its word count without model inference. IMPORTANT: this artifact is a fixed-output deterministic fixture -- it does not read or process its input at all; it always returns the same hardcoded summary string and wordCount regardless of the process-output fields provided. It is a genuine, real WASI binary (not a placeholder stub sharing a digest with unrelated capabilities), useful for proving the registry/artifact-hosting/execution pipeline end-to-end, but it does not perform real analysis on its input. Tracked follow-up for real per-input logic: registry#79.",
+  "inputs": {
+    "schema": {
+      "type": "object",
+      "required": [
+        "title",
+        "tags",
+        "noteType",
+        "suggestedNextAction"
+      ],
+      "properties": {
+        "title": {
+          "type": "string"
+        },
+        "tags": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "noteType": {
+          "type": "string"
+        },
+        "suggestedNextAction": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "outputs": {
+    "schema": {
+      "type": "object",
+      "required": [
+        "summary",
+        "wordCount"
+      ],
+      "properties": {
+        "summary": {
+          "type": "string"
+        },
+        "wordCount": {
+          "type": "number"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "preconditions": [
+    {
+      "id": "process-output-provided",
+      "description": "The caller provides the traverse-starter.process output fields for one note."
+    }
+  ],
+  "postconditions": [
+    {
+      "id": "summary-produced",
+      "description": "The capability returns a fixed summary string and wordCount, identical for every call regardless of the process-output fields provided."
+    }
+  ],
+  "side_effects": [
+    {
+      "kind": "memory_only",
+      "description": "Produces a deterministic summary from the provided input."
+    }
+  ],
+  "emits": [],
+  "consumes": [],
+  "permissions": [
+    {
+      "id": "traverse-starter.summarize"
+    }
+  ],
+  "execution": {
+    "binary_format": "wasm",
+    "entrypoint": {
+      "kind": "wasi-command",
+      "command": "run"
+    },
+    "preferred_targets": [
+      "local"
+    ],
+    "constraints": {
+      "host_api_access": "none",
+      "network_access": "forbidden",
+      "filesystem_access": "none"
+    }
+  },
+  "policies": [
+    {
+      "id": "manual-approval-required"
+    }
+  ],
+  "dependencies": [],
+  "provenance": {
+    "source": "greenfield",
+    "author": "enricopiovesan",
+    "created_at": "2026-07-28T00:00:00Z",
+    "spec_ref": "058-workflow-pipeline-execution@1.0.0",
+    "adr_refs": [
+      "0001-rust-wasm-foundation"
+    ],
+    "exception_refs": []
+  },
+  "evidence": [],
+  "service_type": "stateless",
+  "permitted_targets": [
+    "local",
+    "cloud",
+    "edge",
+    "device"
+  ],
+  "artifact_type": "native",
+  "artifact": {
+    "digest": "sha256:fa5d90f9cbdddc7d81daff0f965650cd34c3fc311d8a312cf79637a1bb2c0b7d",
+    "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/traverse-starter.summarize-1.0.1/summarize-agent.wasm"
+  }
+}

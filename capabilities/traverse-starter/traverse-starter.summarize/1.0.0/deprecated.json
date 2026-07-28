@@ -1,0 +1,5 @@
+{
+  "deprecated": true,
+  "reason": "Placeholder artifact: shared an identical 36-byte stub digest with 5 other unrelated published capabilities, proving no real content had ever been built. Superseded by 1.0.1, a real (though fixed-output fixture) artifact. See #69 and docs/decision-log.md entries 34-35.",
+  "deprecated_at": "2026-07-28T00:00:00Z"
+}
