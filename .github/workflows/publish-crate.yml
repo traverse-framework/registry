@@ -41,3 +41,10 @@ jobs:
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
         run: bash scripts/ci/publish_crate.sh
+
+      # Isolated-consumer smoke test (Project 3 "Verify published
+      # traverse-registry crate through an isolated consumer"): confirms the
+      # just-published version is actually consumable as a real external
+      # dependency, not just buildable from within this workspace. Read-only.
+      - name: Verify published crate from an isolated external consumer
+        run: bash scripts/ci/verify_external_consumer.sh
