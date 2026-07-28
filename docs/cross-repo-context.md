@@ -1,53 +1,44 @@
 # Cross-Repo Context
 
-This repo's own docs (`docs/decision-log.md`, `specs/`) fully explain *this repo's* design. They do not, by themselves, tell you how this registry fits into the rest of the `traverse-framework` org, because that context lives in other repos this repo has no visibility into. This doc is the bridge -- read it before planning any v1-completeness work (real capability content, consumer-side integration, anything that touches how Traverse apps actually get capabilities from here).
+This repo's own docs (`docs/decision-log.md`, `specs/`) fully explain *this repo's* design. They do not, by themselves, tell you how this registry fits into the rest of the `traverse-framework` org, because that context lives in other repos this repo has no visibility into. This doc is the bridge — read it before planning any cross-repo-touching work.
+
+**Rewritten 2026-07-28.** The previous version of this doc (three "open questions," all framed as unresolved) dated to 2026-07-06, this repo's first week. All three have since been resolved and implemented — the crate extraction landed, `registry sync` exists and works, and `reference-apps` consumes at least one component via `registry_ref`. This version replaces that historical framing with the current state and an explicit ownership matrix, per [#69](https://github.com/traverse-framework/registry/issues/69) section 5.2 (a real, recurring gap: agents have repeatedly misfiled work in the wrong repo this year — see the `#62` → `traverse#814` correction, and the `#58`/`#59` compatibility-bridge rework that started from an unverified claim).
 
 ## Org map
 
 | Repo | Role |
 |---|---|
-| [`traverse-framework/traverse`](https://github.com/traverse-framework/traverse) | Runtime + CLI. Owns `traverse-contracts` (the schema). Also, today, still owns the `traverse-registry` crate pending extraction (`traverse` issue tracking this: see `specs/051-registry-extraction/spec.md` there, and this repo's issue #9). |
-| [`traverse-framework/registry`](https://github.com/traverse-framework/registry) (this repo) | The external, git-based capability index: publish/validate/index/release pipeline. Does not itself consume capabilities -- nothing reads from it yet (see "Open question 2" below). |
-| [`traverse-framework/reference-apps`](https://github.com/traverse-framework/reference-apps) (formerly `App-References`) | Real example Traverse apps (`traverse-starter`, `trace-explorer`) with real app manifests, component manifests, and capability contracts -- the closest thing to a "real consumer" this org has today. |
+| [`traverse-framework/traverse`](https://github.com/traverse-framework/traverse) | Runtime + CLI. Owns `traverse-contracts` (the schema everyone else depends on). Owns `traverse-cli` (`registry sync`/`capability publish`; a `list`/`search` browse UX is tracked there as [`traverse#814`](https://github.com/traverse-framework/traverse/issues/814), not here). No longer owns `traverse-registry` — extracted to this repo, see below. |
+| [`traverse-framework/registry`](https://github.com/traverse-framework/registry) (this repo) | The external, git-based capability/event/workflow index (`capabilities/**/contract.json`, `index.json` releases) **and** the `traverse-registry` crate (`crates/traverse-registry/`, published independently to crates.io). Publish → validate → index → release is this repo's whole job; it does not run any CLI or resolve anything for a live app. |
+| [`traverse-framework/reference-apps`](https://github.com/traverse-framework/reference-apps) | Real example Traverse apps (`traverse-starter`, `doc-approval`, `meeting-notes`, etc.) with real app manifests, component manifests, and capability contracts — the closest thing this org has to a real consumer. Owns its own UI shells; does not invent capability business logic (that lives in `traverse`'s example agents or a real product's own crate). |
 | [`traverse-framework/.github`](https://github.com/traverse-framework/.github) | Shared governance: constitution, NFRs, quality standards, CLA. Every repo (including this one) points here instead of duplicating. |
 
-## Open question 1: does this registry's "public" collide with the existing bundle `scope: public/private`?
+## Ownership matrix (the concrete "which repo do I file this in" table)
 
-> **Resolved 2026-07-06**: the two are orthogonal axes that both stay — bundle `scope` is a resolution tier, this repo's `namespace`/`owner` are publisher identity — with "public" pinned to exactly one meaning: populated by `registry sync` from this repo. See `specs/006-public-scope-and-identity` (Draft), `docs/decision-log.md` entry 20, and the traverse-side normative spec ticket [`traverse-framework/Traverse#548`](https://github.com/traverse-framework/Traverse/issues/548).
+| Concern | Owner repo | Notes |
+|---|---|---|
+| `capabilities/**` contracts, `index.json` releases, artifact (WASM) releases | **registry** | This repo's core content. Immutable once merged (spec 007); yank is additive (spec 005), never an edit. |
+| `traverse-registry` crate source, its own crates.io release cadence | **registry** | `crates/traverse-registry/`. Independently versioned (decision-log entry 32) — not lockstep with `traverse`'s own workspace version. |
+| `traverse-registry`'s consumers (anyone depending on the crate, e.g. `traverse` itself) | Whichever repo consumes it | `traverse`'s `Cargo.toml` pins it exact (`traverse-registry = "=<version>"`); bumping that pin is `traverse`-side work. |
+| `traverse-cli registry sync` / `capability publish` / `registry list`/`search` | **traverse** | CLI mechanics live in `crates/traverse-cli`. Browse/search UX was misfiled here once (`#62`) before moving to `traverse#814` — the lesson: a request that's *about* the registry's content isn't automatically registry's *code* to write. |
+| Embedder resolve / materialize (turning a `registry_ref` into a loaded, running capability at app-registration time) | **traverse** | Runtime-side resolution logic; registry only ever publishes the index/artifacts being resolved. |
+| UI shells and `registry_ref` app manifests | **reference-apps** | Consumes the published index; does not define new capability contracts of its own unless it's genuinely a new reference app. |
+| Shared governance (constitution, NFRs, CLA, spec-alignment gate script) | **`.github`** | Every repo pins a version via `.governance-version`; none forks it locally. |
 
-The **existing, in-repo** `traverse-registry` crate (in `traverse-framework/traverse`, pending extraction into this repo per issue #9) already has its own notion of bundle visibility, documented in `traverse`'s [`docs/registry-bundle-authoring-guide.md`](https://github.com/traverse-framework/traverse/blob/main/docs/registry-bundle-authoring-guide.md):
+If a ticket's actual implementation surface doesn't match the repo it was filed in, move it (open the equivalent in the right repo, close the original referencing the move) rather than force-fitting the work into the wrong codebase. That is what happened with `#62` → `traverse#814`.
 
-> `scope` | Yes | `public` or `private`. Public bundles are visible to all consumers; private bundles are registry-scoped.
+## Current state (as of 2026-07-28)
 
-This predates this repo. It is not yet decided whether:
-- a bundle's `scope: public` is meant to mean "resolvable via `traverse-framework/registry`" (this repo), or
-- it means something narrower and unrelated -- e.g. visibility across workspaces on a single local runtime instance, with no connection to this repo at all.
+- **Extraction: done.** `crates/traverse-registry` was physically moved from `traverse` into this repo (`#65`, `#9`). `traverse`'s own copy was deleted and its `Cargo.toml` now depends on the published crate exactly (`traverse-registry = "=0.9.1"` as of this writing) — independently confirmed by checking that `traverse-framework/traverse`'s `crates/traverse-registry/` path 404s and its `Cargo.toml` has no local path entry for it.
+- **`registry sync` and `capability publish`: implemented**, in `traverse`'s CLI (`traverse` #542/#543 from the original open-question list). A synced index populates local workspace state; nothing resolves live against this repo at execution time (the zero-live-network-dependency principle from spec 001 holds).
+- **`reference-apps` consumes via `registry_ref`**: at least `traverse-starter.process` resolves through the synced index rather than a local path (`reference-apps#97`). The other five published seed capabilities are still consumed via local-path/`TRAVERSE_REPO` in `reference-apps` as of the `#69` evidence snapshot (2026-07-27) — cutover for those is gated on the gap below, not on anything technical in the sync/resolve mechanism itself.
+- **Known, current, top-priority gap** (`#69` section 1.1): all six published capabilities resolve to the identical stub-WASM digest — real content, not a placebo pipeline, but not yet real product binaries either. Flipping more `reference-apps` components to `registry_ref` before this closes would pin production manifests to stub artifacts. See `capabilities/README.md` and `#69` for the current, honest status.
+- **Federation/governance compatibility**: the crate's governing-spec validation broke for any external consumer immediately after the first real publish (`#67`/`#68`, `traverse-registry` 0.9.0 → 0.9.1) — a structural bug in how the crate resolved its own governance data, unrelated to the index/sync mechanism above. Fixed, independently re-verified, and now regression-guarded by an isolated-consumer CI check (`#70`) that runs on every future release.
 
-This repo's own schema separately reserves `owner`/`namespace` fields (decision 5, `specs/001-registry-foundation`) for a *different* kind of scoping (who published it / what namespace it lives in) -- that is not the same axis as the bundle-level `public`/`private` `scope` field above. Conflating the two, or leaving them silently unreconciled, is a real risk for whoever writes the next spec here.
+## Historical decisions (for provenance, not current status)
 
-**This needs to be resolved in a spec (in whichever repo ends up owning the concept) before further schema evolution here.**
+These three questions drove this repo's original design and are kept here only as a paper trail — do not treat them as open:
 
-## Open question 2: nothing consumes from this registry yet
-
-> **Resolved 2026-07-06** (design; implementation still traverse-side): component manifests go dual-mode — `contract_path` stays valid (component-bundled capability → private overlay) and a new mutually exclusive `registry_ref: {namespace, id, version_range}` resolves from the sync-populated public tier; artifacts fetch at app-registration time into a digest-verified local cache, never at execution time. See `docs/decision-log.md` entry 21 and [`traverse-framework/Traverse#548`](https://github.com/traverse-framework/Traverse/issues/548) (feeds #542/#543).
-
-Two CLI commands were decided during this repo's original brainstorm (decision log items 6 and 9) but, until 2026-07-05, had no ticket anywhere:
-
-- `traverse-cli registry sync` -- fetch the published index, write local durable state. Now tracked: [`traverse` issue #542](https://github.com/traverse-framework/traverse/issues/542).
-- `traverse-cli capability publish` -- automate opening a PR against this repo. Now tracked: [`traverse` issue #543](https://github.com/traverse-framework/traverse/issues/543).
-
-Both are `needs-spec` and unstarted. Until at least `sync` exists, this repo's entire pipeline (publish -> validate -> index -> release) has no consumer.
-
-## Open question 3: reference apps don't reference this registry today
-
-> **Resolved 2026-07-06**: the seed content is `traverse-starter.process` 1.0.0 published as-is (trace-explorer has no contracts — it is a React client only), via a manual PR with the WASM hosted as a release asset in this repo. reference-apps changes nothing until sync + dual-mode loading land, then flips the process component to `registry_ref` as the end-to-end demo ([`reference-apps#97`](https://github.com/traverse-framework/reference-apps/issues/97)). See `specs/007-artifact-hosting` (Draft) and `docs/decision-log.md` entry 22.
-
-Real, working capability contracts already exist and would pass this repo's validation as-is -- e.g. `traverse`'s [`contracts/examples/traverse-starter/capabilities/process/contract.json`](https://github.com/traverse-framework/traverse/blob/main/contracts/examples/traverse-starter/capabilities/process/contract.json) has real `namespace`/`id`/`version`/`owner` fields, not placeholders.
-
-But `reference-apps`' component manifests resolve capabilities by local relative file path today (see `manifests/traverse-starter/components/process/component.manifest.json`'s `contract_path` field), not by namespace/id/version lookup against a synced registry index. There is no spec or ticket anywhere describing:
-- whether/how reference-apps' capability resolution should switch to registry-sourced lookups once `registry sync` exists,
-- or whether the first real "published content" in this repo's `capabilities/` directory should simply be these existing example contracts, republished here as the seed content proving the pipeline end-to-end.
-
-## Why this matters for planning here
-
-Specs 001-005 in this repo are complete and internally consistent for the pipeline itself, but they were designed without cross-referencing the three items above -- because that context lives in other repos this repo can't see. Before treating "v1 registry serving Traverse apps" as fully planned, these three open questions need their own resolution (likely their own spec slice(s), possibly split across this repo and `traverse`), not just an assumption that the existing specs already cover them.
+1. **Bundle `scope: public/private` vs. this repo's `namespace`/`owner`** — resolved as orthogonal axes (decision-log entry 20, `specs/006-public-scope-and-identity`, now Approved): `scope` is a resolution tier, `namespace`/`owner` is publisher identity, and "public" means exactly one thing — populated by `registry sync` from this repo.
+2. **Nothing consumed from this registry** — resolved by the dual-mode `contract_path`/`registry_ref` manifest design (decision-log entry 21) and implemented by `traverse`'s `registry sync`/dual-mode resolution.
+3. **Reference apps didn't reference this registry** — resolved by seeding real content here (decision-log entry 22) and `reference-apps#97`'s `registry_ref` adoption for `traverse-starter.process`.
