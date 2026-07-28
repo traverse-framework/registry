@@ -1,0 +1,5 @@
+{
+  "deprecated": true,
+  "reason": "Fixed-output fixture: did not read or process its input note at all, always returning valid=true with an empty issues list regardless of what was provided. Superseded by 1.1.0, which genuinely implements the two rules this contract's own description already documented (empty/whitespace note is invalid; a note over 2000 characters is flagged). See registry#79 and docs/decision-log.md.",
+  "deprecated_at": "2026-07-28T00:00:00Z"
+}

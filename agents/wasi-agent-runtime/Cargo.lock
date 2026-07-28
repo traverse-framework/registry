@@ -3,12 +3,5 @@
 version = 4
 
 [[package]]
-name = "doc-approval-analyze-agent"
-version = "0.1.0"
-dependencies = [
- "wasi-agent-runtime",
-]
-
-[[package]]
 name = "wasi-agent-runtime"
 version = "0.1.0"

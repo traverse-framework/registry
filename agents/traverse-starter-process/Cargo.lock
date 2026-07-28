@@ -3,7 +3,7 @@
 version = 4
 
 [[package]]
-name = "doc-approval-analyze-agent"
+name = "traverse-starter-process-agent"
 version = "0.1.0"
 dependencies = [
  "wasi-agent-runtime",

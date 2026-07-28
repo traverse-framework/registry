@@ -1,14 +1,14 @@
 [workspace]
 
 [package]
-name = "doc-approval-analyze-agent"
+name = "doc-approval-recommend-agent"
 version = "0.1.0"
 edition = "2021"
 publish = false
-description = "Real, deterministic, ABI-compliant (no_std, no serde_json/std) implementation of the doc-approval.analyze capability. See registry#79 and docs/decision-log.md."
+description = "Real, deterministic, ABI-compliant (no_std) implementation of the doc-approval.recommend capability. See registry#79 and docs/decision-log.md."
 
 [[bin]]
-name = "analyze-agent"
+name = "recommend-agent"
 path = "src/main.rs"
 
 [dependencies]
