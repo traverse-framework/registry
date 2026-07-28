@@ -1,0 +1,5 @@
+{
+  "deprecated": true,
+  "reason": "Fixed-output fixture: did not read or process its input transcript at all, always returning the same hardcoded action_items/decisions/follow_ups/summary regardless of what was provided. Superseded by 1.1.0, which genuinely scans the transcript line by line for action-item, decision, and follow-up signal keywords and extracts an owner/due heuristically. See registry#79 and docs/decision-log.md.",
+  "deprecated_at": "2026-07-28T00:00:00Z"
+}

@@ -1,0 +1,5 @@
+{
+  "deprecated": true,
+  "reason": "Fixed-output fixture: did not read or process its input at all, always returning \"approve\" / \"analysis satisfies the governed threshold\" / \"high\" regardless of the analysis fields provided. Superseded by 1.1.0, which independently recomputes a confidence level from the actual signal counts (docType/parties/amounts) and downgrades the recommendation -- with a rationale explaining why -- when the input's stated confidence doesn't match what the signals actually support. See registry#79 and docs/decision-log.md.",
+  "deprecated_at": "2026-07-28T00:00:00Z"
+}

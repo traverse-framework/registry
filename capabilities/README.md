@@ -16,30 +16,52 @@ Artifact binaries (WASM, etc.) are **not** committed here — they're referenced
 
 ## Current content (as of 2026-07-28)
 
-Six reference-app capabilities are published, across three namespaces. Each has two
-versions: the original `1.0.0` (a 36-byte placeholder, **deprecated**, kept only for
-immutability/provenance — never resolve it deliberately) and `1.0.1` (current):
+Six reference-app capabilities are published, across three namespaces. Each has gone
+through three states: the original `1.0.0` (a 36-byte placeholder, **deprecated**),
+an intermediate fixed-output fixture (also **deprecated**), and a current version with
+real, input-dependent, ABI-compliant logic:
 
 | namespace | id | current version |
 |---|---|---|
-| `traverse-starter` | `traverse-starter.process` | 1.0.1 |
-| `traverse-starter` | `traverse-starter.validate` | 1.0.1 |
-| `traverse-starter` | `traverse-starter.summarize` | 1.0.1 |
-| `doc-approval` | `doc-approval.analyze` | 1.0.1 |
-| `doc-approval` | `doc-approval.recommend` | 1.0.1 |
-| `meeting-notes` | `meeting-notes.process` | 1.0.1 |
+| `traverse-starter` | `traverse-starter.process` | 1.1.0 |
+| `traverse-starter` | `traverse-starter.validate` | 1.1.0 |
+| `traverse-starter` | `traverse-starter.summarize` | 1.1.0 |
+| `doc-approval` | `doc-approval.analyze` | 1.2.0 |
+| `doc-approval` | `doc-approval.recommend` | 1.1.0 |
+| `meeting-notes` | `meeting-notes.process` | 1.1.0 |
 
-**Resolved (2026-07-28)**: the original `1.0.0`s all shared one identical 36-byte stub
-digest — concrete proof no real content had ever been built. Each `1.0.1` uses a real,
-distinct, source-backed WASM artifact (sourced from `traverse-framework/traverse`'s
-`examples/` tree) and each `1.0.0` is now marked `deprecated` (spec 005 — additive record,
-the original `contract.json` files are untouched, immutability preserved).
+**Resolved (2026-07-28, first pass)**: the original `1.0.0`s all shared one identical
+36-byte stub digest — concrete proof no real content had ever been built. Each `1.0.1`
+used a real, distinct, source-backed WASM artifact (sourced from
+`traverse-framework/traverse`'s `examples/` tree), but every one was a fixed-output
+fixture — none of them actually read their input.
 
-**Known gap, still open**: the `1.0.1` artifacts are genuine, distinct WASI binaries, but
-each is a fixed-output fixture — none of them actually read their input; every call to a
-given capability returns the same hardcoded response regardless of what's passed in. Each
-`1.0.1` contract's `description` says this plainly rather than implying real per-input
-analysis. Writing real, input-dependent deterministic logic is tracked separately as
-[#79](https://github.com/traverse-framework/registry/issues/79) — not blocking, not
-bundled into the artifact-hosting fix above. Full history: `#69` section 1.1,
-`docs/decision-log.md` entries 34-35.
+**Resolved (2026-07-28, second pass)**: all six capabilities now have genuinely
+input-dependent logic, implemented in standalone `no_std` Rust crates under `agents/`
+(source, not just artifacts, is committed in this repo). Along the way, a real
+regression was caught and fixed: the *first* real-logic attempt
+(`doc-approval.analyze` 1.1.0, `std` + `serde_json` + `wasm32-wasip1`) was genuinely
+input-dependent but imported `wasi_snapshot_preview1::environ_get`/`environ_sizes_get`
+— confirmed by inspecting its compiled import table — which fails Traverse's own
+`WasmExecutor` ABI whitelist (`host_abi_v1.json`: only `fd_read`/`fd_write`/`proc_exit`
+are allowed). It ran fine under a generic `wasmtime` host (how it was first verified)
+but could not have executed through `traverse-cli agent execute`/`serve`/an embedder
+SDK. All six capabilities are now built on a shared `no_std` shim,
+[`agents/wasi-agent-runtime/`](../agents/wasi-agent-runtime) (bump allocator, hand-rolled
+JSON parse/write, WASI glue) — verified via `wasm2wat` to import only the three
+whitelisted WASI functions, and executed end-to-end via `wasmtime` with distinct,
+genuinely computed output per capability. `doc-approval.analyze` 1.1.0 is itself now
+deprecated for this reason; its replacement is 1.2.0, not 1.1.1, since 1.1.0 was never
+withdrawn from the index before the fix.
+
+Every prior version (`1.0.0` stubs, `1.0.1`/`1.1.0` fixtures-or-ABI-incompatible
+releases) stays published and resolvable by exact pin — immutability preserved,
+deprecation is additive via a `deprecated.json` sibling (spec 005), never an edit.
+Full history: `#69` section 1.1, `#79`, `docs/decision-log.md`.
+
+**Known, disclosed limitations of the current logic** (reference-tier heuristics, not
+production-grade NLP — each capability's own contract `description` says so): the
+two-consecutive-capitalized-word heuristic in `doc-approval.analyze` can false-positive
+on sentence-initial phrases (e.g. "This Agreement"); the leading-capitalized-word
+heuristic in `meeting-notes.process` can false-positive on sentence-initial pronouns
+(e.g. "We agreed..." yields `made_by: "We"`).

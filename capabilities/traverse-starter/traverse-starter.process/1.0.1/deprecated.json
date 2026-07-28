@@ -1,0 +1,5 @@
+{
+  "deprecated": true,
+  "reason": "Fixed-output fixture: did not read or process its input note at all, always returning the same hardcoded title/tags/noteType/suggestedNextAction/status regardless of what was provided. Superseded by 1.1.0, which genuinely classifies the note by keyword, derives a title from its first line/sentence, tags it, and suggests a next action. See registry#79 and docs/decision-log.md.",
+  "deprecated_at": "2026-07-28T00:00:00Z"
+}
