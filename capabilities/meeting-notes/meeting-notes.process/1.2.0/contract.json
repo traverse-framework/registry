@@ -1,0 +1,223 @@
+{
+  "kind": "capability_contract",
+  "schema_version": "1.0.0",
+  "id": "meeting-notes.process",
+  "namespace": "meeting-notes",
+  "name": "process",
+  "version": "1.2.0",
+  "lifecycle": "active",
+  "owner": {
+    "team": "traverse-core",
+    "contact": "enrico.piovesan10@gmail.com"
+  },
+  "summary": "Extract deterministic structured meeting notes from one transcript.",
+  "description": "Reference app capability for meeting notes that genuinely reads the `transcript` input: scans it line by line (split on newlines/periods) for action-item keywords (\"will\", \"todo\", \"action item\"), decision keywords (\"decided\", \"decision\", \"agreed\"), and follow-up keywords (\"follow up\", \"follow-up\", \"next step\"), heuristically extracting an owner/made_by (the line's leading capitalized word) and a due date (the word following \"by\") where present. This replaces the 1.0.1 fixture, which always returned the same hardcoded fields regardless of input. Known limitation, disclosed rather than hidden: the owner/made_by heuristic can false-positive on any sentence-initial capitalized word, including pronouns (e.g. \"We agreed...\" yields made_by=\"We\") -- acceptable for a reference-tier, no-model capability, not production-grade named-entity recognition. Built no_std on the shared agents/wasi-agent-runtime/ shim: verified to import only wasi_snapshot_preview1::{fd_read, fd_write, proc_exit}, so it is genuinely executable by Traverse's runtime, not just a generic wasmtime host. Source: agents/meeting-notes-process/ in this repo.",
+  "use_cases": [
+    {
+      "scenario": "A transcript with one action-item sentence and one decision sentence extracts both with owner/due and made_by.",
+      "input_example": {
+        "transcript": "Bob will send the report by Friday. Alice decided we should ship next week."
+      },
+      "output_example": {
+        "action_items": [
+          {
+            "task": "Bob will send the report by Friday",
+            "owner": "Bob",
+            "due": "Friday"
+          }
+        ],
+        "decisions": [
+          {
+            "text": "Alice decided we should ship next week",
+            "made_by": "Alice"
+          }
+        ],
+        "follow_ups": [],
+        "summary": "1 action item, 1 decision, and 0 follow-ups identified from 2 lines of transcript."
+      },
+      "happy": true
+    },
+    {
+      "scenario": "A transcript with none of the three signal keywords yields empty arrays, not an error.",
+      "input_example": {
+        "transcript": "We had a nice chat about the weather today"
+      },
+      "output_example": {
+        "action_items": [],
+        "decisions": [],
+        "follow_ups": [],
+        "summary": "0 action items, 0 decisions, and 0 follow-ups identified from 1 line of transcript."
+      },
+      "happy": false
+    },
+    {
+      "scenario": "A 'follow up' phrase is captured as a follow-up, distinct from action items and decisions.",
+      "input_example": {
+        "transcript": "Follow up with legal about the contract terms."
+      },
+      "output_example": {
+        "action_items": [],
+        "decisions": [],
+        "follow_ups": [
+          "Follow up with legal about the contract terms"
+        ],
+        "summary": "0 action items, 0 decisions, and 1 follow-up identified from 1 line of transcript."
+      },
+      "happy": true
+    }
+  ],
+  "inputs": {
+    "schema": {
+      "type": "object",
+      "required": [
+        "transcript"
+      ],
+      "properties": {
+        "transcript": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "outputs": {
+    "schema": {
+      "type": "object",
+      "required": [
+        "action_items",
+        "decisions",
+        "follow_ups",
+        "summary"
+      ],
+      "properties": {
+        "action_items": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "task",
+              "owner",
+              "due"
+            ],
+            "properties": {
+              "task": {
+                "type": "string"
+              },
+              "owner": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "due": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "decisions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "text",
+              "made_by"
+            ],
+            "properties": {
+              "text": {
+                "type": "string"
+              },
+              "made_by": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "follow_ups": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "summary": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "preconditions": [
+    {
+      "id": "transcript-provided",
+      "description": "The caller provides a transcript string. Empty transcripts are accepted and produce empty collections."
+    }
+  ],
+  "postconditions": [
+    {
+      "id": "structured-meeting-notes-produced",
+      "description": "The capability returns summary/action_items/decisions/follow_ups fields genuinely derived from the provided transcript -- distinct inputs produce distinct outputs, deterministically."
+    }
+  ],
+  "side_effects": [
+    {
+      "kind": "memory_only",
+      "description": "Produces deterministic meeting-note metadata from the provided input."
+    }
+  ],
+  "emits": [],
+  "consumes": [],
+  "permissions": [
+    {
+      "id": "meeting-notes.process"
+    }
+  ],
+  "execution": {
+    "binary_format": "wasm",
+    "entrypoint": {
+      "kind": "wasi-command",
+      "command": "run"
+    },
+    "preferred_targets": [
+      "local"
+    ],
+    "constraints": {
+      "host_api_access": "none",
+      "network_access": "forbidden",
+      "filesystem_access": "none"
+    }
+  },
+  "policies": [
+    {
+      "id": "manual-approval-required"
+    }
+  ],
+  "dependencies": [],
+  "provenance": {
+    "source": "greenfield",
+    "author": "enricopiovesan",
+    "created_at": "2026-07-28T00:00:00Z",
+    "spec_ref": "044-application-bundle-manifest@1.0.0",
+    "adr_refs": [
+      "0001-rust-wasm-foundation"
+    ],
+    "exception_refs": []
+  },
+  "evidence": [],
+  "service_type": "stateless",
+  "permitted_targets": [
+    "local"
+  ],
+  "artifact_type": "native",
+  "artifact": {
+    "digest": "sha256:ec192a0c2104b08bee76418c5c6d44358036568d655d8465e506858d1aaadbf2",
+    "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/meeting-notes.process-1.1.0/meeting-process-agent.wasm"
+  }
+}

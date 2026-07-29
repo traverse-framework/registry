@@ -23,12 +23,12 @@ real, input-dependent, ABI-compliant logic:
 
 | namespace | id | current version |
 |---|---|---|
-| `traverse-starter` | `traverse-starter.process` | 1.1.0 |
-| `traverse-starter` | `traverse-starter.validate` | 1.1.0 |
-| `traverse-starter` | `traverse-starter.summarize` | 1.1.0 |
-| `doc-approval` | `doc-approval.analyze` | 1.2.0 |
-| `doc-approval` | `doc-approval.recommend` | 1.1.0 |
-| `meeting-notes` | `meeting-notes.process` | 1.1.0 |
+| `traverse-starter` | `traverse-starter.process` | 1.2.0 |
+| `traverse-starter` | `traverse-starter.validate` | 1.2.0 |
+| `traverse-starter` | `traverse-starter.summarize` | 1.2.0 |
+| `doc-approval` | `doc-approval.analyze` | 1.3.0 |
+| `doc-approval` | `doc-approval.recommend` | 1.2.0 |
+| `meeting-notes` | `meeting-notes.process` | 1.2.0 |
 
 **Resolved (2026-07-28, first pass)**: the original `1.0.0`s all shared one identical
 36-byte stub digest — concrete proof no real content had ever been built. Each `1.0.1`
@@ -83,6 +83,12 @@ on sentence-initial phrases (e.g. "This Agreement"); the leading-capitalized-wor
 heuristic in `meeting-notes.process` can false-positive on sentence-initial pronouns
 (e.g. "We agreed..." yields `made_by: "We"`).
 
+**`use_cases` backfilled (2026-07-29, #107, additive minor bump each)**: all six now
+carry a `use_cases` array (spec 001 FR-011) with concrete, `wasmtime`-verified
+input/output example pairs (schema-conformant, not hand-waved) -- authored fresh for
+these six, since no prior use-case documentation existed for them despite an earlier
+(inaccurate) README claim to that effect.
+
 ## Utility-tier capabilities (added 2026-07-29)
 
 Five general-purpose validation/formatting capabilities, published to dogfood the
@@ -92,11 +98,11 @@ surfaced and fixed):
 
 | namespace | id | current version |
 |---|---|---|
-| `validation` | `validation.validate-email` | 1.1.0 |
-| `validation` | `validation.normalize-phone-number` | 1.1.0 |
-| `validation` | `validation.score-password-strength` | 1.0.0 |
-| `validation` | `validation.validate-luhn` | 1.0.0 |
-| `formatting` | `formatting.format-currency` | 1.0.0 |
+| `validation` | `validation.validate-email` | 1.2.0 |
+| `validation` | `validation.normalize-phone-number` | 1.2.0 |
+| `validation` | `validation.score-password-strength` | 1.1.0 |
+| `validation` | `validation.validate-luhn` | 1.1.0 |
+| `formatting` | `formatting.format-currency` | 1.1.0 |
 
 **Labeled utility-tier, not "business capabilities"**: the AI-advisory review
 (`.agents/skills/capability-review/`) flagged a genuine boundary question when the
@@ -113,14 +119,23 @@ consumer's selection logic would query on. The `capability-review` skill's rubri
 `scripts/ci/ai_advisory_review.py`) has since been refreshed to explicitly account
 for both classes (#114).
 
-Each has a companion `SPEC.md` (use cases, happy/unhappy paths, NFRs, configuration —
-kept alongside the source under `capability-src/`, not in `capabilities/`, since the
-contract schema itself has no field for that level of detail) and, per this registry's
-own disclosure convention, an honestly-documented known limitation found only by
-implementing and testing, not assumed up front: `normalize-phone-number` does not
-strip domestic trunk prefixes (e.g. UK `020 7946 0958`); `score-password-strength`'s
-scoring model was corrected during implementation to match verified, self-consistent
-behavior rather than an earlier draft's imprecise worked examples.
+Happy/unhappy-path behavior for all five is exercised directly in each crate's own
+`#[cfg(test)] mod tests` under `capability-src/` (no separate `SPEC.md` file ever
+existed for these, despite an earlier version of this README claiming one did -- a
+stale claim corrected in the same #107 pass that backfilled `use_cases`, below), and,
+per this registry's own disclosure convention, an honestly-documented known limitation
+found only by implementing and testing, not assumed up front: `normalize-phone-number`
+does not strip domestic trunk prefixes (e.g. UK `020 7946 0958`);
+`score-password-strength`'s scoring model was corrected during implementation to match
+verified, self-consistent behavior rather than an earlier draft's imprecise worked
+examples.
+
+**`use_cases` backfilled (2026-07-29, #107, additive minor bump each)**: all five now
+carry a `use_cases` array (spec 001 FR-011), restructuring the same test-verified
+happy/unhappy examples above into the schema's `{scenario, input_example,
+output_example, happy}` shape -- each pair independently re-verified against the real
+compiled `wasmtime` output as part of this backfill, not just copied from the test
+source.
 
 Source for all five lives under `capability-src/` (`validate-email/`,
 `normalize-phone-number/`, `score-password-strength/`, `validate-luhn/`,
