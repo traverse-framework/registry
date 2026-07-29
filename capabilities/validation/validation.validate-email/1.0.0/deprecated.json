@@ -1,0 +1,5 @@
+{
+  "deprecated": true,
+  "reason": "The published 1.0.0 artifact/artifact_type fields were silently stripped by traverse-cli capability publish (its normalize-and-rewrite step round-trips the contract through the CapabilityContract Rust struct, which has no artifact or artifact_type fields at all -- confirmed by reading crates/traverse-contracts/src/lib.rs). This broke registry sync for every consumer: build_index.py copies contract.get(\"artifact\") straight into the index, producing digest: null / artifact_url: null, which fails to deserialize on the consumer side. Superseded by 1.0.1, which has the correct, complete contract (same content otherwise -- no logic or interface change). See traverse-framework/traverse issue for the underlying CLI bug.",
+  "deprecated_at": "2026-07-29T00:00:00Z"
+}
