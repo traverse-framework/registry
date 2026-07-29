@@ -1,0 +1,116 @@
+{
+  "kind": "capability_contract",
+  "schema_version": "1.0.0",
+  "id": "formatting.format-currency",
+  "namespace": "formatting",
+  "name": "format-currency",
+  "version": "1.0.0",
+  "lifecycle": "active",
+  "owner": {
+    "team": "traverse-core",
+    "contact": "enrico.piovesan10@gmail.com"
+  },
+  "summary": "Format a numeric amount as a currency display string, with correct decimal places and symbol placement for a disclosed, finite set of currency/locale combinations.",
+  "description": "Formats amount as a currency string using currency_code's standard minor-unit decimal places and locale's symbol-placement convention, both drawn from a small fixed, disclosed table covering exactly 8 currencies (USD, EUR, GBP, JPY, CAD, AUD, INR, BHD) and 5 locales (en-US, en-GB, de-DE, fr-FR, ja-JP) -- not a live ISO 4217 registry and not full ICU/CLDR data; see SPEC.md for the exact table. An unrecognized currency_code or locale falls back to a generic '<CODE> <amount>' format rather than guessing, and supported: false is returned so the caller can detect the fallback rather than silently trusting an unstyled result. Negative amounts are formatted with a leading minus sign before the symbol (e.g. '-$12.50'), not locale-specific parenthetical negative notation, in this version.",
+  "inputs": {
+    "schema": {
+      "additionalProperties": false,
+      "properties": {
+        "amount": {
+          "type": "number"
+        },
+        "currency_code": {
+          "type": "string"
+        },
+        "locale": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "amount",
+        "currency_code"
+      ],
+      "type": "object"
+    }
+  },
+  "outputs": {
+    "schema": {
+      "additionalProperties": false,
+      "properties": {
+        "formatted": {
+          "type": "string"
+        },
+        "supported": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "formatted",
+        "supported"
+      ],
+      "type": "object"
+    }
+  },
+  "preconditions": [
+    {
+      "id": "amount-and-currency-provided",
+      "description": "The caller provides a finite numeric amount and an ISO 4217 currency_code string."
+    }
+  ],
+  "postconditions": [
+    {
+      "id": "formatted-always-produced",
+      "description": "formatted is always a non-empty string, even for an unsupported currency_code/locale (generic '<CODE> <amount>' fallback rather than an error)."
+    },
+    {
+      "id": "supported-flag-accurate",
+      "description": "supported: false whenever either currency_code or locale fell outside this version's disclosed lookup tables and the generic fallback format was used."
+    }
+  ],
+  "side_effects": [
+    {
+      "kind": "memory_only",
+      "description": "Produces one formatted string derived from the provided amount/currency_code/locale."
+    }
+  ],
+  "emits": [],
+  "consumes": [],
+  "permissions": [
+    {
+      "id": "formatting.format-currency"
+    }
+  ],
+  "execution": {
+    "binary_format": "wasm",
+    "entrypoint": {
+      "kind": "wasi-command",
+      "command": "run"
+    },
+    "preferred_targets": [
+      "local"
+    ],
+    "constraints": {
+      "host_api_access": "none",
+      "network_access": "forbidden",
+      "filesystem_access": "none"
+    }
+  },
+  "policies": [],
+  "dependencies": [],
+  "provenance": {
+    "source": "greenfield",
+    "author": "enricopiovesan",
+    "created_at": "2026-07-28T00:00:00Z",
+    "spec_ref": null,
+    "adr_refs": [],
+    "exception_refs": []
+  },
+  "evidence": [],
+  "service_type": "stateless",
+  "permitted_targets": [
+    "local"
+  ],
+  "event_trigger": null,
+  "connector_requirements": [],
+  "state_schema": null
+}
