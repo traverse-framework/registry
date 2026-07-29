@@ -129,3 +129,79 @@ jobs:
           tag="index-v${new_version}"
           gh release create "$tag" /tmp/index.json --repo ${{ github.repository }} --title "$tag" --notes "Automated index publish for $tag" || \
           gh release upload "$tag" /tmp/index.json --repo ${{ github.repository }} --clobber
+
+  # Discovery catalog build (registry#103/#105/#106). Regenerates
+  # catalog/catalog.json from whatever is currently published, same
+  # merge-to-main trigger as publish-index (spec 001 FR-006), so the
+  # catalog never drifts from the actual capabilities/ tree.
+  build-catalog:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: "1.94.0"
+          targets: wasm32-unknown-unknown
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: capability-src/catalog-builder
+
+      - name: Install wasmtime
+        run: |
+          curl https://wasmtime.dev/install.sh -sSf | bash
+          echo "$HOME/.wasmtime/bin" >> "$GITHUB_PATH"
+
+      - name: Build catalog-builder
+        run: cargo build --release --target wasm32-unknown-unknown --manifest-path capability-src/catalog-builder/Cargo.toml
+
+      - name: Gather capability metadata
+        run: python3 scripts/ci/gather_catalog_data.py /tmp/gathered.json
+
+      - name: Run catalog-builder
+        run: wasmtime run capability-src/catalog-builder/target/wasm32-unknown-unknown/release/catalog-builder.wasm < /tmp/gathered.json > catalog/catalog.json
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: catalog
+
+  # Deploys the artifact build-catalog just produced. Split into its own
+  # job (rather than one job doing both) because actions/deploy-pages
+  # requires the `pages: write`/`id-token: write` permissions and the
+  # `github-pages` environment, which should be scoped as narrowly as
+  # possible -- not granted to the build steps that also run
+  # capability_validation.py-adjacent tooling.
+  #
+  # continue-on-error is intentional and matches ai-advisory-review's
+  # precedent elsewhere in this file: this action fails until the repo
+  # owner enables GitHub Pages (Settings -> Pages -> Build and deployment
+  # source: "GitHub Actions"), a repo-settings change this agent
+  # deliberately does not make itself (registry#106's own scope note; same
+  # precedent as decision-log entries 28/29). That is an expected,
+  # not-yet-configured state, not a build regression -- it should not show
+  # as a hard, alarming failure on every merge to main until the owner
+  # flips that toggle.
+  deploy-catalog:
+    needs: build-catalog
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    concurrency:
+      group: pages
+      cancel-in-progress: false
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
