@@ -9,12 +9,19 @@ Read `specs/001-registry-foundation/spec.md` before any implementation work — 
 ## Project Structure
 
 ```text
-capabilities/<namespace>/<id>/<version>/contract.json   # published capability records (empty until first publish)
+capabilities/<namespace>/<id>/<version>/contract.json   # published capability records
+capability-src/<name>/                                   # source for each published capability's WASM artifact (no_std Rust)
+capability-src/wasi-capability-runtime/                  # shared no_std runtime shim used by every capability crate
 specs/                                                   # this repo's own governing specs
 docs/decision-log.md                                     # why this repo's design is what it is
 .specify/                                                # spec-driven workflow scaffold (vendored from traverse)
 scripts/ci/                                              # CI gate scripts (vendored from traverse-framework/.github)
 ```
+
+`capability-src/` was named `agents/` until 2026-07-29 (decision-log entry 41) — "agent" is
+now a reserved term for a future capability whose implementation genuinely involves
+AI/model-backed reasoning; every capability published in this registry today is pure,
+deterministic business logic, so none of them qualify.
 
 ## Commands
 
@@ -22,9 +29,13 @@ scripts/ci/                                              # CI gate scripts (vend
 bash scripts/ci/spec_alignment_check.sh <pr-body-file>   # spec-alignment gate (requires BASE_SHA/HEAD_SHA env)
 python3 scripts/ci/capability_validation.py               # deterministic capability checks
 python3 scripts/ci/build_index.py <prev_version> <sha> <out>  # index build
+(cd capability-src/<name> && cargo test)                  # unit-tests one capability's logic (host target)
 ```
 
-No build/test commands yet — this repo has no executable code until the `traverse-registry` crate extraction (`traverse` spec 051) lands.
+The `traverse-registry` crate extraction (`traverse` spec 051) has landed — see
+`docs/decision-log.md` entries 26/29/30 — but every capability under `capability-src/`
+already had real, tested, buildable Rust source before and independent of that; this repo
+has not been executable-code-free since decision-log entry 38.
 
 ## Code Style
 
