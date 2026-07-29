@@ -8,7 +8,7 @@ This directory is the actual registry content: one file tree per published capab
 capabilities/<namespace>/<id>/<version>/contract.json
 ```
 
-- `<namespace>` — reserved for future third-party publishers; every published capability today uses an app-scoped namespace matching its reference app (`traverse-starter`, `doc-approval`, `meeting-notes` — see `specs/008-reference-capability-publication/spec.md`), not a shared default. A `core`-owned unscoped default remains reserved for future use (see `specs/001-registry-foundation/spec.md`, FR-008) but nothing is published there yet.
+- `<namespace>` — reserved for future third-party publishers; identifies *who* published a capability, never *what topic* it's about (that's `use_cases`/`summary`/`description`'s job, not namespace's — see `specs/001-registry-foundation/spec.md`, FR-008/FR-012). Two coexisting conventions for core-team publishes: app-scoped, matching the reference app it belongs to (`traverse-starter`, `doc-approval`, `meeting-notes` — see `specs/008-reference-capability-publication/spec.md`), when a real reference app exists; `core`, for any general-purpose capability with no natural reference app, going forward. **Historical exception**: the 5 `validation`/`formatting` utility capabilities (below) were published before this policy existed and used ad hoc topic-based namespaces instead — left exactly as published, permanently (namespace is part of a capability's public identity; republishing under `core` would create a confusing permanent duplicate, not a fix). Namespace claiming/identity verification for real third-party publishers remains out of scope (spec 001's own stated assumption).
 - `<id>` — the capability identity within its namespace.
 - `<version>` — an exact semver version. Each version is its own immutable directory — never edit an existing version's `contract.json` after merge. To fix a bad publish, see the deprecation/yank process in `specs/001-registry-foundation/spec.md` (User Story 4).
 
@@ -98,15 +98,19 @@ surfaced and fixed):
 | `validation` | `validation.validate-luhn` | 1.0.0 |
 | `formatting` | `formatting.format-currency` | 1.0.0 |
 
-**Explicitly labeled utility-tier, not "business capabilities"**: the AI-advisory
-review (`.agents/skills/capability-review/`) flagged a genuine, unresolved boundary
-question when the first of these was published — email/phone/password/Luhn/currency
-logic reads closer to a reusable utility function than "one meaningful business
-action" (this repo's own duplicate/boundary rubric). That tension was surfaced to the
-repo owner rather than silently resolved; these five are real, published, and
-correctly labeled as a utility-tier pilot batch, not as proof this registry works for
-higher-level business capabilities — that's a deliberately separate, not-yet-started
-follow-up.
+**Labeled utility-tier, not "business capabilities"**: the AI-advisory review
+(`.agents/skills/capability-review/`) flagged a genuine boundary question when the
+first of these was published — email/phone/password/Luhn/currency logic reads closer
+to a reusable utility function than "one meaningful business action" (this repo's own
+duplicate/boundary rubric). **Resolved (2026-07-29, `docs/decision-log.md` entry 42,
+closes #101)**: utility-tier is a legitimate, permanent capability class — these five
+are not a pilot awaiting further validation, they're staying. Deliberately **not**
+given a formal `tier` schema field, though: real discovery/selection (an LLM/MCP
+runtime matching a workflow step, or a human developer doing the same) should run on
+the `use_cases` field (decision-log entry 40), not a business/utility label no actual
+consumer's selection logic would query on. The `capability-review` skill's rubric
+itself is due a refresh to explicitly account for both classes — not done as part of
+this decision, left for whoever next touches that skill.
 
 Each has a companion `SPEC.md` (use cases, happy/unhappy paths, NFRs, configuration —
 kept alongside the source under `capability-src/`, not in `capabilities/`, since the
