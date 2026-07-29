@@ -1,0 +1,20 @@
+[workspace]
+
+[package]
+name = "validate-email-agent"
+version = "0.1.0"
+edition = "2021"
+publish = false
+description = "Real, deterministic, ABI-compliant (no_std) implementation of the validation.validate-email capability. First end-to-end use of the traverse-capability-author skill."
+
+[[bin]]
+name = "validate-email-agent"
+path = "src/main.rs"
+
+[dependencies]
+wasi-agent-runtime = { path = "../wasi-agent-runtime" }
+
+[profile.release]
+opt-level = "s"
+lto = true
+panic = "abort"
