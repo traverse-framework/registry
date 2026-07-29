@@ -37,17 +37,18 @@ used a real, distinct, source-backed WASM artifact (sourced from
 fixture — none of them actually read their input.
 
 **Resolved (2026-07-28, second pass)**: all six capabilities now have genuinely
-input-dependent logic, implemented in standalone `no_std` Rust crates under `agents/`
-(source, not just artifacts, is committed in this repo). Along the way, a real
+input-dependent logic, implemented in standalone `no_std` Rust crates (source, not
+just artifacts, is committed in this repo). Along the way, a real
 regression was caught and fixed: the *first* real-logic attempt
 (`doc-approval.analyze` 1.1.0, `std` + `serde_json` + `wasm32-wasip1`) was genuinely
 input-dependent but imported `wasi_snapshot_preview1::environ_get`/`environ_sizes_get`
 — confirmed by inspecting its compiled import table — which fails Traverse's own
 `WasmExecutor` ABI whitelist (`host_abi_v1.json`: only `fd_read`/`fd_write`/`proc_exit`
 are allowed). It ran fine under a generic `wasmtime` host (how it was first verified)
-but could not have executed through `traverse-cli agent execute`/`serve`/an embedder
+but could not have executed through `traverse-cli capability execute`/`serve`/an embedder
 SDK. All six capabilities are now built on a shared `no_std` shim,
-[`agents/wasi-agent-runtime/`](../agents/wasi-agent-runtime) (bump allocator, hand-rolled
+[`capability-src/wasi-capability-runtime/`](../capability-src/wasi-capability-runtime)
+(bump allocator, hand-rolled
 JSON parse/write, WASI glue) — verified via `wasm2wat` to import only the three
 whitelisted WASI functions, and executed end-to-end via `wasmtime` with distinct,
 genuinely computed output per capability. `doc-approval.analyze` 1.1.0 is itself now
@@ -58,6 +59,22 @@ Every prior version (`1.0.0` stubs, `1.0.1`/`1.1.0` fixtures-or-ABI-incompatible
 releases) stays published and resolvable by exact pin — immutability preserved,
 deprecation is additive via a `deprecated.json` sibling (spec 005), never an edit.
 Full history: `#69` section 1.1, `#79`, `docs/decision-log.md`.
+
+**Naming correction (2026-07-29, decision-log entry 41)**: this repo's source
+directory for capability implementations was renamed from `agents/` to
+`capability-src/`, and the shared runtime shim from `wasi-agent-runtime` to
+`wasi-capability-runtime` (`run_agent()` → `run_capability()`). "Agent" is now a
+reserved term for a future capability whose implementation genuinely involves
+AI/model-backed reasoning — none of the 11 capabilities currently published here do;
+they are all pure, deterministic business logic. **Six already-published, immutable
+contracts, plus one deprecation record, predate this rename and have the old
+`agents/...` path (or `traverse-cli agent execute`/`serve`) written directly into
+their text** (`doc-approval.analyze` 1.2.0's `contract.json`, `doc-approval.analyze`
+1.1.0's `deprecated.json`, `doc-approval.recommend` 1.1.0, `traverse-starter.process`/
+`validate`/`summarize` 1.1.0, `meeting-notes.process` 1.1.0) — per this repo's
+immutability rule, none of that text can ever be edited. Those
+descriptions are historically accurate to when they were written, not to the current
+layout: current source for every capability lives under `capability-src/`, not `agents/`.
 
 **Known, disclosed limitations of the current logic** (reference-tier heuristics, not
 production-grade NLP — each capability's own contract `description` says so): the
@@ -92,14 +109,15 @@ higher-level business capabilities — that's a deliberately separate, not-yet-s
 follow-up.
 
 Each has a companion `SPEC.md` (use cases, happy/unhappy paths, NFRs, configuration —
-kept alongside the source under `agents/`, not in `capabilities/`, since the contract
-schema itself has no field for that level of detail) and, per this registry's own
-disclosure convention, an honestly-documented known limitation found only by
+kept alongside the source under `capability-src/`, not in `capabilities/`, since the
+contract schema itself has no field for that level of detail) and, per this registry's
+own disclosure convention, an honestly-documented known limitation found only by
 implementing and testing, not assumed up front: `normalize-phone-number` does not
 strip domestic trunk prefixes (e.g. UK `020 7946 0958`); `score-password-strength`'s
 scoring model was corrected during implementation to match verified, self-consistent
 behavior rather than an earlier draft's imprecise worked examples.
 
-Source for all five lives under `agents/` (`validate-email/`, `normalize-phone-number/`,
-`score-password-strength/`, `validate-luhn/`, `format-currency/`), built on the same
-shared `agents/wasi-agent-runtime/` shim as the six reference capabilities above.
+Source for all five lives under `capability-src/` (`validate-email/`,
+`normalize-phone-number/`, `score-password-strength/`, `validate-luhn/`,
+`format-currency/`), built on the same shared `capability-src/wasi-capability-runtime/`
+shim as the six reference capabilities above.
