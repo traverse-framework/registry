@@ -65,3 +65,41 @@ two-consecutive-capitalized-word heuristic in `doc-approval.analyze` can false-p
 on sentence-initial phrases (e.g. "This Agreement"); the leading-capitalized-word
 heuristic in `meeting-notes.process` can false-positive on sentence-initial pronouns
 (e.g. "We agreed..." yields `made_by: "We"`).
+
+## Utility-tier capabilities (added 2026-07-29)
+
+Five general-purpose validation/formatting capabilities, published to dogfood the
+`traverse-capability-author` Claude Skill end-to-end (see `docs/decision-log.md`
+entry 39 for the full account, including a real production incident this work
+surfaced and fixed):
+
+| namespace | id | current version |
+|---|---|---|
+| `validation` | `validation.validate-email` | 1.1.0 |
+| `validation` | `validation.normalize-phone-number` | 1.1.0 |
+| `validation` | `validation.score-password-strength` | 1.0.0 |
+| `validation` | `validation.validate-luhn` | 1.0.0 |
+| `formatting` | `formatting.format-currency` | 1.0.0 |
+
+**Explicitly labeled utility-tier, not "business capabilities"**: the AI-advisory
+review (`.agents/skills/capability-review/`) flagged a genuine, unresolved boundary
+question when the first of these was published — email/phone/password/Luhn/currency
+logic reads closer to a reusable utility function than "one meaningful business
+action" (this repo's own duplicate/boundary rubric). That tension was surfaced to the
+repo owner rather than silently resolved; these five are real, published, and
+correctly labeled as a utility-tier pilot batch, not as proof this registry works for
+higher-level business capabilities — that's a deliberately separate, not-yet-started
+follow-up.
+
+Each has a companion `SPEC.md` (use cases, happy/unhappy paths, NFRs, configuration —
+kept alongside the source under `agents/`, not in `capabilities/`, since the contract
+schema itself has no field for that level of detail) and, per this registry's own
+disclosure convention, an honestly-documented known limitation found only by
+implementing and testing, not assumed up front: `normalize-phone-number` does not
+strip domestic trunk prefixes (e.g. UK `020 7946 0958`); `score-password-strength`'s
+scoring model was corrected during implementation to match verified, self-consistent
+behavior rather than an earlier draft's imprecise worked examples.
+
+Source for all five lives under `agents/` (`validate-email/`, `normalize-phone-number/`,
+`score-password-strength/`, `validate-luhn/`, `format-currency/`), built on the same
+shared `agents/wasi-agent-runtime/` shim as the six reference capabilities above.
