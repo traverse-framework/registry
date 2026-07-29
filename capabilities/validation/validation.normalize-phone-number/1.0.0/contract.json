@@ -1,0 +1,140 @@
+{
+  "kind": "capability_contract",
+  "schema_version": "1.0.0",
+  "id": "validation.normalize-phone-number",
+  "namespace": "validation",
+  "name": "normalize-phone-number",
+  "version": "1.0.0",
+  "lifecycle": "active",
+  "owner": {
+    "team": "traverse-core",
+    "contact": "enrico.piovesan10@gmail.com"
+  },
+  "summary": "Normalize a phone number to E.164 format and check its digit-count plausibility for its country code.",
+  "description": "Strips formatting characters (spaces, dashes, parentheses), determines a calling code (from an explicit leading '+' or from the default_country input), and checks the remaining digit count against a fixed table of plausible national-number lengths for a supported set of country calling codes. Returns the E.164-formatted number when plausible. This is NOT a carrier/HLR lookup and does NOT verify the number is actually assigned, active, or reachable -- it is pure format/plausibility validation, deterministic and offline, using a small disclosed table of supported country codes (see SPEC.md), not the full ITU-T numbering plan database. line_type is always \"unknown\" in this version since distinguishing mobile/landline/VoIP requires carrier data this capability does not have access to. Known, disclosed limitation: does NOT strip domestic trunk prefixes (e.g. the leading '0' in how a UK or German number is normally written for in-country dialing, such as '020 7946 0958') -- when relying on default_country rather than an explicit '+' prefix, the caller must supply the number already in national-significant-number form (no leading trunk digit), or normalization will report digit_count_implausible for an otherwise-valid domestic-format number.",
+  "inputs": {
+    "schema": {
+      "additionalProperties": false,
+      "properties": {
+        "default_country": {
+          "type": "string"
+        },
+        "phone": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "phone"
+      ],
+      "type": "object"
+    }
+  },
+  "outputs": {
+    "schema": {
+      "additionalProperties": false,
+      "properties": {
+        "country_code": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "e164": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "line_type": {
+          "type": "string"
+        },
+        "national_number": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "reason": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "valid": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "valid",
+        "e164",
+        "country_code",
+        "national_number",
+        "line_type",
+        "reason"
+      ],
+      "type": "object"
+    }
+  },
+  "preconditions": [
+    {
+      "id": "phone-provided",
+      "description": "The caller provides a string in the phone field, in any common formatting (spaces, dashes, parens, optional leading +)."
+    }
+  ],
+  "postconditions": [
+    {
+      "id": "e164-on-success",
+      "description": "When valid: true, e164 is a well-formed E.164 string ('+' followed by 1-15 digits) and country_code/national_number are its decomposition."
+    },
+    {
+      "id": "no-carrier-lookup",
+      "description": "Never performs a live carrier/HLR/network lookup -- valid: true means format-plausible for the identified country code, not that the number is assigned or reachable."
+    }
+  ],
+  "side_effects": [
+    {
+      "kind": "memory_only",
+      "description": "Produces one normalization result derived from the provided phone string; does not log, persist, or transmit the input."
+    }
+  ],
+  "emits": [],
+  "consumes": [],
+  "permissions": [
+    {
+      "id": "validation.normalize-phone-number"
+    }
+  ],
+  "execution": {
+    "binary_format": "wasm",
+    "entrypoint": {
+      "kind": "wasi-command",
+      "command": "run"
+    },
+    "preferred_targets": [
+      "local"
+    ],
+    "constraints": {
+      "host_api_access": "none",
+      "network_access": "forbidden",
+      "filesystem_access": "none"
+    }
+  },
+  "policies": [],
+  "dependencies": [],
+  "provenance": {
+    "source": "greenfield",
+    "author": "enricopiovesan",
+    "created_at": "2026-07-28T00:00:00Z",
+    "spec_ref": null,
+    "adr_refs": [],
+    "exception_refs": []
+  },
+  "evidence": [],
+  "service_type": "stateless",
+  "permitted_targets": [
+    "local"
+  ],
+  "event_trigger": null,
+  "connector_requirements": [],
+  "state_schema": null
+}
