@@ -112,5 +112,10 @@
   ],
   "event_trigger": null,
   "connector_requirements": [],
-  "state_schema": null
+  "state_schema": null,
+  "artifact_type": "native",
+  "artifact": {
+    "digest": "sha256:e6bcb6bd6052ad65472b19dd52d464641279666179b8ac724bec11c7e56089fd",
+    "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/formatting.format-currency-1.0.0/format-currency-agent.wasm"
+  }
 }
