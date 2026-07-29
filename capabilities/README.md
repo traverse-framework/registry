@@ -109,8 +109,9 @@ given a formal `tier` schema field, though: real discovery/selection (an LLM/MCP
 runtime matching a workflow step, or a human developer doing the same) should run on
 the `use_cases` field (decision-log entry 40), not a business/utility label no actual
 consumer's selection logic would query on. The `capability-review` skill's rubric
-itself is due a refresh to explicitly account for both classes — not done as part of
-this decision, left for whoever next touches that skill.
+(`.agents/skills/capability-review/SKILL.md` and its canonical wording in
+`scripts/ci/ai_advisory_review.py`) has since been refreshed to explicitly account
+for both classes (#114).
 
 Each has a companion `SPEC.md` (use cases, happy/unhappy paths, NFRs, configuration —
 kept alongside the source under `capability-src/`, not in `capabilities/`, since the

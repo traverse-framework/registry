@@ -41,14 +41,18 @@ One of:
 3. **Analyze.** Apply the same rubric as the prompt in
    `scripts/ci/ai_advisory_review.py` (that script is the canonical wording
    -- do not invent a divergent second rubric):
-   - A valid capability represents **one meaningful business action**, not
-     a CRUD wrapper or utility function.
+   - A valid capability represents **one coherent, atomic action** --
+     either a business action or a well-scoped utility action (a
+     validator, formatter, checksum, etc.). Utility-tier is a legitimate,
+     permanent capability class (`docs/decision-log.md` entry 42, closes
+     #101) -- being a utility function is not itself a boundary concern.
    - **Likely duplicates**: existing published capabilities whose effect
      semantically overlaps the new contract even under a different
      name/tags -- identify each as `namespace/id@version` with a reason.
-   - **Boundary concerns**: signs the contract is a CRUD wrapper, a
-     utility/helper disguised as a capability, or otherwise a poor
-     capability boundary -- each with a reason.
+   - **Boundary concerns**: signs the contract is a CRUD wrapper, bundles
+     multiple unrelated actions into one capability, or otherwise fails to
+     represent one coherent atomic action (whether business or
+     utility-tier) -- each with a reason.
 4. **Report** in the same shape as the script's `format_comment` output:
 
    ```markdown
