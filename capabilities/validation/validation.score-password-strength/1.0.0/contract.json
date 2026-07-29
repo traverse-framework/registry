@@ -122,5 +122,10 @@
   ],
   "event_trigger": null,
   "connector_requirements": [],
-  "state_schema": null
+  "state_schema": null,
+  "artifact_type": "native",
+  "artifact": {
+    "digest": "sha256:b0a46a0682fa866f96305e830cc8eef2d114249507700b6d4e42121585c02340",
+    "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/validation.score-password-strength-1.0.0/score-password-strength-agent.wasm"
+  }
 }
