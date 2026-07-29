@@ -50,8 +50,13 @@ def call_claude(new_contract: dict, existing_summaries: list) -> dict:
 
     prompt = (
         "You are reviewing a new capability contract being published to a governed "
-        "capability registry. A valid capability represents ONE meaningful business "
-        "action, not a CRUD wrapper or utility function.\n\n"
+        "capability registry. A valid capability represents ONE coherent, atomic "
+        "action -- either a business action or a well-scoped utility action (a "
+        "validator, formatter, checksum, etc.). Utility-tier is a legitimate, "
+        "permanent capability class -- being a utility function is not itself a "
+        "boundary concern. Flag a boundary concern only if the contract is a CRUD "
+        "wrapper, bundles multiple unrelated actions into one capability, or "
+        "otherwise fails to represent one coherent atomic action.\n\n"
         f"New contract:\n{json.dumps(new_contract, indent=2)}\n\n"
         f"Existing published capabilities (summary only):\n{json.dumps(existing_summaries, indent=2)}\n\n"
         "Respond with JSON only, matching this shape:\n"
