@@ -101,6 +101,49 @@ class BuildIndexContractMetadataTests(unittest.TestCase):
             index = self._run_in(tmp, 5, "deadbeef")
             self.assertEqual(index["index_version"], 6)
 
+    def test_active_contract_missing_artifact_aborts_build(self):
+        # Regression test for a real incident (registry#89/#90): an active
+        # contract with no artifact.digest/.url must never reach the
+        # index with null fields -- that crashes every consumer's parse
+        # of the whole index, not just this one record.
+        with tempfile.TemporaryDirectory() as tmp:
+            contract = valid_contract()
+            del contract["artifact"]
+            write_contract(tmp, contract)
+
+            with self.assertRaises(build_index_module.IndexBuildError) as ctx:
+                self._run_in(tmp, 0, "deadbeef")
+
+            self.assertEqual(ctx.exception.code, "index.missing_artifact_reference")
+
+    def test_deprecated_contract_missing_artifact_is_excluded_not_failed(self):
+        # Contracts are immutable, so an already-published, already-broken
+        # deprecated version can never be fixed by editing -- excluding it
+        # from the index is the only way a future build can ever succeed
+        # again. The build must not fail, and the record must not appear.
+        with tempfile.TemporaryDirectory() as tmp:
+            contract = valid_contract()
+            del contract["artifact"]
+            path = write_contract(tmp, contract)
+            (path.parent / "deprecated.json").write_text(json.dumps({"reason": "test"}))
+
+            index = self._run_in(tmp, 0, "deadbeef")
+
+            self.assertEqual(index["capabilities"], [])
+
+    def test_deprecated_contract_with_artifact_is_still_included(self):
+        # Sanity check the exclusion is specifically about missing
+        # artifact info, not deprecation itself.
+        with tempfile.TemporaryDirectory() as tmp:
+            write_contract(tmp, valid_contract())
+            path = Path(tmp) / "capabilities" / "core" / "example-capability" / "1.0.0"
+            (path / "deprecated.json").write_text(json.dumps({"reason": "test"}))
+
+            index = self._run_in(tmp, 0, "deadbeef")
+
+            self.assertEqual(len(index["capabilities"]), 1)
+            self.assertTrue(index["capabilities"][0]["deprecated"])
+
 
 if __name__ == "__main__":
     unittest.main()

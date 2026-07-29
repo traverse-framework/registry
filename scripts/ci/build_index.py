@@ -8,6 +8,25 @@ through FR-004: contract provenance fields (`contract_digest`,
 `contract_url`) per entry, and hard-failing the build on an unreadable
 contract.json instead of silently omitting it from the index.
 
+Artifact-reference handling (added after a real incident: traverse-cli's
+`capability publish` silently drops `artifact`/`artifact_type` on every
+publish -- see registry#89/#90/#92 and traverse-framework/traverse#859 --
+producing `digest: null`/`artifact_url: null` entries that crashed
+`registry sync` for every consumer, since the whole index fails to
+deserialize once it hits one null record):
+  - An ACTIVE (non-deprecated) contract missing `artifact.digest`/`.url`
+    hard-fails the build, same failure class as an unreadable contract --
+    an unusable record must never reach a consumer.
+  - A DEPRECATED contract missing them is excluded from the index
+    entirely (not included with null fields) rather than failing the
+    build. Contracts are immutable, so an already-broken deprecated
+    version can never be fixed by editing; excluding it is the only way
+    a future index build can ever succeed again. Its `contract.json` and
+    `deprecated.json` remain in git history untouched -- only the
+    aggregate index's *inclusion* of it changes, per spec 005's yank
+    mechanism already treating index presence as additive, not something
+    the underlying files control directly.
+
 Usage: build_index.py <previous_index_version_or_0> <source_commit_sha> <output_path> [repo_slug]
 """
 
@@ -48,6 +67,22 @@ def build_index(previous_index_version: int, source_commit: str, repo_slug: str 
             deprecated = deprecated_path.is_file()
 
             artifact = contract.get("artifact") or {}
+            artifact_digest = artifact.get("digest")
+            artifact_url = artifact.get("url")
+
+            if not artifact_digest or not artifact_url:
+                if deprecated:
+                    # Permanently broken and unfixable (contracts are
+                    # immutable) -- omit from the index rather than emit
+                    # null fields that would crash every consumer's parse.
+                    continue
+                raise IndexBuildError(
+                    "index.missing_artifact_reference",
+                    str(contract_path),
+                    "active contract has no artifact.digest/artifact.url -- "
+                    "an unusable record must not reach a consumer",
+                )
+
             contract_digest = f"sha256:{hashlib.sha256(raw_bytes).hexdigest()}"
             contract_url = f"https://raw.githubusercontent.com/{repo_slug}/{source_commit}/{contract_path.as_posix()}"
 
@@ -56,8 +91,8 @@ def build_index(previous_index_version: int, source_commit: str, repo_slug: str 
                     "namespace": contract.get("namespace"),
                     "id": contract.get("id"),
                     "version": contract.get("version"),
-                    "digest": artifact.get("digest"),
-                    "artifact_url": artifact.get("url"),
+                    "digest": artifact_digest,
+                    "artifact_url": artifact_url,
                     "contract_digest": contract_digest,
                     "contract_url": contract_url,
                     "deprecated": deprecated,
