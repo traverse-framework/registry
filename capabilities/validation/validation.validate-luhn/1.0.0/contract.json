@@ -111,5 +111,10 @@
   ],
   "event_trigger": null,
   "connector_requirements": [],
-  "state_schema": null
+  "state_schema": null,
+  "artifact_type": "native",
+  "artifact": {
+    "digest": "sha256:b20b13054a5938a90b964855f9c8de94feb146045f85c04df7998cda81819133",
+    "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/validation.validate-luhn-1.0.0/validate-luhn-agent.wasm"
+  }
 }
