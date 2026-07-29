@@ -224,13 +224,17 @@ impl<'a> Parser<'a> {
         Ok(out)
     }
 
+    /// Dispatches on the peeked first character rather than trying "true"
+    /// then unconditionally falling through to "false": `consume_literal`
+    /// has no backtracking, so a failed "true" attempt against `false`
+    /// input still consumes the 'f', corrupting the stream before the
+    /// "false" attempt even starts. Peeking first avoids ever attempting
+    /// the wrong literal.
     fn parse_bool(&mut self) -> Result<Value, ()> {
-        if self.consume_literal("true") {
-            Ok(Value::Bool(true))
-        } else if self.consume_literal("false") {
-            Ok(Value::Bool(false))
-        } else {
-            Err(())
+        match self.peek() {
+            Some('t') if self.consume_literal("true") => Ok(Value::Bool(true)),
+            Some('f') if self.consume_literal("false") => Ok(Value::Bool(false)),
+            _ => Err(()),
         }
     }
 
@@ -456,5 +460,24 @@ mod tests {
         let written = write(&value);
         let reparsed = parse(&written).expect("round trip must reparse");
         assert_eq!(value, reparsed);
+    }
+
+    /// Regression test for a real bug: `parse_bool` used to try "true" then
+    /// unconditionally fall through to "false" on any mismatch, but
+    /// `consume_literal` has no backtracking -- a failed "true" attempt
+    /// against `false` input still consumed the 'f', corrupting the stream
+    /// so the "false" attempt failed too. This shipped silently in this
+    /// crate's earlier published capabilities since none of them happened
+    /// to have a boolean *input* field; caught only once one did.
+    #[test]
+    fn parses_false_correctly_alone_and_alongside_other_fields() {
+        assert_eq!(parse(r#"{"a": false}"#).unwrap(), object(alloc::vec![("a", Value::Bool(false))]));
+        assert_eq!(
+            parse(r#"{"email": "alice+x@example.com", "allow_plus_addressing": false}"#).unwrap(),
+            object(alloc::vec![
+                ("email", Value::String(String::from("alice+x@example.com"))),
+                ("allow_plus_addressing", Value::Bool(false)),
+            ])
+        );
     }
 }
