@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Traverse Registry Catalog</title>
+<style>
+  :root { color-scheme: light dark; }
+  body { font-family: -apple-system, system-ui, sans-serif; max-width: 860px; margin: 2rem auto; padding: 0 1rem; }
+  h1 { font-size: 1.5rem; }
+  input[type="search"] { width: 100%; font-size: 1rem; padding: 0.5rem; box-sizing: border-box; margin: 1rem 0; }
+  ul { list-style: none; padding: 0; }
+  li { border: 1px solid #8884; border-radius: 6px; padding: 0.75rem 1rem; margin-bottom: 0.5rem; }
+  .reference { font-family: ui-monospace, monospace; font-weight: 600; }
+  .deprecated { opacity: 0.6; }
+  .deprecated .reference::after { content: " (deprecated)"; font-weight: normal; font-style: italic; }
+  .summary { margin: 0.25rem 0 0; }
+  .empty, .error { opacity: 0.7; font-style: italic; }
+</style>
+</head>
+<body>
+<h1>Traverse Registry Catalog</h1>
+<input type="search" id="search" placeholder="Search capabilities (e.g. &quot;currency&quot;, &quot;email&quot;, &quot;validate&quot;)&hellip;" autofocus>
+<ul id="results"></ul>
+
+<script>
+(function () {
+  var resultsEl = document.getElementById("results");
+  var searchEl = document.getElementById("search");
+  var catalog = null;
+
+  function render(capabilities) {
+    resultsEl.textContent = "";
+    if (capabilities.length === 0) {
+      var li = document.createElement("li");
+      li.className = "empty";
+      li.textContent = "No matching capabilities.";
+      resultsEl.appendChild(li);
+      return;
+    }
+    capabilities.forEach(function (cap) {
+      var li = document.createElement("li");
+      li.className = cap.deprecated ? "deprecated" : "";
+      var ref = document.createElement("div");
+      ref.className = "reference";
+      ref.textContent = cap.reference;
+      var summary = document.createElement("p");
+      summary.className = "summary";
+      summary.textContent = cap.summary || "";
+      li.appendChild(ref);
+      li.appendChild(summary);
+      resultsEl.appendChild(li);
+    });
+  }
+
+  function search(query) {
+    if (!catalog) return;
+    var trimmed = query.trim().toLowerCase();
+    if (trimmed === "") {
+      render(catalog.capabilities);
+      return;
+    }
+    var tokens = trimmed.split(/[^a-z0-9]+/).filter(Boolean);
+    var matchedReferences = null;
+    tokens.forEach(function (token) {
+      var refsForToken = new Set();
+      Object.keys(catalog.search_index).forEach(function (indexedToken) {
+        if (indexedToken.indexOf(token) !== -1) {
+          catalog.search_index[indexedToken].forEach(function (ref) {
+            refsForToken.add(ref);
+          });
+        }
+      });
+      matchedReferences = matchedReferences === null
+        ? refsForToken
+        : new Set([...matchedReferences].filter(function (ref) { return refsForToken.has(ref); }));
+    });
+    var matched = matchedReferences === null ? [] : matchedReferences;
+    render(catalog.capabilities.filter(function (cap) { return matched.has(cap.reference); }));
+  }
+
+  searchEl.addEventListener("input", function () { search(searchEl.value); });
+
+  fetch("./catalog.json")
+    .then(function (response) {
+      if (!response.ok) { throw new Error("HTTP " + response.status); }
+      return response.json();
+    })
+    .then(function (data) {
+      catalog = data;
+      render(catalog.capabilities);
+    })
+    .catch(function (error) {
+      var li = document.createElement("li");
+      li.className = "error";
+      li.textContent = "Could not load catalog.json: " + error.message;
+      resultsEl.appendChild(li);
+    });
+})();
+</script>
+</body>
+</html>
