@@ -8,78 +8,236 @@
   :root { color-scheme: light dark; }
   body { font-family: -apple-system, system-ui, sans-serif; max-width: 860px; margin: 2rem auto; padding: 0 1rem; }
   h1 { font-size: 1.5rem; }
-  input[type="search"] { width: 100%; font-size: 1rem; padding: 0.5rem; box-sizing: border-box; margin: 1rem 0; }
+  h2 { font-size: 1.2rem; margin-top: 1.5rem; }
+  h3 { font-size: 1rem; margin: 1rem 0 0.25rem; }
+  a { color: inherit; }
+  input[type="search"] { width: 100%; font-size: 1rem; padding: 0.5rem; box-sizing: border-box; margin: 1rem 0 0.5rem; }
+  .controls { display: flex; align-items: center; gap: 0.4rem; font-size: 0.9rem; opacity: 0.85; margin-bottom: 1rem; }
   ul { list-style: none; padding: 0; }
   li { border: 1px solid #8884; border-radius: 6px; padding: 0.75rem 1rem; margin-bottom: 0.5rem; }
+  li a.card-link { display: block; text-decoration: none; }
+  li a.card-link:hover .reference { text-decoration: underline; }
   .reference { font-family: ui-monospace, monospace; font-weight: 600; }
+  .badge { display: inline-block; font-size: 0.75rem; font-weight: normal; font-style: italic; opacity: 0.8; margin-left: 0.5rem; }
   .deprecated { opacity: 0.6; }
-  .deprecated .reference::after { content: " (deprecated)"; font-weight: normal; font-style: italic; }
   .summary { margin: 0.25rem 0 0; }
   .empty, .error { opacity: 0.7; font-style: italic; }
+  .back-link { display: inline-block; margin-bottom: 1rem; }
+  pre { background: #8881; border-radius: 6px; padding: 0.75rem; overflow-x: auto; font-size: 0.85rem; }
+  .field-row { margin: 0.25rem 0; }
+  .field-label { opacity: 0.7; font-size: 0.85rem; }
+  .use-case { border: 1px solid #8884; border-radius: 6px; padding: 0.6rem 0.8rem; margin-bottom: 0.6rem; }
+  .use-case-happy { border-left: 3px solid #4a4; }
+  .use-case-unhappy { border-left: 3px solid #a44; }
+  details summary { cursor: pointer; opacity: 0.8; }
 </style>
 </head>
 <body>
-<h1>Traverse Registry Catalog</h1>
-<input type="search" id="search" placeholder="Search capabilities (e.g. &quot;currency&quot;, &quot;email&quot;, &quot;validate&quot;)&hellip;" autofocus>
-<ul id="results"></ul>
+<div id="app"></div>
 
 <script>
 (function () {
-  var resultsEl = document.getElementById("results");
-  var searchEl = document.getElementById("search");
+  var appEl = document.getElementById("app");
   var catalog = null;
+  var showDeprecated = true;
+  var searchQuery = "";
 
-  function render(capabilities) {
-    resultsEl.textContent = "";
-    if (capabilities.length === 0) {
-      var li = document.createElement("li");
-      li.className = "empty";
-      li.textContent = "No matching capabilities.";
-      resultsEl.appendChild(li);
-      return;
+  function el(tag, props, children) {
+    var node = document.createElement(tag);
+    if (props) {
+      Object.keys(props).forEach(function (key) {
+        if (key === "className") { node.className = props[key]; }
+        else if (key === "textContent") { node.textContent = props[key]; }
+        else { node.setAttribute(key, props[key]); }
+      });
     }
-    capabilities.forEach(function (cap) {
-      var li = document.createElement("li");
-      li.className = cap.deprecated ? "deprecated" : "";
-      var ref = document.createElement("div");
-      ref.className = "reference";
-      ref.textContent = cap.reference;
-      var summary = document.createElement("p");
-      summary.className = "summary";
-      summary.textContent = cap.summary || "";
-      li.appendChild(ref);
-      li.appendChild(summary);
-      resultsEl.appendChild(li);
+    (children || []).forEach(function (child) {
+      if (child) { node.appendChild(child); }
     });
+    return node;
   }
 
-  function search(query) {
-    if (!catalog) return;
+  function referenceHash(reference) {
+    return "#/capability/" + encodeURIComponent(reference);
+  }
+
+  function matchedReferencesForQuery(query) {
     var trimmed = query.trim().toLowerCase();
-    if (trimmed === "") {
-      render(catalog.capabilities);
-      return;
-    }
+    if (trimmed === "") { return null; }
     var tokens = trimmed.split(/[^a-z0-9]+/).filter(Boolean);
-    var matchedReferences = null;
+    var matched = null;
     tokens.forEach(function (token) {
       var refsForToken = new Set();
       Object.keys(catalog.search_index).forEach(function (indexedToken) {
         if (indexedToken.indexOf(token) !== -1) {
-          catalog.search_index[indexedToken].forEach(function (ref) {
-            refsForToken.add(ref);
-          });
+          catalog.search_index[indexedToken].forEach(function (ref) { refsForToken.add(ref); });
         }
       });
-      matchedReferences = matchedReferences === null
-        ? refsForToken
-        : new Set([...matchedReferences].filter(function (ref) { return refsForToken.has(ref); }));
+      matched = matched === null ? refsForToken : new Set([...matched].filter(function (ref) { return refsForToken.has(ref); }));
     });
-    var matched = matchedReferences === null ? [] : matchedReferences;
-    render(catalog.capabilities.filter(function (cap) { return matched.has(cap.reference); }));
+    return matched;
   }
 
-  searchEl.addEventListener("input", function () { search(searchEl.value); });
+  function visibleCapabilities() {
+    var matched = matchedReferencesForQuery(searchQuery);
+    return catalog.capabilities.filter(function (cap) {
+      if (!showDeprecated && cap.deprecated) { return false; }
+      if (matched !== null && !matched.has(cap.reference)) { return false; }
+      return true;
+    });
+  }
+
+  function renderListView() {
+    appEl.textContent = "";
+    appEl.appendChild(el("h1", { textContent: "Traverse Registry Catalog" }));
+
+    var searchInput = el("input", {
+      type: "search",
+      id: "search",
+      placeholder: "Search capabilities (e.g. \"currency\", \"email\", \"validate\")…",
+    });
+    searchInput.value = searchQuery;
+    searchInput.addEventListener("input", function () {
+      searchQuery = searchInput.value;
+      renderResultsList();
+    });
+    appEl.appendChild(searchInput);
+
+    var deprecatedToggle = el("input", { type: "checkbox", id: "show-deprecated" });
+    deprecatedToggle.checked = showDeprecated;
+    deprecatedToggle.addEventListener("change", function () {
+      showDeprecated = deprecatedToggle.checked;
+      renderResultsList();
+    });
+    var deprecatedLabel = el("label", {}, [deprecatedToggle, document.createTextNode(" Include deprecated versions")]);
+    appEl.appendChild(el("div", { className: "controls" }, [deprecatedLabel]));
+
+    appEl.appendChild(el("ul", { id: "results" }));
+    renderResultsList();
+    searchInput.focus();
+  }
+
+  function renderResultsList() {
+    var resultsEl = document.getElementById("results");
+    if (!resultsEl) { return; }
+    resultsEl.textContent = "";
+    var capabilities = visibleCapabilities();
+    if (capabilities.length === 0) {
+      resultsEl.appendChild(el("li", { className: "empty", textContent: "No matching capabilities." }));
+      return;
+    }
+    capabilities.forEach(function (cap) {
+      var contract = cap.contract;
+      var reference = el("span", { className: "reference", textContent: cap.reference });
+      if (cap.deprecated) {
+        reference.appendChild(el("span", { className: "badge", textContent: "(deprecated)" }));
+      }
+      var summary = el("p", { className: "summary", textContent: contract.summary || "" });
+      var link = el("a", { className: "card-link", href: referenceHash(cap.reference) }, [reference, summary]);
+      var li = el("li", { className: cap.deprecated ? "deprecated" : "" }, [link]);
+      resultsEl.appendChild(li);
+    });
+  }
+
+  function fieldRow(label, value) {
+    if (value === undefined || value === null || value === "") { return null; }
+    return el("p", { className: "field-row" }, [
+      el("span", { className: "field-label", textContent: label + ": " }),
+      document.createTextNode(String(value)),
+    ]);
+  }
+
+  function jsonBlock(value) {
+    var pre = el("pre", {});
+    pre.textContent = JSON.stringify(value, null, 2);
+    return pre;
+  }
+
+  function renderUseCase(useCase) {
+    var isHappy = useCase.happy !== false;
+    var box = el("div", { className: "use-case " + (isHappy ? "use-case-happy" : "use-case-unhappy") });
+    box.appendChild(el("p", { textContent: useCase.scenario || "" }));
+    box.appendChild(el("div", { className: "field-label", textContent: "Input" }));
+    box.appendChild(jsonBlock(useCase.input_example));
+    box.appendChild(el("div", { className: "field-label", textContent: "Output" }));
+    box.appendChild(jsonBlock(useCase.output_example));
+    return box;
+  }
+
+  function renderDetailView(reference) {
+    var cap = catalog.capabilities.find(function (c) { return c.reference === reference; });
+    appEl.textContent = "";
+    if (!cap) {
+      appEl.appendChild(el("a", { className: "back-link", href: "#", textContent: "← Back to catalog" }));
+      appEl.appendChild(el("p", { className: "error", textContent: "No capability found for \"" + reference + "\"." }));
+      return;
+    }
+    var contract = cap.contract;
+
+    appEl.appendChild(el("a", { className: "back-link", href: "#", textContent: "← Back to catalog" }));
+
+    var title = el("h1", { textContent: cap.reference });
+    if (cap.deprecated) {
+      title.appendChild(el("span", { className: "badge", textContent: "(deprecated)" }));
+    }
+    appEl.appendChild(title);
+
+    if (contract.summary) { appEl.appendChild(el("p", { textContent: contract.summary })); }
+    if (contract.description) { appEl.appendChild(el("p", { textContent: contract.description })); }
+
+    [
+      fieldRow("Lifecycle", contract.lifecycle),
+      fieldRow("Service type", contract.service_type),
+      fieldRow("Permitted targets", (contract.permitted_targets || []).join(", ")),
+      fieldRow("Owner", contract.owner && (contract.owner.team + (contract.owner.contact ? " (" + contract.owner.contact + ")" : ""))),
+      fieldRow("Artifact digest", contract.artifact && contract.artifact.digest),
+    ].forEach(function (row) { if (row) { appEl.appendChild(row); } });
+
+    if (contract.artifact && contract.artifact.url) {
+      appEl.appendChild(el("p", { className: "field-row" }, [
+        el("span", { className: "field-label", textContent: "Artifact: " }),
+        el("a", { href: contract.artifact.url, textContent: contract.artifact.url }),
+      ]));
+    }
+
+    if (Array.isArray(contract.use_cases) && contract.use_cases.length > 0) {
+      appEl.appendChild(el("h2", { textContent: "Use cases" }));
+      contract.use_cases.forEach(function (useCase) {
+        appEl.appendChild(renderUseCase(useCase));
+      });
+    }
+
+    if (contract.inputs && contract.inputs.schema) {
+      appEl.appendChild(el("h2", { textContent: "Input schema" }));
+      appEl.appendChild(jsonBlock(contract.inputs.schema));
+    }
+
+    if (contract.outputs && contract.outputs.schema) {
+      appEl.appendChild(el("h2", { textContent: "Output schema" }));
+      appEl.appendChild(jsonBlock(contract.outputs.schema));
+    }
+
+    var details = el("details", {}, [
+      el("summary", { textContent: "Full contract.json" }),
+      jsonBlock(contract),
+    ]);
+    appEl.appendChild(details);
+  }
+
+  function router() {
+    if (!catalog) { return; }
+    var hash = window.location.hash;
+    var match = hash.match(/^#\/capability\/(.+)$/);
+    if (match) {
+      renderDetailView(decodeURIComponent(match[1]));
+    } else {
+      renderListView();
+    }
+  }
+
+  window.addEventListener("hashchange", router);
+
+  appEl.appendChild(el("p", { className: "empty", textContent: "Loading catalog…" }));
 
   fetch("./catalog.json")
     .then(function (response) {
@@ -88,13 +246,11 @@
     })
     .then(function (data) {
       catalog = data;
-      render(catalog.capabilities);
+      router();
     })
     .catch(function (error) {
-      var li = document.createElement("li");
-      li.className = "error";
-      li.textContent = "Could not load catalog.json: " + error.message;
-      resultsEl.appendChild(li);
+      appEl.textContent = "";
+      appEl.appendChild(el("p", { className: "error", textContent: "Could not load catalog.json: " + error.message }));
     });
 })();
 </script>

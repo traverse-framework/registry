@@ -25,7 +25,18 @@ mod allocator {
     use core::alloc::{GlobalAlloc, Layout};
     use core::cell::UnsafeCell;
 
-    const HEAP_SIZE: usize = 1 << 20; // 1 MiB: generous for one small JSON request/response.
+    // 16 MiB. Was 1 MiB ("generous for one small JSON request/response") until
+    // the catalog-builder build-tool capability (registry#105) needed to hold
+    // the entire capabilities/ tree's contracts (input parse tree + a
+    // full-contract-cloning output tree + the final serialized JSON, none of
+    // it ever freed by this bump allocator) in memory at once -- a
+    // fundamentally different workload from the small, fixed-shape
+    // request/response every other capability here processes. Zero-initialized
+    // static data costs nothing in the compiled .wasm (no data-segment bytes
+    // for zeros) and a declared-but-unwritten linear memory reservation is
+    // cheap at instantiation, so this headroom is free for every capability
+    // that doesn't need it.
+    const HEAP_SIZE: usize = 16 * (1 << 20);
 
     #[repr(align(16))]
     struct AlignedHeap(UnsafeCell<[u8; HEAP_SIZE]>);
