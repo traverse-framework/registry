@@ -93,6 +93,7 @@ fn build_catalog(input: &Value) -> Value {
             .get("deprecated")
             .and_then(Value::as_bool)
             .unwrap_or(false);
+        let test_coverage = record.get("test_coverage").cloned().unwrap_or(Value::Null);
 
         let reference = capability_reference(namespace, id, version);
 
@@ -125,6 +126,7 @@ fn build_catalog(input: &Value) -> Value {
             ("reference", Value::String(reference)),
             ("deprecated", Value::Bool(deprecated)),
             ("contract", contract.clone()),
+            ("test_coverage", test_coverage),
         ]));
     }
 
@@ -234,6 +236,39 @@ mod tests {
         let catalog = build_catalog(&input);
         let capabilities = catalog.get("capabilities").unwrap().as_array().unwrap();
         assert_eq!(capabilities[0].get("contract").unwrap(), &source_contract);
+    }
+
+    #[test]
+    fn test_coverage_is_passed_through_when_present_and_null_when_absent() {
+        let with_coverage = object(vec![
+            ("deprecated", Value::Bool(false)),
+            (
+                "contract",
+                contract("core", "core.a", "1.0.0", "alpha", "alpha capability"),
+            ),
+            (
+                "test_coverage",
+                object(vec![
+                    ("lines_percent", Value::Number(98.8)),
+                    ("functions_percent", Value::Number(100.0)),
+                    ("regions_percent", Value::Number(99.3)),
+                    ("test_count", Value::Number(5.0)),
+                ]),
+            ),
+        ]);
+        let without_coverage = record(
+            contract("core", "core.b", "1.0.0", "bravo", "bravo capability"),
+            false,
+        );
+
+        let catalog = build_catalog(&Value::Array(vec![with_coverage, without_coverage]));
+        let capabilities = catalog.get("capabilities").unwrap().as_array().unwrap();
+
+        let a = capabilities.iter().find(|c| c.get("reference").unwrap().as_str() == Some("core/core.a@1.0.0")).unwrap();
+        assert_eq!(a.get("test_coverage").unwrap().get("test_count").unwrap().as_f64(), Some(5.0));
+
+        let b = capabilities.iter().find(|c| c.get("reference").unwrap().as_str() == Some("core/core.b@1.0.0")).unwrap();
+        assert_eq!(b.get("test_coverage").unwrap(), &Value::Null);
     }
 
     #[test]
