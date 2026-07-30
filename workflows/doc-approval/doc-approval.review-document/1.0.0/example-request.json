@@ -1,0 +1,15 @@
+{
+  "kind": "example_request",
+  "schema_version": "1.0.0",
+  "workflow_id": "doc-approval.review-document",
+  "workflow_version": "1.0.0",
+  "scenario": "An invoice with a recognized party and dollar amount, run through analyze -> recommend end to end.",
+  "request": {
+    "document": "INVOICE. Acme Corp owes $500.00"
+  },
+  "expected_response": {
+    "recommendation": "approve",
+    "rationale": "docType=invoice; 1 party found; 1 amount found; confirmed at high confidence",
+    "confidence": "high"
+  }
+}
