@@ -184,6 +184,9 @@ jobs:
       - name: Run catalog-builder
         run: wasmtime run capability-src/catalog-builder/target/wasm32-unknown-unknown/release/catalog-builder.wasm < /tmp/gathered.json > catalog/catalog.json
 
+      - name: Generate static capability pages + sitemap.xml (registry#131)
+        run: python3 scripts/ci/generate_catalog_pages.py catalog/catalog.json https://registry.traverse-framework.com catalog
+
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:

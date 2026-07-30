@@ -23,10 +23,15 @@ It fetches `./catalog.json` at page-load time and renders:
   list linking every version of that same capability id (marking the current
   and any deprecated ones), and a collapsible raw `contract.json`.
 
-Client-side routing was chosen over generating one static HTML file per
-capability because the WASM ABI only allows a single output stream
-(`fd_write`) per invocation -- `catalog-builder` can only ever produce one
-JSON document, not N files.
+Client-side routing was chosen for this interactive experience because the
+WASM ABI only allows a single output stream (`fd_write`) per invocation --
+`catalog-builder` can only ever produce one JSON document, not N files.
+**However**, hash-fragment "pages" (`#/capability/...`) are invisible to
+search crawlers and link-unfurlers -- they never see the fragment or execute
+this page's JavaScript, so every one looks identical with the same generic
+meta tags. Registry#131 addresses this with a *second*, static rendering
+path -- see below -- rather than by trying to make crawlers understand hash
+routes.
 
 `catalog.json` is **generated, not checked in** -- produced by piping
 `scripts/ci/gather_catalog_data.py`'s output through the `catalog-builder`
@@ -85,3 +90,35 @@ so it also (harmlessly) applies to every other capability's future rebuild;
 zero-initialized static memory costs nothing in the compiled `.wasm` and a
 larger declared-but-unused linear memory reservation is cheap at
 instantiation.
+
+## SEO: static per-capability pages, sitemap, robots.txt (registry#131)
+
+`scripts/ci/generate_catalog_pages.py` reads the same `catalog.json` the SPA
+fetches and emits one **real, statically rendered** HTML file per published
+capability version at `catalog/capability/<namespace>/<id>/<version>/index.html`
+-- its own `<title>`, `<meta name="description">`, Open Graph tags, and
+`<link rel="canonical">`, populated from that capability's own
+`summary`/`description`, plus real body content (use cases, schemas, version
+history, etc.) mirroring the SPA's detail view. These are genuinely separate,
+crawlable documents -- unlike the SPA's hash routes, a search engine or link
+preview bot gets distinct, correct metadata per capability without executing
+any JavaScript. The script also writes `catalog/sitemap.xml` listing the root
+page plus every generated capability page.
+
+```bash
+python3 scripts/ci/generate_catalog_pages.py catalog/catalog.json https://registry.traverse-framework.com catalog
+```
+
+`catalog/robots.txt` is a plain, hand-written static file (its content
+doesn't depend on capability data) allowing full crawl and pointing at the
+sitemap.
+
+The SPA's own detail view gained a **Permalink** field linking to this same
+static page for whichever version is being viewed, so a user of the
+interactive catalog has an obvious, correct URL to copy/share instead of the
+hash-fragment one.
+
+**Out of scope, disclosed**: workflows aren't included -- the catalog
+pipeline (`gather_catalog_data.py`/`catalog-builder`) doesn't process
+`workflows/` at all yet (registry#124's own disclosed gap), so there's
+nothing to statically render for them until that lands.
