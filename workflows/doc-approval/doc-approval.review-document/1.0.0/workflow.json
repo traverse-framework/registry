@@ -1,0 +1,110 @@
+{
+  "kind": "workflow_definition",
+  "schema_version": "1.0.0",
+  "id": "doc-approval.review-document",
+  "namespace": "doc-approval",
+  "name": "review-document",
+  "version": "1.0.0",
+  "lifecycle": "active",
+  "owner": {
+    "team": "traverse-core",
+    "contact": "enrico.piovesan10@gmail.com"
+  },
+  "summary": "Analyze a submitted document and produce an independently-verified approval recommendation.",
+  "inputs": {
+    "schema": {
+      "type": "object",
+      "required": [
+        "document"
+      ],
+      "properties": {
+        "document": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": true
+    }
+  },
+  "outputs": {
+    "schema": {
+      "type": "object",
+      "required": [
+        "recommendation",
+        "rationale",
+        "confidence"
+      ],
+      "properties": {
+        "recommendation": {
+          "type": "string"
+        },
+        "rationale": {
+          "type": "string"
+        },
+        "confidence": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": true
+    }
+  },
+  "nodes": [
+    {
+      "node_id": "analyze_document",
+      "capability_id": "doc-approval.analyze",
+      "capability_version": "1.3.0",
+      "input": {
+        "from_workflow_input": [
+          "document"
+        ]
+      },
+      "output": {
+        "to_workflow_state": [
+          "docType",
+          "parties",
+          "amounts",
+          "confidence",
+          "recommendation"
+        ]
+      }
+    },
+    {
+      "node_id": "recommend_approval",
+      "capability_id": "doc-approval.recommend",
+      "capability_version": "1.2.0",
+      "input": {
+        "from_workflow_input": [
+          "docType",
+          "parties",
+          "amounts",
+          "confidence",
+          "recommendation"
+        ]
+      },
+      "output": {
+        "to_workflow_state": [
+          "recommendation",
+          "rationale",
+          "confidence"
+        ]
+      }
+    }
+  ],
+  "edges": [
+    {
+      "edge_id": "analyze_to_recommend",
+      "from": "analyze_document",
+      "to": "recommend_approval",
+      "trigger": "direct"
+    }
+  ],
+  "start_node": "analyze_document",
+  "terminal_nodes": [
+    "recommend_approval"
+  ],
+  "tags": [
+    "doc-approval",
+    "reference-app",
+    "kit"
+  ],
+  "governing_spec": "001-registry-foundation"
+}

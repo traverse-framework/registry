@@ -125,5 +125,87 @@ class CapabilityValidationSpec006Tests(unittest.TestCase):
             self.assertNotIn("contract.invalid_namespace", codes)
 
 
+def valid_workflow():
+    return {
+        "kind": "workflow_definition",
+        "id": "example.workflow",
+        "namespace": "example",
+        "owner": {"team": "platform"},
+        "version": "1.0.0",
+        "nodes": [],
+        "edges": [],
+        "start_node": "n1",
+        "terminal_nodes": ["n1"],
+    }
+
+
+def write_workflow(tmp_dir: str, workflow: dict, namespace="example", workflow_id="example.workflow", version="1.0.0") -> Path:
+    path = Path(tmp_dir) / "workflows" / namespace / workflow_id / version / "workflow.json"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(workflow))
+    return path
+
+
+class WorkflowValidationFR013Tests(unittest.TestCase):
+    """registry#124: workflows governed the same way capabilities are (spec 001 FR-013)."""
+
+    def test_valid_workflow_passes(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = write_workflow(tmp, valid_workflow())
+            errors: list = []
+            capability_validation.validate_workflow(path, errors)
+            self.assertEqual(errors, [])
+
+    def test_missing_required_field_is_rejected(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            workflow = valid_workflow()
+            del workflow["start_node"]
+            path = write_workflow(tmp, workflow)
+            errors: list = []
+            capability_validation.validate_workflow(path, errors)
+            codes = [e["code"] for e in errors]
+            self.assertIn("workflow.missing_required_field", codes)
+
+    def test_namespace_mismatch_is_rejected(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            workflow = valid_workflow()
+            workflow["namespace"] = "other"
+            path = write_workflow(tmp, workflow, namespace="example")
+            errors: list = []
+            capability_validation.validate_workflow(path, errors)
+            codes = [e["code"] for e in errors]
+            self.assertIn("workflow.namespace_mismatch", codes)
+
+    def test_id_mismatch_is_rejected(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            workflow = valid_workflow()
+            workflow["id"] = "different.workflow"
+            path = write_workflow(tmp, workflow, workflow_id="example.workflow")
+            errors: list = []
+            capability_validation.validate_workflow(path, errors)
+            codes = [e["code"] for e in errors]
+            self.assertIn("workflow.id_mismatch", codes)
+
+    def test_invalid_semver_is_rejected(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            workflow = valid_workflow()
+            workflow["version"] = "not-a-version"
+            path = write_workflow(tmp, workflow, version="not-a-version")
+            errors: list = []
+            capability_validation.validate_workflow(path, errors)
+            codes = [e["code"] for e in errors]
+            self.assertIn("workflow.invalid_semver", codes)
+
+    def test_invalid_json_is_rejected(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "workflows" / "example" / "example.workflow" / "1.0.0" / "workflow.json"
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text("{ not valid json")
+            errors: list = []
+            capability_validation.validate_workflow(path, errors)
+            codes = [e["code"] for e in errors]
+            self.assertIn("workflow.invalid_json", codes)
+
+
 if __name__ == "__main__":
     unittest.main()

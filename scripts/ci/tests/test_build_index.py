@@ -145,5 +145,90 @@ class BuildIndexContractMetadataTests(unittest.TestCase):
             self.assertTrue(index["capabilities"][0]["deprecated"])
 
 
+def write_workflow(tmp_dir: str, workflow: dict, namespace="core", workflow_id="example.workflow", version="1.0.0") -> Path:
+    path = Path(tmp_dir) / "workflows" / namespace / workflow_id / version / "workflow.json"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(workflow))
+    return path
+
+
+def valid_workflow():
+    return {"id": "example.workflow", "namespace": "core", "version": "1.0.0", "nodes": []}
+
+
+class BuildIndexWorkflowFR013Tests(unittest.TestCase):
+    """registry#124: workflows[] array, spec 001 FR-013."""
+
+    def _run_in(self, tmp_dir: str, *args, **kwargs):
+        cwd = os.getcwd()
+        os.chdir(tmp_dir)
+        try:
+            return build_index_module.build_index(*args, **kwargs)
+        finally:
+            os.chdir(cwd)
+
+    def test_entry_includes_workflow_digest_and_url(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = write_workflow(tmp, valid_workflow())
+            raw_bytes = path.read_bytes()
+            expected_digest = f"sha256:{hashlib.sha256(raw_bytes).hexdigest()}"
+
+            index = self._run_in(tmp, 0, "deadbeef", "traverse-framework/registry")
+
+            self.assertEqual(len(index["workflows"]), 1)
+            entry = index["workflows"][0]
+            self.assertEqual(entry["workflow_digest"], expected_digest)
+            self.assertEqual(
+                entry["workflow_url"],
+                "https://raw.githubusercontent.com/traverse-framework/registry/deadbeef/"
+                "workflows/core/example.workflow/1.0.0/workflow.json",
+            )
+            self.assertEqual(entry["namespace"], "core")
+            self.assertEqual(entry["id"], "example.workflow")
+            self.assertEqual(entry["version"], "1.0.0")
+            self.assertFalse(entry["deprecated"])
+
+    def test_examples_subtree_is_excluded(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "workflows" / "examples" / "expedition" / "plan-expedition" / "workflow.json"
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(json.dumps({"id": "expedition.planning.plan-expedition", "namespace": "expedition.planning", "version": "1.0.0"}))
+
+            index = self._run_in(tmp, 0, "deadbeef")
+
+            self.assertEqual(index["workflows"], [])
+
+    def test_deprecated_workflow_is_flagged_not_excluded(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            write_workflow(tmp, valid_workflow())
+            path = Path(tmp) / "workflows" / "core" / "example.workflow" / "1.0.0"
+            (path / "deprecated.json").write_text(json.dumps({"reason": "test"}))
+
+            index = self._run_in(tmp, 0, "deadbeef")
+
+            self.assertEqual(len(index["workflows"]), 1)
+            self.assertTrue(index["workflows"][0]["deprecated"])
+
+    def test_unreadable_workflow_aborts_build(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "workflows" / "core" / "example.workflow" / "1.0.0" / "workflow.json"
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text("{ not valid json")
+
+            with self.assertRaises(build_index_module.IndexBuildError) as ctx:
+                self._run_in(tmp, 0, "deadbeef")
+            self.assertEqual(ctx.exception.code, "index.workflow_unreadable")
+
+    def test_capabilities_and_workflows_coexist_independently(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            write_contract(tmp, valid_contract())
+            write_workflow(tmp, valid_workflow())
+
+            index = self._run_in(tmp, 0, "deadbeef")
+
+            self.assertEqual(len(index["capabilities"]), 1)
+            self.assertEqual(len(index["workflows"]), 1)
+
+
 if __name__ == "__main__":
     unittest.main()

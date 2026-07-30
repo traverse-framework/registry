@@ -1,0 +1,126 @@
+{
+  "kind": "workflow_definition",
+  "schema_version": "1.0.0",
+  "id": "traverse-starter.process-note",
+  "namespace": "traverse-starter",
+  "name": "process-note",
+  "version": "1.0.0",
+  "lifecycle": "active",
+  "owner": {
+    "team": "traverse-core",
+    "contact": "enrico.piovesan10@gmail.com"
+  },
+  "summary": "Validate, classify, and summarize a note end to end using the three traverse-starter reference capabilities.",
+  "inputs": {
+    "schema": {
+      "type": "object",
+      "required": [
+        "note"
+      ],
+      "properties": {
+        "note": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": true
+    }
+  },
+  "outputs": {
+    "schema": {
+      "type": "object",
+      "required": [
+        "summary",
+        "wordCount"
+      ],
+      "properties": {
+        "summary": {
+          "type": "string"
+        },
+        "wordCount": {
+          "type": "number"
+        }
+      },
+      "additionalProperties": true
+    }
+  },
+  "nodes": [
+    {
+      "node_id": "validate_note",
+      "capability_id": "traverse-starter.validate",
+      "capability_version": "1.2.0",
+      "input": {
+        "from_workflow_input": [
+          "note"
+        ]
+      },
+      "output": {
+        "to_workflow_state": [
+          "valid",
+          "issues"
+        ]
+      }
+    },
+    {
+      "node_id": "classify_note",
+      "capability_id": "traverse-starter.process",
+      "capability_version": "1.2.0",
+      "input": {
+        "from_workflow_input": [
+          "note"
+        ]
+      },
+      "output": {
+        "to_workflow_state": [
+          "title",
+          "tags",
+          "noteType",
+          "suggestedNextAction",
+          "status"
+        ]
+      }
+    },
+    {
+      "node_id": "summarize_note",
+      "capability_id": "traverse-starter.summarize",
+      "capability_version": "1.2.0",
+      "input": {
+        "from_workflow_input": [
+          "title",
+          "tags",
+          "noteType",
+          "suggestedNextAction"
+        ]
+      },
+      "output": {
+        "to_workflow_state": [
+          "summary",
+          "wordCount"
+        ]
+      }
+    }
+  ],
+  "edges": [
+    {
+      "edge_id": "validate_to_classify",
+      "from": "validate_note",
+      "to": "classify_note",
+      "trigger": "direct"
+    },
+    {
+      "edge_id": "classify_to_summarize",
+      "from": "classify_note",
+      "to": "summarize_note",
+      "trigger": "direct"
+    }
+  ],
+  "start_node": "validate_note",
+  "terminal_nodes": [
+    "summarize_note"
+  ],
+  "tags": [
+    "traverse-starter",
+    "reference-app",
+    "kit"
+  ],
+  "governing_spec": "001-registry-foundation"
+}
