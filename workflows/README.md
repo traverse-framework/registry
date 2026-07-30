@@ -52,3 +52,7 @@ carve-out, it instead carries a boolean `entrypoint: true` marker directly on
 its own contract (`capabilities/meeting-notes/meeting-notes.process/1.3.0/`),
 plus its own standalone `example-request.json` for the same "runnable
 example" convenience the two workflows get.
+
+For how an MCP host or other LLM-facing consumer is meant to sync and filter
+down to just these two workflows plus `meeting-notes.process` (the "kit-llm"
+convention), see [`docs/kit-llm-sync-profile.md`](../docs/kit-llm-sync-profile.md).

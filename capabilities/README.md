@@ -109,6 +109,14 @@ against the actual compiled WASM binaries (chained through every workflow node v
 `wasmtime run`, not hand-traced), so a consumer can `curl`/pipe a request without
 hand-composing one from `use_cases`.
 
+**"kit-llm" sync profile documented (2026-07-29, #126)**: see
+[`docs/kit-llm-sync-profile.md`](../docs/kit-llm-sync-profile.md) for how an MCP host
+or any LLM-facing consumer runs `registry sync` and filters the index's
+`capabilities[]`/`workflows[]` down to just this curated kit content (`core`,
+`traverse-starter`, `doc-approval`, `meeting-notes` -- explicitly not the
+`validation`/`formatting` utility-tier namespaces below). No new registry-side
+artifact or release process -- a documented convention over the existing mechanism.
+
 ## Utility-tier capabilities (added 2026-07-29)
 
 Five general-purpose validation/formatting capabilities, published to dogfood the
