@@ -122,3 +122,31 @@ hash-fragment one.
 pipeline (`gather_catalog_data.py`/`catalog-builder`) doesn't process
 `workflows/` at all yet (registry#124's own disclosed gap), so there's
 nothing to statically render for them until that lands.
+
+## Analytics (registry#133, decision-log entry 45)
+
+`catalog/analytics.js` loads [Plausible](https://plausible.io) (hosted,
+privacy-first -- no cookies, no PII, no consent banner needed) and exposes
+two small helpers, `trackPageview(url)` and `trackSearch(query, resultCount)`.
+Both `catalog/index.html` and every page
+`scripts/ci/generate_catalog_pages.py` generates load this same script, so
+both surfaces report consistently under one account instead of drifting
+apart.
+
+- **Page views**: the generated static pages get Plausible's automatic
+  pageview tracking for free (each is a real, separate document). The SPA
+  additionally fires a manual, URL-overridden pageview on hash navigation
+  (attributed to the *same* real permalink URL its static-page counterpart
+  uses, via Plausible's `u` override) -- so a capability viewed through
+  either surface counts under one URL, not two.
+- **Search**: a debounced (600ms after the user stops typing) `Search`
+  custom event with `query` and `results` count as properties. Zero-result
+  searches aren't specially flagged beyond `results: 0` -- Plausible's own
+  dashboard can filter/segment by that property directly.
+
+**This repo does not, and cannot, create the actual Plausible account or
+register `registry.traverse-framework.com` with it** -- that's a one-time
+setup step for the repo owner to do directly (creating third-party accounts
+isn't something this codebase does on anyone's behalf). Until that's done,
+these events are sent to an unregistered domain and Plausible silently drops
+them; nothing else about the site depends on it or breaks in the meantime.

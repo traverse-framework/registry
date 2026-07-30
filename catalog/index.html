@@ -14,6 +14,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="./style.css">
+<script defer src="./analytics.js"></script>
 </head>
 <body>
 <nav class="nav">
@@ -30,6 +31,7 @@
   var catalog = null;
   var showDeprecated = true;
   var searchQuery = "";
+  var searchDebounceTimer = null;
 
   // ─── Theme toggle ──────────────────────────────────────────────────────
   var themeBtn = document.getElementById("theme-toggle");
@@ -109,7 +111,16 @@
 
     var searchInput = el("input", { type: "search", id: "search", placeholder: "Search capabilities (e.g. \"currency\", \"email\", \"validate\")…" });
     searchInput.value = searchQuery;
-    searchInput.addEventListener("input", function () { searchQuery = searchInput.value; renderResultsGrid(); });
+    searchInput.addEventListener("input", function () {
+      searchQuery = searchInput.value;
+      renderResultsGrid();
+      // Debounced: track once the user pauses typing, not per keystroke.
+      clearTimeout(searchDebounceTimer);
+      var query = searchQuery.trim();
+      searchDebounceTimer = setTimeout(function () {
+        if (query !== "" && typeof trackSearch === "function") { trackSearch(query, visibleGroups().length); }
+      }, 600);
+    });
     appEl.appendChild(searchInput);
 
     var deprecatedToggle = el("input", { type: "checkbox", id: "show-deprecated" });
@@ -299,7 +310,21 @@
     window.scrollTo(0, 0);
   }
 
-  window.addEventListener("hashchange", router);
+  // Separate from router() (which also runs once on initial load): only
+  // fires on an actual navigation, so it doesn't double-count the
+  // automatic pageview analytics.js's script tag already sends on load.
+  window.addEventListener("hashchange", function () {
+    router();
+    if (typeof trackPageview !== "function") { return; }
+    var match = window.location.hash.match(/^#\/capability\/(.+)$/);
+    var cap = match && catalog.capabilities.find(function (c) { return c.reference === decodeURIComponent(match[1]); });
+    if (cap) {
+      var permalink = window.location.origin + "/capability/" + cap.contract.namespace + "/" + cap.contract.id + "/" + cap.contract.version + "/";
+      trackPageview(permalink);
+    } else {
+      trackPageview();
+    }
+  });
   appEl.appendChild(el("p", { className: "empty", textContent: "Loading catalog…" }));
 
   fetch("./catalog.json")
