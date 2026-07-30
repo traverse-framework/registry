@@ -146,21 +146,39 @@ jobs:
         with:
           toolchain: "1.94.0"
           targets: wasm32-unknown-unknown
+          components: llvm-tools-preview
 
       - name: Cache cargo
         uses: Swatinem/rust-cache@v2
         with:
-          workspaces: capability-src/catalog-builder
+          workspaces: |
+            capability-src/catalog-builder
+            capability-src/validate-luhn
+            capability-src/validate-email
+            capability-src/normalize-phone-number
+            capability-src/score-password-strength
+            capability-src/format-currency
+            capability-src/traverse-starter-process
+            capability-src/traverse-starter-validate
+            capability-src/traverse-starter-summarize
+            capability-src/doc-approval-analyze
+            capability-src/doc-approval-recommend
+            capability-src/meeting-notes-process
 
       - name: Install wasmtime
         run: |
           curl https://wasmtime.dev/install.sh -sSf | bash
           echo "$HOME/.wasmtime/bin" >> "$GITHUB_PATH"
 
+      - name: Install cargo-llvm-cov
+        uses: taiki-e/install-action@cargo-llvm-cov
+
       - name: Build catalog-builder
         run: cargo build --release --target wasm32-unknown-unknown --manifest-path capability-src/catalog-builder/Cargo.toml
 
       - name: Gather capability metadata
+        # Also measures real test_coverage per capability (cargo llvm-cov)
+        # for each id's current version -- see gather_catalog_data.py.
         run: python3 scripts/ci/gather_catalog_data.py /tmp/gathered.json
 
       - name: Run catalog-builder

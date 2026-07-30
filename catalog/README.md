@@ -2,16 +2,31 @@
 
 `index.html` is the thin static template referenced in registry#105's design
 (decision-log entry 40): plain HTML/CSS/vanilla JS, no build step, no
-framework. It fetches `./catalog.json` at page-load time and renders a
-searchable list of every published capability (deprecated versions included
-by default -- a checkbox lets a viewer hide them), plus a hash-routed
-(`#/capability/<namespace>/<id>@<version>`) detail view per capability with
-its full contract: description, input/output schemas, `use_cases`, owner,
-artifact digest/URL, and a collapsible raw `contract.json`. Client-side
-routing was chosen over generating one static HTML file per capability
-because the WASM ABI only allows a single output stream (`fd_write`) per
-invocation -- `catalog-builder` can only ever produce one JSON document, not
-N files.
+framework. Styled to match `traverse-framework/website`'s own design tokens
+(dark purple/orange theme, Space Grotesk/Inter/JetBrains Mono, card/badge/
+code-block components) rather than inventing a separate visual language, with
+a light-mode toggle.
+
+It fetches `./catalog.json` at page-load time and renders:
+
+- A **list view** grouped one card per `namespace/id` (not one per version --
+  each card shows the current/highest version, a "N versions" badge, a
+  coverage badge, and a use-case count), with deprecated capabilities shown
+  by default (a checkbox hides them) and free-text search across
+  `search_index`.
+- A hash-routed (`#/capability/<namespace>/<id>@<version>`, shareable)
+  **detail view** per capability version: description, a prominent **use
+  cases** section (color-coded happy/unhappy, real input/output JSON),
+  **test coverage** (real `cargo llvm-cov` line/function/region percentages
+  and test count -- see below), an **interface** section (input/output JSON
+  schemas plus execution constraints and permissions), a **version history**
+  list linking every version of that same capability id (marking the current
+  and any deprecated ones), and a collapsible raw `contract.json`.
+
+Client-side routing was chosen over generating one static HTML file per
+capability because the WASM ABI only allows a single output stream
+(`fd_write`) per invocation -- `catalog-builder` can only ever produce one
+JSON document, not N files.
 
 `catalog.json` is **generated, not checked in** -- produced by piping
 `scripts/ci/gather_catalog_data.py`'s output through the `catalog-builder`
@@ -40,7 +55,8 @@ needing to grow a new field mapping every time the contract schema does:
     {
       "reference": "validation/validation.validate-luhn@1.1.0",
       "deprecated": false,
-      "contract": { "namespace": "validation", "id": "validation.validate-luhn", "version": "1.1.0", "...": "the full contract.json" }
+      "contract": { "namespace": "validation", "id": "validation.validate-luhn", "version": "1.1.0", "...": "the full contract.json" },
+      "test_coverage": { "lines_percent": 98.8, "functions_percent": 100.0, "regions_percent": 99.3, "test_count": 5 }
     }
   ],
   "search_index": {
@@ -48,6 +64,17 @@ needing to grow a new field mapping every time the contract schema does:
   }
 }
 ```
+
+`test_coverage` is **real, measured data** (`cargo llvm-cov --json --summary-only`
+against the crate under `capability-src/` whose source currently backs the
+capability), not a fabricated or assumed number -- and it is attached only to
+whichever version of each id is *current* (the one whose logic still lives in
+`capability-src/`; older/deprecated versions get `null`, since their actual
+implementation isn't retained separately in this repo to measure honestly).
+See `scripts/ci/gather_catalog_data.py`'s `CURRENT_CRATE_FOR_ID` mapping.
+Requires `cargo-llvm-cov` (and the `llvm-tools-preview` rustup component) on
+`PATH` -- the `build-catalog` CI job installs it via
+`taiki-e/install-action@cargo-llvm-cov`.
 
 Note: `capability-src/wasi-capability-runtime`'s bump-allocator heap was
 raised from 1 MiB to 16 MiB to fit this -- the original size assumed one
