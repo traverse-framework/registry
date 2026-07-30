@@ -16,6 +16,12 @@ deliberately not filtered here, so the catalog-builder capability (or a
 future template) decides what to do with deprecated entries, rather than
 this script silently deciding for it.
 
+Carries the *entire* contract.json per entry, not a hand-picked field
+subset -- the catalog's per-capability detail page needs "all the infos"
+(inputs/outputs schema, use_cases, owner, provenance, artifact, etc.), and
+re-curating a field list here every time the contract schema grows is
+exactly the kind of drift this script should not own.
+
 Usage: gather_catalog_data.py <output_path>
 """
 
@@ -37,13 +43,8 @@ def gather_catalog_data() -> list:
 
         entries.append(
             {
-                "namespace": contract.get("namespace"),
-                "id": contract.get("id"),
-                "version": contract.get("version"),
-                "summary": contract.get("summary"),
-                "description": contract.get("description"),
-                "use_cases": contract.get("use_cases"),
                 "deprecated": deprecated,
+                "contract": contract,
             }
         )
 

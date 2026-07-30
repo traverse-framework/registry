@@ -5,8 +5,11 @@
 //! Input: the flat JSON array `scripts/ci/gather_catalog_data.py` produces
 //! by walking `capabilities/**/contract.json` (the WASM ABI only allows a
 //! single input/single output via `fd_read`/`fd_write`, no filesystem
-//! access, so this crate cannot walk the tree itself). Output: one JSON
-//! object with a deterministically sorted `capabilities` list and a
+//! access, so this crate cannot walk the tree itself) -- each element is
+//! `{deprecated: bool, contract: <full contract.json>}`. Output: one JSON
+//! object with a deterministically sorted `capabilities` list (each entry
+//! carrying the *entire* source contract, not a hand-picked field subset --
+//! the catalog's per-capability detail page needs "all the infos") and a
 //! `search_index` (lowercase token -> sorted `namespace/id@version`
 //! references), which registry#106's GitHub Pages template renders and
 //! searches client-side.
@@ -43,10 +46,10 @@ fn tokenize_into(text: &str, tokens: &mut BTreeSet<String>) {
     }
 }
 
-/// `use_cases` isn't schema-fixed to one shape yet (contracts are only just
-/// starting to populate it, registry#107) -- walk whatever JSON is there
-/// (string, array, or object) and pull every string leaf into the token
-/// text rather than assuming a specific structure.
+/// `use_cases` (and other nested contract fields) aren't walked field by
+/// field for tokenizing -- pull every string leaf out of whatever JSON
+/// shape is there, so a schema change elsewhere in the contract doesn't
+/// silently stop contributing to search.
 fn append_text_leaves(value: &Value, out: &mut String) {
     match value {
         Value::String(s) => {
@@ -74,16 +77,18 @@ fn build_catalog(input: &Value) -> Value {
     let mut index: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
 
     for record in records {
-        let namespace = record.get("namespace").and_then(Value::as_str).unwrap_or("");
-        let id = record.get("id").and_then(Value::as_str).unwrap_or("");
-        let version = record.get("version").and_then(Value::as_str).unwrap_or("");
+        let contract = match record.get("contract") {
+            Some(c) => c,
+            None => continue,
+        };
+        let namespace = contract.get("namespace").and_then(Value::as_str).unwrap_or("");
+        let id = contract.get("id").and_then(Value::as_str).unwrap_or("");
+        let version = contract.get("version").and_then(Value::as_str).unwrap_or("");
         if namespace.is_empty() || id.is_empty() || version.is_empty() {
             // Gather script always populates these for a real contract;
             // skip rather than emit an unusable catalog entry.
             continue;
         }
-        let summary = record.get("summary").and_then(Value::as_str).unwrap_or("");
-        let description = record.get("description").and_then(Value::as_str).unwrap_or("");
         let deprecated = record
             .get("deprecated")
             .and_then(Value::as_bool)
@@ -91,15 +96,22 @@ fn build_catalog(input: &Value) -> Value {
 
         let reference = capability_reference(namespace, id, version);
 
+        // Search text is namespace/id/summary/description/use_cases only --
+        // deliberately not the whole contract (inputs/outputs schemas,
+        // provenance, etc. would just add noise to token matches).
         let mut text = String::new();
         text.push_str(namespace);
         text.push(' ');
         text.push_str(id);
-        text.push(' ');
-        text.push_str(summary);
-        text.push(' ');
-        text.push_str(description);
-        if let Some(use_cases) = record.get("use_cases") {
+        if let Some(summary) = contract.get("summary").and_then(Value::as_str) {
+            text.push(' ');
+            text.push_str(summary);
+        }
+        if let Some(description) = contract.get("description").and_then(Value::as_str) {
+            text.push(' ');
+            text.push_str(description);
+        }
+        if let Some(use_cases) = contract.get("use_cases") {
             append_text_leaves(use_cases, &mut text);
         }
 
@@ -110,12 +122,9 @@ fn build_catalog(input: &Value) -> Value {
         }
 
         capabilities.push(object(alloc::vec![
-            ("namespace", Value::String(String::from(namespace))),
-            ("id", Value::String(String::from(id))),
-            ("version", Value::String(String::from(version))),
-            ("summary", Value::String(String::from(summary))),
-            ("deprecated", Value::Bool(deprecated)),
             ("reference", Value::String(reference)),
+            ("deprecated", Value::Bool(deprecated)),
+            ("contract", contract.clone()),
         ]));
     }
 
@@ -154,14 +163,7 @@ mod tests {
     use super::*;
     use alloc::vec;
 
-    fn record(
-        namespace: &str,
-        id: &str,
-        version: &str,
-        summary: &str,
-        description: &str,
-        deprecated: bool,
-    ) -> Value {
+    fn contract(namespace: &str, id: &str, version: &str, summary: &str, description: &str) -> Value {
         object(vec![
             ("namespace", Value::String(String::from(namespace))),
             ("id", Value::String(String::from(id))),
@@ -169,7 +171,13 @@ mod tests {
             ("summary", Value::String(String::from(summary))),
             ("description", Value::String(String::from(description))),
             ("use_cases", Value::Null),
+        ])
+    }
+
+    fn record(contract_value: Value, deprecated: bool) -> Value {
+        object(vec![
             ("deprecated", Value::Bool(deprecated)),
+            ("contract", contract_value),
         ])
     }
 
@@ -177,19 +185,23 @@ mod tests {
     fn builds_sorted_capability_list_and_reference() {
         let input = Value::Array(vec![
             record(
-                "validation",
-                "validation.validate-luhn",
-                "1.0.0",
-                "Checksum-format validation",
-                "Validates card-number-shaped strings via the Luhn algorithm",
+                contract(
+                    "validation",
+                    "validation.validate-luhn",
+                    "1.0.0",
+                    "Checksum-format validation",
+                    "Validates card-number-shaped strings via the Luhn algorithm",
+                ),
                 false,
             ),
             record(
-                "doc-approval",
-                "doc-approval.analyze",
-                "1.2.0",
-                "Analyze a document for approval signals",
-                "Extracts approving parties from document text",
+                contract(
+                    "doc-approval",
+                    "doc-approval.analyze",
+                    "1.2.0",
+                    "Analyze a document for approval signals",
+                    "Extracts approving parties from document text",
+                ),
                 false,
             ),
         ]);
@@ -209,22 +221,42 @@ mod tests {
     }
 
     #[test]
+    fn full_contract_is_passed_through_verbatim() {
+        let source_contract = contract(
+            "validation",
+            "validation.validate-luhn",
+            "1.0.0",
+            "Checksum-format validation",
+            "Validates card-number-shaped strings via the Luhn algorithm",
+        );
+        let input = Value::Array(vec![record(source_contract.clone(), false)]);
+
+        let catalog = build_catalog(&input);
+        let capabilities = catalog.get("capabilities").unwrap().as_array().unwrap();
+        assert_eq!(capabilities[0].get("contract").unwrap(), &source_contract);
+    }
+
+    #[test]
     fn search_index_maps_token_to_matching_references_only() {
         let input = Value::Array(vec![
             record(
-                "validation",
-                "validation.validate-luhn",
-                "1.0.0",
-                "Luhn checksum validation",
-                "Card-number-shaped string check",
+                contract(
+                    "validation",
+                    "validation.validate-luhn",
+                    "1.0.0",
+                    "Luhn checksum validation",
+                    "Card-number-shaped string check",
+                ),
                 false,
             ),
             record(
-                "formatting",
-                "formatting.format-currency",
-                "1.0.0",
-                "Currency formatting",
-                "Formats a numeric amount as a localized currency string",
+                contract(
+                    "formatting",
+                    "formatting.format-currency",
+                    "1.0.0",
+                    "Currency formatting",
+                    "Formats a numeric amount as a localized currency string",
+                ),
                 false,
             ),
         ]);
@@ -246,22 +278,19 @@ mod tests {
             Some("formatting/formatting.format-currency@1.0.0")
         );
 
-        // Shared token across both summaries/descriptions.
-        assert!(index.get("string").is_none() || {
-            let shared = index.get("string").unwrap().as_array().unwrap();
-            shared.len() <= 2
-        });
         assert!(index.get("nonexistent-token").is_none());
     }
 
     #[test]
     fn deprecated_flag_is_preserved_not_filtered() {
         let input = Value::Array(vec![record(
-            "validation",
-            "validation.validate-email",
-            "1.0.0",
-            "Email validation",
-            "Validates email address format",
+            contract(
+                "validation",
+                "validation.validate-email",
+                "1.0.0",
+                "Email validation",
+                "Validates email address format",
+            ),
             true,
         )]);
 
@@ -272,11 +301,23 @@ mod tests {
     }
 
     #[test]
-    fn malformed_record_missing_identity_is_skipped() {
-        let input = Value::Array(vec![object(vec![(
-            "summary",
-            Value::String(String::from("no namespace/id/version")),
-        )])]);
+    fn malformed_record_missing_contract_is_skipped() {
+        let input = Value::Array(vec![object(vec![("deprecated", Value::Bool(false))])]);
+
+        let catalog = build_catalog(&input);
+        let capabilities = catalog.get("capabilities").unwrap().as_array().unwrap();
+        assert!(capabilities.is_empty());
+    }
+
+    #[test]
+    fn malformed_contract_missing_identity_is_skipped() {
+        let input = Value::Array(vec![record(
+            object(vec![(
+                "summary",
+                Value::String(String::from("no namespace/id/version")),
+            )]),
+            false,
+        )]);
 
         let catalog = build_catalog(&input);
         let capabilities = catalog.get("capabilities").unwrap().as_array().unwrap();
@@ -293,19 +334,11 @@ mod tests {
     #[test]
     fn output_genuinely_differs_across_distinct_inputs() {
         let one = build_catalog(&Value::Array(vec![record(
-            "core",
-            "core.a",
-            "1.0.0",
-            "alpha",
-            "alpha capability",
+            contract("core", "core.a", "1.0.0", "alpha", "alpha capability"),
             false,
         )]));
         let two = build_catalog(&Value::Array(vec![record(
-            "core",
-            "core.b",
-            "1.0.0",
-            "bravo",
-            "bravo capability",
+            contract("core", "core.b", "1.0.0", "bravo", "bravo capability"),
             false,
         )]));
         assert_ne!(one, two, "output must depend on input, not be fixed");
