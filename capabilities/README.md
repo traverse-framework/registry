@@ -23,12 +23,12 @@ real, input-dependent, ABI-compliant logic:
 
 | namespace | id | current version |
 |---|---|---|
-| `traverse-starter` | `traverse-starter.process` | 1.2.0 |
-| `traverse-starter` | `traverse-starter.validate` | 1.2.0 |
-| `traverse-starter` | `traverse-starter.summarize` | 1.2.0 |
-| `doc-approval` | `doc-approval.analyze` | 1.3.0 |
-| `doc-approval` | `doc-approval.recommend` | 1.2.0 |
-| `meeting-notes` | `meeting-notes.process` | 1.3.0 |
+| `traverse-starter` | `traverse-starter.process` | 1.2.1 |
+| `traverse-starter` | `traverse-starter.validate` | 1.2.1 |
+| `traverse-starter` | `traverse-starter.summarize` | 1.2.1 |
+| `doc-approval` | `doc-approval.analyze` | 1.3.1 |
+| `doc-approval` | `doc-approval.recommend` | 1.2.1 |
+| `meeting-notes` | `meeting-notes.process` | 1.3.1 |
 
 **Resolved (2026-07-28, first pass)**: the original `1.0.0`s all shared one identical
 36-byte stub digest — concrete proof no real content had ever been built. Each `1.0.1`
@@ -89,6 +89,16 @@ input/output example pairs (schema-conformant, not hand-waved) -- authored fresh
 these six, since no prior use-case documentation existed for them despite an earlier
 (inaccurate) README claim to that effect.
 
+**`scenario` rewritten as a full user story (2026-07-30, #139, decision-log entry 46,
+patch bump each)**: every `use_cases[].scenario` was a plain declarative sentence
+(e.g. "A document with a recognized type... reaches high confidence.") rather than the
+"As a `<persona>`, I want to `<action>`, so that `<benefit>`." format FR-011 was
+amended to require. Rewritten with real personas grounded in how each capability is
+actually used (an accounts-payable clerk, an approvals manager, a meeting organizer) --
+`input_example`/`output_example`/`happy` are untouched, only `scenario` text changed,
+which `capability_validation.py`'s own `classify_change()` confirms is a patch-class
+change, not minor.
+
 **Kit workflows published (2026-07-29, #124, spec 001 FR-013)**: `traverse-starter`
 (`validate` -> `process` -> `summarize`) and `doc-approval` (`analyze` -> `recommend`)
 are now published as first-class, versioned workflow records under
@@ -126,11 +136,11 @@ surfaced and fixed):
 
 | namespace | id | current version |
 |---|---|---|
-| `validation` | `validation.validate-email` | 1.2.0 |
-| `validation` | `validation.normalize-phone-number` | 1.2.0 |
-| `validation` | `validation.score-password-strength` | 1.1.0 |
-| `validation` | `validation.validate-luhn` | 1.1.0 |
-| `formatting` | `formatting.format-currency` | 1.1.0 |
+| `validation` | `validation.validate-email` | 1.2.1 |
+| `validation` | `validation.normalize-phone-number` | 1.2.1 |
+| `validation` | `validation.score-password-strength` | 1.1.1 |
+| `validation` | `validation.validate-luhn` | 1.1.1 |
+| `formatting` | `formatting.format-currency` | 1.1.1 |
 
 **Labeled utility-tier, not "business capabilities"**: the AI-advisory review
 (`.agents/skills/capability-review/`) flagged a genuine boundary question when the
@@ -164,6 +174,12 @@ happy/unhappy examples above into the schema's `{scenario, input_example,
 output_example, happy}` shape -- each pair independently re-verified against the real
 compiled `wasmtime` output as part of this backfill, not just copied from the test
 source.
+
+**`scenario` rewritten as a full user story (2026-07-30, #139, decision-log entry 46,
+patch bump each)**: same rewrite as the six reference-app capabilities above, with
+personas grounded in these five's own real usage (a signup/checkout/payment form
+developer) -- `input_example`/`output_example`/`happy` untouched, only `scenario` text
+changed.
 
 Source for all five lives under `capability-src/` (`validate-email/`,
 `normalize-phone-number/`, `score-password-strength/`, `validate-luhn/`,
