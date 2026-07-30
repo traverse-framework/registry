@@ -27,6 +27,16 @@ deserialize once it hits one null record):
     mechanism already treating index presence as additive, not something
     the underlying files control directly.
 
+Also implements specs/001-registry-foundation/spec.md FR-013 (decision-log
+entry 44): a `workflows[]` array, built the same way `capabilities[]` is.
+A workflow.json has no separate compiled artifact -- the JSON file itself is
+the whole published record -- so each entry gets a `workflow_digest`/
+`workflow_url` pair (the same provenance purpose as `contract_digest`/
+`contract_url` above) instead of an `artifact`-style digest/url pair.
+`workflows/examples/` is excluded -- it holds pre-FR-013 demo/fixture
+content that doesn't follow the real `workflows/<namespace>/<id>/<version>/`
+layout, the same way this script never walks `examples/applications/`.
+
 Usage: build_index.py <previous_index_version_or_0> <source_commit_sha> <output_path> [repo_slug]
 """
 
@@ -104,7 +114,46 @@ def build_index(previous_index_version: int, source_commit: str, repo_slug: str 
         "generated_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "source_commit": source_commit,
         "capabilities": entries,
+        "workflows": build_workflow_entries(source_commit, repo_slug),
     }
+
+
+def build_workflow_entries(source_commit: str, repo_slug: str) -> list:
+    workflows_dir = Path("workflows")
+    entries = []
+
+    if not workflows_dir.is_dir():
+        return entries
+
+    for workflow_path in sorted(p for p in workflows_dir.rglob("workflow.json") if "examples" not in p.parts):
+        try:
+            raw_bytes = workflow_path.read_bytes()
+            workflow = json.loads(raw_bytes)
+        except Exception as exc:
+            raise IndexBuildError(
+                "index.workflow_unreadable",
+                str(workflow_path),
+                f"Unable to read/parse workflow.json: {exc}",
+            )
+
+        deprecated_path = workflow_path.parent / "deprecated.json"
+        deprecated = deprecated_path.is_file()
+
+        workflow_digest = f"sha256:{hashlib.sha256(raw_bytes).hexdigest()}"
+        workflow_url = f"https://raw.githubusercontent.com/{repo_slug}/{source_commit}/{workflow_path.as_posix()}"
+
+        entries.append(
+            {
+                "namespace": workflow.get("namespace"),
+                "id": workflow.get("id"),
+                "version": workflow.get("version"),
+                "workflow_digest": workflow_digest,
+                "workflow_url": workflow_url,
+                "deprecated": deprecated,
+            }
+        )
+
+    return entries
 
 
 def main() -> int:
@@ -127,7 +176,10 @@ def main() -> int:
         return 1
 
     output_path.write_text(json.dumps(index, indent=2) + "\n")
-    print(f"Built index_version={index['index_version']} with {len(index['capabilities'])} capabilities at {output_path}")
+    print(
+        f"Built index_version={index['index_version']} with {len(index['capabilities'])} capabilities "
+        f"and {len(index['workflows'])} workflows at {output_path}"
+    )
     return 0
 
 

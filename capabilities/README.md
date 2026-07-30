@@ -28,7 +28,7 @@ real, input-dependent, ABI-compliant logic:
 | `traverse-starter` | `traverse-starter.summarize` | 1.2.0 |
 | `doc-approval` | `doc-approval.analyze` | 1.3.0 |
 | `doc-approval` | `doc-approval.recommend` | 1.2.0 |
-| `meeting-notes` | `meeting-notes.process` | 1.2.0 |
+| `meeting-notes` | `meeting-notes.process` | 1.3.0 |
 
 **Resolved (2026-07-28, first pass)**: the original `1.0.0`s all shared one identical
 36-byte stub digest — concrete proof no real content had ever been built. Each `1.0.1`
@@ -88,6 +88,19 @@ carry a `use_cases` array (spec 001 FR-011) with concrete, `wasmtime`-verified
 input/output example pairs (schema-conformant, not hand-waved) -- authored fresh for
 these six, since no prior use-case documentation existed for them despite an earlier
 (inaccurate) README claim to that effect.
+
+**Kit workflows published (2026-07-29, #124, spec 001 FR-013)**: `traverse-starter`
+(`validate` -> `process` -> `summarize`) and `doc-approval` (`analyze` -> `recommend`)
+are now published as first-class, versioned workflow records under
+[`workflows/traverse-starter/traverse-starter.process-note/1.0.0/`](../workflows/traverse-starter/traverse-starter.process-note/1.0.0)
+and
+[`workflows/doc-approval/doc-approval.review-document/1.0.0/`](../workflows/doc-approval/doc-approval.review-document/1.0.0),
+included in the public index's new `workflows[]` array (same build/immutability rules
+as `capabilities[]`). `meeting-notes.process` has no natural multi-step pipeline, so it
+instead got a minor-version republish (1.2.0 -> 1.3.0) adding a boolean
+`"entrypoint": true` marker directly on its own contract, per FR-013's explicit
+single-capability-entrypoint carve-out -- no workflow wrapper forced around one
+capability.
 
 ## Utility-tier capabilities (added 2026-07-29)
 

@@ -124,26 +124,124 @@ def validate_contract(path: Path, errors: list) -> None:
             fail(errors, "contract.invalid_digest_format", str(path), "artifact digest must be a 'sha256:' prefixed value")
 
 
-def check_immutability(base_sha: str, head_sha: str, errors: list) -> None:
-    """FR: no PR may modify an existing contract.json (specs/001 FR-002, specs/005 FR-002)."""
-    diff = subprocess.check_output(
-        ["git", "diff", "--name-status", f"{base_sha}...{head_sha}", "--", "capabilities/"],
-        text=True,
-    )
-    for line in diff.splitlines():
-        if not line.strip():
+def real_workflow_paths(workflows_dir: Path):
+    """Real, published workflow.json files only -- excludes
+    workflows/examples/, which holds demo/fixture content
+    (workflows/examples/expedition/plan-expedition/) that predates FR-013's
+    real workflows/<namespace>/<id>/<version>/ layout and doesn't follow it,
+    the same way capability_validation.py never walks examples/applications/."""
+    return sorted(p for p in workflows_dir.rglob("workflow.json") if "examples" not in p.parts)
+
+
+def validate_workflow(path: Path, errors: list) -> None:
+    """Workflow records are governed the same way capability records are
+    (spec 001 FR-013, referencing FR-001/FR-002): immutable versioned
+    directories, path-consistent identity, valid semver. Not every
+    capability-specific check applies -- a workflow.json has no `artifact`
+    or forbidden `scope` field -- so this validates the structural subset
+    that genuinely carries over, not a full duplicate of validate_contract.
+    """
+    try:
+        workflow = json.loads(path.read_text())
+    except Exception as exc:
+        fail(errors, "workflow.invalid_json", str(path), f"Unable to parse JSON: {exc}")
+        return
+
+    for field in ["id", "namespace", "owner", "version", "nodes", "edges", "start_node", "terminal_nodes"]:
+        if field not in workflow:
+            fail(errors, "workflow.missing_required_field", str(path), f"Missing required field '{field}'")
+
+    # path is workflows/<namespace>/<id>/<version>/workflow.json
+    parts = path.parts
+    try:
+        idx = parts.index("workflows")
+        namespace_seg, id_seg, version_seg = parts[idx + 1], parts[idx + 2], parts[idx + 3]
+    except (ValueError, IndexError):
+        fail(errors, "workflow.bad_path", str(path), "Path does not match workflows/<namespace>/<id>/<version>/workflow.json")
+        return
+
+    namespace = workflow.get("namespace")
+    if namespace and namespace != namespace_seg:
+        fail(
+            errors,
+            "workflow.namespace_mismatch",
+            str(path),
+            f"workflow.json namespace '{namespace}' does not match path segment '{namespace_seg}'",
+        )
+
+    if workflow.get("id") and workflow.get("id") != id_seg:
+        fail(errors, "workflow.id_mismatch", str(path), f"workflow.json id '{workflow.get('id')}' does not match path segment '{id_seg}'")
+
+    version = workflow.get("version")
+    if version and version != version_seg:
+        fail(errors, "workflow.version_mismatch", str(path), f"workflow.json version '{version}' does not match path segment '{version_seg}'")
+    if version and not SEMVER_RE.match(version):
+        fail(errors, "workflow.invalid_semver", str(path), f"'{version}' is not a valid semver string")
+
+
+def check_workflow_capability_references(errors: list) -> None:
+    """A workflow's nodes must reference capability versions that actually
+    exist in this registry -- the workflow equivalent of
+    check_dependency_resolvability, applied to `nodes[].capability_id`/
+    `capability_version` instead of a capability's own `dependencies[]`."""
+    workflows_dir = Path("workflows")
+    capabilities_dir = Path("capabilities")
+    if not workflows_dir.is_dir():
+        return
+
+    published_versions: dict = {}
+    for contract_path in sorted(capabilities_dir.rglob("contract.json")):
+        try:
+            contract = json.loads(contract_path.read_text())
+        except Exception:
             continue
-        parts = line.split("\t")
-        status = parts[0]
-        path = parts[-1]
-        if path.endswith("contract.json") and status != "A":
-            fail(
-                errors,
-                "capabilities.contract_modified",
-                path,
-                f"contract.json must never be modified once published (git status: {status}). "
-                "Use a new version directory, or a deprecated.json sibling to yank.",
-            )
+        published_versions.setdefault(contract.get("id"), set()).add(contract.get("version"))
+
+    for workflow_path in real_workflow_paths(workflows_dir):
+        try:
+            workflow = json.loads(workflow_path.read_text())
+        except Exception:
+            continue
+        for node in workflow.get("nodes", []) or []:
+            capability_id = node.get("capability_id")
+            capability_version = node.get("capability_version")
+            if not capability_id or not capability_version:
+                continue
+            if capability_version not in published_versions.get(capability_id, set()):
+                fail(
+                    errors,
+                    "workflow.capability_reference_unresolvable",
+                    str(workflow_path),
+                    f"Node '{node.get('node_id')}' references {capability_id}@{capability_version}, "
+                    "which is not a published capability in this registry",
+                )
+
+
+def check_immutability(base_sha: str, head_sha: str, errors: list) -> None:
+    """FR: no PR may modify an existing contract.json/workflow.json once
+    published (specs/001 FR-002/FR-013, specs/005 FR-002)."""
+    for governed_dir, filename, error_code in (
+        ("capabilities/", "contract.json", "capabilities.contract_modified"),
+        ("workflows/", "workflow.json", "workflows.workflow_modified"),
+    ):
+        diff = subprocess.check_output(
+            ["git", "diff", "--name-status", f"{base_sha}...{head_sha}", "--", governed_dir],
+            text=True,
+        )
+        for line in diff.splitlines():
+            if not line.strip():
+                continue
+            parts = line.split("\t")
+            status = parts[0]
+            path = parts[-1]
+            if path.endswith(filename) and status != "A":
+                fail(
+                    errors,
+                    error_code,
+                    path,
+                    f"{filename} must never be modified once published (git status: {status}). "
+                    "Use a new version directory, or a deprecated.json sibling to yank.",
+                )
 
 
 def _semver_tuple(version: str):
@@ -260,12 +358,18 @@ def check_dependency_resolvability(errors: list) -> None:
 def main() -> int:
     errors: list = []
     capabilities_dir = Path("capabilities")
+    workflows_dir = Path("workflows")
 
     if capabilities_dir.is_dir():
         for contract_path in sorted(capabilities_dir.rglob("contract.json")):
             validate_contract(contract_path, errors)
         check_semver_bump(errors)
         check_dependency_resolvability(errors)
+
+    if workflows_dir.is_dir():
+        for workflow_path in real_workflow_paths(workflows_dir):
+            validate_workflow(workflow_path, errors)
+        check_workflow_capability_references(errors)
 
     base_sha = None
     head_sha = None
