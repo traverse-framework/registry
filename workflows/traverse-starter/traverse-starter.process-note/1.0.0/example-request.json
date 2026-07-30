@@ -1,0 +1,14 @@
+{
+  "kind": "example_request",
+  "schema_version": "1.0.0",
+  "workflow_id": "traverse-starter.process-note",
+  "workflow_version": "1.0.0",
+  "scenario": "A TODO-flavored note run through the full validate -> process -> summarize pipeline.",
+  "request": {
+    "note": "TODO: call the vendor about the invoice."
+  },
+  "expected_response": {
+    "summary": "TODO: call the vendor about the invoice (todo, new). Next: Add to the task list and assign an owner. [tags: todo]",
+    "wordCount": 21
+  }
+}

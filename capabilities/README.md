@@ -100,7 +100,14 @@ as `capabilities[]`). `meeting-notes.process` has no natural multi-step pipeline
 instead got a minor-version republish (1.2.0 -> 1.3.0) adding a boolean
 `"entrypoint": true` marker directly on its own contract, per FR-013's explicit
 single-capability-entrypoint carve-out -- no workflow wrapper forced around one
-capability.
+capability. See [`workflows/README.md`](../workflows/README.md) for the full layout.
+
+**Runnable example requests published (2026-07-29, #125)**: each kit entrypoint (the
+two workflows above, plus `meeting-notes.process`) now has a standalone
+`example-request.json` sibling -- a real `request`/`expected_response` pair, verified
+against the actual compiled WASM binaries (chained through every workflow node via
+`wasmtime run`, not hand-traced), so a consumer can `curl`/pipe a request without
+hand-composing one from `use_cases`.
 
 ## Utility-tier capabilities (added 2026-07-29)
 
