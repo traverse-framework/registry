@@ -8,6 +8,16 @@ contract.json), and checks yank records (specs/005-yank-deprecation)
 never accompany a modified contract.json. Also enforces the finalized
 owner/namespace/scope field shapes from specs/006-public-scope-and-identity
 FR-002 through FR-004.
+
+Also enforces specs/001-registry-foundation FR-011 (amended, decision-log
+entry 46, registry#140): a newly-published use_cases[].scenario must be a
+full user story, not a plain declarative sentence. Diff-based (only checks
+contract.json files newly ADDED in a PR, via git diff) rather than run
+against the whole historical tree -- older, already-published, immutable
+versions predate this requirement and can never be edited to match it, so
+checking them unconditionally would fail permanently and forever. See
+check_new_scenario_format's docstring for the concrete incident that
+confirmed this.
 """
 
 import json
@@ -28,6 +38,27 @@ REQUIRED_FIELDS = ["id", "namespace", "owner", "version"]
 
 def fail(errors, code, path, message):
     errors.append({"code": code, "path": path, "message": message})
+
+
+def is_user_story_scenario(scenario) -> bool:
+    """spec 001 FR-011 (amended, decision-log entry 46): a use_cases[]
+    scenario must be a full user story -- "As a <persona>, I want to
+    <action>, so that <benefit>." -- not a plain declarative sentence.
+    Deliberately permissive (substring presence + order, not a rigid
+    regex): real scenario prose varies in wording/punctuation around these
+    three clauses, and a strict pattern would false-positive on a
+    legitimately-phrased story."""
+    if not isinstance(scenario, str):
+        return False
+    lowered = scenario.lower()
+    as_a_index = lowered.find("as a")
+    if as_a_index == -1:
+        return False
+    i_want_index = lowered.find("i want", as_a_index)
+    if i_want_index == -1:
+        return False
+    so_that_index = lowered.find("so that", i_want_index)
+    return so_that_index != -1
 
 
 def validate_contract(path: Path, errors: list) -> None:
@@ -122,6 +153,55 @@ def validate_contract(path: Path, errors: list) -> None:
             )
         elif not str(artifact["digest"]).startswith("sha256:"):
             fail(errors, "contract.invalid_digest_format", str(path), "artifact digest must be a 'sha256:' prefixed value")
+
+
+def check_new_scenario_format(path: Path, errors: list) -> None:
+    """spec 001 FR-011 (amended, decision-log entry 46): a use_cases[]
+    scenario must be a full user story. Deliberately NOT called from
+    validate_contract, which runs unconditionally on every contract.json in
+    the tree, including every already-published, immutable older version --
+    those can never be edited to match a format introduced after they were
+    published, so checking them here would fail permanently and forever
+    (confirmed empirically: running this against the full pre-#139 tree
+    failed on 20 historical versions with no way to ever fix them). Wired
+    into main() as a diff-based check instead, the same way
+    check_immutability only looks at what a PR actually adds -- see
+    check_new_scenarios_are_user_stories below."""
+    try:
+        contract = json.loads(path.read_text())
+    except Exception:
+        return
+    use_cases = contract.get("use_cases")
+    if not isinstance(use_cases, list):
+        return
+    for index, use_case in enumerate(use_cases):
+        scenario = use_case.get("scenario") if isinstance(use_case, dict) else None
+        if not is_user_story_scenario(scenario):
+            fail(
+                errors,
+                "contract.scenario_not_user_story",
+                str(path),
+                f"use_cases[{index}].scenario must be a full user story "
+                "('As a <persona>, I want to <action>, so that <benefit>.'), "
+                f"not a plain declarative sentence (spec 001 FR-011): {scenario!r}",
+            )
+
+
+def check_new_scenarios_are_user_stories(base_sha: str, head_sha: str, errors: list) -> None:
+    """Only validates newly-ADDED contract.json files in this PR's diff --
+    see check_new_scenario_format's docstring for why this must not run
+    against the whole historical tree."""
+    diff = subprocess.check_output(
+        ["git", "diff", "--name-status", f"{base_sha}...{head_sha}", "--", "capabilities/"],
+        text=True,
+    )
+    for line in diff.splitlines():
+        if not line.strip():
+            continue
+        parts = line.split("\t")
+        status, path = parts[0], parts[-1]
+        if status == "A" and path.endswith("contract.json"):
+            check_new_scenario_format(Path(path), errors)
 
 
 def real_workflow_paths(workflows_dir: Path):
@@ -378,6 +458,10 @@ def main() -> int:
     if base_sha and head_sha:
         try:
             check_immutability(base_sha, head_sha, errors)
+        except subprocess.CalledProcessError as exc:
+            fail(errors, "git.diff_failed", "capabilities/", f"Unable to compute diff: {exc}")
+        try:
+            check_new_scenarios_are_user_stories(base_sha, head_sha, errors)
         except subprocess.CalledProcessError as exc:
             fail(errors, "git.diff_failed", "capabilities/", f"Unable to compute diff: {exc}")
 

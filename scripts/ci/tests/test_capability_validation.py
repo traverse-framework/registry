@@ -207,5 +207,84 @@ class WorkflowValidationFR013Tests(unittest.TestCase):
             self.assertIn("workflow.invalid_json", codes)
 
 
+class ScenarioUserStoryFormatTests(unittest.TestCase):
+    """registry#140, decision-log entry 46: use_cases[].scenario must be a
+    full user story. is_user_story_scenario is deliberately permissive
+    (substring presence + order), not a rigid regex -- see its docstring."""
+
+    def test_valid_user_story_passes(self):
+        self.assertTrue(
+            capability_validation.is_user_story_scenario(
+                "As a developer, I want to validate an email address, so that I can reject malformed input early."
+            )
+        )
+
+    def test_plain_declarative_sentence_fails(self):
+        self.assertFalse(capability_validation.is_user_story_scenario("A well-formed address is accepted."))
+
+    def test_missing_so_that_clause_fails(self):
+        self.assertFalse(capability_validation.is_user_story_scenario("As a developer, I want to validate an email."))
+
+    def test_wrong_clause_order_fails(self):
+        # "so that" appearing before "i want" is not a valid story, even
+        # though all three substrings are technically present somewhere.
+        self.assertFalse(
+            capability_validation.is_user_story_scenario("So that signups work, as a developer I want validation.")
+        )
+
+    def test_non_string_scenario_fails(self):
+        self.assertFalse(capability_validation.is_user_story_scenario(None))
+        self.assertFalse(capability_validation.is_user_story_scenario(42))
+
+    def test_case_insensitive(self):
+        self.assertTrue(
+            capability_validation.is_user_story_scenario(
+                "AS A developer, I WANT to validate email, SO THAT signups are clean."
+            )
+        )
+
+
+def write_use_case_contract(tmp_dir: str, scenario, namespace="core", cap_id="example-capability", version="1.0.0") -> Path:
+    contract = {
+        "id": cap_id,
+        "namespace": namespace,
+        "owner": {"team": "platform"},
+        "version": version,
+        "use_cases": [{"scenario": scenario, "input_example": {}, "output_example": {}, "happy": True}],
+    }
+    return write_contract(tmp_dir, contract, namespace=namespace, cap_id=cap_id, version=version)
+
+
+class CheckNewScenarioFormatTests(unittest.TestCase):
+    """check_new_scenario_format is the per-file check
+    check_new_scenarios_are_user_stories (git-diff based, only run against
+    newly-added contract.json files in a PR -- see its docstring for why it
+    must never run against the whole historical tree) calls per path."""
+
+    def test_valid_user_story_scenario_passes(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = write_use_case_contract(
+                tmp, "As a developer, I want to validate an email address, so that signups are clean."
+            )
+            errors: list = []
+            capability_validation.check_new_scenario_format(path, errors)
+            self.assertEqual(errors, [])
+
+    def test_plain_declarative_scenario_is_rejected(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = write_use_case_contract(tmp, "A well-formed address is accepted.")
+            errors: list = []
+            capability_validation.check_new_scenario_format(path, errors)
+            codes = [e["code"] for e in errors]
+            self.assertIn("contract.scenario_not_user_story", codes)
+
+    def test_contract_without_use_cases_is_not_flagged(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = write_contract(tmp, valid_contract())
+            errors: list = []
+            capability_validation.check_new_scenario_format(path, errors)
+            self.assertEqual(errors, [])
+
+
 if __name__ == "__main__":
     unittest.main()
