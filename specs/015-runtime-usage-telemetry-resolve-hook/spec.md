@@ -48,4 +48,4 @@ This specification governs the resolve-hook behavior change to `crates/traverse-
 
 ## Implementation Ticket
 
-- `traverse-framework/registry`#144 — emit the `resolve` event via the port inside `crates/traverse-registry`'s resolution path (this repo's Project 3), blocked on `traverse-framework/traverse`#927 (port trait) publishing.
+- `traverse-framework/registry`#145 — emit the `resolve` event via the port inside `crates/traverse-registry`'s resolution path (this repo's Project 3), blocked on `traverse-framework/traverse`#927 (port trait) publishing.
