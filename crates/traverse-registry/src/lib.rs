@@ -9,6 +9,7 @@ mod federation;
 mod graph;
 mod model_resolution;
 mod native_runtime_artifact;
+mod observed_lineage;
 mod public_registry_cache;
 mod public_registry_state;
 pub mod semver_resolver;
@@ -26,6 +27,7 @@ pub use federation::*;
 pub use graph::*;
 pub use model_resolution::*;
 pub use native_runtime_artifact::*;
+pub use observed_lineage::*;
 pub use public_registry_cache::*;
 pub use public_registry_state::*;
 pub use semver_resolver::{
