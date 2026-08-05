@@ -440,3 +440,90 @@ fn event_product_key(scope: RegistryScope, descriptor: &EventProductDescriptor) 
         descriptor.contract.version.clone(),
     )
 }
+
+/// Catalog/discovery filters over registered event products (spec 016
+/// FR-010). Every field is optional; an absent field imposes no
+/// constraint, so an all-`None` query returns everything `discover` would.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct EventProductCatalogQuery {
+    pub event_id: Option<String>,
+    pub capability_id: Option<String>,
+    pub domain: Option<String>,
+    pub owner_team: Option<String>,
+    pub lifecycle: Option<Lifecycle>,
+    pub classification: Option<DataClassification>,
+}
+
+impl EventProductRegistry {
+    /// Deterministic catalog/discovery search: filters `discover`'s
+    /// already-deterministic, precedence-ordered results by every
+    /// non-`None` field in `query`. `capability_id` matches either a
+    /// declared publisher or a declared subscriber. `classification`
+    /// matches when any of the descriptor's field classifications is at
+    /// that level.
+    #[must_use]
+    pub fn catalog_search(
+        &self,
+        lookup_scope: LookupScope,
+        query: &EventProductCatalogQuery,
+    ) -> Vec<&EventProductDescriptor> {
+        self.discover(lookup_scope)
+            .into_iter()
+            .filter(|descriptor| matches_query(descriptor, query))
+            .collect()
+    }
+}
+
+fn matches_query(descriptor: &EventProductDescriptor, query: &EventProductCatalogQuery) -> bool {
+    let contract = &descriptor.contract;
+
+    if let Some(event_id) = &query.event_id
+        && &contract.id != event_id
+    {
+        return false;
+    }
+
+    if let Some(capability_id) = &query.capability_id {
+        let is_publisher = contract
+            .publishers
+            .iter()
+            .any(|reference| &reference.capability_id == capability_id);
+        let is_subscriber = contract
+            .subscribers
+            .iter()
+            .any(|reference| &reference.capability_id == capability_id);
+        if !is_publisher && !is_subscriber {
+            return false;
+        }
+    }
+
+    if let Some(domain) = &query.domain
+        && &contract.classification.domain != domain
+    {
+        return false;
+    }
+
+    if let Some(owner_team) = &query.owner_team
+        && &contract.owner.team != owner_team
+    {
+        return false;
+    }
+
+    if let Some(lifecycle) = &query.lifecycle
+        && &contract.lifecycle != lifecycle
+    {
+        return false;
+    }
+
+    if let Some(classification) = &query.classification {
+        let has_classification = descriptor
+            .field_classifications
+            .iter()
+            .any(|entry| &entry.classification == classification);
+        if !has_classification {
+            return false;
+        }
+    }
+
+    true
+}
