@@ -1,0 +1,75 @@
+{
+  "contract": {
+    "kind": "event_contract",
+    "schema_version": "1.0.0",
+    "id": "content.comments.comment-draft-created",
+    "namespace": "content.comments",
+    "name": "comment-draft-created",
+    "version": "1.0.0",
+    "lifecycle": "active",
+    "owner": {
+      "team": "traverse-core",
+      "contact": "enrico.piovesan10@gmail.com"
+    },
+    "summary": "Published when a comment draft has been created.",
+    "description": "Governed event contract for comment draft creation.",
+    "payload": {
+      "schema": {
+        "type": "object",
+        "required": [
+          "draft_id"
+        ],
+        "properties": {
+          "draft_id": {
+            "type": "string"
+          },
+          "author_email": {
+            "type": "string"
+          }
+        }
+      },
+      "compatibility": "backward-compatible"
+    },
+    "classification": {
+      "domain": "content.comments",
+      "bounded_context": "comments",
+      "event_type": "domain",
+      "tags": [
+        "comments"
+      ]
+    },
+    "publishers": [
+      {
+        "capability_id": "content.comments.create-comment-draft",
+        "version": "1.0.0"
+      }
+    ],
+    "subscribers": [],
+    "policies": [
+      {
+        "id": "default-comment-safety"
+      }
+    ],
+    "tags": [
+      "comments"
+    ],
+    "provenance": {
+      "source": "greenfield",
+      "author": "enricopiovesan",
+      "created_at": "2026-03-30T00:00:00Z"
+    },
+    "evidence": []
+  },
+  "support_route": "",
+  "field_classifications": [
+    {
+      "field_path": "draft_id",
+      "classification": "internal"
+    },
+    {
+      "field_path": "author_email",
+      "classification": "confidential"
+    }
+  ],
+  "replacement": null
+}

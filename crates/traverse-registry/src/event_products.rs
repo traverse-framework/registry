@@ -1,4 +1,5 @@
 use crate::{LookupScope, RegistryScope};
+use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 use traverse_contracts::{ErrorSeverity, EventContract, Lifecycle};
 
@@ -9,7 +10,12 @@ pub const EVENT_PRODUCT_GOVERNING_SPEC: &str = "016-ecca-event-product-adoption"
 /// (governed by `specs/012-event-registry-adoption`). `traverse-contracts` is an
 /// exact-pinned external dependency, so this descriptor cannot add fields to
 /// `EventContract` itself -- it composes around it instead.
-#[derive(Debug, Clone, PartialEq, Eq)]
+///
+/// `Serialize`/`Deserialize` exist so this descriptor can be expressed as a
+/// portable JSON conformance fixture (`crates/traverse-registry/fixtures/`)
+/// for cross-repo consumers -- not because this crate persists it to disk
+/// itself.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct EventProductDescriptor {
     pub contract: EventContract,
     pub support_route: String,
@@ -17,13 +23,14 @@ pub struct EventProductDescriptor {
     pub replacement: Option<EventProductReplacement>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct FieldClassification {
     pub field_path: String,
     pub classification: DataClassification,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum DataClassification {
     Public,
     Internal,
@@ -31,7 +38,7 @@ pub enum DataClassification {
     Restricted,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct EventProductReplacement {
     pub event_id: String,
     pub version: String,
