@@ -188,7 +188,7 @@ jobs:
         run: python3 scripts/ci/generate_catalog_pages.py catalog/catalog.json https://registry.traverse-framework.com catalog
 
       - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@v3
+        uses: actions/upload-pages-artifact@v5
         with:
           path: catalog
 
