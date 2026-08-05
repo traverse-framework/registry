@@ -42,6 +42,11 @@ fn error_code_from_str(name: &str) -> Option<EventProductErrorCode> {
         "InvalidReplacement" => EventProductErrorCode::InvalidReplacement,
         "NonPastTenseName" => EventProductErrorCode::NonPastTenseName,
         "ImmutableDescriptorConflict" => EventProductErrorCode::ImmutableDescriptorConflict,
+        "MissingCloudEventsSource" => EventProductErrorCode::MissingCloudEventsSource,
+        "InvalidCloudEventsSubjectField" => EventProductErrorCode::InvalidCloudEventsSubjectField,
+        "MissingDeduplicationIdField" => EventProductErrorCode::MissingDeduplicationIdField,
+        "MissingCorrelationIdField" => EventProductErrorCode::MissingCorrelationIdField,
+        "MissingRetentionPolicy" => EventProductErrorCode::MissingRetentionPolicy,
         _ => return None,
     })
 }

@@ -6,9 +6,9 @@ use traverse_contracts::{
     EventType, IdReference, Lifecycle, Owner, PayloadCompatibility,
 };
 use traverse_registry::{
-    DataClassification, DriftKind, EventProductDescriptor, EventProductRegistration,
-    EventProductRegistry, FieldClassification, ObservedEventInteraction, ObservedLineageStore,
-    ObservedRole, RegistryScope,
+    DataClassification, DriftKind, EventExposureClass, EventProductDescriptor,
+    EventProductRegistration, EventProductRegistry, FieldClassification, ObservedEventInteraction,
+    ObservedLineageStore, ObservedRole, RegistryScope,
 };
 
 fn descriptor(id: &str, name: &str, publisher: &str) -> EventProductDescriptor {
@@ -58,11 +58,19 @@ fn descriptor(id: &str, name: &str, publisher: &str) -> EventProductDescriptor {
             evidence: vec![],
         },
         support_route: "https://support.traverse.dev/comments".to_string(),
+        exposure: EventExposureClass::Internal,
         field_classifications: vec![FieldClassification {
             field_path: "draft_id".to_string(),
-            classification: DataClassification::Internal,
+            classification: DataClassification::NoClassification,
         }],
         replacement: None,
+        cloud_events_source: format!("traverse://capability/{publisher}"),
+        cloud_events_subject_field: Some("draft_id".to_string()),
+        deduplication_id_field: "draft_id".to_string(),
+        ordering_scope_field: None,
+        correlation_id_field: "envelope.correlation_id".to_string(),
+        causation_id_field: None,
+        retention_policy: "retain 90 days".to_string(),
     }
 }
 
