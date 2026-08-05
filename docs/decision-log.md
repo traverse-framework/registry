@@ -204,6 +204,17 @@ The owner then escalated #102 into a verdict: without at least an MCP surface an
 
 **Execution boundary**: spec 016 drafted Draft (not approved); slice 1 implemented and PR'd; slices 2-6 filed as `Backlog` Project 3 issues for later passes, not attempted here.
 
+49. **`016-ecca-event-product-adoption` approved by the repo owner as its own standalone decision; `traverse-registry` 0.10.0 shipped and `traverse#896` handoff posted (2026-08-05)**: entry 48 drafted the spec Draft-only (registered in `draft_specs[]`, not self-approved) and shipped six implementation slices (#151-#156, PRs #157-#163) against it while Draft, per this repo's normal Draft-spec-implementation order. Owner reviewed and approved the spec directly -- a clear, standalone "approve the specs" instruction, not a bundled "ok" answering something else, satisfying the registry-ops guardrail. Moved from `draft_specs[]` to `specs[]` (`status: approved`, `version: "1.0.0"`, `immutable: true`) in both `specs/governance/approved-specs.json` and the bundled `crates/traverse-registry/governance/approved-specs.json` copy; `specs/016-ecca-event-product-adoption/spec.md`'s header updated to record the approval date.
+
+Same pass, owner also approved cutting the actual release and posting the cross-repo handoff (both explicitly flagged in entry 48/at the time as needing a direct check-in beyond the general implementation go-ahead, since a crates.io publish is permanent and the handoff comment is external, shared-visibility communication):
+
+- Workspace version bumped 0.9.1 -> 0.10.0 (#164) -- minor, not patch: everything added is purely additive new public API (feature addition convention), and a minor bump correctly requires Traverse to bump its pinned dependency deliberately rather than floating onto unreviewed new surface area via caret semantics.
+- Tag `v0.10.0` pushed, `publish-crate.yml` ran clean including its own isolated-external-consumer verification step; confirmed live via the crates.io sparse index. (First tag-push attempt was denied by this session's own auto-mode classifier as a hard tool-layer block, not a judgment call -- reported to the owner per the tool's own instructions rather than worked around; the owner's explicit "do it" on the next turn is what actually unblocked the retry.)
+- Handoff comment posted on `traverse-framework/traverse#896` naming the published interface (`EventProductDescriptor`/`EventProductRegistry`/`ObservedLineageStore`/`generate_async_api_document`), validation commands, and the portable JSON conformance-fixture path (`crates/traverse-registry/fixtures/event-products/`) for `traverse#897`/`#898` to test their own runtime/reference-app port against.
+- Registry `#156` and the `#150` umbrella closed (goal met); `#160` (catalog UI) stays open standalone, still deliberately blocked on real event-product data existing.
+
+**Execution boundary**: this entry records the full close-out of the ECCA registry-side effort begun in entry 48. Remaining open threads are explicitly outside this repo's or this decision's control: `#160` waits on real data, and `traverse#897`/`#898` are the Traverse team's own work now that they're unblocked.
+
 ## What Was Explicitly Deferred, Not Decided
 
 - ~~The exact schema field names/types for `owner`/`namespace` (reserved conceptually, not yet finalized in code)~~ — finalized 2026-07-06 in `specs/006-public-scope-and-identity` (Draft): `namespace` = string equal to the path segment; `owner` = the `traverse-contracts` `Owner` object shape
