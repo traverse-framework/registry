@@ -1,6 +1,7 @@
 //! Registry support for Traverse.
 
 mod application_manifest;
+mod async_api;
 mod bundle;
 pub mod dependency_resolver;
 mod event_products;
@@ -16,6 +17,7 @@ pub mod semver_resolver;
 mod workflows;
 mod workspace_app_state;
 pub use application_manifest::*;
+pub use async_api::*;
 pub use bundle::*;
 pub use dependency_resolver::{
     DigestMismatch, MAX_TRANSITIVE_DEPTH, ResolutionError, ResolvedDependencyLock,
