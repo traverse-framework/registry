@@ -230,6 +230,15 @@ Also found while auditing: Traverse's own `traverse#899` ("Inventory published c
 
 **Execution boundary**: this entry records the finding and the spec amendment only. Code changes to `crates/traverse-registry` to match v2.0.0, a corrected crate release, the FR-020 inventory (`#170`), and final ticket/board sweep across both `traverse-framework/registry`'s Project 3 and `traverse-framework/traverse`'s project board are separate, in-progress work from this same pass -- tracked via tasks, not re-litigated here.
 
+51. **`016-ecca-event-product-adoption` v2.0.0 approved by the repo owner as its own standalone decision (2026-08-05)**: entry 50 amended the spec to v2.0.0 (correcting the Spec-534 alignment gaps) and left it in `draft_specs[]` pending re-approval, same as v1.0.0's own approval process. Owner reviewed and approved directly via the `status-check` skill's checklist flow -- a clear, standalone "approved" answering the specific approval question, not a bundled "ok" on something else. Moved from `draft_specs[]` to `specs[]` (`status: approved`, `version: "2.0.0"`, `immutable: true`) in both `specs/governance/approved-specs.json` and the bundled `crates/traverse-registry/governance/approved-specs.json` copy, superseding the v1.0.0 entry; spec header updated to record the re-approval date.
+
+Same status-check pass also surfaced two pre-existing, unrelated blocked issues worth recording here since they came up investigating "what's the next step":
+
+- **`#145`** (crates/traverse-registry emit resolve usage-telemetry event, Spec 015) was blocked on `traverse-framework/traverse#927` (the `UsageTelemetrySink` trait). `#927` is now closed and the trait exists in that repo's source (`crates/traverse-contracts/src/usage_telemetry.rs`), but `traverse-contracts` is still published at `0.8.1` on crates.io -- the same version this repo already has pinned. So `#145` isn't actually unblocked yet: the remaining blocker narrowed from "Traverse needs to write the trait" to "Traverse needs to cut a release," but it's still their action, not this repo's.
+- **`#103`** (capability discovery via GitHub Pages + MCP umbrella) has all four registry-repo children done; its only remaining item is a `search_capabilities` MCP tool in `traverse-mcp` (`traverse-framework/traverse`), explicitly out of this repo's scope per the issue's own 2026-07-29 status note. Nothing actionable here either.
+
+Neither required any registry-side action -- both are genuinely waiting on Traverse's own timeline, not on anything this repo or its owner needs to do.
+
 ## What Was Explicitly Deferred, Not Decided
 
 - ~~The exact schema field names/types for `owner`/`namespace` (reserved conceptually, not yet finalized in code)~~ — finalized 2026-07-06 in `specs/006-public-scope-and-identity` (Draft): `namespace` = string equal to the path segment; `owner` = the `traverse-contracts` `Owner` object shape
