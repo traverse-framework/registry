@@ -6,8 +6,9 @@ use traverse_contracts::{
     EventType, IdReference, Lifecycle, Owner, PayloadCompatibility,
 };
 use traverse_registry::{
-    DataClassification, EventProductDescriptor, EventProductRegistration, EventProductRegistry,
-    FieldClassification, LookupScope, RegistryScope,
+    DataClassification, EventProductCatalogQuery, EventProductDescriptor,
+    EventProductRegistration, EventProductRegistry, FieldClassification, LookupScope,
+    RegistryScope,
 };
 
 fn event_contract(
@@ -280,4 +281,184 @@ fn declared_publishes_and_consumes_index_by_capability() {
 
     assert!(registry.declared_publishes("unknown.capability").is_empty());
     assert!(registry.declared_consumes("unknown.capability").is_empty());
+}
+
+fn second_descriptor() -> EventProductDescriptor {
+    let mut second = descriptor(
+        "billing.invoices.invoice-issued",
+        "invoice-issued",
+        "1.0.0",
+        "billing.invoices.issue-invoice",
+        Some("billing.invoices.send-invoice-email"),
+    );
+    second.contract.namespace = "billing.invoices".to_string();
+    second.contract.classification.domain = "billing.invoices".to_string();
+    second.contract.owner.team = "billing-platform".to_string();
+    second.contract.lifecycle = Lifecycle::Deprecated;
+    second.replacement = Some(traverse_registry::EventProductReplacement {
+        event_id: "billing.invoices.invoice-issued-v2".to_string(),
+        version: "1.0.0".to_string(),
+    });
+    second.field_classifications = vec![FieldClassification {
+        field_path: "draft_id".to_string(),
+        classification: DataClassification::Confidential,
+    }];
+    second
+}
+
+fn populated_registry() -> EventProductRegistry {
+    let mut registry = EventProductRegistry::new();
+    registry
+        .register(EventProductRegistration {
+            scope: RegistryScope::Public,
+            descriptor: descriptor(
+                "content.comments.comment-draft-created",
+                "comment-draft-created",
+                "1.0.0",
+                "content.comments.create-comment-draft",
+                Some("content.comments.publish-comment"),
+            ),
+        })
+        .expect("first registration should pass");
+    registry
+        .register(EventProductRegistration {
+            scope: RegistryScope::Public,
+            descriptor: second_descriptor(),
+        })
+        .expect("second registration should pass");
+    registry
+}
+
+#[test]
+fn catalog_search_with_no_filters_returns_everything_discover_would() {
+    let registry = populated_registry();
+    let all = registry.catalog_search(LookupScope::PublicOnly, &EventProductCatalogQuery::default());
+    assert_eq!(all.len(), 2);
+}
+
+#[test]
+fn catalog_search_filters_by_event_id() {
+    let registry = populated_registry();
+    let results = registry.catalog_search(
+        LookupScope::PublicOnly,
+        &EventProductCatalogQuery {
+            event_id: Some("billing.invoices.invoice-issued".to_string()),
+            ..Default::default()
+        },
+    );
+    assert_eq!(results.len(), 1);
+    assert_eq!(results[0].contract.id, "billing.invoices.invoice-issued");
+}
+
+#[test]
+fn catalog_search_filters_by_capability_id_matches_publisher_or_subscriber() {
+    let registry = populated_registry();
+
+    let by_publisher = registry.catalog_search(
+        LookupScope::PublicOnly,
+        &EventProductCatalogQuery {
+            capability_id: Some("billing.invoices.issue-invoice".to_string()),
+            ..Default::default()
+        },
+    );
+    assert_eq!(by_publisher.len(), 1);
+
+    let by_subscriber = registry.catalog_search(
+        LookupScope::PublicOnly,
+        &EventProductCatalogQuery {
+            capability_id: Some("content.comments.publish-comment".to_string()),
+            ..Default::default()
+        },
+    );
+    assert_eq!(by_subscriber.len(), 1);
+    assert_eq!(
+        by_subscriber[0].contract.id,
+        "content.comments.comment-draft-created"
+    );
+}
+
+#[test]
+fn catalog_search_filters_by_domain() {
+    let registry = populated_registry();
+    let results = registry.catalog_search(
+        LookupScope::PublicOnly,
+        &EventProductCatalogQuery {
+            domain: Some("billing.invoices".to_string()),
+            ..Default::default()
+        },
+    );
+    assert_eq!(results.len(), 1);
+    assert_eq!(results[0].contract.owner.team, "billing-platform");
+}
+
+#[test]
+fn catalog_search_filters_by_owner_team() {
+    let registry = populated_registry();
+    let results = registry.catalog_search(
+        LookupScope::PublicOnly,
+        &EventProductCatalogQuery {
+            owner_team: Some("traverse-core".to_string()),
+            ..Default::default()
+        },
+    );
+    assert_eq!(results.len(), 1);
+    assert_eq!(
+        results[0].contract.id,
+        "content.comments.comment-draft-created"
+    );
+}
+
+#[test]
+fn catalog_search_filters_by_lifecycle() {
+    let registry = populated_registry();
+    let results = registry.catalog_search(
+        LookupScope::PublicOnly,
+        &EventProductCatalogQuery {
+            lifecycle: Some(Lifecycle::Deprecated),
+            ..Default::default()
+        },
+    );
+    assert_eq!(results.len(), 1);
+    assert_eq!(results[0].contract.id, "billing.invoices.invoice-issued");
+}
+
+#[test]
+fn catalog_search_filters_by_classification() {
+    let registry = populated_registry();
+    let results = registry.catalog_search(
+        LookupScope::PublicOnly,
+        &EventProductCatalogQuery {
+            classification: Some(DataClassification::Confidential),
+            ..Default::default()
+        },
+    );
+    assert_eq!(results.len(), 1);
+    assert_eq!(results[0].contract.id, "billing.invoices.invoice-issued");
+
+    let internal_only = registry.catalog_search(
+        LookupScope::PublicOnly,
+        &EventProductCatalogQuery {
+            classification: Some(DataClassification::Internal),
+            ..Default::default()
+        },
+    );
+    assert_eq!(internal_only.len(), 1);
+    assert_eq!(
+        internal_only[0].contract.id,
+        "content.comments.comment-draft-created"
+    );
+}
+
+#[test]
+fn catalog_search_combines_filters_with_and_semantics() {
+    let registry = populated_registry();
+    let results = registry.catalog_search(
+        LookupScope::PublicOnly,
+        &EventProductCatalogQuery {
+            domain: Some("content.comments".to_string()),
+            lifecycle: Some(Lifecycle::Deprecated),
+            ..Default::default()
+        },
+    );
+    assert!(results.is_empty());
 }
