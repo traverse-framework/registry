@@ -215,6 +215,21 @@ Same pass, owner also approved cutting the actual release and posting the cross-
 
 **Execution boundary**: this entry records the full close-out of the ECCA registry-side effort begun in entry 48. Remaining open threads are explicitly outside this repo's or this decision's control: `#160` waits on real data, and `traverse#897`/`#898` are the Traverse team's own work now that they're unblocked.
 
+50. **`016-ecca-event-product-adoption` amended to v2.0.0 after reading Traverse's actual Spec 534 FR text and runtime validator for the first time; real gaps found in already-published `traverse-registry` 0.10.0 (2026-08-05)**: entries 48/49 drafted and approved spec 016 from `ADR-0028`'s summary-level decision points and `traverse#896`'s DoD paraphrase -- never `traverse-framework/traverse`'s `specs/534-ecca-event-products/spec.md` FR text directly, and never `crates/traverse-runtime/src/events/validation.rs`. Prompted by the owner auditing tickets in both projects and asking whether any gaps existed, both were read in full for the first time. They weren't cosmetic differences:
+
+- No top-level exposure class (FR-007) -- v1.0.0 had none.
+- Wrong field-classification vocabulary -- v1.0.0 invented `public`/`internal`/`confidential`/`restricted`; FR-007 requires `none`/`personal`/`sensitive`/`regulated`.
+- Naming-grammar check more lenient than Traverse's own runtime check -- v1.0.0's irregular-verb allow-list meant registry could accept a name (e.g. ending `-sent`) Traverse's `is_fact_type` would reject. Corrected to match Traverse's exact algorithm (whole-name `-ed` suffix, no allow-list).
+- Missing CloudEvents `source`/`subject` mapping fields (FR-005).
+- Missing delivery-semantics declarations -- dedup identity, ordering scope, correlation/causation ID (FR-010). v1.0.0 scoped this out entirely as runtime-only; FR-010 sits in Spec 534's *descriptor* requirements section, so the *declaration* belongs here even though enforcement stays in Traverse.
+- Validation diagnostics missing `remediation`/`contract_id`/`version`/governing-spec fields Traverse's own `EventValidationDiagnostic` already carries (FR-012).
+
+Also found while auditing: Traverse's own `traverse#899` ("Inventory published capabilities for ECCA event-product compliance", closed) covers Traverse's internal `contracts/examples/`/`contracts/inference/` fixture tree, not this registry's real `capabilities/*/*/*/contract.json` tree -- despite several capability IDs overlapping by name (`doc-approval.analyze`, `meeting-notes.process`, etc.), they're different artifacts in different repos. Registry's real 49 published capabilities have never been classified under Spec 534's FR-020. Filed as `#170`, not attempted in this entry -- expected outcome is all 49 classify `no-event-required` (they're pre-ECCA utility capabilities with no async effects), but that's still evidence that needs producing, not assuming.
+
+**Amendment mechanics**: spec 016 bumped 1.0.0 -> 2.0.0, moved back to `draft_specs[]` (not left `approved` with materially different content the owner never reviewed -- the owner approved v1.0.0's actual text, not a promise to accept whatever it later became). Re-approval needed as its own standalone decision, same process as the original.
+
+**Execution boundary**: this entry records the finding and the spec amendment only. Code changes to `crates/traverse-registry` to match v2.0.0, a corrected crate release, the FR-020 inventory (`#170`), and final ticket/board sweep across both `traverse-framework/registry`'s Project 3 and `traverse-framework/traverse`'s project board are separate, in-progress work from this same pass -- tracked via tasks, not re-litigated here.
+
 ## What Was Explicitly Deferred, Not Decided
 
 - ~~The exact schema field names/types for `owner`/`namespace` (reserved conceptually, not yet finalized in code)~~ — finalized 2026-07-06 in `specs/006-public-scope-and-identity` (Draft): `namespace` = string equal to the path segment; `owner` = the `traverse-contracts` `Owner` object shape

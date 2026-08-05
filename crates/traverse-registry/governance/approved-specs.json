@@ -263,17 +263,19 @@
         "crates/traverse-registry/",
         "specs/015-runtime-usage-telemetry-resolve-hook/"
       ]
-    },
+    }
+  ],
+  "draft_specs": [
     {
       "id": "016-ecca-event-product-adoption",
-      "version": "1.0.0",
-      "status": "approved",
-      "immutable": true,
+      "version": "2.0.0",
+      "status": "draft",
+      "immutable": false,
       "path": "specs/016-ecca-event-product-adoption/spec.md",
       "governs": [
         "crates/traverse-registry/"
-      ]
+      ],
+      "amendment_note": "supersedes approved v1.0.0; corrects real gaps found comparing against traverse-framework/traverse's Spec 534 raw FR text and crates/traverse-runtime/src/events/validation.rs -- pending repo-owner re-approval, same as v1.0.0's own approval process"
     }
-  ],
-  "draft_specs": []
+  ]
 }
