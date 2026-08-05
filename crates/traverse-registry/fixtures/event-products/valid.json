@@ -15,12 +15,18 @@
     "description": "Governed event contract for comment draft creation.",
     "payload": {
       "schema": {
-        "type": "object",
-        "required": ["draft_id"],
         "properties": {
-          "draft_id": { "type": "string" },
-          "author_email": { "type": "string" }
-        }
+          "author_email": {
+            "type": "string"
+          },
+          "draft_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "draft_id"
+        ],
+        "type": "object"
       },
       "compatibility": "backward-compatible"
     },
@@ -28,14 +34,25 @@
       "domain": "content.comments",
       "bounded_context": "comments",
       "event_type": "domain",
-      "tags": ["comments"]
+      "tags": [
+        "comments"
+      ]
     },
     "publishers": [
-      { "capability_id": "content.comments.create-comment-draft", "version": "1.0.0" }
+      {
+        "capability_id": "content.comments.create-comment-draft",
+        "version": "1.0.0"
+      }
     ],
     "subscribers": [],
-    "policies": [{ "id": "default-comment-safety" }],
-    "tags": ["comments"],
+    "policies": [
+      {
+        "id": "default-comment-safety"
+      }
+    ],
+    "tags": [
+      "comments"
+    ],
     "provenance": {
       "source": "greenfield",
       "author": "enricopiovesan",
@@ -44,9 +61,23 @@
     "evidence": []
   },
   "support_route": "https://support.traverse.dev/comments",
+  "exposure": "internal",
   "field_classifications": [
-    { "field_path": "draft_id", "classification": "internal" },
-    { "field_path": "author_email", "classification": "confidential" }
+    {
+      "field_path": "draft_id",
+      "classification": "none"
+    },
+    {
+      "field_path": "author_email",
+      "classification": "personal"
+    }
   ],
-  "replacement": null
+  "replacement": null,
+  "cloud_events_source": "traverse://capability/content.comments.create-comment-draft",
+  "cloud_events_subject_field": "draft_id",
+  "deduplication_id_field": "draft_id",
+  "ordering_scope_field": null,
+  "correlation_id_field": "envelope.correlation_id",
+  "causation_id_field": null,
+  "retention_policy": "retain 90 days"
 }

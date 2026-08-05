@@ -2,9 +2,9 @@
   "contract": {
     "kind": "event_contract",
     "schema_version": "1.0.0",
-    "id": "content.comments.create-comment-draft-event",
+    "id": "content.comments.comment-draft-created",
     "namespace": "content.comments",
-    "name": "create-comment-draft-event",
+    "name": "comment-draft-created",
     "version": "1.0.0",
     "lifecycle": "active",
     "owner": {
@@ -77,7 +77,7 @@
   "cloud_events_subject_field": "draft_id",
   "deduplication_id_field": "draft_id",
   "ordering_scope_field": null,
-  "correlation_id_field": "envelope.correlation_id",
+  "correlation_id_field": "",
   "causation_id_field": null,
   "retention_policy": "retain 90 days"
 }

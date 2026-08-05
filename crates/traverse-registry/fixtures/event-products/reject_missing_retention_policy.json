@@ -2,9 +2,9 @@
   "contract": {
     "kind": "event_contract",
     "schema_version": "1.0.0",
-    "id": "content.comments.create-comment-draft-event",
+    "id": "content.comments.comment-draft-created",
     "namespace": "content.comments",
-    "name": "create-comment-draft-event",
+    "name": "comment-draft-created",
     "version": "1.0.0",
     "lifecycle": "active",
     "owner": {
@@ -79,5 +79,5 @@
   "ordering_scope_field": null,
   "correlation_id_field": "envelope.correlation_id",
   "causation_id_field": null,
-  "retention_policy": "retain 90 days"
+  "retention_policy": ""
 }

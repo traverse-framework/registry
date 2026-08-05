@@ -15,18 +15,18 @@
     "description": "Governed event contract for comment draft creation.",
     "payload": {
       "schema": {
-        "type": "object",
+        "properties": {
+          "author_email": {
+            "type": "string"
+          },
+          "draft_id": {
+            "type": "string"
+          }
+        },
         "required": [
           "draft_id"
         ],
-        "properties": {
-          "draft_id": {
-            "type": "string"
-          },
-          "author_email": {
-            "type": "string"
-          }
-        }
+        "type": "object"
       },
       "compatibility": "backward-compatible"
     },
@@ -61,18 +61,26 @@
     "evidence": []
   },
   "support_route": "https://support.traverse.dev/comments",
+  "exposure": "internal",
   "field_classifications": [
     {
       "field_path": "draft_id",
-      "classification": "internal"
+      "classification": "none"
     },
     {
       "field_path": "author_email",
-      "classification": "confidential"
+      "classification": "personal"
     }
   ],
   "replacement": {
     "event_id": "content.comments.comment-draft-created",
     "version": "1.0.0"
-  }
+  },
+  "cloud_events_source": "traverse://capability/content.comments.create-comment-draft",
+  "cloud_events_subject_field": "draft_id",
+  "deduplication_id_field": "draft_id",
+  "ordering_scope_field": null,
+  "correlation_id_field": "envelope.correlation_id",
+  "causation_id_field": null,
+  "retention_policy": "retain 90 days"
 }

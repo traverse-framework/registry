@@ -6,8 +6,8 @@ use traverse_contracts::{
     EventType, IdReference, Lifecycle, Owner, PayloadCompatibility,
 };
 use traverse_registry::{
-    DataClassification, EventProductDescriptor, EventProductErrorCode, EventProductReplacement,
-    FieldClassification, validate_event_product_descriptor,
+    DataClassification, EventExposureClass, EventProductDescriptor, EventProductErrorCode,
+    EventProductReplacement, FieldClassification, validate_event_product_descriptor,
 };
 
 fn base_event_contract(id: &str, name: &str, version: &str) -> EventContract {
@@ -64,11 +64,11 @@ fn base_field_classifications() -> Vec<FieldClassification> {
     vec![
         FieldClassification {
             field_path: "draft_id".to_string(),
-            classification: DataClassification::Internal,
+            classification: DataClassification::NoClassification,
         },
         FieldClassification {
             field_path: "author_email".to_string(),
-            classification: DataClassification::Confidential,
+            classification: DataClassification::Personal,
         },
     ]
 }
@@ -81,8 +81,16 @@ fn base_descriptor() -> EventProductDescriptor {
             "1.0.0",
         ),
         support_route: "https://support.traverse.dev/comments".to_string(),
+        exposure: EventExposureClass::Internal,
         field_classifications: base_field_classifications(),
         replacement: None,
+        cloud_events_source: "traverse://capability/content.comments.create-comment-draft".to_string(),
+        cloud_events_subject_field: Some("draft_id".to_string()),
+        deduplication_id_field: "draft_id".to_string(),
+        ordering_scope_field: None,
+        correlation_id_field: "envelope.correlation_id".to_string(),
+        causation_id_field: None,
+        retention_policy: "retain 90 days".to_string(),
     }
 }
 
@@ -97,6 +105,20 @@ fn accepts_valid_event_product_descriptor() {
 }
 
 #[test]
+fn every_exposure_class_is_constructible() {
+    for exposure in [
+        EventExposureClass::Public,
+        EventExposureClass::Partner,
+        EventExposureClass::Internal,
+        EventExposureClass::Restricted,
+    ] {
+        let mut descriptor = base_descriptor();
+        descriptor.exposure = exposure;
+        assert!(validate_event_product_descriptor(&descriptor, None).is_ok());
+    }
+}
+
+#[test]
 fn rejects_missing_support_route() {
     let mut descriptor = base_descriptor();
     descriptor.support_route = String::new();
@@ -105,6 +127,11 @@ fn rejects_missing_support_route() {
         .expect_err("empty support route should fail");
 
     assert!(error_codes(&failure).contains(&EventProductErrorCode::MissingSupportRoute));
+    let error = &failure.errors[0];
+    assert_eq!(error.contract_id, descriptor.contract.id);
+    assert_eq!(error.contract_version, descriptor.contract.version);
+    assert!(!error.remediation.is_empty());
+    assert_eq!(error.governing_spec, "016-ecca-event-product-adoption");
 }
 
 #[test]
@@ -134,7 +161,7 @@ fn rejects_unexpected_field_classification() {
     let mut descriptor = base_descriptor();
     descriptor.field_classifications.push(FieldClassification {
         field_path: "not_a_declared_property".to_string(),
-        classification: DataClassification::Public,
+        classification: DataClassification::NoClassification,
     });
 
     let failure = validate_event_product_descriptor(&descriptor, None)
@@ -156,6 +183,29 @@ fn rejects_duplicate_field_classification() {
         .expect_err("duplicate classification for the same field should fail");
 
     assert!(error_codes(&failure).contains(&EventProductErrorCode::DuplicateFieldClassification));
+}
+
+#[test]
+fn every_field_classification_value_is_constructible() {
+    for classification in [
+        DataClassification::NoClassification,
+        DataClassification::Personal,
+        DataClassification::Sensitive,
+        DataClassification::Regulated,
+    ] {
+        let mut descriptor = base_descriptor();
+        descriptor.field_classifications = vec![
+            FieldClassification {
+                field_path: "draft_id".to_string(),
+                classification,
+            },
+            FieldClassification {
+                field_path: "author_email".to_string(),
+                classification: DataClassification::Personal,
+            },
+        ];
+        assert!(validate_event_product_descriptor(&descriptor, None).is_ok());
+    }
 }
 
 #[test]
@@ -223,13 +273,93 @@ fn rejects_non_past_tense_name() {
     assert!(error_codes(&failure).contains(&EventProductErrorCode::NonPastTenseName));
 }
 
+/// Spec 016 v2.0.0, FR-007: matches Traverse's own runtime `is_fact_type`
+/// exactly -- whole-name `-ed` suffix, no irregular-verb allowance. v1.0.0
+/// allowed this via a curated allow-list Traverse's own runtime doesn't
+/// have; v2.0.0 deliberately narrows to stay consistent with the runtime
+/// side actually enforcing it (NFR-006).
 #[test]
-fn accepts_irregular_past_tense_name() {
+fn rejects_irregular_past_participle_not_ending_in_ed() {
     let mut descriptor = base_descriptor();
     descriptor.contract.id = "content.comments.comment-draft-sent".to_string();
     descriptor.contract.name = "comment-draft-sent".to_string();
 
+    let failure = validate_event_product_descriptor(&descriptor, None)
+        .expect_err("'sent' does not end in '-ed' and must be rejected, matching Traverse's own runtime check");
+
+    assert!(error_codes(&failure).contains(&EventProductErrorCode::NonPastTenseName));
+}
+
+#[test]
+fn rejects_missing_cloud_events_source() {
+    let mut descriptor = base_descriptor();
+    descriptor.cloud_events_source = String::new();
+
+    let failure = validate_event_product_descriptor(&descriptor, None)
+        .expect_err("empty cloud_events_source should fail");
+
+    assert!(error_codes(&failure).contains(&EventProductErrorCode::MissingCloudEventsSource));
+}
+
+#[test]
+fn rejects_cloud_events_subject_field_not_a_declared_property() {
+    let mut descriptor = base_descriptor();
+    descriptor.cloud_events_subject_field = Some("not_a_declared_property".to_string());
+
+    let failure = validate_event_product_descriptor(&descriptor, None)
+        .expect_err("subject field must be a declared payload property");
+
+    assert!(error_codes(&failure).contains(&EventProductErrorCode::InvalidCloudEventsSubjectField));
+}
+
+#[test]
+fn accepts_absent_cloud_events_subject_field() {
+    let mut descriptor = base_descriptor();
+    descriptor.cloud_events_subject_field = None;
+
     assert!(validate_event_product_descriptor(&descriptor, None).is_ok());
+}
+
+#[test]
+fn rejects_missing_deduplication_id_field() {
+    let mut descriptor = base_descriptor();
+    descriptor.deduplication_id_field = String::new();
+
+    let failure = validate_event_product_descriptor(&descriptor, None)
+        .expect_err("empty deduplication_id_field should fail");
+
+    assert!(error_codes(&failure).contains(&EventProductErrorCode::MissingDeduplicationIdField));
+}
+
+#[test]
+fn rejects_missing_correlation_id_field() {
+    let mut descriptor = base_descriptor();
+    descriptor.correlation_id_field = String::new();
+
+    let failure = validate_event_product_descriptor(&descriptor, None)
+        .expect_err("empty correlation_id_field should fail");
+
+    assert!(error_codes(&failure).contains(&EventProductErrorCode::MissingCorrelationIdField));
+}
+
+#[test]
+fn accepts_absent_ordering_scope_and_causation_id() {
+    let mut descriptor = base_descriptor();
+    descriptor.ordering_scope_field = None;
+    descriptor.causation_id_field = None;
+
+    assert!(validate_event_product_descriptor(&descriptor, None).is_ok());
+}
+
+#[test]
+fn rejects_missing_retention_policy() {
+    let mut descriptor = base_descriptor();
+    descriptor.retention_policy = String::new();
+
+    let failure = validate_event_product_descriptor(&descriptor, None)
+        .expect_err("empty retention_policy should fail");
+
+    assert!(error_codes(&failure).contains(&EventProductErrorCode::MissingRetentionPolicy));
 }
 
 #[test]
