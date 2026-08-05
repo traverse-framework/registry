@@ -265,5 +265,16 @@
       ]
     }
   ],
-  "draft_specs": []
+  "draft_specs": [
+    {
+      "id": "016-ecca-event-product-adoption",
+      "version": "0.1.0",
+      "status": "draft",
+      "immutable": false,
+      "path": "specs/016-ecca-event-product-adoption/spec.md",
+      "governs": [
+        "crates/traverse-registry/"
+      ]
+    }
+  ]
 }

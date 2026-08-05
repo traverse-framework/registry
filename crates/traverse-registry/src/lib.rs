@@ -3,6 +3,7 @@
 mod application_manifest;
 mod bundle;
 pub mod dependency_resolver;
+mod event_products;
 mod events;
 mod federation;
 mod graph;
@@ -19,6 +20,7 @@ pub use dependency_resolver::{
     DigestMismatch, MAX_TRANSITIVE_DEPTH, ResolutionError, ResolvedDependencyLock,
     lookup_lock_record, resolve_dependencies, verify_lock_digests,
 };
+pub use event_products::*;
 pub use events::*;
 pub use federation::*;
 pub use graph::*;
