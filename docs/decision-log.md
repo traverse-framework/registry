@@ -239,6 +239,14 @@ Same status-check pass also surfaced two pre-existing, unrelated blocked issues 
 
 Neither required any registry-side action -- both are genuinely waiting on Traverse's own timeline, not on anything this repo or its owner needs to do.
 
+52. **`016-ecca-event-product-adoption` v2.1.0: `support_route`'s purpose clarified and codified as NFR-007, approved same-day (2026-08-05)**: scoping a real event product (`governance.approval-requested`, companion to a submitted `decide-state-transition` capability contract) surfaced that `FR-002`'s support-route requirement needed its rationale made explicit. The owner pushed back directly on a loose framing ("a place to go when the event breaks") and worked through it live:
+
+- The governed contract machinery (immutable versions, semver-enforced compatibility classification, the `replacement` pointer) already answers "is this version still valid, what changed, where do I go instead" *without* a human -- that is the entire point of building a governed contract system. A generic repo-wide support link doesn't solve anything a schema lookup can't already solve.
+- `support_route` is for the actual residual: semantic drift a schema can't catch, declared-vs-observed lineage drift once actually observed, genuine incidents in emitted data. Not routine compatibility questions.
+- Generalized into a standing constraint on the whole spec, not just FR-002: **NFR-007 Self-service, no human bottleneck** -- every routine question MUST be answerable from the descriptor and this crate's deterministic APIs alone; any future FR that introduces a human-in-the-loop step must justify it as covering something the contract structurally cannot.
+
+No FR text changed -- this is scope-clarifying, not requirement-changing (FR-002's validation rule is identical; only its rationale and scope are now explicit). Owner gave direct, standalone approval ("approve the new or updated specs and move on") mid-amendment, so this one skipped the `draft_specs[]` staging step used for v1.0.0 and v2.0.0 -- registered straight into `specs[]` at `2.1.0`, superseding `2.0.0`.
+
 ## What Was Explicitly Deferred, Not Decided
 
 - ~~The exact schema field names/types for `owner`/`namespace` (reserved conceptually, not yet finalized in code)~~ — finalized 2026-07-06 in `specs/006-public-scope-and-identity` (Draft): `namespace` = string equal to the path segment; `owner` = the `traverse-contracts` `Owner` object shape
