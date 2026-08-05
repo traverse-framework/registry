@@ -263,18 +263,17 @@
         "crates/traverse-registry/",
         "specs/015-runtime-usage-telemetry-resolve-hook/"
       ]
-    }
-  ],
-  "draft_specs": [
+    },
     {
       "id": "016-ecca-event-product-adoption",
-      "version": "0.1.0",
-      "status": "draft",
-      "immutable": false,
+      "version": "1.0.0",
+      "status": "approved",
+      "immutable": true,
       "path": "specs/016-ecca-event-product-adoption/spec.md",
       "governs": [
         "crates/traverse-registry/"
       ]
     }
-  ]
+  ],
+  "draft_specs": []
 }
