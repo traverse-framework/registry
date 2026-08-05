@@ -252,6 +252,17 @@
       "governs": [
         "crates/traverse-registry/"
       ]
+    },
+    {
+      "id": "015-runtime-usage-telemetry-resolve-hook",
+      "version": "1.0.0",
+      "status": "approved",
+      "immutable": true,
+      "path": "specs/015-runtime-usage-telemetry-resolve-hook/spec.md",
+      "governs": [
+        "crates/traverse-registry/",
+        "specs/015-runtime-usage-telemetry-resolve-hook/"
+      ]
     }
   ],
   "draft_specs": []
