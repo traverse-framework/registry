@@ -1,0 +1,87 @@
+{
+  "kind": "ecca_capability_inventory",
+  "schema_version": "1.0.0",
+  "governing_spec": "534-ecca-event-products@1.0.0",
+  "governing_issue": "traverse-framework/registry#170",
+  "generated_at": "2026-08-05T00:00:00Z",
+  "scope_note": "Covers this repository's own real published capabilities (capabilities/*/*/*/contract.json). traverse-framework/traverse#899's own inventory (contracts/governance/ecca-capability-inventory.json in that repo) covers a different, unrelated set of artifacts under that repo's contracts/examples/ and contracts/inference/ trees -- despite some capability_id values coincidentally matching, they are not the same content and #899 does not satisfy Spec 534 FR-020 for this repository's catalog.",
+  "capabilities": [
+    {
+      "capability_id": "doc-approval.analyze",
+      "published_versions": ["1.0.0", "1.0.1", "1.1.0", "1.2.0", "1.3.0", "1.3.1"],
+      "path": "capabilities/doc-approval/doc-approval.analyze/1.3.1/contract.json",
+      "classification": "no-event-required",
+      "evidence": "side_effects=[memory_only] across every published version; empty emits/consumes; result returns directly to the caller with no asynchronous domain fact broadcast to independent consumers."
+    },
+    {
+      "capability_id": "doc-approval.recommend",
+      "published_versions": ["1.0.0", "1.0.1", "1.1.0", "1.2.0", "1.2.1"],
+      "path": "capabilities/doc-approval/doc-approval.recommend/1.2.1/contract.json",
+      "classification": "no-event-required",
+      "evidence": "side_effects=[memory_only] across every published version; empty emits/consumes; result returns directly to the caller with no asynchronous domain fact broadcast to independent consumers."
+    },
+    {
+      "capability_id": "formatting.format-currency",
+      "published_versions": ["1.0.0", "1.1.0", "1.1.1"],
+      "path": "capabilities/formatting/formatting.format-currency/1.1.1/contract.json",
+      "classification": "no-event-required",
+      "evidence": "side_effects=[memory_only] across every published version; empty emits/consumes; a pure formatting function with no externally meaningful asynchronous effect."
+    },
+    {
+      "capability_id": "meeting-notes.process",
+      "published_versions": ["1.0.0", "1.0.1", "1.1.0", "1.2.0", "1.3.0", "1.3.1"],
+      "path": "capabilities/meeting-notes/meeting-notes.process/1.3.1/contract.json",
+      "classification": "no-event-required",
+      "evidence": "side_effects=[memory_only] across every published version; empty emits/consumes; result returns directly to the caller with no asynchronous domain fact broadcast to independent consumers."
+    },
+    {
+      "capability_id": "traverse-starter.process",
+      "published_versions": ["1.0.0", "1.0.1", "1.1.0", "1.2.0", "1.2.1"],
+      "path": "capabilities/traverse-starter/traverse-starter.process/1.2.1/contract.json",
+      "classification": "no-event-required",
+      "evidence": "side_effects=[memory_only] across every published version; empty emits/consumes; result returns directly to the caller with no asynchronous domain fact broadcast to independent consumers."
+    },
+    {
+      "capability_id": "traverse-starter.summarize",
+      "published_versions": ["1.0.0", "1.0.1", "1.1.0", "1.2.0", "1.2.1"],
+      "path": "capabilities/traverse-starter/traverse-starter.summarize/1.2.1/contract.json",
+      "classification": "no-event-required",
+      "evidence": "side_effects=[memory_only] across every published version; empty emits/consumes; result returns directly to the caller with no asynchronous domain fact broadcast to independent consumers."
+    },
+    {
+      "capability_id": "traverse-starter.validate",
+      "published_versions": ["1.0.0", "1.0.1", "1.1.0", "1.2.0", "1.2.1"],
+      "path": "capabilities/traverse-starter/traverse-starter.validate/1.2.1/contract.json",
+      "classification": "no-event-required",
+      "evidence": "side_effects=[memory_only] across every published version; empty emits/consumes; result returns directly to the caller with no asynchronous domain fact broadcast to independent consumers."
+    },
+    {
+      "capability_id": "validation.normalize-phone-number",
+      "published_versions": ["1.0.0", "1.1.0", "1.2.0", "1.2.1"],
+      "path": "capabilities/validation/validation.normalize-phone-number/1.2.1/contract.json",
+      "classification": "no-event-required",
+      "evidence": "side_effects=[memory_only] across every published version; empty emits/consumes; a pure validation function with no externally meaningful asynchronous effect."
+    },
+    {
+      "capability_id": "validation.score-password-strength",
+      "published_versions": ["1.0.0", "1.1.0", "1.1.1"],
+      "path": "capabilities/validation/validation.score-password-strength/1.1.1/contract.json",
+      "classification": "no-event-required",
+      "evidence": "side_effects=[memory_only] across every published version; empty emits/consumes; a pure validation function with no externally meaningful asynchronous effect."
+    },
+    {
+      "capability_id": "validation.validate-email",
+      "published_versions": ["1.0.0", "1.1.0", "1.2.0", "1.2.1"],
+      "path": "capabilities/validation/validation.validate-email/1.2.1/contract.json",
+      "classification": "no-event-required",
+      "evidence": "side_effects=[memory_only] across every published version; empty emits/consumes; a pure validation function with no externally meaningful asynchronous effect."
+    },
+    {
+      "capability_id": "validation.validate-luhn",
+      "published_versions": ["1.0.0", "1.1.0", "1.1.1"],
+      "path": "capabilities/validation/validation.validate-luhn/1.1.1/contract.json",
+      "classification": "no-event-required",
+      "evidence": "side_effects=[memory_only] across every published version; empty emits/consumes; a pure validation function with no externally meaningful asynchronous effect."
+    }
+  ]
+}
