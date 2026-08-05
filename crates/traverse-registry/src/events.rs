@@ -717,14 +717,14 @@ fn declared_bump(previous: &Version, candidate: &Version) -> EventDeclaredVersio
     }
 }
 
-fn compare_versions(left: &str, right: &str) -> Ordering {
+pub(crate) fn compare_versions(left: &str, right: &str) -> Ordering {
     match (Version::parse(left), Version::parse(right)) {
         (Ok(left), Ok(right)) => left.cmp(&right),
         _ => left.cmp(right),
     }
 }
 
-fn lookup_order(lookup_scope: LookupScope) -> &'static [RegistryScope] {
+pub(crate) fn lookup_order(lookup_scope: LookupScope) -> &'static [RegistryScope] {
     match lookup_scope {
         LookupScope::PublicOnly => &[RegistryScope::Public],
         LookupScope::PreferPrivate => &[RegistryScope::Private, RegistryScope::Public],

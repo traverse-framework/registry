@@ -1,3 +1,5 @@
+use crate::{LookupScope, RegistryScope};
+use std::collections::{BTreeMap, BTreeSet};
 use traverse_contracts::{ErrorSeverity, EventContract, Lifecycle};
 
 /// Governing spec for this module: `specs/016-ecca-event-product-adoption`.
@@ -279,4 +281,162 @@ fn event_product_error(
         message: message.to_string(),
         severity: ErrorSeverity::Error,
     }
+}
+
+type EventProductKey = (RegistryScope, String, String);
+
+/// Stores validated [`EventProductDescriptor`] records and indexes the
+/// declared producer/consumer relationships already present on each
+/// descriptor's `contract.publishers`/`contract.subscribers` -- this does
+/// **not** introduce a second, divergent declared-relationship model
+/// (spec 016 FR-008); it indexes what `012`'s `EventContract` already
+/// declares so it can be looked up by capability without reparsing raw
+/// contract JSON.
+#[derive(Debug, Clone, Default)]
+pub struct EventProductRegistry {
+    descriptors: BTreeMap<EventProductKey, EventProductDescriptor>,
+    publishers_index: BTreeMap<String, BTreeSet<EventProductKey>>,
+    subscribers_index: BTreeMap<String, BTreeSet<EventProductKey>>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct EventProductRegistration {
+    pub scope: RegistryScope,
+    pub descriptor: EventProductDescriptor,
+}
+
+impl EventProductRegistry {
+    #[must_use]
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Registers one ECCA event-product descriptor.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`EventProductValidationFailure`] when the descriptor fails
+    /// `validate_event_product_descriptor`, including an immutable-content
+    /// conflict against a previously registered descriptor for the same
+    /// `(scope, id, version)`.
+    pub fn register(
+        &mut self,
+        request: EventProductRegistration,
+    ) -> Result<(), EventProductValidationFailure> {
+        let EventProductRegistration { scope, descriptor } = request;
+        let key = event_product_key(scope, &descriptor);
+        let existing = self.descriptors.get(&key);
+        validate_event_product_descriptor(&descriptor, existing)?;
+
+        if existing == Some(&descriptor) {
+            return Ok(());
+        }
+
+        self.index_declared_relationships(&key, &descriptor);
+        self.descriptors.insert(key, descriptor);
+        Ok(())
+    }
+
+    fn index_declared_relationships(
+        &mut self,
+        key: &EventProductKey,
+        descriptor: &EventProductDescriptor,
+    ) {
+        for publisher in &descriptor.contract.publishers {
+            self.publishers_index
+                .entry(publisher.capability_id.clone())
+                .or_default()
+                .insert(key.clone());
+        }
+        for subscriber in &descriptor.contract.subscribers {
+            self.subscribers_index
+                .entry(subscriber.capability_id.clone())
+                .or_default()
+                .insert(key.clone());
+        }
+    }
+
+    #[must_use]
+    pub fn find_exact(
+        &self,
+        scope: RegistryScope,
+        id: &str,
+        version: &str,
+    ) -> Option<&EventProductDescriptor> {
+        self.descriptors
+            .get(&(scope, id.to_string(), version.to_string()))
+    }
+
+    /// Deterministic discovery across scopes, honoring the same
+    /// public/private precedence rules as `012`'s `EventRegistry::discover`.
+    #[must_use]
+    pub fn discover(&self, lookup_scope: LookupScope) -> Vec<&EventProductDescriptor> {
+        let mut results = Vec::new();
+        let mut shadowed = BTreeSet::new();
+
+        for &scope in crate::events::lookup_order(lookup_scope) {
+            let entries = self
+                .descriptors
+                .iter()
+                .filter(|((entry_scope, _, _), _)| *entry_scope == scope);
+
+            for ((_, id, version), descriptor) in entries {
+                if lookup_scope == LookupScope::PreferPrivate
+                    && scope == RegistryScope::Public
+                    && shadowed.contains(&(id.clone(), version.clone()))
+                {
+                    continue;
+                }
+
+                if scope == RegistryScope::Private {
+                    shadowed.insert((id.clone(), version.clone()));
+                }
+
+                results.push(descriptor);
+            }
+        }
+
+        results.sort_by(|left, right| {
+            left.contract
+                .id
+                .cmp(&right.contract.id)
+                .then_with(|| {
+                    crate::events::compare_versions(&right.contract.version, &left.contract.version)
+                })
+                .then_with(|| left.contract.namespace.cmp(&right.contract.namespace))
+        });
+        results
+    }
+
+    /// Declared events one capability publishes, ordered deterministically
+    /// by `(scope, id, version)`.
+    #[must_use]
+    pub fn declared_publishes(&self, capability_id: &str) -> Vec<&EventProductDescriptor> {
+        self.publishers_index
+            .get(capability_id)
+            .into_iter()
+            .flatten()
+            .filter_map(|key| self.descriptors.get(key))
+            .collect()
+    }
+
+    /// Declared events one capability consumes, ordered deterministically
+    /// by `(scope, id, version)`.
+    #[must_use]
+    pub fn declared_consumes(&self, capability_id: &str) -> Vec<&EventProductDescriptor> {
+        self.subscribers_index
+            .get(capability_id)
+            .into_iter()
+            .flatten()
+            .filter_map(|key| self.descriptors.get(key))
+            .collect()
+    }
+}
+
+fn event_product_key(scope: RegistryScope, descriptor: &EventProductDescriptor) -> EventProductKey {
+    (
+        scope,
+        descriptor.contract.id.clone(),
+        descriptor.contract.version.clone(),
+    )
 }
