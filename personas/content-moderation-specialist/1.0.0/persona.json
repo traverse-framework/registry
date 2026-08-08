@@ -1,0 +1,17 @@
+{
+  "id": "content-moderation-specialist",
+  "version": "1.0.0",
+  "name": "Content Moderation Specialist",
+  "summary": "Configures blocklists and quarantine obligations for unsafe comment content.",
+  "description": "Tunes moderation blocklists and approval roles. Uses core.process-comment moderation_quarantine allows so flagged content can be reviewed before wide visibility.",
+  "distinguished_from": [
+    {
+      "persona_id": "collaboration-platform-engineer",
+      "how": "Optimizes for safety review queues, not ordinary create/reply collaboration flows."
+    },
+    {
+      "persona_id": "compliance-officer",
+      "how": "Handles proactive content quarantine, not post-delete retention for eDiscovery."
+    }
+  ]
+}

@@ -1,0 +1,17 @@
+{
+  "id": "collaboration-platform-engineer",
+  "version": "1.0.0",
+  "name": "Collaboration Platform Engineer",
+  "summary": "Builds commenting, mentions, and thread depth controls for collaboration products.",
+  "description": "Owns productized commenting surfaces (create/reply, mentions, thread limits). Uses core.process-comment to validate comment actions before persistence and notification fan-out.",
+  "distinguished_from": [
+    {
+      "persona_id": "content-moderation-specialist",
+      "how": "Focuses on happy-path collaboration UX and thread structure, not quarantine/blocklist moderation workflows."
+    },
+    {
+      "persona_id": "client-developer",
+      "how": "Implements platform comment policy wiring, not client UI validation of empty bodies/reactions."
+    }
+  ]
+}

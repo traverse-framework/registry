@@ -1,0 +1,17 @@
+{
+  "id": "platform-engineer",
+  "version": "1.0.0",
+  "name": "Platform Engineer",
+  "summary": "Enforces multi-tenant isolation for platform comment actions.",
+  "description": "Wires enforce_tenant_isolation so cross-tenant comment attempts deny even for admins. Uses core.process-comment tenant_isolation_violation outcomes.",
+  "distinguished_from": [
+    {
+      "persona_id": "security-architect",
+      "how": "Focuses on tenant boundary isolation, not per-comment ownership own_only rules."
+    },
+    {
+      "persona_id": "multi-tenant-saas-developer",
+      "how": "Owns platform-level isolation policy for commenting, not general SaaS document authz via core.authorize."
+    }
+  ]
+}
