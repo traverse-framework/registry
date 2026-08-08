@@ -489,13 +489,23 @@ SERVICE_TYPE_PAGE_TEMPLATE = """<!doctype html>
 """
 
 
+def current_capabilities_by_group(capabilities: list) -> list:
+    """One entry per distinct namespace/id, pointing at its highest
+    version -- same 'current' convention as current_personas_by_id, needed
+    here so a service-type page doesn't list every historical version of
+    a capability that has been republished multiple times."""
+    by_group: dict = {}
+    for entry in capabilities:
+        group_key = f"{entry['contract']['namespace']}/{entry['contract']['id']}"
+        current = by_group.get(group_key)
+        if current is None or semver_key(entry["contract"]["version"]) > semver_key(current["contract"]["version"]):
+            by_group[group_key] = entry
+    return list(by_group.values())
+
+
 def render_service_type_page(base_url: str, service_type_id: str, definition: dict, capabilities: list) -> str:
-    matching = [
-        entry
-        for entry in capabilities
-        if entry["contract"].get("service_type") == service_type_id
-        and not entry["deprecated"]
-    ]
+    current_capabilities = current_capabilities_by_group(capabilities)
+    matching = [entry for entry in current_capabilities if entry["contract"].get("service_type") == service_type_id]
 
     if matching:
         rows = []
