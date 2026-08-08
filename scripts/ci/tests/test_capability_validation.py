@@ -286,5 +286,194 @@ class CheckNewScenarioFormatTests(unittest.TestCase):
             self.assertEqual(errors, [])
 
 
+def valid_persona(persona_id="alpha-persona", version="1.0.0", distinguished_from=None):
+    return {
+        "id": persona_id,
+        "version": version,
+        "name": "Alpha Persona",
+        "summary": "A summary.",
+        "description": "A fuller description.",
+        "distinguished_from": distinguished_from if distinguished_from is not None else [],
+    }
+
+
+def write_persona(tmp_dir: str, persona: dict, persona_id="alpha-persona", version="1.0.0") -> Path:
+    path = Path(tmp_dir) / "personas" / persona_id / version / "persona.json"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(persona))
+    return path
+
+
+class PersonaValidationTests(unittest.TestCase):
+    """registry#177 follow-on, spec 017-persona-registry, decision-log
+    entry 53: personas/ is a real governed content type, validated
+    unconditionally (whole-tree) unlike the diff-based persona_ref check
+    below -- this schema was correct from the very first persona."""
+
+    def test_valid_persona_passes(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = write_persona(tmp, valid_persona())
+            errors: list = []
+            capability_validation.validate_persona(path, errors)
+            self.assertEqual(errors, [])
+
+    def test_missing_required_field_is_rejected(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            persona = valid_persona()
+            del persona["description"]
+            path = write_persona(tmp, persona)
+            errors: list = []
+            capability_validation.validate_persona(path, errors)
+            codes = [e["code"] for e in errors]
+            self.assertIn("persona.missing_required_field", codes)
+
+    def test_id_mismatch_is_rejected(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            persona = valid_persona(persona_id="alpha-persona")
+            persona["id"] = "different-persona"
+            path = write_persona(tmp, persona, persona_id="alpha-persona")
+            errors: list = []
+            capability_validation.validate_persona(path, errors)
+            codes = [e["code"] for e in errors]
+            self.assertIn("persona.id_mismatch", codes)
+
+    def test_invalid_semver_is_rejected(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            persona = valid_persona(version="not-a-version")
+            path = write_persona(tmp, persona, version="not-a-version")
+            errors: list = []
+            capability_validation.validate_persona(path, errors)
+            codes = [e["code"] for e in errors]
+            self.assertIn("persona.invalid_semver", codes)
+
+    def test_malformed_distinguished_from_entry_is_rejected(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            persona = valid_persona(distinguished_from=[{"persona_id": "beta-persona"}])
+            path = write_persona(tmp, persona)
+            errors: list = []
+            capability_validation.validate_persona(path, errors)
+            codes = [e["code"] for e in errors]
+            self.assertIn("persona.invalid_distinguished_from_entry", codes)
+
+
+class CheckPersonaDistinguishedFromResolvesTests(unittest.TestCase):
+    def test_two_personas_with_valid_mutual_references_pass(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            write_persona(
+                tmp,
+                valid_persona("alpha-persona", distinguished_from=[{"persona_id": "beta-persona", "how": "different domain"}]),
+                persona_id="alpha-persona",
+            )
+            write_persona(
+                tmp,
+                valid_persona("beta-persona", distinguished_from=[{"persona_id": "alpha-persona", "how": "different domain"}]),
+                persona_id="beta-persona",
+            )
+            import os
+
+            cwd = os.getcwd()
+            try:
+                os.chdir(tmp)
+                errors: list = []
+                capability_validation.check_persona_distinguished_from_resolves(errors)
+                self.assertEqual(errors, [])
+            finally:
+                os.chdir(cwd)
+
+    def test_empty_distinguished_from_rejected_when_other_personas_exist(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            write_persona(tmp, valid_persona("alpha-persona", distinguished_from=[]), persona_id="alpha-persona")
+            write_persona(
+                tmp,
+                valid_persona("beta-persona", distinguished_from=[{"persona_id": "alpha-persona", "how": "x"}]),
+                persona_id="beta-persona",
+            )
+            import os
+
+            cwd = os.getcwd()
+            try:
+                os.chdir(tmp)
+                errors: list = []
+                capability_validation.check_persona_distinguished_from_resolves(errors)
+                codes = [e["code"] for e in errors]
+                self.assertIn("persona.empty_distinguished_from", codes)
+            finally:
+                os.chdir(cwd)
+
+    def test_dangling_reference_is_rejected(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            write_persona(
+                tmp,
+                valid_persona("alpha-persona", distinguished_from=[{"persona_id": "nonexistent", "how": "x"}]),
+                persona_id="alpha-persona",
+            )
+            import os
+
+            cwd = os.getcwd()
+            try:
+                os.chdir(tmp)
+                errors: list = []
+                capability_validation.check_persona_distinguished_from_resolves(errors)
+                codes = [e["code"] for e in errors]
+                self.assertIn("persona.distinguished_from_unresolvable", codes)
+            finally:
+                os.chdir(cwd)
+
+
+def write_use_case_contract_with_persona_ref(tmp_dir: str, persona_ref, namespace="core", cap_id="example-capability", version="1.0.0") -> Path:
+    contract = {
+        "id": cap_id,
+        "namespace": namespace,
+        "owner": {"team": "platform"},
+        "version": version,
+        "use_cases": [
+            {
+                "scenario": "As a developer, I want to validate an email address, so that signups are clean.",
+                "input_example": {},
+                "output_example": {},
+                "happy": True,
+                "persona_ref": persona_ref,
+            }
+        ],
+    }
+    return write_contract(tmp_dir, contract, namespace=namespace, cap_id=cap_id, version=version)
+
+
+class CheckNewUseCasePersonaRefTests(unittest.TestCase):
+    """check_new_use_case_persona_ref is the per-file check
+    check_new_use_cases_have_persona_ref (git-diff based, same reasoning as
+    check_new_scenario_format) calls per path."""
+
+    def test_valid_persona_ref_passes(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = write_use_case_contract_with_persona_ref(tmp, "alpha-persona")
+            errors: list = []
+            capability_validation.check_new_use_case_persona_ref(path, errors, {"alpha-persona"})
+            self.assertEqual(errors, [])
+
+    def test_missing_persona_ref_is_rejected(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = write_use_case_contract_with_persona_ref(tmp, None)
+            errors: list = []
+            capability_validation.check_new_use_case_persona_ref(path, errors, {"alpha-persona"})
+            codes = [e["code"] for e in errors]
+            self.assertIn("contract.use_case_missing_persona_ref", codes)
+
+    def test_unregistered_persona_ref_is_rejected(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = write_use_case_contract_with_persona_ref(tmp, "nonexistent-persona")
+            errors: list = []
+            capability_validation.check_new_use_case_persona_ref(path, errors, {"alpha-persona"})
+            codes = [e["code"] for e in errors]
+            self.assertIn("contract.use_case_persona_ref_unresolvable", codes)
+
+    def test_contract_without_use_cases_is_not_flagged(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = write_contract(tmp, valid_contract())
+            errors: list = []
+            capability_validation.check_new_use_case_persona_ref(path, errors, {"alpha-persona"})
+            self.assertEqual(errors, [])
+
+
 if __name__ == "__main__":
     unittest.main()

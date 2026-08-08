@@ -23,12 +23,12 @@ real, input-dependent, ABI-compliant logic:
 
 | namespace | id | current version |
 |---|---|---|
-| `traverse-starter` | `traverse-starter.process` | 1.2.1 |
-| `traverse-starter` | `traverse-starter.validate` | 1.2.1 |
-| `traverse-starter` | `traverse-starter.summarize` | 1.2.2 |
-| `doc-approval` | `doc-approval.analyze` | 1.3.1 |
-| `doc-approval` | `doc-approval.recommend` | 1.2.1 |
-| `meeting-notes` | `meeting-notes.process` | 1.3.1 |
+| `traverse-starter` | `traverse-starter.process` | 1.2.2 |
+| `traverse-starter` | `traverse-starter.validate` | 1.2.2 |
+| `traverse-starter` | `traverse-starter.summarize` | 1.2.3 |
+| `doc-approval` | `doc-approval.analyze` | 1.3.2 |
+| `doc-approval` | `doc-approval.recommend` | 1.2.2 |
+| `meeting-notes` | `meeting-notes.process` | 1.3.2 |
 
 **Resolved (2026-07-28, first pass)**: the original `1.0.0`s all shared one identical
 36-byte stub digest — concrete proof no real content had ever been built. Each `1.0.1`
@@ -108,6 +108,28 @@ actually used (an accounts-payable clerk, an approvals manager, a meeting organi
 which `capability_validation.py`'s own `classify_change()` confirms is a patch-class
 change, not minor.
 
+**`persona_ref` added to every `use_case` (2026-08-08, #177 follow-on, decision-log entry
+53, spec 017-persona-registry, patch bump each)**: the persona named in each `use_case`'s
+"As a `<persona>`..." scenario text was free prose only, and an audit found real overlap
+across capabilities (three different phrasings for the same imagined person building the
+`traverse-starter` note pipeline). `personas/` is now a real, governed, versioned content
+type (same immutable model as `capabilities/`, see `specs/017-persona-registry/spec.md`),
+and every `use_case` across all 11 capabilities now carries a `persona_ref` naming one of
+six canonical personas: `note-taking-app-developer` (`traverse-starter.process`/`validate`/
+`summarize`), `checkout-flow-developer` (`validation.normalize-phone-number`,
+`formatting.format-currency`, `validation.validate-luhn`), `signup-form-developer`
+(`validation.validate-email`, `validation.score-password-strength`),
+`accounts-payable-clerk` (`doc-approval.analyze`), `approvals-manager`
+(`doc-approval.recommend`), `meeting-organizer` (`meeting-notes.process`). The
+"As `<persona>`..." clause in each `scenario` was also rewritten to the canonical
+persona name wherever it differed (e.g. "payment form developer" -> "checkout flow
+developer") -- the rest of each sentence, and every `input_example`/`output_example`/
+`happy`, are untouched. Four personas' text already matched their canonical name
+exactly (`signup-form-developer`, `accounts-payable-clerk`, `approvals-manager`,
+`meeting-organizer`) and needed no text change, only the new field. Still a
+patch-class change per `classify_change()` (no top-level field added; `use_cases`
+already existed).
+
 **Kit workflows published (2026-07-29, #124, spec 001 FR-013)**: `traverse-starter`
 (`validate` -> `process` -> `summarize`) and `doc-approval` (`analyze` -> `recommend`)
 are now published as first-class, versioned workflow records under
@@ -145,11 +167,11 @@ surfaced and fixed):
 
 | namespace | id | current version |
 |---|---|---|
-| `validation` | `validation.validate-email` | 1.2.1 |
-| `validation` | `validation.normalize-phone-number` | 1.2.1 |
-| `validation` | `validation.score-password-strength` | 1.1.1 |
-| `validation` | `validation.validate-luhn` | 1.1.1 |
-| `formatting` | `formatting.format-currency` | 1.1.1 |
+| `validation` | `validation.validate-email` | 1.2.2 |
+| `validation` | `validation.normalize-phone-number` | 1.2.2 |
+| `validation` | `validation.score-password-strength` | 1.1.2 |
+| `validation` | `validation.validate-luhn` | 1.1.2 |
+| `formatting` | `formatting.format-currency` | 1.1.2 |
 
 **Labeled utility-tier, not "business capabilities"**: the AI-advisory review
 (`.agents/skills/capability-review/`) flagged a genuine boundary question when the

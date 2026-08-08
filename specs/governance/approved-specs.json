@@ -273,6 +273,17 @@
       "governs": [
         "crates/traverse-registry/"
       ]
+    },
+    {
+      "id": "017-persona-registry",
+      "version": "1.0.0",
+      "status": "approved",
+      "immutable": true,
+      "path": "specs/017-persona-registry/spec.md",
+      "governs": [
+        "personas/",
+        "specs/017-persona-registry/"
+      ]
     }
   ],
   "draft_specs": []

@@ -28,6 +28,13 @@ the catalog pipeline (gather_catalog_data.py / catalog-builder) doesn't
 process workflows/ at all yet (see registry#124's own disclosed gap), so
 there is nothing to statically render for them until that lands.
 
+Also generates one static page per persona (specs/017-persona-registry,
+decision-log entry 53) at catalog/persona/<id>/<version>/index.html, with
+its own full definition, distinguished_from cross-links, and a reverse
+"used by" list of every capability use case that references it -- the same
+crawlability reasoning as capability pages, and cross-linked from every
+use case's persona badge on both the SPA and its own generated page.
+
 Usage: generate_catalog_pages.py <catalog.json> <base_url> <output_dir>
 """
 
@@ -95,12 +102,26 @@ def redacted_contract(contract: dict) -> dict:
     return redacted
 
 
-def use_case_block(use_case: dict) -> str:
+def persona_page_path(persona: dict) -> str:
+    return f"persona/{persona['id']}/{persona['version']}/"
+
+
+def use_case_block(use_case: dict, base_url: str, personas_by_id: dict) -> str:
     happy = use_case.get("happy", True) is not False
     css_class = "use-case" if happy else "use-case unhappy"
+    persona_html = ""
+    persona_ref = use_case.get("persona_ref")
+    if persona_ref:
+        persona_entry = personas_by_id.get(persona_ref)
+        if persona_entry:
+            href = f"{base_url}/{persona_page_path(persona_entry['persona'])}"
+            persona_html = f'<div class="use-case-persona">Persona: <a class="badge" href="{esc(href)}">{esc(persona_entry["persona"]["name"])}</a></div>'
+        else:
+            persona_html = f'<div class="use-case-persona">Persona: <span class="badge badge-danger">{esc(persona_ref)} (unregistered)</span></div>'
     return (
         f'<div class="{css_class}">'
         f'<p class="use-case-scenario">{esc(use_case.get("scenario", ""))}</p>'
+        f"{persona_html}"
         f'<div class="use-case-io">'
         f'<div><div class="io-label">Input</div>{json_block(use_case.get("input_example"))}</div>'
         f'<div><div class="io-label">Output</div>{json_block(use_case.get("output_example"))}</div>'
@@ -207,7 +228,7 @@ PAGE_TEMPLATE = """<!doctype html>
 """
 
 
-def render_capability_page(base_url: str, entry: dict, group_versions: list) -> str:
+def render_capability_page(base_url: str, entry: dict, group_versions: list, personas_by_id: dict) -> str:
     contract = entry["contract"]
 
     header_badges = [f'<span class="badge badge-accent">{esc(contract["namespace"])}</span>', f'<span class="badge">v{esc(contract["version"])}</span>']
@@ -233,7 +254,11 @@ def render_capability_page(base_url: str, entry: dict, group_versions: list) -> 
         field_rows += f'<div class="field-row"><span class="field-label">Artifact</span><span class="field-value"><a href="{esc(artifact["url"])}">{esc(artifact["url"])}</a></span></div>'
 
     use_cases = contract.get("use_cases") or []
-    use_cases_html = "".join(use_case_block(uc) for uc in use_cases) if use_cases else '<p class="empty">No use cases published for this version yet.</p>'
+    use_cases_html = (
+        "".join(use_case_block(uc, base_url, personas_by_id) for uc in use_cases)
+        if use_cases
+        else '<p class="empty">No use cases published for this version yet.</p>'
+    )
 
     interface_parts = []
     if (contract.get("inputs") or {}).get("schema"):
@@ -271,9 +296,120 @@ def render_capability_page(base_url: str, entry: dict, group_versions: list) -> 
     )
 
 
+PERSONA_PAGE_TEMPLATE = """<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{title}</title>
+<meta name="description" content="{description}">
+<meta property="og:type" content="website">
+<meta property="og:title" content="{title}">
+<meta property="og:description" content="{description}">
+<meta property="og:url" content="{canonical_url}">
+<link rel="canonical" href="{canonical_url}">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/style.css">
+<script defer src="/analytics.js"></script>
+</head>
+<body>
+<nav class="nav">
+  <div class="nav-inner">
+    <a href="/" class="nav-logo"><span>Traverse<span class="nav-logo-dot">.</span></span><span class="nav-label">REGISTRY CATALOG</span></a>
+  </div>
+</nav>
+<div class="container">
+<a class="back-link" href="/#/personas">← Back to personas</a>
+<div class="detail-header-badges"><span class="badge">v{version}</span></div>
+<h1 class="t-h1 detail-title">{name}</h1>
+{summary_html}
+{description_html}
+<h2 class="t-h2">Distinguished from</h2>
+{distinguished_from_html}
+<h2 class="t-h2">Used by</h2>
+{used_by_html}
+<p style="margin-top:2rem"><a href="/#/persona/{encoded_reference}">Open in the interactive catalog →</a></p>
+</div>
+</body>
+</html>
+"""
+
+
+def render_persona_page(base_url: str, persona_entry: dict, personas_by_id: dict, capabilities: list) -> str:
+    persona = persona_entry["persona"]
+
+    distinguished_from = persona.get("distinguished_from") or []
+    if distinguished_from:
+        rows = []
+        for item in distinguished_from:
+            other = personas_by_id.get(item.get("persona_id"))
+            if other:
+                href = f"{base_url}/{persona_page_path(other['persona'])}"
+                label_html = f'<a href="{esc(href)}">{esc(other["persona"]["name"])}</a>'
+            else:
+                label_html = f'<span class="badge badge-danger">{esc(item.get("persona_id"))} (unregistered)</span>'
+            rows.append(field_row_html(other["persona"]["name"] if other else item.get("persona_id"), f'{label_html} -- {esc(item.get("how"))}'))
+        distinguished_from_html = "".join(rows)
+    else:
+        distinguished_from_html = '<p class="empty">No other personas registered yet.</p>'
+
+    uses = []
+    for entry in capabilities:
+        for use_case in entry["contract"].get("use_cases") or []:
+            if use_case.get("persona_ref") == persona["id"]:
+                uses.append((entry, use_case))
+
+    if uses:
+        rows = []
+        for entry, use_case in uses:
+            href = f"{base_url}/{capability_page_path(entry['contract'])}"
+            happy = use_case.get("happy", True) is not False
+            badge = '<span class="badge">happy</span>' if happy else '<span class="badge badge-danger">unhappy</span>'
+            rows.append(
+                f'<a class="version-row" href="{esc(href)}"><div class="version-left">'
+                f'<span class="t-mono">{esc(entry["contract"]["id"])}</span> {badge}</div>'
+                f'<span class="t-muted" style="font-size:0.8rem">view →</span></a>'
+            )
+        used_by_html = "\n".join(rows)
+    else:
+        used_by_html = '<p class="empty">No published use case references this persona yet.</p>'
+
+    title = f"{persona['name']} · Traverse Registry Catalog"
+    canonical_url = f"{base_url}/{persona_page_path(persona)}"
+
+    return PERSONA_PAGE_TEMPLATE.format(
+        title=esc(title),
+        description=esc(persona.get("summary") or persona["name"]),
+        canonical_url=esc(canonical_url),
+        version=esc(persona["version"]),
+        name=esc(persona["name"]),
+        summary_html=f'<p class="detail-summary">{esc(persona["summary"])}</p>' if persona.get("summary") else "",
+        description_html=f'<p class="detail-description">{esc(persona["description"])}</p>' if persona.get("description") else "",
+        distinguished_from_html=distinguished_from_html,
+        used_by_html=used_by_html,
+        encoded_reference=esc(persona_entry["reference"]).replace("/", "%2F").replace("@", "%40"),
+    )
+
+
+def current_personas_by_id(personas: list) -> dict:
+    """One entry per persona id, pointing at its highest version -- same
+    convention capabilities use for their own 'current' version."""
+    by_id: dict = {}
+    for entry in personas:
+        pid = entry["persona"]["id"]
+        current = by_id.get(pid)
+        if current is None or semver_key(entry["persona"]["version"]) > semver_key(current["persona"]["version"]):
+            by_id[pid] = entry
+    return by_id
+
+
 def generate(catalog_path: Path, base_url: str, output_dir: Path) -> list:
     catalog = json.loads(catalog_path.read_text())
     capabilities = catalog.get("capabilities", [])
+    personas = catalog.get("personas", [])
+    personas_by_id = current_personas_by_id(personas)
 
     by_group: dict = {}
     for entry in capabilities:
@@ -283,11 +419,18 @@ def generate(catalog_path: Path, base_url: str, output_dir: Path) -> list:
     generated_paths = []
     for entry in capabilities:
         group_key = f"{entry['contract']['namespace']}/{entry['contract']['id']}"
-        page_html = render_capability_page(base_url, entry, by_group[group_key])
+        page_html = render_capability_page(base_url, entry, by_group[group_key], personas_by_id)
         page_path = output_dir / capability_page_path(entry["contract"]) / "index.html"
         page_path.parent.mkdir(parents=True, exist_ok=True)
         page_path.write_text(page_html)
         generated_paths.append(capability_page_path(entry["contract"]))
+
+    for persona_entry in personas_by_id.values():
+        page_html = render_persona_page(base_url, persona_entry, personas_by_id, capabilities)
+        page_path = output_dir / persona_page_path(persona_entry["persona"]) / "index.html"
+        page_path.parent.mkdir(parents=True, exist_ok=True)
+        page_path.write_text(page_html)
+        generated_paths.append(persona_page_path(persona_entry["persona"]))
 
     return generated_paths
 
@@ -311,7 +454,7 @@ def main() -> int:
     page_paths = generate(catalog_path, base_url, output_dir)
     write_sitemap(base_url, page_paths, output_dir / "sitemap.xml")
 
-    print(f"Generated {len(page_paths)} static capability page(s) and sitemap.xml at {output_dir}")
+    print(f"Generated {len(page_paths)} static page(s) (capabilities + personas) and sitemap.xml at {output_dir}")
     return 0
 
 

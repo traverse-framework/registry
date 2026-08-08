@@ -1,0 +1,181 @@
+{
+  "kind": "capability_contract",
+  "schema_version": "1.0.0",
+  "id": "validation.score-password-strength",
+  "namespace": "validation",
+  "name": "score-password-strength",
+  "version": "1.1.2",
+  "lifecycle": "active",
+  "owner": {
+    "team": "traverse-core",
+    "contact": "enrico.piovesan10@gmail.com"
+  },
+  "summary": "Score a password's structural strength (length, character-class diversity, common weak patterns) without checking it against any breach database.",
+  "description": "Computes a deterministic 0-4 strength score and a human-readable issue list from structural properties only. Exact model: 1 point each for containing a lowercase letter, an uppercase letter, a digit, and a symbol (a structural score of 0-4); +1 bonus if the password is at least twice min_length; -1 each for a 4+ character sequential run (e.g. '1234', 'abcd', either direction) and a 4+ character immediate repeat (e.g. 'aaaa'); if the password is shorter than min_length, the whole score is capped at 1 regardless of character diversity (a short password is weak even if varied); if require_symbol is true and no symbol is present, the score is capped at 3. Every unmet criterion and triggered penalty is reported individually in issues (not merged into combined messages). Deliberately does NOT check the password against a known-breached-password list (e.g. HaveIBeenPwned) -- that requires a live network call, which is not available to any capability under the current ABI whitelist; a caller wanting breach-checking must do that outside the sandbox, separately, ideally without ever passing the plaintext password to a third-party service uncontrolled by the caller. The password value itself is never included in the output.",
+  "use_cases": [
+    {
+      "scenario": "As a signup form developer, I want a password mixing all four character classes at sufficient length to score very_strong with no issues, so that a genuinely strong password isn't flagged as needing improvement.",
+      "input_example": {
+        "password": "Tr@verse2026!"
+      },
+      "output_example": {
+        "score": 4,
+        "strength": "very_strong",
+        "issues": []
+      },
+      "happy": true,
+      "persona_ref": "signup-form-developer"
+    },
+    {
+      "scenario": "As a signup form developer, I want an empty password to score very_weak with every improvement issue flagged, so that a user who skips the field gets clear, complete guidance instead of a bare rejection.",
+      "input_example": {
+        "password": ""
+      },
+      "output_example": {
+        "score": 0,
+        "strength": "very_weak",
+        "issues": [
+          "too_short",
+          "add_lowercase",
+          "add_uppercase",
+          "add_digit",
+          "add_symbol"
+        ]
+      },
+      "happy": false,
+      "persona_ref": "signup-form-developer"
+    },
+    {
+      "scenario": "As a signup form developer, I want to be able to require a symbol via config, so that I can enforce my product's specific password policy instead of accepting whatever the default rules allow.",
+      "input_example": {
+        "password": "Tr4versetraverse",
+        "require_symbol": true
+      },
+      "output_example": {
+        "score": 3,
+        "strength": "strong",
+        "issues": [
+          "add_symbol"
+        ]
+      },
+      "happy": true,
+      "persona_ref": "signup-form-developer"
+    }
+  ],
+  "inputs": {
+    "schema": {
+      "additionalProperties": false,
+      "properties": {
+        "min_length": {
+          "type": "number"
+        },
+        "password": {
+          "type": "string"
+        },
+        "require_symbol": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "password"
+      ],
+      "type": "object"
+    }
+  },
+  "outputs": {
+    "schema": {
+      "additionalProperties": false,
+      "properties": {
+        "issues": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "score": {
+          "type": "number"
+        },
+        "strength": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "score",
+        "strength",
+        "issues"
+      ],
+      "type": "object"
+    }
+  },
+  "preconditions": [
+    {
+      "id": "password-provided",
+      "description": "The caller provides a string in the password field, possibly empty."
+    }
+  ],
+  "postconditions": [
+    {
+      "id": "score-in-range",
+      "description": "score is an integer 0-4; strength is the corresponding label (very_weak, weak, fair, strong, very_strong)."
+    },
+    {
+      "id": "password-not-echoed",
+      "description": "The output never contains the input password value, in whole or in part."
+    },
+    {
+      "id": "no-breach-check",
+      "description": "Never checks the password against any external breach/leak database -- structural scoring only."
+    }
+  ],
+  "side_effects": [
+    {
+      "kind": "memory_only",
+      "description": "Produces one scoring result derived from the provided password; does not log, persist, or transmit the input password."
+    }
+  ],
+  "emits": [],
+  "consumes": [],
+  "permissions": [
+    {
+      "id": "validation.score-password-strength"
+    }
+  ],
+  "execution": {
+    "binary_format": "wasm",
+    "entrypoint": {
+      "kind": "wasi-command",
+      "command": "run"
+    },
+    "preferred_targets": [
+      "local"
+    ],
+    "constraints": {
+      "host_api_access": "none",
+      "network_access": "forbidden",
+      "filesystem_access": "none"
+    }
+  },
+  "policies": [],
+  "dependencies": [],
+  "provenance": {
+    "source": "greenfield",
+    "author": "enricopiovesan",
+    "created_at": "2026-07-28T00:00:00Z",
+    "spec_ref": null,
+    "adr_refs": [],
+    "exception_refs": []
+  },
+  "evidence": [],
+  "service_type": "stateless",
+  "permitted_targets": [
+    "local"
+  ],
+  "event_trigger": null,
+  "connector_requirements": [],
+  "state_schema": null,
+  "artifact_type": "native",
+  "artifact": {
+    "digest": "sha256:b0a46a0682fa866f96305e830cc8eef2d114249507700b6d4e42121585c02340",
+    "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/validation.score-password-strength-1.0.0/score-password-strength-agent.wasm"
+  }
+}

@@ -2,17 +2,21 @@
 //! discovery umbrella). Not a published `capabilities/` capability -- see
 //! `Cargo.toml`'s description and `docs/decision-log.md` entry 40.
 //!
-//! Input: the flat JSON array `scripts/ci/gather_catalog_data.py` produces
-//! by walking `capabilities/**/contract.json` (the WASM ABI only allows a
-//! single input/single output via `fd_read`/`fd_write`, no filesystem
-//! access, so this crate cannot walk the tree itself) -- each element is
-//! `{deprecated: bool, contract: <full contract.json>}`. Output: one JSON
-//! object with a deterministically sorted `capabilities` list (each entry
-//! carrying the *entire* source contract, not a hand-picked field subset --
-//! the catalog's per-capability detail page needs "all the infos") and a
-//! `search_index` (lowercase token -> sorted `namespace/id@version`
-//! references), which registry#106's GitHub Pages template renders and
-//! searches client-side.
+//! Input: the JSON object `scripts/ci/gather_catalog_data.py` produces by
+//! walking `capabilities/**/contract.json` and `personas/**/persona.json`
+//! (the WASM ABI only allows a single input/single output via
+//! `fd_read`/`fd_write`, no filesystem access, so this crate cannot walk
+//! either tree itself): `{capabilities: [{deprecated, contract, test_coverage}],
+//! personas: [{persona}]}`. Output: one JSON object with a deterministically
+//! sorted `capabilities` list (each entry carrying the *entire* source
+//! contract, not a hand-picked field subset -- the catalog's per-capability
+//! detail page needs "all the infos"), a `search_index` (lowercase token ->
+//! sorted `namespace/id@version` references) built from capabilities only,
+//! and a deterministically sorted `personas` list (specs/017-persona-registry,
+//! decision-log entry 53; each entry carries the entire persona record, same
+//! reasoning as capabilities -- not search-indexed, reached via a dedicated
+//! list view and direct persona_ref links instead), which registry#106's
+//! GitHub Pages template renders and searches client-side.
 
 #![cfg_attr(not(test), no_std)]
 #![cfg_attr(not(test), no_main)]
@@ -70,8 +74,45 @@ fn append_text_leaves(value: &Value, out: &mut String) {
     }
 }
 
+/// Builds the personas[] output list from the personas half of the input
+/// (specs/017-persona-registry, decision-log entry 53). Deliberately not
+/// folded into the capability search_index -- personas are reached via a
+/// dedicated list view and direct links from a use case's persona_ref, not
+/// free-text search, so this stays a simple pass-through/sort, mirroring
+/// capabilities' own "carry the entire record" rule without capabilities'
+/// search-indexing complexity.
+fn build_personas(persona_records: &[Value]) -> Vec<Value> {
+    let mut personas: Vec<Value> = Vec::new();
+
+    for record in persona_records {
+        let persona = match record.get("persona") {
+            Some(p) => p,
+            None => continue,
+        };
+        let id = persona.get("id").and_then(Value::as_str).unwrap_or("");
+        let version = persona.get("version").and_then(Value::as_str).unwrap_or("");
+        if id.is_empty() || version.is_empty() {
+            continue;
+        }
+        personas.push(object(alloc::vec![
+            ("reference", Value::String(alloc::format!("{id}@{version}"))),
+            ("persona", persona.clone()),
+        ]));
+    }
+
+    personas.sort_by(|a, b| {
+        let reference_a = a.get("reference").and_then(Value::as_str).unwrap_or("");
+        let reference_b = b.get("reference").and_then(Value::as_str).unwrap_or("");
+        reference_a.cmp(reference_b)
+    });
+
+    personas
+}
+
 fn build_catalog(input: &Value) -> Value {
-    let records = input.as_array().unwrap_or(&[]);
+    let records = input.get("capabilities").and_then(Value::as_array).unwrap_or(&[]);
+    let persona_records = input.get("personas").and_then(Value::as_array).unwrap_or(&[]);
+    let personas = build_personas(persona_records);
 
     let mut capabilities: Vec<Value> = Vec::new();
     let mut index: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
@@ -150,6 +191,7 @@ fn build_catalog(input: &Value) -> Value {
 
     object(alloc::vec![
         ("capabilities", Value::Array(capabilities)),
+        ("personas", Value::Array(personas)),
         ("search_index", search_index),
     ])
 }
@@ -183,9 +225,38 @@ mod tests {
         ])
     }
 
+    fn capabilities_input(records: Vec<Value>) -> Value {
+        object(vec![
+            ("capabilities", Value::Array(records)),
+            ("personas", Value::Array(vec![])),
+        ])
+    }
+
+    fn persona(id: &str, version: &str, name: &str) -> Value {
+        object(vec![
+            ("id", Value::String(String::from(id))),
+            ("version", Value::String(String::from(version))),
+            ("name", Value::String(String::from(name))),
+            ("summary", Value::String(String::from("summary"))),
+            ("description", Value::String(String::from("description"))),
+            ("distinguished_from", Value::Array(vec![])),
+        ])
+    }
+
+    fn persona_record(persona_value: Value) -> Value {
+        object(vec![("persona", persona_value)])
+    }
+
+    fn personas_input(records: Vec<Value>) -> Value {
+        object(vec![
+            ("capabilities", Value::Array(vec![])),
+            ("personas", Value::Array(records)),
+        ])
+    }
+
     #[test]
     fn builds_sorted_capability_list_and_reference() {
-        let input = Value::Array(vec![
+        let input = capabilities_input(vec![
             record(
                 contract(
                     "validation",
@@ -231,7 +302,7 @@ mod tests {
             "Checksum-format validation",
             "Validates card-number-shaped strings via the Luhn algorithm",
         );
-        let input = Value::Array(vec![record(source_contract.clone(), false)]);
+        let input = capabilities_input(vec![record(source_contract.clone(), false)]);
 
         let catalog = build_catalog(&input);
         let capabilities = catalog.get("capabilities").unwrap().as_array().unwrap();
@@ -261,7 +332,7 @@ mod tests {
             false,
         );
 
-        let catalog = build_catalog(&Value::Array(vec![with_coverage, without_coverage]));
+        let catalog = build_catalog(&capabilities_input(vec![with_coverage, without_coverage]));
         let capabilities = catalog.get("capabilities").unwrap().as_array().unwrap();
 
         let a = capabilities.iter().find(|c| c.get("reference").unwrap().as_str() == Some("core/core.a@1.0.0")).unwrap();
@@ -273,7 +344,7 @@ mod tests {
 
     #[test]
     fn search_index_maps_token_to_matching_references_only() {
-        let input = Value::Array(vec![
+        let input = capabilities_input(vec![
             record(
                 contract(
                     "validation",
@@ -318,7 +389,7 @@ mod tests {
 
     #[test]
     fn deprecated_flag_is_preserved_not_filtered() {
-        let input = Value::Array(vec![record(
+        let input = capabilities_input(vec![record(
             contract(
                 "validation",
                 "validation.validate-email",
@@ -337,7 +408,7 @@ mod tests {
 
     #[test]
     fn malformed_record_missing_contract_is_skipped() {
-        let input = Value::Array(vec![object(vec![("deprecated", Value::Bool(false))])]);
+        let input = capabilities_input(vec![object(vec![("deprecated", Value::Bool(false))])]);
 
         let catalog = build_catalog(&input);
         let capabilities = catalog.get("capabilities").unwrap().as_array().unwrap();
@@ -346,7 +417,7 @@ mod tests {
 
     #[test]
     fn malformed_contract_missing_identity_is_skipped() {
-        let input = Value::Array(vec![record(
+        let input = capabilities_input(vec![record(
             object(vec![(
                 "summary",
                 Value::String(String::from("no namespace/id/version")),
@@ -361,21 +432,85 @@ mod tests {
 
     #[test]
     fn empty_input_produces_empty_catalog_not_a_panic() {
-        let catalog = build_catalog(&Value::Array(Vec::new()));
+        let catalog = build_catalog(&capabilities_input(Vec::new()));
         assert!(catalog.get("capabilities").unwrap().as_array().unwrap().is_empty());
+        assert!(catalog.get("personas").unwrap().as_array().unwrap().is_empty());
         assert!(matches!(catalog.get("search_index"), Some(Value::Object(fields)) if fields.is_empty()));
     }
 
     #[test]
     fn output_genuinely_differs_across_distinct_inputs() {
-        let one = build_catalog(&Value::Array(vec![record(
+        let one = build_catalog(&capabilities_input(vec![record(
             contract("core", "core.a", "1.0.0", "alpha", "alpha capability"),
             false,
         )]));
-        let two = build_catalog(&Value::Array(vec![record(
+        let two = build_catalog(&capabilities_input(vec![record(
             contract("core", "core.b", "1.0.0", "bravo", "bravo capability"),
             false,
         )]));
         assert_ne!(one, two, "output must depend on input, not be fixed");
+    }
+
+    #[test]
+    fn builds_sorted_persona_list_and_reference() {
+        let input = personas_input(vec![
+            persona_record(persona("signup-form-developer", "1.0.0", "Signup Form Developer")),
+            persona_record(persona("accounts-payable-clerk", "1.0.0", "Accounts-Payable Clerk")),
+        ]);
+
+        let catalog = build_catalog(&input);
+        let personas = catalog.get("personas").unwrap().as_array().unwrap();
+        assert_eq!(personas.len(), 2);
+        // "accounts-payable-clerk@..." sorts before "signup-form-developer@..." lexicographically.
+        assert_eq!(personas[0].get("reference").unwrap().as_str(), Some("accounts-payable-clerk@1.0.0"));
+        assert_eq!(personas[1].get("reference").unwrap().as_str(), Some("signup-form-developer@1.0.0"));
+    }
+
+    #[test]
+    fn full_persona_is_passed_through_verbatim() {
+        let source_persona = persona("meeting-organizer", "1.0.0", "Meeting Organizer");
+        let input = personas_input(vec![persona_record(source_persona.clone())]);
+
+        let catalog = build_catalog(&input);
+        let personas = catalog.get("personas").unwrap().as_array().unwrap();
+        assert_eq!(personas[0].get("persona").unwrap(), &source_persona);
+    }
+
+    #[test]
+    fn malformed_persona_record_missing_persona_is_skipped() {
+        let input = personas_input(vec![object(vec![("not_persona", Value::Bool(true))])]);
+        let catalog = build_catalog(&input);
+        assert!(catalog.get("personas").unwrap().as_array().unwrap().is_empty());
+    }
+
+    #[test]
+    fn malformed_persona_missing_identity_is_skipped() {
+        let input = personas_input(vec![persona_record(object(vec![(
+            "name",
+            Value::String(String::from("no id or version")),
+        )]))]);
+        let catalog = build_catalog(&input);
+        assert!(catalog.get("personas").unwrap().as_array().unwrap().is_empty());
+    }
+
+    #[test]
+    fn capabilities_and_personas_are_independent() {
+        let input = object(vec![
+            (
+                "capabilities",
+                Value::Array(vec![record(
+                    contract("core", "core.a", "1.0.0", "alpha", "alpha capability"),
+                    false,
+                )]),
+            ),
+            (
+                "personas",
+                Value::Array(vec![persona_record(persona("meeting-organizer", "1.0.0", "Meeting Organizer"))]),
+            ),
+        ]);
+
+        let catalog = build_catalog(&input);
+        assert_eq!(catalog.get("capabilities").unwrap().as_array().unwrap().len(), 1);
+        assert_eq!(catalog.get("personas").unwrap().as_array().unwrap().len(), 1);
     }
 }

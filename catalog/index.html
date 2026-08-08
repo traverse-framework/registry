@@ -58,7 +58,31 @@
   }
 
   function referenceHash(reference) { return "#/capability/" + encodeURIComponent(reference); }
+  function personaHash(reference) { return "#/persona/" + encodeURIComponent(reference); }
   function groupKey(reference) { return reference.split("@")[0]; }
+
+  // Personas are versioned (specs/017-persona-registry) but a use_case's
+  // persona_ref names an id only, not id@version -- resolves to that
+  // persona's highest published version, the same "current" convention
+  // groupedCapabilities() uses for capabilities.
+  function findPersonaById(personaId) {
+    var matches = (catalog.personas || []).filter(function (p) { return groupKey(p.reference) === personaId; });
+    if (matches.length === 0) { return null; }
+    matches.sort(function (a, b) { return a.persona.version.localeCompare(b.persona.version, undefined, { numeric: true }); });
+    return matches[matches.length - 1];
+  }
+
+  // Every use case, across every current capability version, that names
+  // this persona -- the persona page's reverse lookup.
+  function useCasesForPersona(personaId) {
+    var results = [];
+    (catalog.capabilities || []).forEach(function (cap) {
+      (cap.contract.use_cases || []).forEach(function (useCase) {
+        if (useCase.persona_ref === personaId) { results.push({ cap: cap, useCase: useCase }); }
+      });
+    });
+    return results;
+  }
 
   function matchedReferencesForQuery(query) {
     var trimmed = query.trim().toLowerCase();
@@ -108,6 +132,7 @@
     appEl.appendChild(el("div", { className: "section-label", textContent: "DISCOVER" }));
     appEl.appendChild(el("h1", { className: "t-h1", textContent: "Capability Catalog" }));
     appEl.appendChild(el("p", { className: "t-muted", textContent: "Every published Traverse registry capability -- deterministic, ABI-compliant WASM business logic, versioned and immutable once merged." }));
+    appEl.appendChild(el("a", { className: "back-link", href: "#/personas", textContent: "Browse personas →" }));
 
     var searchInput = el("input", { type: "search", id: "search", placeholder: "Search capabilities (e.g. \"currency\", \"email\", \"validate\")…" });
     searchInput.value = searchQuery;
@@ -227,6 +252,16 @@
     var isHappy = useCase.happy !== false;
     var box = el("div", { className: "use-case" + (isHappy ? "" : " unhappy") });
     box.appendChild(el("p", { className: "use-case-scenario", textContent: useCase.scenario || "" }));
+    if (useCase.persona_ref) {
+      var personaEntry = findPersonaById(useCase.persona_ref);
+      var personaLink = personaEntry
+        ? el("a", { className: "badge", href: personaHash(personaEntry.reference), textContent: personaEntry.persona.name })
+        : el("span", { className: "badge badge-danger", textContent: useCase.persona_ref + " (unregistered)" });
+      box.appendChild(el("div", { className: "use-case-persona" }, [
+        document.createTextNode("Persona: "),
+        personaLink,
+      ]));
+    }
     box.appendChild(el("div", { className: "use-case-io" }, [
       el("div", {}, [el("div", { className: "io-label", textContent: "Input" }), jsonBlock(useCase.input_example)]),
       el("div", {}, [el("div", { className: "io-label", textContent: "Output" }), jsonBlock(useCase.output_example)]),
@@ -348,10 +383,108 @@
     appEl.appendChild(details);
   }
 
+  // One entry per distinct persona id, pointing at its highest version --
+  // same convention as groupedCapabilities().
+  function groupedPersonas() {
+    var byId = {};
+    (catalog.personas || []).forEach(function (p) {
+      var key = groupKey(p.reference);
+      if (!byId[key]) { byId[key] = []; }
+      byId[key].push(p);
+    });
+    return Object.keys(byId).sort().map(function (key) {
+      var versions = byId[key].slice().sort(function (a, b) { return a.persona.version.localeCompare(b.persona.version, undefined, { numeric: true }); });
+      return versions[versions.length - 1];
+    });
+  }
+
+  function renderPersonaListView() {
+    appEl.textContent = "";
+    appEl.appendChild(el("a", { className: "back-link", href: "#", textContent: "← Back to catalog" }));
+    appEl.appendChild(el("div", { className: "section-label", textContent: "PERSONAS" }));
+    appEl.appendChild(el("h1", { className: "t-h1", textContent: "Personas" }));
+    appEl.appendChild(el("p", { className: "t-muted", textContent: "Every persona a published use case is written for -- one canonical definition each, so a use case's \"As a <persona>...\" always resolves to exactly one specific, unambiguous person." }));
+
+    var grid = el("div", { className: "grid" });
+    var personas = groupedPersonas();
+    if (personas.length === 0) {
+      grid.appendChild(el("p", { className: "empty", textContent: "No personas published yet." }));
+    } else {
+      personas.forEach(function (entry) {
+        var useCaseCount = useCasesForPersona(entry.persona.id).length;
+        var card = el("a", { className: "card", href: personaHash(entry.reference) }, [
+          el("div", { className: "card-top" }, [el("span", { className: "badge", textContent: "v" + entry.persona.version })]),
+          el("div", { className: "card-id", textContent: entry.persona.name }),
+          el("p", { className: "card-summary", textContent: entry.persona.summary || "" }),
+          el("div", { className: "card-bottom" }, [el("span", { className: "badge", textContent: useCaseCount + " use case" + (useCaseCount === 1 ? "" : "s") })]),
+        ]);
+        grid.appendChild(card);
+      });
+    }
+    appEl.appendChild(grid);
+  }
+
+  function renderPersonaDetailView(reference) {
+    var entry = (catalog.personas || []).find(function (p) { return p.reference === reference; });
+    appEl.textContent = "";
+    appEl.appendChild(el("a", { className: "back-link", href: "#/personas", textContent: "← Back to personas" }));
+    if (!entry) {
+      appEl.appendChild(el("p", { className: "error", textContent: "No persona found for \"" + reference + "\"." }));
+      return;
+    }
+    var persona = entry.persona;
+
+    appEl.appendChild(el("div", { className: "detail-header-badges" }, [el("span", { className: "badge", textContent: "v" + persona.version })]));
+    appEl.appendChild(el("h1", { className: "t-h1 detail-title", textContent: persona.name }));
+    if (persona.summary) { appEl.appendChild(el("p", { className: "detail-summary", textContent: persona.summary })); }
+    if (persona.description) { appEl.appendChild(el("p", { className: "detail-description", textContent: persona.description })); }
+
+    appEl.appendChild(el("h2", { className: "t-h2", textContent: "Distinguished from" }));
+    var distinguishedFrom = Array.isArray(persona.distinguished_from) ? persona.distinguished_from : [];
+    if (distinguishedFrom.length === 0) {
+      appEl.appendChild(el("p", { className: "empty", textContent: "No other personas registered yet." }));
+    } else {
+      distinguishedFrom.forEach(function (entry2) {
+        var other = findPersonaById(entry2.persona_id);
+        var label = other ? other.persona.name : entry2.persona_id;
+        var link = other
+          ? el("a", { href: personaHash(other.reference), textContent: label })
+          : el("span", { className: "badge badge-danger", textContent: label + " (unregistered)" });
+        appEl.appendChild(fieldRow(label, el("span", {}, [link, document.createTextNode(" -- " + entry2.how)])));
+      });
+    }
+
+    appEl.appendChild(el("h2", { className: "t-h2", textContent: "Used by" }));
+    var uses = useCasesForPersona(persona.id);
+    if (uses.length === 0) {
+      appEl.appendChild(el("p", { className: "empty", textContent: "No published use case references this persona yet." }));
+    } else {
+      uses.forEach(function (u) {
+        var row = el("a", { className: "version-row", href: referenceHash(u.cap.reference) }, [
+          el("div", { className: "version-left" }, [
+            el("span", { className: "t-mono", textContent: u.cap.contract.id }),
+            el("span", { className: "badge" + (u.useCase.happy === false ? " badge-danger" : ""), textContent: u.useCase.happy === false ? "unhappy" : "happy" }),
+          ]),
+          el("span", { className: "t-muted", style: "font-size:0.8rem", textContent: "view →" }),
+        ]);
+        appEl.appendChild(row);
+      });
+    }
+  }
+
   function router() {
     if (!catalog) { return; }
-    var match = window.location.hash.match(/^#\/capability\/(.+)$/);
-    if (match) { renderDetailView(decodeURIComponent(match[1])); } else { renderListView(); }
+    var capabilityMatch = window.location.hash.match(/^#\/capability\/(.+)$/);
+    var personaMatch = window.location.hash.match(/^#\/persona\/(.+)$/);
+    if (capabilityMatch) {
+      renderDetailView(decodeURIComponent(capabilityMatch[1]));
+    } else if (personaMatch) {
+      renderPersonaDetailView(decodeURIComponent(personaMatch[1]));
+    } else if (window.location.hash === "#/personas") {
+      renderPersonaListView();
+    } else {
+      renderListView();
+    }
     window.scrollTo(0, 0);
   }
 

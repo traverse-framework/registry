@@ -1,0 +1,182 @@
+{
+  "kind": "capability_contract",
+  "schema_version": "1.0.0",
+  "id": "doc-approval.analyze",
+  "namespace": "doc-approval",
+  "name": "analyze",
+  "version": "1.3.2",
+  "lifecycle": "active",
+  "owner": {
+    "team": "traverse-core",
+    "contact": "enrico.piovesan10@gmail.com"
+  },
+  "summary": "Analyze a submitted document into deterministic approval-review fields using simple keyword/heuristic rules.",
+  "description": "Real, deterministic document approval analysis: genuinely reads the `document` input and derives its fields via simple keyword classification (docType), a two-consecutive-capitalized-word heuristic (parties), and a `$`-prefixed number scan (amounts) -- no model, network, randomness, or host state dependency, matching this capability's original design constraints. This replaces 1.1.0, which was genuinely input-dependent but built with std + serde_json targeting wasm32-wasip1 -- that import set (environ_get/environ_sizes_get) fails Traverse's own WasmExecutor ABI whitelist, so it could run under a generic wasmtime host but not through traverse-cli agent execute/serve or an embedder SDK. This version is built no_std on the shared agents/wasi-agent-runtime/ shim: verified to import only wasi_snapshot_preview1::{fd_read, fd_write, proc_exit}, so it is both input-dependent and genuinely executable by Traverse's runtime. Known limitation, disclosed rather than hidden: the party-extraction heuristic is intentionally simple and can false-positive on any two consecutive capitalized words at a sentence start (e.g. \"This Agreement\"), not just genuine named parties -- acceptable for a reference-tier, no-model capability, not production-grade named-entity recognition. Source: agents/doc-approval-analyze/ in this repo.",
+  "use_cases": [
+    {
+      "scenario": "As an accounts-payable clerk, I want a submitted invoice to be automatically classified with its party and amount extracted, so that a document with strong signals can move straight to high-confidence approval routing.",
+      "input_example": {
+        "document": "INVOICE. Acme Corp owes $500.00"
+      },
+      "output_example": {
+        "docType": "invoice",
+        "parties": [
+          "Acme Corp"
+        ],
+        "amounts": [
+          "$500.00"
+        ],
+        "confidence": "high",
+        "recommendation": "approve"
+      },
+      "happy": true,
+      "persona_ref": "accounts-payable-clerk"
+    },
+    {
+      "scenario": "As an accounts-payable clerk, I want plain text with no recognizable signals to be flagged as low confidence, so that I know to review it manually instead of trusting an automated read that found nothing.",
+      "input_example": {
+        "document": "just some plain lowercase text with no signals"
+      },
+      "output_example": {
+        "docType": "general",
+        "parties": [],
+        "amounts": [],
+        "confidence": "low",
+        "recommendation": "insufficient_data"
+      },
+      "happy": false,
+      "persona_ref": "accounts-payable-clerk"
+    },
+    {
+      "scenario": "As an accounts-payable clerk, I want a document with only a recognized type but no extracted party or amount to land at medium confidence, so that it's routed for manual review rather than auto-approved on a partial read.",
+      "input_example": {
+        "document": "This contract has no dollar amounts or named parties mentioned."
+      },
+      "output_example": {
+        "docType": "contract",
+        "parties": [],
+        "amounts": [],
+        "confidence": "medium",
+        "recommendation": "manual_review"
+      },
+      "happy": false,
+      "persona_ref": "accounts-payable-clerk"
+    }
+  ],
+  "inputs": {
+    "schema": {
+      "type": "object",
+      "required": [
+        "document"
+      ],
+      "properties": {
+        "document": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "outputs": {
+    "schema": {
+      "type": "object",
+      "required": [
+        "docType",
+        "parties",
+        "amounts",
+        "confidence",
+        "recommendation"
+      ],
+      "properties": {
+        "docType": {
+          "type": "string"
+        },
+        "parties": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "amounts": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "confidence": {
+          "type": "string"
+        },
+        "recommendation": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "preconditions": [
+    {
+      "id": "document-provided",
+      "description": "The caller provides a document string to analyze; its content is read and processed."
+    }
+  ],
+  "postconditions": [
+    {
+      "id": "analysis-fields-produced",
+      "description": "The capability returns docType, parties, amounts, confidence, and recommendation fields genuinely derived from the provided document -- distinct inputs produce distinct outputs, deterministically (the same input always produces the same output)."
+    }
+  ],
+  "side_effects": [
+    {
+      "kind": "memory_only",
+      "description": "Produces one deterministic analysis payload derived from the provided document."
+    }
+  ],
+  "emits": [],
+  "consumes": [],
+  "permissions": [
+    {
+      "id": "doc-approval.analyze"
+    }
+  ],
+  "execution": {
+    "binary_format": "wasm",
+    "entrypoint": {
+      "kind": "wasi-command",
+      "command": "run"
+    },
+    "preferred_targets": [
+      "local"
+    ],
+    "constraints": {
+      "host_api_access": "none",
+      "network_access": "forbidden",
+      "filesystem_access": "none"
+    }
+  },
+  "policies": [
+    {
+      "id": "manual-approval-required"
+    }
+  ],
+  "dependencies": [],
+  "provenance": {
+    "source": "greenfield",
+    "author": "enricopiovesan",
+    "created_at": "2026-07-28T00:00:00Z",
+    "spec_ref": "058-workflow-pipeline-execution@1.0.0",
+    "adr_refs": [
+      "0001-rust-wasm-foundation"
+    ],
+    "exception_refs": []
+  },
+  "evidence": [],
+  "service_type": "stateless",
+  "permitted_targets": [
+    "local"
+  ],
+  "artifact_type": "native",
+  "artifact": {
+    "digest": "sha256:a097297ba082d5aa01dad8f5d99fd37b16153a369c0b3d6824eebcc7c49dd3a3",
+    "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/doc-approval.analyze-1.2.0/analyze-agent.wasm"
+  }
+}
