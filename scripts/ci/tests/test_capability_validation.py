@@ -35,6 +35,40 @@ def write_contract(tmp_dir: str, contract: dict, namespace="core", cap_id="examp
     return path
 
 
+class ServiceTypeValidationTests(unittest.TestCase):
+    """traverse-framework/traverse spec 014-service-type-taxonomy: a closed
+    enum registry does not own or extend, validated whole-tree (unlike
+    use_cases[].scenario/persona_ref) since every already-published contract
+    already conforms."""
+
+    def test_known_service_type_passes(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            contract = valid_contract()
+            contract["service_type"] = "subscribable"
+            path = write_contract(tmp, contract)
+            errors: list = []
+            capability_validation.validate_contract(path, errors)
+            self.assertEqual(errors, [])
+
+    def test_unknown_service_type_is_rejected(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            contract = valid_contract()
+            contract["service_type"] = "eventual"
+            path = write_contract(tmp, contract)
+            errors: list = []
+            capability_validation.validate_contract(path, errors)
+            codes = [e["code"] for e in errors]
+            self.assertIn("contract.invalid_service_type", codes)
+
+    def test_missing_service_type_is_not_flagged(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = write_contract(tmp, valid_contract())
+            errors: list = []
+            capability_validation.validate_contract(path, errors)
+            codes = [e["code"] for e in errors]
+            self.assertNotIn("contract.invalid_service_type", codes)
+
+
 class CapabilityValidationSpec006Tests(unittest.TestCase):
     def test_valid_seed_shaped_contract_passes(self):
         with tempfile.TemporaryDirectory() as tmp:

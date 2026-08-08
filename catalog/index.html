@@ -59,6 +59,11 @@
 
   function referenceHash(reference) { return "#/capability/" + encodeURIComponent(reference); }
   function personaHash(reference) { return "#/persona/" + encodeURIComponent(reference); }
+  function serviceTypeHash(id) { return "#/service-type/" + encodeURIComponent(id); }
+
+  function capabilitiesForServiceType(serviceTypeId) {
+    return groupedCapabilities().filter(function (group) { return group.latest.contract.service_type === serviceTypeId; });
+  }
   function groupKey(reference) { return reference.split("@")[0]; }
 
   // Personas are versioned (specs/017-persona-registry) but a use_case's
@@ -132,7 +137,10 @@
     appEl.appendChild(el("div", { className: "section-label", textContent: "DISCOVER" }));
     appEl.appendChild(el("h1", { className: "t-h1", textContent: "Capability Catalog" }));
     appEl.appendChild(el("p", { className: "t-muted", textContent: "Every published Traverse registry capability -- deterministic, ABI-compliant WASM business logic, versioned and immutable once merged." }));
-    appEl.appendChild(el("a", { className: "back-link", href: "#/personas", textContent: "Browse personas →" }));
+    appEl.appendChild(el("div", { style: "display:flex; gap:1rem; flex-wrap:wrap" }, [
+      el("a", { className: "back-link", href: "#/personas", textContent: "Browse personas →" }),
+      el("a", { className: "back-link", href: "#/service-types", textContent: "Browse service types →" }),
+    ]));
 
     var searchInput = el("input", { type: "search", id: "search", placeholder: "Search capabilities (e.g. \"currency\", \"email\", \"validate\")…" });
     searchInput.value = searchQuery;
@@ -200,6 +208,29 @@
   // held a personal email address for every capability published so far.
   // Map the publishing team to a public GitHub identity instead.
   var OWNER_GITHUB = { "traverse-core": "enricopiovesan" };
+
+  // service_type is a closed enum this registry does not own or extend --
+  // defined by traverse-framework/traverse's spec 014-service-type-taxonomy.
+  // Not a governed content type here (no personas/-style versioned records):
+  // just a fixed reference table for three values that will essentially
+  // never change, rendered as pages for discoverability/cross-linking.
+  var SERVICE_TYPE_DEFINITIONS = {
+    stateless: {
+      name: "Stateless",
+      summary: "A pure function with no external state -- can execute on any target.",
+      description: "Every invocation is independent: given the same input, a stateless capability produces the same output, with no memory of prior calls and no managed persistence. Because it holds no state, it can run on any execution target (browser, edge, cloud, or device) -- the placement evaluator has no target-compatibility constraint to enforce. Today, every capability published in this registry is stateless.",
+    },
+    subscribable: {
+      name: "Subscribable",
+      summary: "Event-activated -- runs when a declared event occurs, not on direct request.",
+      description: "Instead of being invoked directly, a subscribable capability declares the specific event that triggers it (event_trigger) and runs when that event occurs. No capability published in this registry declares this service type yet.",
+    },
+    stateful: {
+      name: "Stateful",
+      summary: "Requires managed persistence across invocations -- target-constrained.",
+      description: "A stateful capability depends on durable state carried between invocations, which requires the runtime to provide managed persistence. Browser environments cannot guarantee durable storage, so a stateful capability can never declare Browser among its permitted targets -- the placement evaluator enforces this as a hard constraint, not just a recommendation. No capability published in this registry declares this service type yet.",
+    },
+  };
 
   function renderOwner(owner) {
     if (!owner || !owner.team) { return null; }
@@ -331,7 +362,13 @@
 
     var permalink = "/capability/" + contract.namespace + "/" + contract.id + "/" + contract.version + "/";
     appEl.appendChild(fieldRow("Permalink", el("a", { href: permalink, textContent: permalink })));
-    appEl.appendChild(fieldRow("Service type", textNode(contract.service_type)));
+    if (contract.service_type) {
+      var serviceTypeDef = SERVICE_TYPE_DEFINITIONS[contract.service_type];
+      var serviceTypeValue = serviceTypeDef
+        ? el("a", { className: "badge", href: serviceTypeHash(contract.service_type), textContent: serviceTypeDef.name })
+        : textNode(contract.service_type);
+      appEl.appendChild(fieldRow("Service type", serviceTypeValue));
+    }
     appEl.appendChild(fieldRow("Permitted targets", textNode((contract.permitted_targets || []).join(", "))));
     appEl.appendChild(fieldRow("Owner", renderOwner(contract.owner)));
     if (contract.artifact && contract.artifact.digest) { appEl.appendChild(fieldRow("Artifact digest", el("span", { className: "t-mono" }, [textNode(contract.artifact.digest)]))); }
@@ -472,16 +509,70 @@
     }
   }
 
+  function renderServiceTypeListView() {
+    appEl.textContent = "";
+    appEl.appendChild(el("a", { className: "back-link", href: "#", textContent: "← Back to catalog" }));
+    appEl.appendChild(el("div", { className: "section-label", textContent: "SERVICE TYPES" }));
+    appEl.appendChild(el("h1", { className: "t-h1", textContent: "Service Types" }));
+    appEl.appendChild(el("p", { className: "t-muted", textContent: "The execution model every published capability declares (traverse-framework/traverse spec 014-service-type-taxonomy) -- a closed set this registry does not define or extend." }));
+
+    var grid = el("div", { className: "grid" });
+    Object.keys(SERVICE_TYPE_DEFINITIONS).forEach(function (id) {
+      var def = SERVICE_TYPE_DEFINITIONS[id];
+      var count = capabilitiesForServiceType(id).length;
+      var card = el("a", { className: "card", href: serviceTypeHash(id) }, [
+        el("div", { className: "card-id", textContent: def.name }),
+        el("p", { className: "card-summary", textContent: def.summary }),
+        el("div", { className: "card-bottom" }, [el("span", { className: "badge", textContent: count + " capabilit" + (count === 1 ? "y" : "ies") })]),
+      ]);
+      grid.appendChild(card);
+    });
+    appEl.appendChild(grid);
+  }
+
+  function renderServiceTypeDetailView(id) {
+    var def = SERVICE_TYPE_DEFINITIONS[id];
+    appEl.textContent = "";
+    appEl.appendChild(el("a", { className: "back-link", href: "#/service-types", textContent: "← Back to service types" }));
+    if (!def) {
+      appEl.appendChild(el("p", { className: "error", textContent: "No service type found for \"" + id + "\"." }));
+      return;
+    }
+
+    appEl.appendChild(el("h1", { className: "t-h1 detail-title", textContent: def.name }));
+    appEl.appendChild(el("p", { className: "detail-summary", textContent: def.summary }));
+    appEl.appendChild(el("p", { className: "detail-description", textContent: def.description }));
+
+    appEl.appendChild(el("h2", { className: "t-h2", textContent: "Capabilities" }));
+    var groups = capabilitiesForServiceType(id);
+    if (groups.length === 0) {
+      appEl.appendChild(el("p", { className: "empty", textContent: "No published capability declares this service type yet." }));
+    } else {
+      groups.forEach(function (group) {
+        var row = el("a", { className: "version-row", href: referenceHash(group.latest.reference) }, [
+          el("div", { className: "version-left" }, [el("span", { className: "t-mono", textContent: group.latest.contract.id })]),
+          el("span", { className: "t-muted", style: "font-size:0.8rem", textContent: "view →" }),
+        ]);
+        appEl.appendChild(row);
+      });
+    }
+  }
+
   function router() {
     if (!catalog) { return; }
     var capabilityMatch = window.location.hash.match(/^#\/capability\/(.+)$/);
     var personaMatch = window.location.hash.match(/^#\/persona\/(.+)$/);
+    var serviceTypeMatch = window.location.hash.match(/^#\/service-type\/(.+)$/);
     if (capabilityMatch) {
       renderDetailView(decodeURIComponent(capabilityMatch[1]));
     } else if (personaMatch) {
       renderPersonaDetailView(decodeURIComponent(personaMatch[1]));
+    } else if (serviceTypeMatch) {
+      renderServiceTypeDetailView(decodeURIComponent(serviceTypeMatch[1]));
     } else if (window.location.hash === "#/personas") {
       renderPersonaListView();
+    } else if (window.location.hash === "#/service-types") {
+      renderServiceTypeListView();
     } else {
       renderListView();
     }
