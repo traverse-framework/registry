@@ -1,0 +1,6 @@
+{
+  "deprecated": true,
+  "reason": "Overclaimed action.enum (resolve/unresolve/pin/unpin) and description features (markup sanitisation, allow-list strict mentions) beyond the published use-case/smoke matrix. Superseded by honesty-aligned 1.0.1 which retains only create/edit/reply/delete/react with explicit known limitations. See traverse ADR-0038 / Spec 102 and registry#193.",
+  "deprecated_at": "2026-08-08T06:45:00Z",
+  "superseded_by": "1.0.1"
+}
