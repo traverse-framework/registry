@@ -141,6 +141,7 @@ input[type="search"]::placeholder { color: var(--fg-subtle); }
 .use-case { border: 1px solid var(--border); border-left: 3px solid var(--success); border-radius: var(--radius); padding: 1rem 1.25rem; margin-bottom: 0.85rem; background: var(--bg-card); }
 .use-case.unhappy { border-left-color: var(--danger); }
 .use-case-scenario { font-size: 0.9375rem; margin-bottom: 0.75rem; }
+.use-case-persona { font-size: 0.8125rem; color: var(--fg-subtle); margin-bottom: 0.75rem; display: flex; align-items: center; gap: 0.4rem; }
 .use-case-io { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; }
 @media (max-width: 640px) { .use-case-io { grid-template-columns: 1fr; } }
 .io-label { font-family: var(--font-mono); font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--fg-subtle); margin-bottom: 0.3rem; }

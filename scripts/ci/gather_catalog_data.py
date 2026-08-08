@@ -7,8 +7,10 @@ capability-discovery umbrella; design decided via `/brainstorm`,
 capability (`capability-src/catalog-builder/`) cannot walk `capabilities/`
 itself -- the governed WASM ABI only allows a single input/single output
 via `fd_read`/`fd_write`, no directory listing, no filesystem access -- so
-this plain script does the tree walk and hands the capability one flat
-JSON array to transform.
+this plain script does the tree walk and hands the capability one JSON
+object to transform: `{"capabilities": [...], "personas": [...]}` (the
+`personas` array added for specs/017-persona-registry, decision-log entry
+53 -- same "carry the entire record" reasoning as capabilities, below).
 
 Mirrors scripts/ci/build_index.py's walk (every capabilities/**/contract.json,
 including deprecated versions, each carrying its own `deprecated` flag) --
@@ -104,7 +106,7 @@ def measure_test_coverage(crate_dir: str) -> Optional[dict]:
     }
 
 
-def gather_catalog_data() -> list:
+def gather_capabilities() -> list:
     capabilities_dir = Path("capabilities")
     entries = []
 
@@ -141,15 +143,37 @@ def gather_catalog_data() -> list:
     return entries
 
 
+def gather_personas() -> list:
+    """Walks personas/**/persona.json (specs/017-persona-registry) the same
+    way gather_capabilities walks capabilities/ -- carries the entire
+    persona record, not a hand-picked field subset, for the same reason
+    documented at this module's top for capabilities."""
+    personas_dir = Path("personas")
+    entries = []
+
+    if not personas_dir.is_dir():
+        return entries
+
+    for persona_path in sorted(personas_dir.rglob("persona.json")):
+        persona = json.loads(persona_path.read_text())
+        entries.append({"persona": persona})
+
+    return entries
+
+
+def gather_catalog_data() -> dict:
+    return {"capabilities": gather_capabilities(), "personas": gather_personas()}
+
+
 def main() -> int:
     if len(sys.argv) != 2:
         print("Usage: gather_catalog_data.py <output_path>", file=sys.stderr)
         return 1
 
     output_path = Path(sys.argv[1])
-    entries = gather_catalog_data()
-    output_path.write_text(json.dumps(entries, indent=2) + "\n")
-    print(f"Gathered {len(entries)} capability record(s) at {output_path}")
+    data = gather_catalog_data()
+    output_path.write_text(json.dumps(data, indent=2) + "\n")
+    print(f"Gathered {len(data['capabilities'])} capability record(s) and {len(data['personas'])} persona record(s) at {output_path}")
     return 0
 
 

@@ -18,6 +18,18 @@ versions predate this requirement and can never be edited to match it, so
 checking them unconditionally would fail permanently and forever. See
 check_new_scenario_format's docstring for the concrete incident that
 confirmed this.
+
+Also enforces specs/017-persona-registry (decision-log entry 53): every
+personas/<id>/<version>/persona.json must carry the required fields
+(including a non-empty distinguished_from list, once more than one persona
+is registered), every distinguished_from reference must resolve to a real
+persona id, and every use_cases[] entry in a newly-ADDED contract.json must
+carry a persona_ref resolving to a real, registered persona. Persona shape
+and distinguished_from resolution run unconditionally (whole-tree) since
+that schema was correct from this spec's very first persona -- only the
+persona_ref-on-use_cases requirement is diff-based, for the same reason the
+scenario-format check is: older contract.json versions predate the field
+and can never be edited to add it.
 """
 
 import json
@@ -202,6 +214,169 @@ def check_new_scenarios_are_user_stories(base_sha: str, head_sha: str, errors: l
         status, path = parts[0], parts[-1]
         if status == "A" and path.endswith("contract.json"):
             check_new_scenario_format(Path(path), errors)
+
+
+PERSONA_REQUIRED_FIELDS = ["id", "version", "name", "summary", "description", "distinguished_from"]
+
+
+def validate_persona(path: Path, errors: list) -> None:
+    """spec 017-persona-registry FR-001/FR-002/FR-003: a persona.json must
+    carry the required fields, its id/version must match its path, and its
+    distinguished_from entries must be well-formed. Runs unconditionally
+    (whole-tree, unlike the diff-based use_cases[].persona_ref check) --
+    this schema is correct for every persona from the spec's first version,
+    so there is no historical-content problem to guard against here."""
+    try:
+        persona = json.loads(path.read_text())
+    except Exception as exc:
+        fail(errors, "persona.invalid_json", str(path), f"Unable to parse JSON: {exc}")
+        return
+
+    for field in PERSONA_REQUIRED_FIELDS:
+        if field not in persona:
+            fail(errors, "persona.missing_required_field", str(path), f"Missing required field '{field}'")
+
+    # path is personas/<persona-id>/<version>/persona.json
+    parts = path.parts
+    try:
+        idx = parts.index("personas")
+        id_seg, version_seg = parts[idx + 1], parts[idx + 2]
+    except (ValueError, IndexError):
+        fail(errors, "persona.bad_path", str(path), "Path does not match personas/<persona-id>/<version>/persona.json")
+        return
+
+    if persona.get("id") and persona.get("id") != id_seg:
+        fail(errors, "persona.id_mismatch", str(path), f"persona.json id '{persona.get('id')}' does not match path segment '{id_seg}'")
+
+    version = persona.get("version")
+    if version and version != version_seg:
+        fail(errors, "persona.version_mismatch", str(path), f"persona.json version '{version}' does not match path segment '{version_seg}'")
+    if version and not SEMVER_RE.match(version):
+        fail(errors, "persona.invalid_semver", str(path), f"'{version}' is not a valid semver string")
+
+    distinguished_from = persona.get("distinguished_from")
+    if distinguished_from is not None:
+        if not isinstance(distinguished_from, list):
+            fail(errors, "persona.invalid_distinguished_from", str(path), "distinguished_from must be an array")
+        else:
+            for index, entry in enumerate(distinguished_from):
+                if not isinstance(entry, dict) or not entry.get("persona_id") or not entry.get("how"):
+                    fail(
+                        errors,
+                        "persona.invalid_distinguished_from_entry",
+                        str(path),
+                        f"distinguished_from[{index}] must be an object with non-empty 'persona_id' and 'how'",
+                    )
+
+
+def collect_registered_persona_ids(personas_dir: Path) -> set:
+    ids = set()
+    for persona_path in sorted(personas_dir.rglob("persona.json")):
+        try:
+            persona = json.loads(persona_path.read_text())
+        except Exception:
+            continue
+        if persona.get("id"):
+            ids.add(persona["id"])
+    return ids
+
+
+def check_persona_distinguished_from_resolves(errors: list) -> None:
+    """spec 017-persona-registry FR-002/FR-006: distinguished_from must be
+    non-empty whenever another persona is registered, and every reference
+    in it must resolve to a real persona id."""
+    personas_dir = Path("personas")
+    if not personas_dir.is_dir():
+        return
+
+    persona_ids = collect_registered_persona_ids(personas_dir)
+
+    for persona_path in sorted(personas_dir.rglob("persona.json")):
+        try:
+            persona = json.loads(persona_path.read_text())
+        except Exception:
+            continue
+        own_id = persona.get("id")
+        distinguished_from = persona.get("distinguished_from")
+        if not isinstance(distinguished_from, list):
+            continue
+
+        if not distinguished_from and len(persona_ids) > 1:
+            fail(
+                errors,
+                "persona.empty_distinguished_from",
+                str(persona_path),
+                f"distinguished_from must be non-empty -- {len(persona_ids) - 1} other persona(s) are registered",
+            )
+
+        for entry in distinguished_from:
+            if not isinstance(entry, dict):
+                continue
+            ref = entry.get("persona_id")
+            if ref and ref not in persona_ids:
+                fail(
+                    errors,
+                    "persona.distinguished_from_unresolvable",
+                    str(persona_path),
+                    f"distinguished_from references unknown persona id '{ref}'",
+                )
+            if ref == own_id:
+                fail(
+                    errors,
+                    "persona.distinguished_from_self_reference",
+                    str(persona_path),
+                    "distinguished_from must not reference its own persona id",
+                )
+
+
+def check_new_use_case_persona_ref(path: Path, errors: list, persona_ids: set) -> None:
+    """spec 017-persona-registry FR-004/FR-005: a newly-added contract.json's
+    use_cases[] entries must each carry a persona_ref resolving to a real,
+    registered persona. Deliberately NOT called from validate_contract for
+    the same reason check_new_scenario_format isn't: already-published,
+    immutable older versions predate this field and can never be edited to
+    add it."""
+    try:
+        contract = json.loads(path.read_text())
+    except Exception:
+        return
+    use_cases = contract.get("use_cases")
+    if not isinstance(use_cases, list):
+        return
+    for index, use_case in enumerate(use_cases):
+        persona_ref = use_case.get("persona_ref") if isinstance(use_case, dict) else None
+        if not persona_ref:
+            fail(
+                errors,
+                "contract.use_case_missing_persona_ref",
+                str(path),
+                f"use_cases[{index}] is missing persona_ref (spec 017-persona-registry FR-004)",
+            )
+        elif persona_ref not in persona_ids:
+            fail(
+                errors,
+                "contract.use_case_persona_ref_unresolvable",
+                str(path),
+                f"use_cases[{index}].persona_ref '{persona_ref}' does not resolve to a registered persona (spec 017-persona-registry FR-005)",
+            )
+
+
+def check_new_use_cases_have_persona_ref(base_sha: str, head_sha: str, errors: list) -> None:
+    """Only validates newly-ADDED contract.json files in this PR's diff --
+    see check_new_use_case_persona_ref's docstring for why this must not run
+    against the whole historical tree."""
+    persona_ids = collect_registered_persona_ids(Path("personas"))
+    diff = subprocess.check_output(
+        ["git", "diff", "--name-status", f"{base_sha}...{head_sha}", "--", "capabilities/"],
+        text=True,
+    )
+    for line in diff.splitlines():
+        if not line.strip():
+            continue
+        parts = line.split("\t")
+        status, path = parts[0], parts[-1]
+        if status == "A" and path.endswith("contract.json"):
+            check_new_use_case_persona_ref(Path(path), errors, persona_ids)
 
 
 def real_workflow_paths(workflows_dir: Path):
@@ -439,12 +614,18 @@ def main() -> int:
     errors: list = []
     capabilities_dir = Path("capabilities")
     workflows_dir = Path("workflows")
+    personas_dir = Path("personas")
 
     if capabilities_dir.is_dir():
         for contract_path in sorted(capabilities_dir.rglob("contract.json")):
             validate_contract(contract_path, errors)
         check_semver_bump(errors)
         check_dependency_resolvability(errors)
+
+    if personas_dir.is_dir():
+        for persona_path in sorted(personas_dir.rglob("persona.json")):
+            validate_persona(persona_path, errors)
+        check_persona_distinguished_from_resolves(errors)
 
     if workflows_dir.is_dir():
         for workflow_path in real_workflow_paths(workflows_dir):
@@ -462,6 +643,10 @@ def main() -> int:
             fail(errors, "git.diff_failed", "capabilities/", f"Unable to compute diff: {exc}")
         try:
             check_new_scenarios_are_user_stories(base_sha, head_sha, errors)
+        except subprocess.CalledProcessError as exc:
+            fail(errors, "git.diff_failed", "capabilities/", f"Unable to compute diff: {exc}")
+        try:
+            check_new_use_cases_have_persona_ref(base_sha, head_sha, errors)
         except subprocess.CalledProcessError as exc:
             fail(errors, "git.diff_failed", "capabilities/", f"Unable to compute diff: {exc}")
 

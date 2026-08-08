@@ -1,0 +1,17 @@
+{
+  "id": "checkout-flow-developer",
+  "version": "1.0.0",
+  "name": "Checkout Flow Developer",
+  "summary": "A software developer building or maintaining an e-commerce checkout page, from shipping details through payment.",
+  "description": "Owns the checkout experience on an e-commerce site or app: collecting and validating a customer's phone number (validation.normalize-phone-number) for shipping/delivery contact, displaying prices correctly formatted for the customer's own locale and currency (formatting.format-currency), and catching an obviously mistyped card number before attempting a doomed charge (validation.validate-luhn). All three concerns live on the same checkout page and are typically owned by the same feature team, even though each is a narrow, separate validation/formatting step.",
+  "distinguished_from": [
+    {
+      "persona_id": "signup-form-developer",
+      "how": "Works on the purchase/payment flow, which happens after a customer already has an account -- not the account-creation form itself. Different point in the customer lifecycle."
+    },
+    {
+      "persona_id": "note-taking-app-developer",
+      "how": "Builds an e-commerce checkout experience, not a note-taking/productivity app -- a completely different product domain."
+    }
+  ]
+}

@@ -1,0 +1,17 @@
+{
+  "id": "note-taking-app-developer",
+  "version": "1.0.0",
+  "name": "Note-Taking App Developer",
+  "summary": "A software developer building a personal productivity app that lets users capture freeform notes and turns them into organized, actionable items.",
+  "description": "Builds and maintains a note-taking / productivity application's server-side or client-side note-processing pipeline. Integrates the traverse-starter reference kit's three capabilities in sequence: traverse-starter.validate to reject an empty note before it's ever saved, traverse-starter.process to classify a saved note by type (todo, idea, question) and drive status/tagging from urgency signals, and traverse-starter.summarize to compose the processed fields into a single readable line for the app's note list view. Cares about the pipeline never crashing on a blank or malformed note, since that failure mode reaches real end users directly in their note list.",
+  "distinguished_from": [
+    {
+      "persona_id": "checkout-flow-developer",
+      "how": "Builds a note-taking/productivity product, not an e-commerce checkout flow -- a different product domain entirely, with no shared forms or transactional data."
+    },
+    {
+      "persona_id": "signup-form-developer",
+      "how": "Works on the app's core note-processing pipeline, not its account-creation/signup form -- a different feature area of a product that could otherwise be the same app."
+    }
+  ]
+}
