@@ -170,6 +170,44 @@
     });
   }
 
+  // Never render contract.owner.contact directly -- it is free-form
+  // optional metadata (spec 006-public-scope-and-identity FR-003) and has
+  // held a personal email address for every capability published so far.
+  // Map the publishing team to a public GitHub identity instead.
+  var OWNER_GITHUB = { "traverse-core": "enricopiovesan" };
+
+  function renderOwner(owner) {
+    if (!owner || !owner.team) { return null; }
+    var handle = OWNER_GITHUB[owner.team];
+    var parts = [document.createTextNode(owner.team)];
+    if (handle) {
+      parts.push(document.createTextNode(" · "));
+      parts.push(el("a", { href: "https://github.com/" + handle, target: "_blank", rel: "noopener", textContent: "@" + handle }));
+    }
+    return el("span", {}, parts);
+  }
+
+  function renderEvents(contract) {
+    var emits = Array.isArray(contract.emits) ? contract.emits : [];
+    var consumes = Array.isArray(contract.consumes) ? contract.consumes : [];
+    if (emits.length === 0 && consumes.length === 0) {
+      return el("p", { className: "empty", textContent: "This capability does not declare any emitted or consumed events." });
+    }
+    function eventList(label, items) {
+      if (items.length === 0) {
+        return el("div", { className: "field-row" }, [
+          el("span", { className: "field-label", textContent: label }),
+          el("span", { className: "field-value t-muted", textContent: "none" }),
+        ]);
+      }
+      return el("div", { className: "field-row" }, [
+        el("span", { className: "field-label", textContent: label }),
+        el("span", { className: "field-value" }, [jsonBlock(items)]),
+      ]);
+    }
+    return el("div", {}, [eventList("Emits", emits), eventList("Consumes", consumes)]);
+  }
+
   function fieldRow(label, valueNode) {
     if (!valueNode) { return null; }
     return el("div", { className: "field-row" }, [
@@ -260,7 +298,7 @@
     appEl.appendChild(fieldRow("Permalink", el("a", { href: permalink, textContent: permalink })));
     appEl.appendChild(fieldRow("Service type", textNode(contract.service_type)));
     appEl.appendChild(fieldRow("Permitted targets", textNode((contract.permitted_targets || []).join(", "))));
-    appEl.appendChild(fieldRow("Owner", textNode(contract.owner && (contract.owner.team + (contract.owner.contact ? " (" + contract.owner.contact + ")" : "")))));
+    appEl.appendChild(fieldRow("Owner", renderOwner(contract.owner)));
     if (contract.artifact && contract.artifact.digest) { appEl.appendChild(fieldRow("Artifact digest", el("span", { className: "t-mono" }, [textNode(contract.artifact.digest)]))); }
     if (contract.artifact && contract.artifact.url) {
       var link = el("a", { href: contract.artifact.url, textContent: contract.artifact.url });
@@ -296,10 +334,17 @@
       appEl.appendChild(fieldRow("Permissions", textNode(contract.permissions.map(function (p) { return p.id; }).join(", "))));
     }
 
+    appEl.appendChild(el("h2", { className: "t-h2", textContent: "Events" }));
+    appEl.appendChild(renderEvents(contract));
+
     appEl.appendChild(el("h2", { className: "t-h2", textContent: "Version history" }));
     appEl.appendChild(renderVersionHistory(reference));
 
-    var details = el("details", {}, [el("summary", { textContent: "Full contract.json" }), jsonBlock(contract)]);
+    var redactedContract = Object.assign({}, contract);
+    if (redactedContract.owner && redactedContract.owner.contact) {
+      redactedContract.owner = Object.assign({}, redactedContract.owner, { contact: "[redacted -- see Owner field above]" });
+    }
+    var details = el("details", {}, [el("summary", { textContent: "Full contract.json" }), jsonBlock(redactedContract)]);
     appEl.appendChild(details);
   }
 
