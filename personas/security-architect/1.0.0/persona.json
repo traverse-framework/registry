@@ -1,0 +1,17 @@
+{
+  "id": "security-architect",
+  "version": "1.0.0",
+  "name": "Security Architect",
+  "summary": "Defines ownership and privilege boundaries for comment edit/delete actions.",
+  "description": "Ensures own_only and role gates prevent cross-user comment mutation. Uses core.process-comment not_owner denials as evidence that edit/delete privileges are enforced.",
+  "distinguished_from": [
+    {
+      "persona_id": "platform-engineer",
+      "how": "Focuses on principal ownership/privilege rules, not multi-tenant isolation mechanics."
+    },
+    {
+      "persona_id": "compliance-officer",
+      "how": "Owns access-control correctness, not soft-delete retention/eDiscovery obligations."
+    }
+  ]
+}
