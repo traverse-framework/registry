@@ -1,0 +1,17 @@
+{
+  "id": "platform-security-engineer",
+  "version": "1.0.0",
+  "name": "Platform Security Engineer",
+  "summary": "Owns authorization policy correctness and privileged-operation guardrails across shared platforms.",
+  "description": "Defines and reviews allow/deny policy for privileged actions (delete, admin operations, suspended-account blocks). Uses core.authorize to prove role-matched allows and high-priority denies before policy ships to production tenants.",
+  "distinguished_from": [
+    {
+      "persona_id": "compliance-officer",
+      "how": "Focuses on technical authz policy evaluation and privilege boundaries, not audit-obligation or regulatory control design."
+    },
+    {
+      "persona_id": "incident-responder",
+      "how": "Authors steady-state policy; does not operate break-glass emergency overrides during incidents."
+    }
+  ]
+}

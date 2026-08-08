@@ -1,0 +1,17 @@
+{
+  "id": "incident-responder",
+  "version": "1.0.0",
+  "name": "Incident Responder",
+  "summary": "Needs auditable emergency break-glass access during production incidents.",
+  "description": "During incidents, temporarily elevates access via break_glass attributes while requiring obligations and break_glass_used audit markers. Uses core.authorize break_glass_override outcomes.",
+  "distinguished_from": [
+    {
+      "persona_id": "platform-security-engineer",
+      "how": "Operates temporary emergency overrides; does not author the default steady-state privilege model."
+    },
+    {
+      "persona_id": "runtime-engineer",
+      "how": "Uses the break-glass policy path operationally, not the invalid-policy host guards."
+    }
+  ]
+}
