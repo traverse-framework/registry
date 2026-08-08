@@ -19,6 +19,12 @@ checking them unconditionally would fail permanently and forever. See
 check_new_scenario_format's docstring for the concrete incident that
 confirmed this.
 
+Also enforces that a contract's service_type, if present, is one of the
+three values traverse-framework/traverse's spec 014-service-type-taxonomy
+defines (stateless/subscribable/stateful) -- a closed enum registry does
+not own, validated whole-tree since every already-published contract
+already conforms.
+
 Also enforces specs/017-persona-registry (decision-log entry 53): every
 personas/<id>/<version>/persona.json must carry the required fields
 (including a non-empty distinguished_from list, once more than one persona
@@ -46,6 +52,14 @@ SEMVER_RE = re.compile(
 )
 
 REQUIRED_FIELDS = ["id", "namespace", "owner", "version"]
+
+# traverse-framework/traverse spec 014-service-type-taxonomy (external,
+# authoritative -- this is a closed enum registry does not own or extend).
+# Safe to validate whole-tree, unlike use_cases[].scenario/persona_ref:
+# every one of the 61 already-published contracts (current and historical)
+# already uses one of these three values, confirmed by inspection before
+# adding this check, so there is no legacy-incompatibility risk.
+KNOWN_SERVICE_TYPES = {"stateless", "subscribable", "stateful"}
 
 
 def fail(errors, code, path, message):
@@ -132,6 +146,16 @@ def validate_contract(path: Path, errors: list) -> None:
             str(path),
             "contract.json must not declare a top-level 'scope' field -- resolution tier is a "
             "consumer-side concept, not part of a published record (spec 006 FR-004)",
+        )
+
+    service_type = contract.get("service_type")
+    if service_type is not None and service_type not in KNOWN_SERVICE_TYPES:
+        fail(
+            errors,
+            "contract.invalid_service_type",
+            str(path),
+            f"service_type '{service_type}' is not one of {sorted(KNOWN_SERVICE_TYPES)} "
+            "(traverse-framework/traverse spec 014-service-type-taxonomy)",
         )
 
     if contract.get("id") and contract.get("id") != id_seg:

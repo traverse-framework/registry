@@ -35,6 +35,14 @@ its own full definition, distinguished_from cross-links, and a reverse
 crawlability reasoning as capability pages, and cross-linked from every
 use case's persona badge on both the SPA and its own generated page.
 
+Also generates one static page per service_type at
+catalog/service-type/<id>/index.html. Unlike personas, service_type is a
+closed, externally-defined enum (traverse-framework/traverse spec
+014-service-type-taxonomy) this registry does not own or extend -- so
+there's no governed content type or CI-enforced field here, just a fixed
+SERVICE_TYPE_DEFINITIONS table and a reverse "capabilities" list per type,
+cross-linked from each capability's own Service type field.
+
 Usage: generate_catalog_pages.py <catalog.json> <base_url> <output_dir>
 """
 
@@ -56,6 +64,44 @@ def field_row(label: str, value) -> str:
 
 def field_row_html(label: str, value_html: str) -> str:
     return f'<div class="field-row"><span class="field-label">{esc(label)}</span><span class="field-value">{value_html}</span></div>'
+
+
+# service_type is a closed enum this registry does not own or extend --
+# defined by traverse-framework/traverse's spec 014-service-type-taxonomy.
+# Not a governed content type here (no personas/-style versioned records):
+# just a fixed reference table for three values that will essentially never
+# change, rendered as pages for discoverability/cross-linking.
+SERVICE_TYPE_DEFINITIONS = {
+    "stateless": {
+        "name": "Stateless",
+        "summary": "A pure function with no external state -- can execute on any target.",
+        "description": "Every invocation is independent: given the same input, a stateless capability produces the same output, with no memory of prior calls and no managed persistence. Because it holds no state, it can run on any execution target (browser, edge, cloud, or device) -- the placement evaluator has no target-compatibility constraint to enforce. Today, every capability published in this registry is stateless.",
+    },
+    "subscribable": {
+        "name": "Subscribable",
+        "summary": "Event-activated -- runs when a declared event occurs, not on direct request.",
+        "description": "Instead of being invoked directly, a subscribable capability declares the specific event that triggers it (event_trigger) and runs when that event occurs. No capability published in this registry declares this service type yet.",
+    },
+    "stateful": {
+        "name": "Stateful",
+        "summary": "Requires managed persistence across invocations -- target-constrained.",
+        "description": "A stateful capability depends on durable state carried between invocations, which requires the runtime to provide managed persistence. Browser environments cannot guarantee durable storage, so a stateful capability can never declare Browser among its permitted targets -- the placement evaluator enforces this as a hard constraint, not just a recommendation. No capability published in this registry declares this service type yet.",
+    },
+}
+
+
+def service_type_page_path(service_type_id: str) -> str:
+    return f"service-type/{service_type_id}/"
+
+
+def service_type_field_html(service_type: str, base_url: str) -> str:
+    if not service_type:
+        return ""
+    definition = SERVICE_TYPE_DEFINITIONS.get(service_type)
+    if not definition:
+        return field_row("Service type", service_type)
+    href = f"{base_url}/{service_type_page_path(service_type)}"
+    return field_row_html("Service type", f'<a class="badge" href="{esc(href)}">{esc(definition["name"])}</a>')
 
 
 # Never render contract.owner.contact directly -- it is free-form optional
@@ -242,7 +288,7 @@ def render_capability_page(base_url: str, entry: dict, group_versions: list, per
 
     field_rows = "".join(
         [
-            field_row("Service type", contract.get("service_type")),
+            service_type_field_html(contract.get("service_type"), base_url),
             field_row("Permitted targets", ", ".join(contract.get("permitted_targets") or [])),
             owner_html(contract.get("owner")),
         ]
@@ -405,6 +451,80 @@ def current_personas_by_id(personas: list) -> dict:
     return by_id
 
 
+SERVICE_TYPE_PAGE_TEMPLATE = """<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{title}</title>
+<meta name="description" content="{meta_description}">
+<meta property="og:type" content="website">
+<meta property="og:title" content="{title}">
+<meta property="og:description" content="{meta_description}">
+<meta property="og:url" content="{canonical_url}">
+<link rel="canonical" href="{canonical_url}">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/style.css">
+<script defer src="/analytics.js"></script>
+</head>
+<body>
+<nav class="nav">
+  <div class="nav-inner">
+    <a href="/" class="nav-logo"><span>Traverse<span class="nav-logo-dot">.</span></span><span class="nav-label">REGISTRY CATALOG</span></a>
+  </div>
+</nav>
+<div class="container">
+<a class="back-link" href="/#/service-types">← Back to service types</a>
+<h1 class="t-h1 detail-title">{name}</h1>
+<p class="detail-summary">{summary}</p>
+<p class="detail-description">{description}</p>
+<h2 class="t-h2">Capabilities</h2>
+{capabilities_html}
+<p style="margin-top:2rem"><a href="/#/service-type/{id}">Open in the interactive catalog →</a></p>
+</div>
+</body>
+</html>
+"""
+
+
+def render_service_type_page(base_url: str, service_type_id: str, definition: dict, capabilities: list) -> str:
+    matching = [
+        entry
+        for entry in capabilities
+        if entry["contract"].get("service_type") == service_type_id
+        and not entry["deprecated"]
+    ]
+
+    if matching:
+        rows = []
+        for entry in matching:
+            href = f"{base_url}/{capability_page_path(entry['contract'])}"
+            rows.append(
+                f'<a class="version-row" href="{esc(href)}"><div class="version-left">'
+                f'<span class="t-mono">{esc(entry["contract"]["id"])}</span></div>'
+                f'<span class="t-muted" style="font-size:0.8rem">view →</span></a>'
+            )
+        capabilities_html = "\n".join(rows)
+    else:
+        capabilities_html = '<p class="empty">No published capability declares this service type yet.</p>'
+
+    title = f"{definition['name']} · Traverse Registry Catalog"
+    canonical_url = f"{base_url}/{service_type_page_path(service_type_id)}"
+
+    return SERVICE_TYPE_PAGE_TEMPLATE.format(
+        title=esc(title),
+        meta_description=esc(definition["summary"]),
+        canonical_url=esc(canonical_url),
+        name=esc(definition["name"]),
+        summary=esc(definition["summary"]),
+        description=esc(definition["description"]),
+        capabilities_html=capabilities_html,
+        id=esc(service_type_id),
+    )
+
+
 def generate(catalog_path: Path, base_url: str, output_dir: Path) -> list:
     catalog = json.loads(catalog_path.read_text())
     capabilities = catalog.get("capabilities", [])
@@ -431,6 +551,13 @@ def generate(catalog_path: Path, base_url: str, output_dir: Path) -> list:
         page_path.parent.mkdir(parents=True, exist_ok=True)
         page_path.write_text(page_html)
         generated_paths.append(persona_page_path(persona_entry["persona"]))
+
+    for service_type_id, definition in SERVICE_TYPE_DEFINITIONS.items():
+        page_html = render_service_type_page(base_url, service_type_id, definition, capabilities)
+        page_path = output_dir / service_type_page_path(service_type_id) / "index.html"
+        page_path.parent.mkdir(parents=True, exist_ok=True)
+        page_path.write_text(page_html)
+        generated_paths.append(service_type_page_path(service_type_id))
 
     return generated_paths
 
