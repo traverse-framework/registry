@@ -47,8 +47,52 @@ def field_row(label: str, value) -> str:
     return f'<div class="field-row"><span class="field-label">{esc(label)}</span><span class="field-value">{esc(value)}</span></div>'
 
 
+def field_row_html(label: str, value_html: str) -> str:
+    return f'<div class="field-row"><span class="field-label">{esc(label)}</span><span class="field-value">{value_html}</span></div>'
+
+
+# Never render contract.owner.contact directly -- it is free-form optional
+# metadata (spec 006-public-scope-and-identity FR-003) and has held a
+# personal email address for every capability published so far. Map the
+# publishing team to a public GitHub identity instead.
+OWNER_GITHUB = {"traverse-core": "enricopiovesan"}
+
+
+def owner_html(owner: dict) -> str:
+    team = (owner or {}).get("team")
+    if not team:
+        return ""
+    handle = OWNER_GITHUB.get(team)
+    if not handle:
+        return field_row(team, team)
+    link = f'<a href="https://github.com/{esc(handle)}" target="_blank" rel="noopener">@{esc(handle)}</a>'
+    return field_row_html("Owner", f"{esc(team)} · {link}")
+
+
+def events_html(contract: dict) -> str:
+    emits = contract.get("emits") or []
+    consumes = contract.get("consumes") or []
+    if not emits and not consumes:
+        return '<p class="empty">This capability does not declare any emitted or consumed events.</p>'
+
+    def event_list(label: str, items: list) -> str:
+        if not items:
+            return field_row_html(label, '<span class="t-muted">none</span>')
+        return field_row_html(label, json_block(items))
+
+    return event_list("Emits", emits) + event_list("Consumes", consumes)
+
+
 def json_block(value) -> str:
     return f'<div class="code-block"><pre>{esc(json.dumps(value, indent=2))}</pre></div>'
+
+
+def redacted_contract(contract: dict) -> dict:
+    redacted = dict(contract)
+    owner = redacted.get("owner")
+    if owner and owner.get("contact"):
+        redacted["owner"] = dict(owner, contact="[redacted -- see Owner field above]")
+    return redacted
 
 
 def use_case_block(use_case: dict) -> str:
@@ -151,6 +195,8 @@ PAGE_TEMPLATE = """<!doctype html>
 {coverage_html}
 <h2 class="t-h2">Interface</h2>
 {interface_html}
+<h2 class="t-h2">Events</h2>
+{events_html}
 <h2 class="t-h2">Version history</h2>
 {version_history_html}
 <details><summary>Full contract.json</summary>{raw_contract_block}</details>
@@ -177,11 +223,7 @@ def render_capability_page(base_url: str, entry: dict, group_versions: list) -> 
         [
             field_row("Service type", contract.get("service_type")),
             field_row("Permitted targets", ", ".join(contract.get("permitted_targets") or [])),
-            field_row(
-                "Owner",
-                (contract.get("owner") or {}).get("team")
-                and (contract["owner"]["team"] + (f" ({contract['owner']['contact']})" if contract["owner"].get("contact") else "")),
-            ),
+            owner_html(contract.get("owner")),
         ]
     )
     artifact = contract.get("artifact") or {}
@@ -222,8 +264,9 @@ def render_capability_page(base_url: str, entry: dict, group_versions: list) -> 
         use_cases_html=use_cases_html,
         coverage_html=coverage_block(entry.get("test_coverage")),
         interface_html="".join(interface_parts),
+        events_html=events_html(contract),
         version_history_html=version_history_block(base_url, group_versions, entry["reference"]),
-        raw_contract_block=json_block(contract),
+        raw_contract_block=json_block(redacted_contract(contract)),
         encoded_reference=esc(entry["reference"]).replace("/", "%2F").replace("@", "%40"),
     )
 

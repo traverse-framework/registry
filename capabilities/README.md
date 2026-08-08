@@ -25,7 +25,7 @@ real, input-dependent, ABI-compliant logic:
 |---|---|---|
 | `traverse-starter` | `traverse-starter.process` | 1.2.1 |
 | `traverse-starter` | `traverse-starter.validate` | 1.2.1 |
-| `traverse-starter` | `traverse-starter.summarize` | 1.2.1 |
+| `traverse-starter` | `traverse-starter.summarize` | 1.2.2 |
 | `doc-approval` | `doc-approval.analyze` | 1.3.1 |
 | `doc-approval` | `doc-approval.recommend` | 1.2.1 |
 | `meeting-notes` | `meeting-notes.process` | 1.3.1 |
@@ -88,6 +88,15 @@ carry a `use_cases` array (spec 001 FR-011) with concrete, `wasmtime`-verified
 input/output example pairs (schema-conformant, not hand-waved) -- authored fresh for
 these six, since no prior use-case documentation existed for them despite an earlier
 (inaccurate) README claim to that effect.
+
+**Missing unhappy-path use case backfilled (2026-08-05, #177, patch bump)**: `traverse-starter.summarize`
+was the one capability among these six left with only happy-path `use_cases` entries after the
+#107 backfill -- corrected by adding a real, `cargo test`-verified unhappy-path scenario (a
+blank-title note; `title.unwrap_or("Untitled note")`'s actual behavior only triggers on a missing/
+non-string field, not an empty string, so a blank title genuinely produces a degenerate but
+deterministic `" (general, new). Next: Triage and categorize."` summary rather than crashing --
+verified against the compiled logic, not assumed). `1.2.1` -> `1.2.2`, patch per `classify_change()`
+(appending to an already-present `use_cases` array, no new top-level field).
 
 **`scenario` rewritten as a full user story (2026-07-30, #139, decision-log entry 46,
 patch bump each)**: every `use_cases[].scenario` was a plain declarative sentence
