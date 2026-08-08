@@ -1,0 +1,17 @@
+{
+  "id": "client-developer",
+  "version": "1.0.0",
+  "name": "Client Developer",
+  "summary": "Surfaces precise authorization precondition errors in client applications.",
+  "description": "Builds clients that must distinguish invalid principal payloads from ordinary denies. Uses core.authorize invalid_principal reason_code and null policy_hash to show actionable errors instead of a generic failure.",
+  "distinguished_from": [
+    {
+      "persona_id": "platform-developer",
+      "how": "Consumes structured denial codes in UI/SDK layers, not platform service integration."
+    },
+    {
+      "persona_id": "multi-tenant-saas-developer",
+      "how": "Handles client error UX for malformed principals, not tenant-isolation policy authoring."
+    }
+  ]
+}
