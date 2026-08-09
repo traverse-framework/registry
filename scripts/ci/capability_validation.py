@@ -42,6 +42,16 @@ FR-001 (registry#192): when a newly-ADDED contract.json declares
 inputs.schema.properties.action.enum, every enum value must appear as
 use_cases[].input_example.action for at least one use case. Diff-based for
 the same immutability reason as scenario/persona_ref checks.
+
+Also enforces specs/001-registry-foundation FR-007 and
+specs/007-artifact-hosting FR-001 (registry#187): a newly-ADDED
+contract.json MUST include artifact.digest (sha256:…) and artifact.url
+pointing at this repo's artifacts/<tag>/<asset> GitHub Release download
+URL. Diff-based so already-published immutable versions that predate (or
+were broken by) this requirement are never re-judged -- the same reason
+scenario/persona_ref checks are diff-based. The index builder already
+hard-fails active contracts missing these fields; this gate blocks the
+unusable publish at PR time instead.
 """
 
 import json
@@ -55,6 +65,15 @@ SEMVER_RE = re.compile(
     r"(?:-((?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)"
     r"(?:\.(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?"
     r"(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?$"
+)
+
+# specs/007-artifact-hosting: assets live under this repo's
+# artifacts/<id>-<version> (or artifacts/<namespace>.<id>-<version>)
+# GitHub Release tags. Allowed host is this registry only -- consumers
+# must not depend on another repo's release hygiene for immutability.
+ARTIFACT_RELEASE_URL_RE = re.compile(
+    r"^https://github\.com/traverse-framework/registry/releases/download/"
+    r"artifacts/[^/]+/[^/]+$"
 )
 
 REQUIRED_FIELDS = ["id", "namespace", "owner", "version"]
@@ -480,6 +499,77 @@ def check_new_contracts_action_enum_coverage(base_sha: str, head_sha: str, error
             check_new_action_enum_covered_by_use_cases(Path(path), errors)
 
 
+def check_new_contract_artifact_reference(path: Path, errors: list) -> None:
+    """spec 001 FR-007 / spec 007 FR-001 / registry#187: a newly-added
+    contract.json must carry a fetchable artifact reference. Deliberately
+    NOT called from validate_contract (whole-tree): two already-published
+    deprecated versions lack artifact after traverse-cli stripped the field
+    (traverse#859), and contracts are immutable, so checking the historical
+    tree would fail permanently. Wired into main() as a diff-based check.
+    """
+    try:
+        contract = json.loads(path.read_text())
+    except Exception:
+        return
+    artifact = contract.get("artifact")
+    if not isinstance(artifact, dict):
+        fail(
+            errors,
+            "contract.missing_artifact_reference",
+            str(path),
+            "newly-added contract.json must include artifact.digest and "
+            "artifact.url (spec 001 FR-007 / spec 007 FR-001); upload the "
+            "WASM under an artifacts/<id>-<version> release before opening "
+            "the contract PR (see traverse-framework/traverse#859 for the "
+            "CLI publish path that historically dropped these fields)",
+        )
+        return
+    digest = artifact.get("digest")
+    url = artifact.get("url")
+    if not digest or not url:
+        fail(
+            errors,
+            "contract.missing_artifact_reference",
+            str(path),
+            "newly-added contract.json artifact must include both "
+            "'digest' and 'url' (spec 001 FR-007 / spec 007 FR-001)",
+        )
+        return
+    if not str(digest).startswith("sha256:"):
+        fail(
+            errors,
+            "contract.invalid_digest_format",
+            str(path),
+            "artifact digest must be a 'sha256:' prefixed value",
+        )
+    if not ARTIFACT_RELEASE_URL_RE.match(str(url)):
+        fail(
+            errors,
+            "contract.invalid_artifact_url",
+            str(path),
+            "artifact.url must be a GitHub Release asset under "
+            "https://github.com/traverse-framework/registry/releases/download/"
+            "artifacts/<tag>/<asset> (spec 007-artifact-hosting)",
+        )
+
+
+def check_new_contracts_have_artifact_reference(base_sha: str, head_sha: str, errors: list) -> None:
+    """Only validates newly-ADDED contract.json files in this PR's diff --
+    see check_new_contract_artifact_reference's docstring for why this must
+    not run against the whole historical tree."""
+    diff = subprocess.check_output(
+        ["git", "diff", "--name-status", f"{base_sha}...{head_sha}", "--", "capabilities/"],
+        text=True,
+    )
+    for line in diff.splitlines():
+        if not line.strip():
+            continue
+        parts = line.split("\t")
+        status, path = parts[0], parts[-1]
+        if status == "A" and path.endswith("contract.json"):
+            check_new_contract_artifact_reference(Path(path), errors)
+
+
 def real_workflow_paths(workflows_dir: Path):
     """Real, published workflow.json files only -- excludes
     workflows/examples/, which holds demo/fixture content
@@ -752,6 +842,10 @@ def main() -> int:
             fail(errors, "git.diff_failed", "capabilities/", f"Unable to compute diff: {exc}")
         try:
             check_new_contracts_action_enum_coverage(base_sha, head_sha, errors)
+        except subprocess.CalledProcessError as exc:
+            fail(errors, "git.diff_failed", "capabilities/", f"Unable to compute diff: {exc}")
+        try:
+            check_new_contracts_have_artifact_reference(base_sha, head_sha, errors)
         except subprocess.CalledProcessError as exc:
             fail(errors, "git.diff_failed", "capabilities/", f"Unable to compute diff: {exc}")
 

@@ -16,6 +16,10 @@ Read [`specs/001-registry-foundation/spec.md`](specs/001-registry-foundation/spe
 4. Merging to `main` builds a versioned index artifact and publishes it as a GitHub Release.
 5. Anyone running `traverse-cli registry sync` fetches that release into local workspace state — the runtime never talks to this repo live.
 
+### Artifact references on new publishes
+
+Newly **added** `capabilities/**/contract.json` files must include `artifact.digest` (`sha256:…`) and `artifact.url` pointing at a GitHub Release asset under `https://github.com/traverse-framework/registry/releases/download/artifacts/<tag>/<asset>` (see `specs/007-artifact-hosting/spec.md`). CI rejects missing or non-matching references at PR time so unusable records never reach the index. Until [traverse#859](https://github.com/traverse-framework/traverse/issues/859) is fixed, verify `traverse-cli capability publish` did not strip these fields from the opened PR.
+
 Building with an AI coding agent? [traverse-framework/claude-skills](https://github.com/traverse-framework/claude-skills) hosts a Claude Skill that checks this registry before authoring a new capability, so you don't duplicate something that's already published.
 
 ## Layout
