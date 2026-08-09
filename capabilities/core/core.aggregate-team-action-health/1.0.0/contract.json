@@ -1,0 +1,144 @@
+{
+  "artifact": {
+    "digest": "sha256:31e61af5ac0b328b22a0328c6c8d56228496fe39134dcc45e093b41f1457e64b",
+    "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/core.aggregate-team-action-health-1.0.0/core-aggregate-team-action-health.wasm"
+  },
+  "connector_requirements": [],
+  "consumes": [],
+  "dependencies": [],
+  "description": "Pure aggregation capability used by the Manager Visibility workflow. Returns a compact health snapshot that can be rendered in a dashboard or weekly digest.",
+  "emits": [],
+  "event_trigger": null,
+  "evidence": [],
+  "execution": {
+    "binary_format": "wasm",
+    "constraints": {
+      "filesystem_access": "none",
+      "host_api_access": "none",
+      "network_access": "forbidden"
+    },
+    "entrypoint": {
+      "command": "run",
+      "kind": "wasi-command"
+    },
+    "preferred_targets": [
+      "local",
+      "edge",
+      "browser"
+    ]
+  },
+  "id": "core.aggregate-team-action-health",
+  "inputs": {
+    "schema": {
+      "properties": {
+        "aggregation_config": {
+          "required": [
+            "version"
+          ],
+          "type": "object"
+        },
+        "items": {
+          "items": {
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "reference_date": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "items",
+        "reference_date",
+        "aggregation_config"
+      ],
+      "type": "object"
+    }
+  },
+  "kind": "capability_contract",
+  "lifecycle": "active",
+  "name": "aggregate-team-action-health",
+  "namespace": "core",
+  "outputs": {
+    "schema": {
+      "properties": {
+        "evaluation_trace": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "on_track_pct": {
+          "type": "number"
+        },
+        "overdue_count": {
+          "type": "integer"
+        },
+        "overloaded_owners": {
+          "type": "array"
+        },
+        "reason_code": {
+          "type": "string"
+        },
+        "top_pressure_items": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "total_open": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "total_open",
+        "reason_code"
+      ],
+      "type": "object"
+    }
+  },
+  "owner": {
+    "contact": "founders@loop.dev",
+    "team": "loop"
+  },
+  "permissions": [
+    {
+      "id": "core.aggregate-team-action-health"
+    }
+  ],
+  "permitted_targets": [
+    "local",
+    "edge",
+    "browser",
+    "cloud"
+  ],
+  "policies": [],
+  "postconditions": [
+    {
+      "description": "Identical inputs produce identical outputs",
+      "id": "deterministic"
+    }
+  ],
+  "preconditions": [],
+  "provenance": {
+    "adr_refs": [
+      "persona-council-review-2026-08-08"
+    ],
+    "author": "loop-founders + traverse-capability-author",
+    "created_at": "2026-08-08T06:00:00Z",
+    "exception_refs": [],
+    "source": "ai-assisted",
+    "spec_ref": "core.aggregate-team-action-health@1.0.0"
+  },
+  "schema_version": "1.0.0",
+  "service_type": "stateless",
+  "side_effects": [
+    {
+      "description": "Pure aggregation",
+      "kind": "memory_only"
+    }
+  ],
+  "state_schema": null,
+  "summary": "Aggregates open action items of a team into a health summary for managers (on-track %, overdue, overloaded owners, top pressure items).",
+  "version": "1.0.0"
+}
