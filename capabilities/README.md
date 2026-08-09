@@ -25,7 +25,7 @@ Copy-paste sequence for a new capability version (manual path today; `traverse-c
 3. **Set `artifact.digest` / `artifact.url` on the contract** pointing at
    `https://github.com/traverse-framework/registry/releases/download/artifacts/<tag>/<asset>`.
    Newly added contracts missing either field fail CI (`contract.missing_artifact_reference`).
-4. **Ensure every `use_cases[].persona_ref` resolves** to an existing `personas/<id>/<version>/persona.json` (see `specs/017-persona-registry/spec.md`). Author missing personas before opening the contract PR.
+4. **Ensure every `use_cases[].persona_ref` resolves** to an existing `personas/<id>/<version>/persona.json` (see `specs/017-persona-registry/spec.md` and [`personas/README.md`](../personas/README.md)). Author missing personas before opening the contract PR — prefer `bash scripts/scaffold/new-persona.sh` so `distinguished_from` and local `validate_persona` checks pass first.
 5. **Open the PR with the org body sections** required by `spec-alignment`: `## Summary`, `## Governing Spec` (bare approved-spec ids in backticks, one per bullet), `## Project Item`, `## Definition of Done`, `## Validation`. Editing the body alone does not re-run that check — push a new commit after body fixes.
 
 Never edit an already-merged `contract.json`; yank via `deprecated.json` and publish a new version instead.
