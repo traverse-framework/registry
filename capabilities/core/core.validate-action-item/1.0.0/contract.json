@@ -1,0 +1,222 @@
+{
+  "artifact": {
+    "digest": "sha256:844081f9329040f28a6cba49400f949834894aa49247a07e92728e78d4ccc29c",
+    "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/core.validate-action-item-1.0.0/core-validate-action-item.wasm"
+  },
+  "connector_requirements": [],
+  "consumes": [],
+  "dependencies": [],
+  "description": "Gatekeeper capability used when turning extracted candidates into real tracked items (Loop WF2). Enforces data quality rules that are configurable per workspace via `validation_config`. Pure and deterministic — never mutates storage.\n\nChecks covered by this guest:\n- non-empty title\n- optional required owner / due date\n- past-due rejection when `allow_past_due` is false\n- duplicate detection (`none` | `title` | `title_and_owner`) against `existing_open_items`",
+  "emits": [],
+  "event_trigger": null,
+  "evidence": [],
+  "execution": {
+    "binary_format": "wasm",
+    "constraints": {
+      "filesystem_access": "none",
+      "host_api_access": "none",
+      "network_access": "forbidden"
+    },
+    "entrypoint": {
+      "command": "run",
+      "kind": "wasi-command"
+    },
+    "preferred_targets": [
+      "local",
+      "edge",
+      "browser"
+    ]
+  },
+  "id": "core.validate-action-item",
+  "inputs": {
+    "schema": {
+      "additionalProperties": false,
+      "properties": {
+        "action_item": {
+          "additionalProperties": true,
+          "properties": {
+            "due_date": {
+              "type": "string"
+            },
+            "owner_id": {
+              "type": "string"
+            },
+            "source": {
+              "type": "string"
+            },
+            "title": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "title"
+          ],
+          "type": "object"
+        },
+        "existing_open_items": {
+          "default": [],
+          "items": {
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "reference_date": {
+          "type": "string"
+        },
+        "validation_config": {
+          "properties": {
+            "allow_past_due": {
+              "default": false,
+              "type": "boolean"
+            },
+            "duplicate_check": {
+              "enum": [
+                "none",
+                "title",
+                "title_and_owner"
+              ],
+              "type": "string"
+            },
+            "require_due_date": {
+              "default": false,
+              "type": "boolean"
+            },
+            "require_owner": {
+              "default": true,
+              "type": "boolean"
+            },
+            "version": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "version"
+          ],
+          "type": "object"
+        }
+      },
+      "required": [
+        "action_item",
+        "validation_config",
+        "reference_date"
+      ],
+      "type": "object"
+    }
+  },
+  "kind": "capability_contract",
+  "lifecycle": "active",
+  "name": "validate-action-item",
+  "namespace": "core",
+  "outputs": {
+    "schema": {
+      "additionalProperties": false,
+      "properties": {
+        "errors": {
+          "items": {
+            "properties": {
+              "code": {
+                "type": "string"
+              },
+              "field": {
+                "type": "string"
+              },
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "field",
+              "code",
+              "message"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "evaluation_trace": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "normalized": {
+          "type": [
+            "object",
+            "null"
+          ]
+        },
+        "reason_code": {
+          "enum": [
+            "ok",
+            "validation_failed",
+            "duplicate",
+            "invalid_config"
+          ],
+          "type": "string"
+        },
+        "valid": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "valid",
+        "reason_code"
+      ],
+      "type": "object"
+    }
+  },
+  "owner": {
+    "contact": "founders@loop.dev",
+    "team": "loop"
+  },
+  "permissions": [
+    {
+      "id": "core.validate-action-item"
+    }
+  ],
+  "permitted_targets": [
+    "local",
+    "edge",
+    "browser",
+    "cloud"
+  ],
+  "policies": [
+    {
+      "id": "fail-closed-on-invalid"
+    }
+  ],
+  "postconditions": [
+    {
+      "description": "Identical inputs produce identical outputs",
+      "id": "deterministic"
+    }
+  ],
+  "preconditions": [
+    {
+      "description": "action_item.title must be non-empty",
+      "id": "title-present"
+    }
+  ],
+  "provenance": {
+    "adr_refs": [
+      "persona-council-review-2026-08-08"
+    ],
+    "author": "loop-founders + traverse-capability-author",
+    "created_at": "2026-08-08T06:00:00Z",
+    "exception_refs": [],
+    "source": "ai-assisted",
+    "spec_ref": "core.validate-action-item@1.0.0"
+  },
+  "schema_version": "1.0.0",
+  "service_type": "stateless",
+  "side_effects": [
+    {
+      "description": "Pure validation",
+      "kind": "memory_only"
+    }
+  ],
+  "state_schema": null,
+  "summary": "Validates a single action item for required fields, owner existence, due-date sanity and duplicate detection before it becomes a commitment.",
+  "version": "1.0.0"
+}
