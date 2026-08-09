@@ -1,0 +1,202 @@
+{
+  "artifact": {
+    "digest": "sha256:776940c947298b22db406e36fca944d2f6596822a5bd365265a541a1cce4b56e",
+    "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/core.select-items-for-followup-1.1.0/core-select-items-for-followup.wasm"
+  },
+  "connector_requirements": [],
+  "consumes": [],
+  "dependencies": [],
+  "description": "Hero capability of Loop (council-revised). Key improvements from 1.0.0:\n- Respects per-user quiet hours and snooze until timestamps\n- Enforces max nudges per user per day\n- Escalation only after repeated ignored nudges + high pressure\n- Explicit skip reasons (quiet_hours, snoozed, budget_exceeded, recently_active, low_pressure)\n- Still pure and deterministic — no messages are sent, only the selection decision is produced.",
+  "emits": [],
+  "event_trigger": null,
+  "evidence": [],
+  "execution": {
+    "binary_format": "wasm",
+    "constraints": {
+      "filesystem_access": "none",
+      "host_api_access": "none",
+      "network_access": "forbidden"
+    },
+    "entrypoint": {
+      "command": "run",
+      "kind": "wasi-command"
+    },
+    "preferred_targets": [
+      "local",
+      "edge",
+      "browser"
+    ]
+  },
+  "id": "core.select-items-for-followup",
+  "inputs": {
+    "schema": {
+      "properties": {
+        "followup_config": {
+          "properties": {
+            "direct_days_overdue": {
+              "type": "integer"
+            },
+            "escalate_after_nudges": {
+              "type": "integer"
+            },
+            "min_pressure_for_soft": {
+              "type": "number"
+            },
+            "respect_quiet_hours": {
+              "type": "boolean"
+            },
+            "soft_days_before_due": {
+              "type": "integer"
+            },
+            "version": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "version"
+          ],
+          "type": "object"
+        },
+        "open_items": {
+          "items": {
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "reference_datetime": {
+          "type": "string"
+        },
+        "user_preferences": {
+          "additionalProperties": true,
+          "type": "object"
+        }
+      },
+      "required": [
+        "open_items",
+        "reference_datetime",
+        "followup_config"
+      ],
+      "type": "object"
+    }
+  },
+  "kind": "capability_contract",
+  "lifecycle": "active",
+  "name": "select-items-for-followup",
+  "namespace": "core",
+  "outputs": {
+    "schema": {
+      "properties": {
+        "evaluation_trace": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "reason_code": {
+          "type": "string"
+        },
+        "selected": {
+          "items": {
+            "properties": {
+              "intensity": {
+                "enum": [
+                  "soft",
+                  "direct",
+                  "escalate"
+                ],
+                "type": "string"
+              },
+              "item_id": {
+                "type": "string"
+              },
+              "reason": {
+                "type": "string"
+              },
+              "recommended_channel": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "item_id",
+              "intensity",
+              "reason"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "skipped": {
+          "items": {
+            "properties": {
+              "detail": {
+                "type": "string"
+              },
+              "item_id": {
+                "type": "string"
+              },
+              "reason": {
+                "type": "string"
+              }
+            },
+            "type": "object"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "selected",
+        "skipped",
+        "reason_code"
+      ],
+      "type": "object"
+    }
+  },
+  "owner": {
+    "contact": "founders@loop.dev",
+    "team": "loop"
+  },
+  "permissions": [
+    {
+      "id": "core.select-items-for-followup"
+    }
+  ],
+  "permitted_targets": [
+    "local",
+    "edge",
+    "browser",
+    "cloud"
+  ],
+  "policies": [
+    {
+      "id": "anti-spam-by-design"
+    }
+  ],
+  "postconditions": [
+    {
+      "description": "Identical inputs produce identical outputs",
+      "id": "deterministic"
+    }
+  ],
+  "preconditions": [],
+  "provenance": {
+    "adr_refs": [
+      "persona-council-review-2026-08-08"
+    ],
+    "author": "loop-founders + traverse-capability-author",
+    "created_at": "2026-08-08T06:20:00Z",
+    "exception_refs": [],
+    "source": "ai-assisted",
+    "spec_ref": "core.select-items-for-followup@1.1.0"
+  },
+  "schema_version": "1.0.0",
+  "service_type": "stateless",
+  "side_effects": [
+    {
+      "description": "Pure selection decision",
+      "kind": "memory_only"
+    }
+  ],
+  "state_schema": null,
+  "summary": "Decides which open action items need attention now. Council-revised with quiet hours, snooze support, per-user nudge budgets and higher escalation bar.",
+  "version": "1.1.0"
+}
