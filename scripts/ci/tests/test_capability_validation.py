@@ -577,5 +577,82 @@ class CheckNewActionEnumCoverageTests(unittest.TestCase):
             self.assertIn("contract.action_enum_non_string", codes)
 
 
+def write_artifact_contract(
+    tmp_dir: str,
+    artifact,
+    namespace="core",
+    cap_id="example-capability",
+    version="1.0.0",
+) -> Path:
+    contract = valid_contract()
+    contract["id"] = cap_id
+    contract["namespace"] = namespace
+    contract["version"] = version
+    if artifact is not None:
+        contract["artifact"] = artifact
+    return write_contract(tmp_dir, contract, namespace=namespace, cap_id=cap_id, version=version)
+
+
+class CheckNewContractArtifactReferenceTests(unittest.TestCase):
+    """check_new_contract_artifact_reference implements spec 001 FR-007 /
+    spec 007 FR-001 / registry#187 for newly-ADDED contracts."""
+
+    VALID_URL = (
+        "https://github.com/traverse-framework/registry/releases/download/"
+        "artifacts/example-capability-1.0.0/example-capability.wasm"
+    )
+
+    def test_valid_artifact_reference_passes(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = write_artifact_contract(
+                tmp,
+                {"digest": "sha256:" + ("a" * 64), "url": self.VALID_URL},
+            )
+            errors: list = []
+            capability_validation.check_new_contract_artifact_reference(path, errors)
+            self.assertEqual(errors, [])
+
+    def test_missing_artifact_is_rejected(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = write_artifact_contract(tmp, None)
+            errors: list = []
+            capability_validation.check_new_contract_artifact_reference(path, errors)
+            codes = [e["code"] for e in errors]
+            self.assertIn("contract.missing_artifact_reference", codes)
+
+    def test_artifact_missing_digest_or_url_is_rejected(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = write_artifact_contract(tmp, {"digest": "sha256:" + ("a" * 64)})
+            errors: list = []
+            capability_validation.check_new_contract_artifact_reference(path, errors)
+            codes = [e["code"] for e in errors]
+            self.assertIn("contract.missing_artifact_reference", codes)
+
+    def test_non_sha256_digest_is_rejected(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = write_artifact_contract(
+                tmp,
+                {"digest": "md5:deadbeef", "url": self.VALID_URL},
+            )
+            errors: list = []
+            capability_validation.check_new_contract_artifact_reference(path, errors)
+            codes = [e["code"] for e in errors]
+            self.assertIn("contract.invalid_digest_format", codes)
+
+    def test_non_artifacts_release_url_is_rejected(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = write_artifact_contract(
+                tmp,
+                {
+                    "digest": "sha256:" + ("a" * 64),
+                    "url": "https://example.invalid/artifact.wasm",
+                },
+            )
+            errors: list = []
+            capability_validation.check_new_contract_artifact_reference(path, errors)
+            codes = [e["code"] for e in errors]
+            self.assertIn("contract.invalid_artifact_url", codes)
+
+
 if __name__ == "__main__":
     unittest.main()
