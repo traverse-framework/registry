@@ -14,6 +14,22 @@ capabilities/<namespace>/<id>/<version>/contract.json
 
 Artifact binaries (WASM, etc.) are **not** committed here — they're referenced by digest + GitHub Release URL from within `contract.json` (see `specs/001-registry-foundation/spec.md`, FR-007).
 
+## Publisher checklist
+
+Copy-paste sequence for a new capability version (manual path today; `traverse-cli capability publish` automates the PR open once [traverse#859](https://github.com/traverse-framework/traverse/issues/859) / publish automation lands — still verify the opened PR kept `artifact` fields):
+
+1. **SHA-256 the WASM** you will upload (`shasum -a 256 <file.wasm>` → `sha256:<hex>`).
+2. **Create the artifact release** in this repo before the contract PR:
+   `gh release create artifacts/<capability-id>-<version> <file.wasm> --repo traverse-framework/registry --title "<capability-id> <version> artifacts" --notes "<one-liner>"`
+   (fallback tag `artifacts/<namespace>.<id>-<version>` if the id does not embed its namespace — see `specs/007-artifact-hosting/spec.md`).
+3. **Set `artifact.digest` / `artifact.url` on the contract** pointing at
+   `https://github.com/traverse-framework/registry/releases/download/artifacts/<tag>/<asset>`.
+   Newly added contracts missing either field fail CI (`contract.missing_artifact_reference`).
+4. **Ensure every `use_cases[].persona_ref` resolves** to an existing `personas/<id>/<version>/persona.json` (see `specs/017-persona-registry/spec.md`). Author missing personas before opening the contract PR.
+5. **Open the PR with the org body sections** required by `spec-alignment`: `## Summary`, `## Governing Spec` (bare approved-spec ids in backticks, one per bullet), `## Project Item`, `## Definition of Done`, `## Validation`. Editing the body alone does not re-run that check — push a new commit after body fixes.
+
+Never edit an already-merged `contract.json`; yank via `deprecated.json` and publish a new version instead.
+
 ## Current content (as of 2026-07-28)
 
 Six reference-app capabilities are published, across three namespaces. Each has gone
