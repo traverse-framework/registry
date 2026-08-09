@@ -509,5 +509,73 @@ class CheckNewUseCasePersonaRefTests(unittest.TestCase):
             self.assertEqual(errors, [])
 
 
+def write_action_enum_contract(tmp_dir: str, enum_values, covered_actions) -> Path:
+    use_cases = [
+        {
+            "scenario": "As a developer, I want to exercise an action, so that coverage holds.",
+            "input_example": {"action": action},
+            "output_example": {"ok": True},
+            "happy": True,
+            "persona_ref": "alpha-persona",
+        }
+        for action in covered_actions
+    ]
+    contract = valid_contract()
+    contract["inputs"] = {
+        "schema": {
+            "type": "object",
+            "properties": {
+                "action": {"type": "string", "enum": enum_values},
+            },
+        }
+    }
+    contract["use_cases"] = use_cases
+    return write_contract(tmp_dir, contract)
+
+
+class CheckNewActionEnumCoverageTests(unittest.TestCase):
+    """check_new_action_enum_covered_by_use_cases implements traverse Spec
+    102 FR-001 / registry#192 for newly-ADDED contracts."""
+
+    def test_full_coverage_passes(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = write_action_enum_contract(tmp, ["create", "edit"], ["create", "edit"])
+            errors: list = []
+            capability_validation.check_new_action_enum_covered_by_use_cases(path, errors)
+            self.assertEqual(errors, [])
+
+    def test_uncovered_enum_value_is_rejected(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = write_action_enum_contract(tmp, ["create", "resolve"], ["create"])
+            errors: list = []
+            capability_validation.check_new_action_enum_covered_by_use_cases(path, errors)
+            codes = [e["code"] for e in errors]
+            self.assertIn("contract.action_enum_uncovered_by_use_cases", codes)
+            self.assertTrue(any("resolve" in e["message"] for e in errors))
+
+    def test_missing_action_enum_is_not_flagged(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = write_contract(tmp, valid_contract())
+            errors: list = []
+            capability_validation.check_new_action_enum_covered_by_use_cases(path, errors)
+            self.assertEqual(errors, [])
+
+    def test_non_string_enum_value_is_rejected(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            contract = valid_contract()
+            contract["inputs"] = {
+                "schema": {
+                    "properties": {
+                        "action": {"enum": ["create", 1]},
+                    }
+                }
+            }
+            path = write_contract(tmp, contract)
+            errors: list = []
+            capability_validation.check_new_action_enum_covered_by_use_cases(path, errors)
+            codes = [e["code"] for e in errors]
+            self.assertIn("contract.action_enum_non_string", codes)
+
+
 if __name__ == "__main__":
     unittest.main()

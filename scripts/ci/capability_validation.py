@@ -36,6 +36,12 @@ that schema was correct from this spec's very first persona -- only the
 persona_ref-on-use_cases requirement is diff-based, for the same reason the
 scenario-format check is: older contract.json versions predate the field
 and can never be edited to add it.
+
+Also enforces traverse-framework/traverse Spec 102-contract-surface-coverage
+FR-001 (registry#192): when a newly-ADDED contract.json declares
+inputs.schema.properties.action.enum, every enum value must appear as
+use_cases[].input_example.action for at least one use case. Diff-based for
+the same immutability reason as scenario/persona_ref checks.
 """
 
 import json
@@ -403,6 +409,77 @@ def check_new_use_cases_have_persona_ref(base_sha: str, head_sha: str, errors: l
             check_new_use_case_persona_ref(Path(path), errors, persona_ids)
 
 
+def check_new_action_enum_covered_by_use_cases(path: Path, errors: list) -> None:
+    """traverse Spec 102-contract-surface-coverage FR-001 / registry#192:
+    every inputs.schema.properties.action.enum value on a newly-added
+    contract.json must appear in some use_cases[].input_example.action.
+    Skip when action.enum is absent (capabilities without that discriminator).
+    """
+    try:
+        contract = json.loads(path.read_text())
+    except Exception:
+        return
+    action_schema = (
+        contract.get("inputs", {})
+        .get("schema", {})
+        .get("properties", {})
+        .get("action")
+    )
+    if not isinstance(action_schema, dict):
+        return
+    enum_values = action_schema.get("enum")
+    if not isinstance(enum_values, list) or not enum_values:
+        return
+    declared = []
+    for value in enum_values:
+        if not isinstance(value, str):
+            fail(
+                errors,
+                "contract.action_enum_non_string",
+                str(path),
+                "inputs.schema.properties.action.enum must contain only strings (spec 102 FR-001)",
+            )
+            return
+        declared.append(value)
+    use_cases = contract.get("use_cases")
+    covered = set()
+    if isinstance(use_cases, list):
+        for use_case in use_cases:
+            if not isinstance(use_case, dict):
+                continue
+            input_example = use_case.get("input_example")
+            if isinstance(input_example, dict):
+                action = input_example.get("action")
+                if isinstance(action, str):
+                    covered.add(action)
+    uncovered = [action for action in declared if action not in covered]
+    if uncovered:
+        fail(
+            errors,
+            "contract.action_enum_uncovered_by_use_cases",
+            str(path),
+            "inputs.schema.properties.action.enum values lack covering use_cases: "
+            + ", ".join(uncovered)
+            + " (traverse Spec 102-contract-surface-coverage FR-001)",
+        )
+
+
+def check_new_contracts_action_enum_coverage(base_sha: str, head_sha: str, errors: list) -> None:
+    """Only validates newly-ADDED contract.json files in this PR's diff --
+    older immutable publishes may predate Spec 102 coverage."""
+    diff = subprocess.check_output(
+        ["git", "diff", "--name-status", f"{base_sha}...{head_sha}", "--", "capabilities/"],
+        text=True,
+    )
+    for line in diff.splitlines():
+        if not line.strip():
+            continue
+        parts = line.split("\t")
+        status, path = parts[0], parts[-1]
+        if status == "A" and path.endswith("contract.json"):
+            check_new_action_enum_covered_by_use_cases(Path(path), errors)
+
+
 def real_workflow_paths(workflows_dir: Path):
     """Real, published workflow.json files only -- excludes
     workflows/examples/, which holds demo/fixture content
@@ -671,6 +748,10 @@ def main() -> int:
             fail(errors, "git.diff_failed", "capabilities/", f"Unable to compute diff: {exc}")
         try:
             check_new_use_cases_have_persona_ref(base_sha, head_sha, errors)
+        except subprocess.CalledProcessError as exc:
+            fail(errors, "git.diff_failed", "capabilities/", f"Unable to compute diff: {exc}")
+        try:
+            check_new_contracts_action_enum_coverage(base_sha, head_sha, errors)
         except subprocess.CalledProcessError as exc:
             fail(errors, "git.diff_failed", "capabilities/", f"Unable to compute diff: {exc}")
 
