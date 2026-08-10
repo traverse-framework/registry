@@ -1,0 +1,408 @@
+{
+  "artifact": {
+    "digest": "sha256:c5526446fd6bfe09287ffecf2bd3b4c5ddfb78b8f9e0bffcae2c0476e37bfb95",
+    "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/core.assign-ownership-1.0.1/core-assign-ownership.wasm"
+  },
+  "connector_requirements": [],
+  "consumes": [],
+  "dependencies": [],
+  "description": "Resolves a suggested owner against workspace members (id, email, name) and applies ownership_config.fallback when unresolved. Pure and deterministic.\n\nImplemented and smoke-tested matrix (use_cases):\n- name_match → ok\n- email_match → ok\n- null suggestion with fallback=creator → ok\n- unknown suggestion with fallback=fail → unresolved\n- inactive member with require_active_member → inactive_member\n- invalid fallback value → config_error\n- unknown suggestion with fallback=unassigned → ok (owner_id null)\n\nKnown limitations (intentional in 1.0.1):\n- Does not mutate storage or notify members; callers persist the decision",
+  "emits": [],
+  "event_trigger": null,
+  "evidence": [
+    {
+      "evidence_id": "core-assign-ownership-1.0.1-contract-validation",
+      "status": "passed",
+      "type": "contract_validation"
+    }
+  ],
+  "execution": {
+    "binary_format": "wasm",
+    "constraints": {
+      "filesystem_access": "none",
+      "host_api_access": "none",
+      "network_access": "forbidden"
+    },
+    "entrypoint": {
+      "command": "run",
+      "kind": "wasi-command"
+    },
+    "preferred_targets": [
+      "local",
+      "edge",
+      "browser"
+    ]
+  },
+  "id": "core.assign-ownership",
+  "inputs": {
+    "schema": {
+      "additionalProperties": false,
+      "properties": {
+        "creator_id": {
+          "type": "string"
+        },
+        "ownership_config": {
+          "properties": {
+            "fallback": {
+              "enum": [
+                "creator",
+                "unassigned",
+                "fail"
+              ],
+              "type": "string"
+            },
+            "require_active_member": {
+              "type": "boolean"
+            },
+            "version": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "version"
+          ],
+          "type": "object"
+        },
+        "suggested_owner": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "workspace_members": {
+          "items": {
+            "properties": {
+              "active": {
+                "type": "boolean"
+              },
+              "email": {
+                "type": "string"
+              },
+              "id": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              }
+            },
+            "type": "object"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "suggested_owner",
+        "workspace_members",
+        "ownership_config"
+      ],
+      "type": "object"
+    }
+  },
+  "kind": "capability_contract",
+  "lifecycle": "active",
+  "name": "assign-ownership",
+  "namespace": "core",
+  "outputs": {
+    "schema": {
+      "additionalProperties": false,
+      "properties": {
+        "evaluation_trace": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "owner_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "reason_code": {
+          "enum": [
+            "ok",
+            "unresolved",
+            "inactive_member",
+            "config_error"
+          ],
+          "type": "string"
+        },
+        "resolution_method": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "reason_code"
+      ],
+      "type": "object"
+    }
+  },
+  "owner": {
+    "contact": "founders@loop.dev",
+    "team": "loop"
+  },
+  "permissions": [
+    {
+      "id": "core.assign-ownership"
+    }
+  ],
+  "permitted_targets": [
+    "local",
+    "edge",
+    "browser",
+    "cloud"
+  ],
+  "policies": [],
+  "postconditions": [
+    {
+      "description": "Identical inputs produce identical outputs",
+      "id": "deterministic"
+    }
+  ],
+  "preconditions": [],
+  "provenance": {
+    "adr_refs": [
+      "persona-council-review-2026-08-08"
+    ],
+    "author": "loop-founders + traverse-capability-author",
+    "created_at": "2026-08-08T06:00:00Z",
+    "exception_refs": [],
+    "source": "ai-assisted",
+    "spec_ref": "core.assign-ownership@1.0.1"
+  },
+  "schema_version": "1.0.0",
+  "service_type": "stateless",
+  "side_effects": [
+    {
+      "description": "Pure resolution",
+      "kind": "memory_only"
+    }
+  ],
+  "state_schema": null,
+  "summary": "Resolves and records clear ownership for an action item (single accountable person).",
+  "use_cases": [
+    {
+      "happy": true,
+      "input_example": {
+        "creator_id": "user-carol",
+        "ownership_config": {
+          "fallback": "creator",
+          "require_active_member": true,
+          "version": "1.0"
+        },
+        "suggested_owner": "Ada Lovelace",
+        "workspace_members": [
+          {
+            "email": "ada@loop.dev",
+            "id": "user-ada",
+            "name": "Ada Lovelace"
+          },
+          {
+            "email": "bob@loop.dev",
+            "id": "user-bob",
+            "name": "Bob Smith"
+          }
+        ]
+      },
+      "output_example": {
+        "evaluation_trace": [
+          "exact name match on Ada Lovelace"
+        ],
+        "owner_id": "user-ada",
+        "reason_code": "ok",
+        "resolution_method": "name_match"
+      },
+      "persona_ref": "runtime-engineer",
+      "scenario": "As the system, I want a name match to resolve to a canonical user id."
+    },
+    {
+      "happy": true,
+      "input_example": {
+        "creator_id": "user-carol",
+        "ownership_config": {
+          "fallback": "creator",
+          "require_active_member": true,
+          "version": "1.0"
+        },
+        "suggested_owner": "bob@loop.dev",
+        "workspace_members": [
+          {
+            "email": "ada@loop.dev",
+            "id": "user-ada",
+            "name": "Ada Lovelace"
+          },
+          {
+            "email": "bob@loop.dev",
+            "id": "user-bob",
+            "name": "Bob Smith"
+          }
+        ]
+      },
+      "output_example": {
+        "evaluation_trace": [
+          "email match on bob@loop.dev"
+        ],
+        "owner_id": "user-bob",
+        "reason_code": "ok",
+        "resolution_method": "email_match"
+      },
+      "persona_ref": "runtime-engineer",
+      "scenario": "As the system, I want an email suggestion to resolve by email."
+    },
+    {
+      "happy": true,
+      "input_example": {
+        "creator_id": "user-carol",
+        "ownership_config": {
+          "fallback": "creator",
+          "require_active_member": true,
+          "version": "1.0"
+        },
+        "suggested_owner": null,
+        "workspace_members": [
+          {
+            "email": "carol@loop.dev",
+            "id": "user-carol",
+            "name": "Carol Jones"
+          }
+        ]
+      },
+      "output_example": {
+        "evaluation_trace": [
+          "suggested_owner null",
+          "fallback=creator"
+        ],
+        "owner_id": "user-carol",
+        "reason_code": "ok",
+        "resolution_method": "fallback_creator"
+      },
+      "persona_ref": "meeting-organizer",
+      "scenario": "As the system, I want a null suggestion to fall back to the creator."
+    },
+    {
+      "happy": false,
+      "input_example": {
+        "creator_id": "user-carol",
+        "ownership_config": {
+          "fallback": "fail",
+          "require_active_member": true,
+          "version": "1.0"
+        },
+        "suggested_owner": "Unknown Person",
+        "workspace_members": [
+          {
+            "email": "ada@loop.dev",
+            "id": "user-ada",
+            "name": "Ada Lovelace"
+          }
+        ]
+      },
+      "output_example": {
+        "evaluation_trace": [
+          "no member match for suggestion",
+          "fallback=fail"
+        ],
+        "owner_id": null,
+        "reason_code": "unresolved",
+        "resolution_method": "unresolved"
+      },
+      "persona_ref": "runtime-engineer",
+      "scenario": "As the system, I want an unknown suggestion to fail closed when fallback is fail."
+    },
+    {
+      "happy": false,
+      "input_example": {
+        "creator_id": "user-carol",
+        "ownership_config": {
+          "fallback": "fail",
+          "require_active_member": true,
+          "version": "1.0"
+        },
+        "suggested_owner": "user-ada",
+        "workspace_members": [
+          {
+            "active": false,
+            "email": "ada@loop.dev",
+            "id": "user-ada",
+            "name": "Ada Lovelace"
+          }
+        ]
+      },
+      "output_example": {
+        "evaluation_trace": [
+          "matched inactive member"
+        ],
+        "owner_id": null,
+        "reason_code": "inactive_member",
+        "resolution_method": "unresolved"
+      },
+      "persona_ref": "runtime-engineer",
+      "scenario": "As the system, I want an inactive member match rejected with inactive_member when require_active_member is true."
+    },
+    {
+      "happy": false,
+      "input_example": {
+        "creator_id": "user-carol",
+        "ownership_config": {
+          "fallback": "bogus",
+          "require_active_member": true,
+          "version": "1.0"
+        },
+        "suggested_owner": "Ada Lovelace",
+        "workspace_members": [
+          {
+            "email": "ada@loop.dev",
+            "id": "user-ada",
+            "name": "Ada Lovelace"
+          },
+          {
+            "email": "bob@loop.dev",
+            "id": "user-bob",
+            "name": "Bob Smith"
+          }
+        ]
+      },
+      "output_example": {
+        "evaluation_trace": [
+          "invalid fallback"
+        ],
+        "owner_id": null,
+        "reason_code": "config_error",
+        "resolution_method": "config_error"
+      },
+      "persona_ref": "runtime-engineer",
+      "scenario": "As the system, I want an invalid fallback value rejected with config_error."
+    },
+    {
+      "happy": true,
+      "input_example": {
+        "creator_id": "user-carol",
+        "ownership_config": {
+          "fallback": "unassigned",
+          "require_active_member": true,
+          "version": "1.0"
+        },
+        "suggested_owner": "Unknown Person",
+        "workspace_members": [
+          {
+            "email": "ada@loop.dev",
+            "id": "user-ada",
+            "name": "Ada Lovelace"
+          }
+        ]
+      },
+      "output_example": {
+        "evaluation_trace": [
+          "no member match for suggestion",
+          "fallback=unassigned"
+        ],
+        "owner_id": null,
+        "reason_code": "ok",
+        "resolution_method": "fallback_unassigned"
+      },
+      "persona_ref": "collaboration-product-owner",
+      "scenario": "As the system, I want unknown suggestions to resolve as unassigned when fallback is unassigned."
+    }
+  ],
+  "version": "1.0.1"
+}
