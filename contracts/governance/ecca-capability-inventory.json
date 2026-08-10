@@ -288,16 +288,17 @@
       "capability_id": "core.transition-action-status",
       "published_versions": [
         "1.0.0",
-        "1.1.0"
+        "1.1.0",
+        "1.2.0"
       ],
-      "path": "capabilities/core/core.transition-action-status/1.1.0/contract.json",
+      "path": "capabilities/core/core.transition-action-status/1.2.0/contract.json",
       "classification": "governed-event-declared",
       "event_product": {
         "event_id": "core.action-item.status-transitioned",
         "version": "1.0.0",
         "path": "events/core/core.action-item.status-transitioned/1.0.0/product.json"
       },
-      "evidence": "Status transitions are domain facts independent consumers may observe. Governed event product core.action-item.status-transitioned@1.0.0 is published with this capability as publisher (registry#168). Published contract versions still carry empty emits[] (immutable); a future honesty bump may declare the emit on the capability contract itself."
+      "evidence": "Status transitions are domain facts independent consumers may observe. Governed event product core.action-item.status-transitioned@1.0.0 is published with this capability as publisher. Capability contract 1.2.0 declares emits=[{event_id: core.action-item.status-transitioned, version: 1.0.0}] and side_effects include event_emission (declaration-only honesty bump; WASM guest remains pure evaluation without host emit ABI). Immutable prior versions 1.0.0/1.1.0 retain empty emits[]."
     },
     {
       "capability_id": "core.validate-action-item",
