@@ -1,0 +1,187 @@
+{
+  "artifact": {
+    "digest": "sha256:167022884613fde17404f9cada73d3bcc8e9da38a93c926f09a6d41c46b5cf28",
+    "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/core.evaluate-completion-quality-1.0.0/core-evaluate-completion-quality.wasm"
+  },
+  "connector_requirements": [],
+  "consumes": [],
+  "dependencies": [],
+  "description": "Pure WF4 capability. Evaluates completion_note length and evidence_refs against pressure_score and config. High-pressure items require evidence; thin completions get needs_evidence or fail.",
+  "emits": [],
+  "event_trigger": null,
+  "evidence": [],
+  "execution": {
+    "binary_format": "wasm",
+    "constraints": {
+      "filesystem_access": "none",
+      "host_api_access": "none",
+      "network_access": "forbidden"
+    },
+    "entrypoint": {
+      "command": "run",
+      "kind": "wasi-command"
+    },
+    "preferred_targets": [
+      "local",
+      "edge",
+      "browser"
+    ]
+  },
+  "id": "core.evaluate-completion-quality",
+  "inputs": {
+    "schema": {
+      "properties": {
+        "item": {
+          "properties": {
+            "completion_note": {
+              "type": "string"
+            },
+            "evidence_refs": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "id": {
+              "type": "string"
+            },
+            "pressure_score": {
+              "type": "number"
+            },
+            "status": {
+              "type": "string"
+            },
+            "title": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "id",
+            "status"
+          ],
+          "type": "object"
+        },
+        "quality_config": {
+          "properties": {
+            "high_pressure_threshold": {
+              "type": "number"
+            },
+            "min_note_length": {
+              "type": "integer"
+            },
+            "require_evidence_when_high_pressure": {
+              "type": "boolean"
+            },
+            "version": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "version"
+          ],
+          "type": "object"
+        }
+      },
+      "required": [
+        "item",
+        "quality_config"
+      ],
+      "type": "object"
+    }
+  },
+  "kind": "capability_contract",
+  "lifecycle": "active",
+  "name": "evaluate-completion-quality",
+  "namespace": "core",
+  "outputs": {
+    "schema": {
+      "properties": {
+        "evaluation_trace": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "gaps": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "item_id": {
+          "type": "string"
+        },
+        "quality_score": {
+          "type": "number"
+        },
+        "reason_code": {
+          "enum": [
+            "ok",
+            "invalid_status",
+            "invalid_input",
+            "config_error"
+          ],
+          "type": "string"
+        },
+        "verdict": {
+          "enum": [
+            "pass",
+            "needs_evidence",
+            "fail"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "quality_score",
+        "verdict",
+        "reason_code"
+      ],
+      "type": "object"
+    }
+  },
+  "owner": {
+    "contact": "founders@loop.dev",
+    "team": "loop"
+  },
+  "permissions": [
+    {
+      "id": "core.evaluate-completion-quality"
+    }
+  ],
+  "permitted_targets": [
+    "local",
+    "edge",
+    "browser",
+    "cloud"
+  ],
+  "policies": [],
+  "postconditions": [
+    {
+      "description": "Identical inputs produce identical outputs",
+      "id": "deterministic"
+    }
+  ],
+  "preconditions": [],
+  "provenance": {
+    "adr_refs": [
+      "persona-council-review-2026-08-08"
+    ],
+    "author": "loop-founders + traverse-capability-author",
+    "created_at": "2026-08-08T06:00:00Z",
+    "exception_refs": [],
+    "source": "ai-assisted",
+    "spec_ref": "core.evaluate-completion-quality@1.0.0"
+  },
+  "schema_version": "1.0.0",
+  "service_type": "stateless",
+  "side_effects": [
+    {
+      "description": "Pure quality evaluation",
+      "kind": "memory_only"
+    }
+  ],
+  "state_schema": null,
+  "summary": "Scores completion quality for a done action item, with a stronger evidence bar under high pressure.",
+  "version": "1.0.0"
+}
