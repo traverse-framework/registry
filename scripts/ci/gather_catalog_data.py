@@ -164,11 +164,13 @@ def gather_personas() -> list:
 
 
 def gather_events() -> list:
-    """Minimal FR-016 gather for catalog-builder (#160 unblock / #168).
+    """FR-016 / registry#160: walk events/**/product.json for catalog-builder.
 
-    Emits a compact `events` array (id/version/summary/publishers/subscribers/
-    exposure/lifecycle) rather than the full product.json -- enough for a later
-    catalog render without coupling this script to every ECCA additive field.
+    Carries the *entire* EventProductDescriptor per entry (plus a sibling
+    `deprecated` flag), same "don't hand-curate a field subset" reasoning as
+    gather_capabilities -- the catalog's event detail page and FR-014 filters
+    (event/capability/domain/owner/lifecycle/classification) need owner,
+    domain, field_classifications, support_route, etc., not just a summary.
     """
     events_dir = Path("events")
     entries = []
@@ -178,16 +180,11 @@ def gather_events() -> list:
 
     for product_path in sorted(events_dir.rglob("product.json")):
         product = json.loads(product_path.read_text())
-        contract = product.get("contract") or {}
+        deprecated = (product_path.parent / "deprecated.json").is_file()
         entries.append(
             {
-                "id": contract.get("id"),
-                "version": contract.get("version"),
-                "summary": contract.get("summary"),
-                "publishers": contract.get("publishers") or [],
-                "subscribers": contract.get("subscribers") or [],
-                "exposure": product.get("exposure"),
-                "lifecycle": contract.get("lifecycle"),
+                "deprecated": deprecated,
+                "product": product,
             }
         )
 
