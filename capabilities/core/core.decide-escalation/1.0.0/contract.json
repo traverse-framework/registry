@@ -1,0 +1,187 @@
+{
+  "artifact": {
+    "digest": "sha256:fb270f5c4ff7f7371b58cc675f66e7f469cfcdc09ce895875207079bcda97d4b",
+    "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/core.decide-escalation-1.0.0/core-decide-escalation.wasm"
+  },
+  "connector_requirements": [],
+  "consumes": [],
+  "dependencies": [],
+  "description": "Pure WF5 capability. Consumes a health snapshot (from core.aggregate-team-action-health) and applies multi-signal thresholds so managers only get real-time exceptions; otherwise digest.",
+  "emits": [],
+  "event_trigger": null,
+  "evidence": [],
+  "execution": {
+    "binary_format": "wasm",
+    "constraints": {
+      "filesystem_access": "none",
+      "host_api_access": "none",
+      "network_access": "forbidden"
+    },
+    "entrypoint": {
+      "command": "run",
+      "kind": "wasi-command"
+    },
+    "preferred_targets": [
+      "local",
+      "edge",
+      "browser"
+    ]
+  },
+  "id": "core.decide-escalation",
+  "inputs": {
+    "schema": {
+      "properties": {
+        "escalation_config": {
+          "properties": {
+            "max_on_track_pct_for_escalate": {
+              "type": "number"
+            },
+            "min_overdue_for_escalate": {
+              "type": "integer"
+            },
+            "min_overloaded_owners": {
+              "type": "integer"
+            },
+            "require_multiple_signals": {
+              "type": "boolean"
+            },
+            "version": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "version"
+          ],
+          "type": "object"
+        },
+        "health": {
+          "properties": {
+            "on_track_pct": {
+              "type": "number"
+            },
+            "overdue_count": {
+              "type": "integer"
+            },
+            "overloaded_owners": {
+              "type": "array"
+            },
+            "top_pressure_items": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "total_open": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "total_open",
+            "overdue_count"
+          ],
+          "type": "object"
+        }
+      },
+      "required": [
+        "health",
+        "escalation_config"
+      ],
+      "type": "object"
+    }
+  },
+  "kind": "capability_contract",
+  "lifecycle": "active",
+  "name": "decide-escalation",
+  "namespace": "core",
+  "outputs": {
+    "schema": {
+      "properties": {
+        "decision": {
+          "enum": [
+            "escalate",
+            "digest"
+          ],
+          "type": "string"
+        },
+        "escalate_item_ids": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "evaluation_trace": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "reason_code": {
+          "enum": [
+            "ok",
+            "invalid_input",
+            "config_error"
+          ],
+          "type": "string"
+        },
+        "signals": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "signals_met": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "decision",
+        "reason_code"
+      ],
+      "type": "object"
+    }
+  },
+  "owner": {
+    "contact": "founders@loop.dev",
+    "team": "loop"
+  },
+  "permissions": [
+    {
+      "id": "core.decide-escalation"
+    }
+  ],
+  "permitted_targets": [
+    "local",
+    "edge",
+    "browser",
+    "cloud"
+  ],
+  "policies": [],
+  "postconditions": [
+    {
+      "description": "Identical inputs produce identical outputs",
+      "id": "deterministic"
+    }
+  ],
+  "preconditions": [],
+  "provenance": {
+    "adr_refs": [
+      "persona-council-review-2026-08-08"
+    ],
+    "author": "loop-founders + traverse-capability-author",
+    "created_at": "2026-08-08T06:00:00Z",
+    "exception_refs": [],
+    "source": "ai-assisted",
+    "spec_ref": "core.decide-escalation@1.0.0"
+  },
+  "schema_version": "1.0.0",
+  "service_type": "stateless",
+  "side_effects": [
+    {
+      "description": "Pure escalation decision",
+      "kind": "memory_only"
+    }
+  ],
+  "state_schema": null,
+  "summary": "Decides escalate vs weekly digest from team action health, with a deliberately high bar.",
+  "version": "1.0.0"
+}
