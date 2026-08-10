@@ -64,11 +64,25 @@ needing to grow a new field mapping every time the contract schema does:
       "test_coverage": { "lines_percent": 98.8, "functions_percent": 100.0, "regions_percent": 99.3, "test_count": 5 }
     }
   ],
+  "personas": [
+    { "reference": "meeting-organizer@1.0.0", "persona": { "...": "the full persona.json" } }
+  ],
+  "events": [
+    {
+      "reference": "core/core.action-item.status-transitioned@1.0.0",
+      "deprecated": false,
+      "product": { "...": "the full events/.../product.json EventProductDescriptor" }
+    }
+  ],
   "search_index": {
     "luhn": ["validation/validation.validate-luhn@1.1.0"]
   }
 }
 ```
+
+Event products (registry#160 / specs/016 FR-014) are listed under `#/events` with
+filters for event, capability, domain, owner, lifecycle, and exposure
+classification. They are not folded into the capability `search_index`.
 
 `test_coverage` is **real, measured data** (`cargo llvm-cov --json --summary-only`
 against the crate under `capability-src/` whose source currently backs the

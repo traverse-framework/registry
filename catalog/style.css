@@ -82,9 +82,39 @@ input[type="search"] {
 }
 input[type="search"]:focus { border-color: var(--border-hover); }
 input[type="search"]::placeholder { color: var(--fg-subtle); }
-.controls { display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem; color: var(--fg-muted); margin-bottom: 1.75rem; }
+.controls { display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem; color: var(--fg-muted); margin-bottom: 1.75rem; flex-wrap: wrap; }
 .controls input[type="checkbox"] { accent-color: var(--accent); }
 .controls label { display: flex; align-items: center; gap: 0.4rem; cursor: pointer; }
+.filters {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+  gap: 0.75rem;
+  margin: 0 0 1.75rem;
+}
+.filters label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-size: 0.75rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--fg-muted);
+}
+.filters select,
+.filters input[type="search"] {
+  width: 100%;
+  margin: 0;
+  font-size: 0.9rem;
+  text-transform: none;
+  letter-spacing: normal;
+  color: var(--fg);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  padding: 0.55rem 0.7rem;
+}
+.filters select:focus,
+.filters input[type="search"]:focus { outline: none; border-color: var(--border-hover); }
 
 /* ─── Cards / grid ────────────────────────────────────────────────────── */
 .grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem; }

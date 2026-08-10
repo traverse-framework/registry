@@ -32,6 +32,14 @@
   var showDeprecated = true;
   var searchQuery = "";
   var searchDebounceTimer = null;
+  var eventFilters = {
+    event: "",
+    capability: "",
+    domain: "",
+    owner: "",
+    lifecycle: "",
+    classification: "",
+  };
 
   // ─── Theme toggle ──────────────────────────────────────────────────────
   var themeBtn = document.getElementById("theme-toggle");
@@ -60,6 +68,7 @@
   function referenceHash(reference) { return "#/capability/" + encodeURIComponent(reference); }
   function personaHash(reference) { return "#/persona/" + encodeURIComponent(reference); }
   function serviceTypeHash(id) { return "#/service-type/" + encodeURIComponent(id); }
+  function eventHash(reference) { return "#/event/" + encodeURIComponent(reference); }
 
   function capabilitiesForServiceType(serviceTypeId) {
     return groupedCapabilities().filter(function (group) { return group.latest.contract.service_type === serviceTypeId; });
@@ -138,6 +147,7 @@
     appEl.appendChild(el("h1", { className: "t-h1", textContent: "Capability Catalog" }));
     appEl.appendChild(el("p", { className: "t-muted", textContent: "Every published Traverse registry capability -- deterministic, ABI-compliant WASM business logic, versioned and immutable once merged." }));
     appEl.appendChild(el("div", { style: "display:flex; gap:1rem; flex-wrap:wrap" }, [
+      el("a", { className: "back-link", href: "#/events", textContent: "Browse event products →" }),
       el("a", { className: "back-link", href: "#/personas", textContent: "Browse personas →" }),
       el("a", { className: "back-link", href: "#/service-types", textContent: "Browse service types →" }),
     ]));
@@ -243,6 +253,17 @@
     return el("span", {}, parts);
   }
 
+  function findEventById(eventId) {
+    var matches = (catalog.events || []).filter(function (entry) {
+      return entry.product && entry.product.contract && entry.product.contract.id === eventId;
+    });
+    if (matches.length === 0) { return null; }
+    matches.sort(function (a, b) {
+      return a.product.contract.version.localeCompare(b.product.contract.version, undefined, { numeric: true });
+    });
+    return matches[matches.length - 1];
+  }
+
   function renderEvents(contract) {
     var emits = Array.isArray(contract.emits) ? contract.emits : [];
     var consumes = Array.isArray(contract.consumes) ? contract.consumes : [];
@@ -256,9 +277,20 @@
           el("span", { className: "field-value t-muted", textContent: "none" }),
         ]);
       }
+      var links = items.map(function (item) {
+        var eventId = typeof item === "string" ? item : (item && (item.event_id || item.id));
+        var published = eventId ? findEventById(eventId) : null;
+        if (published) {
+          return el("div", {}, [
+            el("a", { href: eventHash(published.reference), textContent: eventId }),
+            document.createTextNode(published.product.contract.version ? (" @" + published.product.contract.version) : ""),
+          ]);
+        }
+        return el("div", { className: "t-mono", textContent: JSON.stringify(item) });
+      });
       return el("div", { className: "field-row" }, [
         el("span", { className: "field-label", textContent: label }),
-        el("span", { className: "field-value" }, [jsonBlock(items)]),
+        el("span", { className: "field-value" }, links),
       ]);
     }
     return el("div", {}, [eventList("Emits", emits), eventList("Consumes", consumes)]);
@@ -558,21 +590,284 @@
     }
   }
 
+  function eventContract(entry) {
+    return entry && entry.product && entry.product.contract ? entry.product.contract : null;
+  }
+
+  function groupedEvents() {
+    var byGroup = {};
+    (catalog.events || []).forEach(function (entry) {
+      var contract = eventContract(entry);
+      if (!contract) { return; }
+      var key = groupKey(entry.reference);
+      if (!byGroup[key]) { byGroup[key] = []; }
+      byGroup[key].push(entry);
+    });
+    return Object.keys(byGroup).sort().map(function (key) {
+      var versions = byGroup[key].slice().sort(function (a, b) {
+        return eventContract(a).version.localeCompare(eventContract(b).version, undefined, { numeric: true });
+      });
+      return { key: key, latest: versions[versions.length - 1], versions: versions };
+    });
+  }
+
+  function uniqueSorted(values) {
+    return Array.from(new Set(values.filter(Boolean))).sort();
+  }
+
+  function eventFilterOptions() {
+    var capabilities = [];
+    var domains = [];
+    var owners = [];
+    var lifecycles = [];
+    var classifications = [];
+    (catalog.events || []).forEach(function (entry) {
+      var contract = eventContract(entry);
+      if (!contract) { return; }
+      domains.push(contract.classification && contract.classification.domain);
+      owners.push(contract.owner && contract.owner.team);
+      lifecycles.push(contract.lifecycle);
+      classifications.push(entry.product.exposure);
+      (contract.publishers || []).forEach(function (ref) { capabilities.push(ref.capability_id); });
+      (contract.subscribers || []).forEach(function (ref) { capabilities.push(ref.capability_id); });
+    });
+    return {
+      capabilities: uniqueSorted(capabilities),
+      domains: uniqueSorted(domains),
+      owners: uniqueSorted(owners),
+      lifecycles: uniqueSorted(lifecycles),
+      classifications: uniqueSorted(classifications),
+    };
+  }
+
+  function eventMatchesCapability(contract, capabilityId) {
+    if (!capabilityId) { return true; }
+    function hasRef(list) {
+      return (list || []).some(function (ref) { return ref.capability_id === capabilityId; });
+    }
+    return hasRef(contract.publishers) || hasRef(contract.subscribers);
+  }
+
+  function visibleEventGroups() {
+    var query = eventFilters.event.trim().toLowerCase();
+    return groupedEvents().filter(function (group) {
+      var entry = group.latest;
+      var contract = eventContract(entry);
+      if (!contract) { return false; }
+      if (query) {
+        var haystack = [contract.id, contract.name, contract.summary, contract.namespace]
+          .filter(Boolean)
+          .join(" ")
+          .toLowerCase();
+        if (haystack.indexOf(query) === -1) { return false; }
+      }
+      if (!eventMatchesCapability(contract, eventFilters.capability)) { return false; }
+      if (eventFilters.domain && !(contract.classification && contract.classification.domain === eventFilters.domain)) {
+        return false;
+      }
+      if (eventFilters.owner && !(contract.owner && contract.owner.team === eventFilters.owner)) {
+        return false;
+      }
+      if (eventFilters.lifecycle && contract.lifecycle !== eventFilters.lifecycle) { return false; }
+      if (eventFilters.classification && entry.product.exposure !== eventFilters.classification) {
+        return false;
+      }
+      return true;
+    });
+  }
+
+  function filterSelect(labelText, key, options) {
+    var select = el("select", { id: "event-filter-" + key });
+    select.appendChild(el("option", { value: "", textContent: "Any" }));
+    options.forEach(function (option) {
+      var node = el("option", { value: option, textContent: option });
+      if (eventFilters[key] === option) { node.selected = true; }
+      select.appendChild(node);
+    });
+    select.addEventListener("change", function () {
+      eventFilters[key] = select.value;
+      renderEventResultsGrid();
+    });
+    return el("label", {}, [document.createTextNode(labelText), select]);
+  }
+
+  function renderEventListView() {
+    appEl.textContent = "";
+    appEl.appendChild(el("a", { className: "back-link", href: "#", textContent: "← Back to catalog" }));
+    appEl.appendChild(el("div", { className: "section-label", textContent: "EVENTS" }));
+    appEl.appendChild(el("h1", { className: "t-h1", textContent: "Event Products" }));
+    appEl.appendChild(el("p", { className: "t-muted", textContent: "Governed ECCA event products published under events/ -- filterable by event, capability, domain, owner, lifecycle, and exposure classification (specs/016 FR-014)." }));
+
+    var options = eventFilterOptions();
+    var eventSearch = el("input", {
+      type: "search",
+      id: "event-filter-event",
+      placeholder: "Filter by event id, name, or summary…",
+    });
+    eventSearch.value = eventFilters.event;
+    eventSearch.addEventListener("input", function () {
+      eventFilters.event = eventSearch.value;
+      renderEventResultsGrid();
+    });
+
+    appEl.appendChild(el("div", { className: "filters" }, [
+      el("label", {}, [document.createTextNode("Event"), eventSearch]),
+      filterSelect("Capability", "capability", options.capabilities),
+      filterSelect("Domain", "domain", options.domains),
+      filterSelect("Owner", "owner", options.owners),
+      filterSelect("Lifecycle", "lifecycle", options.lifecycles),
+      filterSelect("Classification", "classification", options.classifications),
+    ]));
+
+    appEl.appendChild(el("div", { className: "grid", id: "event-results" }));
+    renderEventResultsGrid();
+    eventSearch.focus();
+  }
+
+  function renderEventResultsGrid() {
+    var resultsEl = document.getElementById("event-results");
+    if (!resultsEl) { return; }
+    resultsEl.textContent = "";
+    var groups = visibleEventGroups();
+    if (groups.length === 0) {
+      resultsEl.appendChild(el("p", { className: "empty", textContent: "No matching event products." }));
+      return;
+    }
+    groups.forEach(function (group) {
+      var entry = group.latest;
+      var contract = eventContract(entry);
+      var top = [
+        el("span", { className: "badge badge-accent", textContent: contract.namespace }),
+        el("span", { className: "badge", textContent: "v" + contract.version }),
+        el("span", { className: "badge", textContent: entry.product.exposure || "exposure?" }),
+      ];
+      if (contract.lifecycle) { top.push(el("span", { className: "badge", textContent: contract.lifecycle })); }
+      if (entry.deprecated) { top.push(el("span", { className: "badge badge-danger", textContent: "deprecated" })); }
+
+      var publisherCount = (contract.publishers || []).length;
+      var subscriberCount = (contract.subscribers || []).length;
+      var card = el("a", { className: "card", href: eventHash(entry.reference) }, [
+        el("div", { className: "card-top" }, top),
+        el("div", { className: "card-id", textContent: contract.id }),
+        el("p", { className: "card-summary", textContent: contract.summary || "" }),
+        el("div", { className: "card-bottom" }, [
+          el("span", { className: "badge", textContent: publisherCount + " publisher" + (publisherCount === 1 ? "" : "s") }),
+          el("span", { className: "badge", textContent: subscriberCount + " subscriber" + (subscriberCount === 1 ? "" : "s") }),
+        ]),
+      ]);
+      resultsEl.appendChild(card);
+    });
+  }
+
+  function renderCapabilityRefs(label, refs) {
+    if (!refs || refs.length === 0) {
+      return fieldRow(label, el("span", { className: "t-muted", textContent: "none" }));
+    }
+    var nodes = refs.map(function (ref) {
+      var capabilityId = ref.capability_id;
+      var version = ref.version;
+      var matches = (catalog.capabilities || []).filter(function (cap) {
+        return cap.contract && cap.contract.id === capabilityId && (!version || cap.contract.version === version);
+      });
+      var text = capabilityId + (version ? ("@" + version) : "");
+      if (matches.length > 0) {
+        return el("div", {}, [el("a", { href: referenceHash(matches[0].reference), textContent: text })]);
+      }
+      return el("div", { className: "t-mono", textContent: text });
+    });
+    return fieldRow(label, el("div", {}, nodes));
+  }
+
+  function renderEventDetailView(reference) {
+    var entry = (catalog.events || []).find(function (e) { return e.reference === reference; });
+    appEl.textContent = "";
+    appEl.appendChild(el("a", { className: "back-link", href: "#/events", textContent: "← Back to event products" }));
+    if (!entry || !eventContract(entry)) {
+      appEl.appendChild(el("p", { className: "error", textContent: "No event product found for \"" + reference + "\"." }));
+      return;
+    }
+    var product = entry.product;
+    var contract = product.contract;
+
+    var badges = [
+      el("span", { className: "badge badge-accent", textContent: contract.namespace }),
+      el("span", { className: "badge", textContent: "v" + contract.version }),
+      el("span", { className: "badge", textContent: product.exposure || "exposure?" }),
+    ];
+    if (contract.lifecycle) { badges.push(el("span", { className: "badge", textContent: contract.lifecycle })); }
+    if (entry.deprecated) { badges.push(el("span", { className: "badge badge-danger", textContent: "deprecated" })); }
+
+    appEl.appendChild(el("div", { className: "detail-header-badges" }, badges));
+    appEl.appendChild(el("h1", { className: "t-h1 detail-title", textContent: contract.id }));
+    if (contract.summary) { appEl.appendChild(el("p", { className: "detail-summary", textContent: contract.summary })); }
+    if (contract.description) { appEl.appendChild(el("p", { className: "detail-description", textContent: contract.description })); }
+
+    appEl.appendChild(el("h2", { className: "t-h2", textContent: "Product" }));
+    appEl.appendChild(fieldRow("Name", textNode(contract.name)));
+    appEl.appendChild(fieldRow("Domain", textNode(contract.classification && contract.classification.domain)));
+    appEl.appendChild(fieldRow("Owner", renderOwner(contract.owner)));
+    appEl.appendChild(fieldRow("Exposure classification", textNode(product.exposure)));
+    appEl.appendChild(fieldRow("Lifecycle", textNode(contract.lifecycle)));
+    if (product.support_route) {
+      appEl.appendChild(fieldRow(
+        "Support route",
+        el("a", { href: product.support_route, target: "_blank", rel: "noopener", textContent: product.support_route })
+      ));
+    }
+    appEl.appendChild(fieldRow("Retention policy", textNode(product.retention_policy)));
+
+    appEl.appendChild(el("h2", { className: "t-h2", textContent: "Relationships" }));
+    appEl.appendChild(renderCapabilityRefs("Publishers", contract.publishers));
+    appEl.appendChild(renderCapabilityRefs("Subscribers", contract.subscribers));
+
+    appEl.appendChild(el("h2", { className: "t-h2", textContent: "Payload & classifications" }));
+    appEl.appendChild(fieldRow("Payload schema", jsonBlock(contract.payload)));
+    appEl.appendChild(fieldRow("Field classifications", jsonBlock(product.field_classifications || [])));
+
+    appEl.appendChild(el("h2", { className: "t-h2", textContent: "Delivery semantics" }));
+    appEl.appendChild(fieldRow("CloudEvents source", textNode(product.cloud_events_source)));
+    appEl.appendChild(fieldRow("CloudEvents subject field", textNode(product.cloud_events_subject_field)));
+    appEl.appendChild(fieldRow("Deduplication id field", textNode(product.deduplication_id_field)));
+    appEl.appendChild(fieldRow("Ordering scope field", textNode(product.ordering_scope_field)));
+    appEl.appendChild(fieldRow("Correlation id field", textNode(product.correlation_id_field)));
+    appEl.appendChild(fieldRow("Causation id field", textNode(product.causation_id_field)));
+
+    var versions = groupedEvents().find(function (group) { return group.key === groupKey(reference); });
+    if (versions && versions.versions.length > 1) {
+      appEl.appendChild(el("h2", { className: "t-h2", textContent: "Versions" }));
+      versions.versions.slice().reverse().forEach(function (versionEntry) {
+        var versionContract = eventContract(versionEntry);
+        appEl.appendChild(el("a", { className: "version-row", href: eventHash(versionEntry.reference) }, [
+          el("div", { className: "version-left" }, [
+            el("span", { className: "t-mono", textContent: "v" + versionContract.version }),
+            versionEntry.deprecated ? el("span", { className: "badge badge-danger", textContent: "deprecated" }) : null,
+          ]),
+          el("span", { className: "t-muted", style: "font-size:0.8rem", textContent: "view →" }),
+        ]));
+      });
+    }
+  }
+
   function router() {
     if (!catalog) { return; }
     var capabilityMatch = window.location.hash.match(/^#\/capability\/(.+)$/);
     var personaMatch = window.location.hash.match(/^#\/persona\/(.+)$/);
     var serviceTypeMatch = window.location.hash.match(/^#\/service-type\/(.+)$/);
+    var eventMatch = window.location.hash.match(/^#\/event\/(.+)$/);
     if (capabilityMatch) {
       renderDetailView(decodeURIComponent(capabilityMatch[1]));
     } else if (personaMatch) {
       renderPersonaDetailView(decodeURIComponent(personaMatch[1]));
     } else if (serviceTypeMatch) {
       renderServiceTypeDetailView(decodeURIComponent(serviceTypeMatch[1]));
+    } else if (eventMatch) {
+      renderEventDetailView(decodeURIComponent(eventMatch[1]));
     } else if (window.location.hash === "#/personas") {
       renderPersonaListView();
     } else if (window.location.hash === "#/service-types") {
       renderServiceTypeListView();
+    } else if (window.location.hash === "#/events") {
+      renderEventListView();
     } else {
       renderListView();
     }

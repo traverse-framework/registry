@@ -3,20 +3,22 @@
 //! `Cargo.toml`'s description and `docs/decision-log.md` entry 40.
 //!
 //! Input: the JSON object `scripts/ci/gather_catalog_data.py` produces by
-//! walking `capabilities/**/contract.json` and `personas/**/persona.json`
-//! (the WASM ABI only allows a single input/single output via
-//! `fd_read`/`fd_write`, no filesystem access, so this crate cannot walk
-//! either tree itself): `{capabilities: [{deprecated, contract, test_coverage}],
-//! personas: [{persona}]}`. Output: one JSON object with a deterministically
-//! sorted `capabilities` list (each entry carrying the *entire* source
-//! contract, not a hand-picked field subset -- the catalog's per-capability
-//! detail page needs "all the infos"), a `search_index` (lowercase token ->
-//! sorted `namespace/id@version` references) built from capabilities only,
-//! and a deterministically sorted `personas` list (specs/017-persona-registry,
-//! decision-log entry 53; each entry carries the entire persona record, same
-//! reasoning as capabilities -- not search-indexed, reached via a dedicated
-//! list view and direct persona_ref links instead), which registry#106's
-//! GitHub Pages template renders and searches client-side.
+//! walking `capabilities/**/contract.json`, `personas/**/persona.json`, and
+//! `events/**/product.json` (the WASM ABI only allows a single input/single
+//! output via `fd_read`/`fd_write`, no filesystem access, so this crate
+//! cannot walk those trees itself):
+//! `{capabilities: [{deprecated, contract, test_coverage}],
+//! personas: [{persona}], events: [{deprecated, product}]}`.
+//! Output: one JSON object with a deterministically sorted `capabilities`
+//! list (each entry carrying the *entire* source contract, not a hand-picked
+//! field subset -- the catalog's per-capability detail page needs "all the
+//! infos"), a `search_index` (lowercase token -> sorted
+//! `namespace/id@version` references) built from capabilities only, a
+//! deterministically sorted `personas` list (specs/017-persona-registry,
+//! decision-log entry 53), and a deterministically sorted `events` list
+//! (specs/016 FR-014 / registry#160; each entry carries the entire
+//! EventProductDescriptor), which registry#106's GitHub Pages template
+//! renders and searches client-side.
 
 #![cfg_attr(not(test), no_std)]
 #![cfg_attr(not(test), no_main)]
@@ -109,10 +111,58 @@ fn build_personas(persona_records: &[Value]) -> Vec<Value> {
     personas
 }
 
+/// Builds the events[] output list from the events half of the input
+/// (specs/016 FR-014 / registry#160). Same pass-through/sort pattern as
+/// personas -- event products are reached via a dedicated filtered list
+/// view and direct links, not the capability search_index.
+fn build_events(event_records: &[Value]) -> Vec<Value> {
+    let mut events: Vec<Value> = Vec::new();
+
+    for record in event_records {
+        let product = match record.get("product") {
+            Some(p) => p,
+            None => continue,
+        };
+        let contract = match product.get("contract") {
+            Some(c) => c,
+            None => continue,
+        };
+        let namespace = contract.get("namespace").and_then(Value::as_str).unwrap_or("");
+        let id = contract.get("id").and_then(Value::as_str).unwrap_or("");
+        let version = contract.get("version").and_then(Value::as_str).unwrap_or("");
+        if namespace.is_empty() || id.is_empty() || version.is_empty() {
+            continue;
+        }
+        let deprecated = record
+            .get("deprecated")
+            .and_then(Value::as_bool)
+            .unwrap_or(false);
+
+        events.push(object(alloc::vec![
+            (
+                "reference",
+                Value::String(capability_reference(namespace, id, version)),
+            ),
+            ("deprecated", Value::Bool(deprecated)),
+            ("product", product.clone()),
+        ]));
+    }
+
+    events.sort_by(|a, b| {
+        let reference_a = a.get("reference").and_then(Value::as_str).unwrap_or("");
+        let reference_b = b.get("reference").and_then(Value::as_str).unwrap_or("");
+        reference_a.cmp(reference_b)
+    });
+
+    events
+}
+
 fn build_catalog(input: &Value) -> Value {
     let records = input.get("capabilities").and_then(Value::as_array).unwrap_or(&[]);
     let persona_records = input.get("personas").and_then(Value::as_array).unwrap_or(&[]);
+    let event_records = input.get("events").and_then(Value::as_array).unwrap_or(&[]);
     let personas = build_personas(persona_records);
+    let events = build_events(event_records);
 
     let mut capabilities: Vec<Value> = Vec::new();
     let mut index: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
@@ -192,6 +242,7 @@ fn build_catalog(input: &Value) -> Value {
     object(alloc::vec![
         ("capabilities", Value::Array(capabilities)),
         ("personas", Value::Array(personas)),
+        ("events", Value::Array(events)),
         ("search_index", search_index),
     ])
 }
@@ -229,6 +280,50 @@ mod tests {
         object(vec![
             ("capabilities", Value::Array(records)),
             ("personas", Value::Array(vec![])),
+            ("events", Value::Array(vec![])),
+        ])
+    }
+
+    fn event_product(namespace: &str, id: &str, version: &str, summary: &str, exposure: &str) -> Value {
+        object(vec![
+            (
+                "contract",
+                object(vec![
+                    ("namespace", Value::String(String::from(namespace))),
+                    ("id", Value::String(String::from(id))),
+                    ("version", Value::String(String::from(version))),
+                    ("summary", Value::String(String::from(summary))),
+                    ("lifecycle", Value::String(String::from("active"))),
+                    (
+                        "owner",
+                        object(vec![("team", Value::String(String::from("loop")))]),
+                    ),
+                    (
+                        "classification",
+                        object(vec![("domain", Value::String(String::from("core.action-item")))]),
+                    ),
+                    ("publishers", Value::Array(vec![])),
+                    ("subscribers", Value::Array(vec![])),
+                ]),
+            ),
+            ("exposure", Value::String(String::from(exposure))),
+            ("support_route", Value::String(String::from("https://support.traverse.dev/events"))),
+            ("field_classifications", Value::Array(vec![])),
+        ])
+    }
+
+    fn event_record(product_value: Value, deprecated: bool) -> Value {
+        object(vec![
+            ("deprecated", Value::Bool(deprecated)),
+            ("product", product_value),
+        ])
+    }
+
+    fn events_input(records: Vec<Value>) -> Value {
+        object(vec![
+            ("capabilities", Value::Array(vec![])),
+            ("personas", Value::Array(vec![])),
+            ("events", Value::Array(records)),
         ])
     }
 
@@ -251,6 +346,7 @@ mod tests {
         object(vec![
             ("capabilities", Value::Array(vec![])),
             ("personas", Value::Array(records)),
+            ("events", Value::Array(vec![])),
         ])
     }
 
@@ -435,6 +531,7 @@ mod tests {
         let catalog = build_catalog(&capabilities_input(Vec::new()));
         assert!(catalog.get("capabilities").unwrap().as_array().unwrap().is_empty());
         assert!(catalog.get("personas").unwrap().as_array().unwrap().is_empty());
+        assert!(catalog.get("events").unwrap().as_array().unwrap().is_empty());
         assert!(matches!(catalog.get("search_index"), Some(Value::Object(fields)) if fields.is_empty()));
     }
 
@@ -507,10 +604,73 @@ mod tests {
                 "personas",
                 Value::Array(vec![persona_record(persona("meeting-organizer", "1.0.0", "Meeting Organizer"))]),
             ),
+            ("events", Value::Array(vec![])),
         ]);
 
         let catalog = build_catalog(&input);
         assert_eq!(catalog.get("capabilities").unwrap().as_array().unwrap().len(), 1);
         assert_eq!(catalog.get("personas").unwrap().as_array().unwrap().len(), 1);
+        assert!(catalog.get("events").unwrap().as_array().unwrap().is_empty());
+    }
+
+    #[test]
+    fn builds_sorted_event_list_and_reference() {
+        let input = events_input(vec![
+            event_record(
+                event_product(
+                    "core",
+                    "core.action-item.status-transitioned",
+                    "1.0.0",
+                    "Status transitioned",
+                    "internal",
+                ),
+                false,
+            ),
+            event_record(
+                event_product(
+                    "content.comments",
+                    "content.comments.comment-draft-created",
+                    "1.0.0",
+                    "Draft created",
+                    "internal",
+                ),
+                false,
+            ),
+        ]);
+
+        let catalog = build_catalog(&input);
+        let events = catalog.get("events").unwrap().as_array().unwrap();
+        assert_eq!(events.len(), 2);
+        assert_eq!(
+            events[0].get("reference").unwrap().as_str(),
+            Some("content.comments/content.comments.comment-draft-created@1.0.0")
+        );
+        assert_eq!(
+            events[1].get("reference").unwrap().as_str(),
+            Some("core/core.action-item.status-transitioned@1.0.0")
+        );
+    }
+
+    #[test]
+    fn full_event_product_is_passed_through_verbatim() {
+        let source = event_product(
+            "core",
+            "core.action-item.status-transitioned",
+            "1.0.0",
+            "Status transitioned",
+            "internal",
+        );
+        let input = events_input(vec![event_record(source.clone(), false)]);
+        let catalog = build_catalog(&input);
+        let events = catalog.get("events").unwrap().as_array().unwrap();
+        assert_eq!(events[0].get("product").unwrap(), &source);
+        assert_eq!(events[0].get("deprecated").unwrap().as_bool(), Some(false));
+    }
+
+    #[test]
+    fn malformed_event_record_missing_product_is_skipped() {
+        let input = events_input(vec![object(vec![("deprecated", Value::Bool(false))])]);
+        let catalog = build_catalog(&input);
+        assert!(catalog.get("events").unwrap().as_array().unwrap().is_empty());
     }
 }
