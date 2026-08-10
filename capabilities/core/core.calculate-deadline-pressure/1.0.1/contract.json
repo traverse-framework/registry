@@ -1,0 +1,314 @@
+{
+  "artifact": {
+    "digest": "sha256:75f4eb3620b325df2150ec5c3f19a7cd52d46e2d5d4cb35d0a83b634c4baf14c",
+    "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/core.calculate-deadline-pressure-1.0.1/core-calculate-deadline-pressure.wasm"
+  },
+  "connector_requirements": [],
+  "consumes": [],
+  "dependencies": [],
+  "description": "Pure WF2 capability used after ownership assignment. Maps days-until-due into a 0.0-1.0 pressure_score and a band (low|medium|high|overdue).\n\nImplemented and smoke-tested matrix (use_cases):\n- due-soon medium pressure\n- overdue max pressure\n- missing_due_date when due_date is empty\n- invalid_date for unparseable dates\n- config_error when reference_date is empty\n\nKnown limitations (intentional in 1.0.1):\n- Band thresholds are fixed heuristic cutovers; no calendar/holiday awareness",
+  "emits": [],
+  "event_trigger": null,
+  "evidence": [
+    {
+      "evidence_id": "core-calculate-deadline-pressure-1.0.1-contract-validation",
+      "status": "passed",
+      "type": "contract_validation"
+    }
+  ],
+  "execution": {
+    "binary_format": "wasm",
+    "constraints": {
+      "filesystem_access": "none",
+      "host_api_access": "none",
+      "network_access": "forbidden"
+    },
+    "entrypoint": {
+      "command": "run",
+      "kind": "wasi-command"
+    },
+    "preferred_targets": [
+      "local",
+      "edge",
+      "browser"
+    ]
+  },
+  "id": "core.calculate-deadline-pressure",
+  "inputs": {
+    "schema": {
+      "properties": {
+        "item": {
+          "properties": {
+            "due_date": {
+              "type": "string"
+            },
+            "id": {
+              "type": "string"
+            },
+            "status": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "id",
+            "due_date"
+          ],
+          "type": "object"
+        },
+        "pressure_config": {
+          "properties": {
+            "horizon_days": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "version": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "version"
+          ],
+          "type": "object"
+        },
+        "reference_date": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "item",
+        "reference_date",
+        "pressure_config"
+      ],
+      "type": "object"
+    }
+  },
+  "kind": "capability_contract",
+  "lifecycle": "active",
+  "name": "calculate-deadline-pressure",
+  "namespace": "core",
+  "outputs": {
+    "schema": {
+      "properties": {
+        "days_until_due": {
+          "type": "integer"
+        },
+        "evaluation_trace": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "item_id": {
+          "type": "string"
+        },
+        "pressure_band": {
+          "enum": [
+            "low",
+            "medium",
+            "high",
+            "overdue",
+            "unknown"
+          ],
+          "type": "string"
+        },
+        "pressure_score": {
+          "type": "number"
+        },
+        "reason_code": {
+          "enum": [
+            "ok",
+            "missing_due_date",
+            "invalid_date",
+            "config_error"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "pressure_score",
+        "pressure_band",
+        "reason_code"
+      ],
+      "type": "object"
+    }
+  },
+  "owner": {
+    "contact": "founders@loop.dev",
+    "team": "loop"
+  },
+  "permissions": [
+    {
+      "id": "core.calculate-deadline-pressure"
+    }
+  ],
+  "permitted_targets": [
+    "local",
+    "edge",
+    "browser",
+    "cloud"
+  ],
+  "policies": [],
+  "postconditions": [
+    {
+      "description": "Identical inputs produce identical outputs",
+      "id": "deterministic"
+    }
+  ],
+  "preconditions": [],
+  "provenance": {
+    "adr_refs": [
+      "persona-council-review-2026-08-08"
+    ],
+    "author": "loop-founders + traverse-capability-author",
+    "created_at": "2026-08-08T06:00:00Z",
+    "exception_refs": [],
+    "source": "ai-assisted",
+    "spec_ref": "core.calculate-deadline-pressure@1.0.1"
+  },
+  "schema_version": "1.0.0",
+  "service_type": "stateless",
+  "side_effects": [
+    {
+      "description": "Pure pressure calculation",
+      "kind": "memory_only"
+    }
+  ],
+  "state_schema": null,
+  "summary": "Computes a deterministic deadline pressure score from due date versus a reference date.",
+  "use_cases": [
+    {
+      "happy": true,
+      "input_example": {
+        "item": {
+          "due_date": "2026-08-10",
+          "id": "ai-1",
+          "status": "open"
+        },
+        "pressure_config": {
+          "horizon_days": 14,
+          "version": "1.0"
+        },
+        "reference_date": "2026-08-07"
+      },
+      "output_example": {
+        "days_until_due": 3,
+        "evaluation_trace": [
+          "days_until_due=3",
+          "horizon=14",
+          "band=medium"
+        ],
+        "item_id": "ai-1",
+        "pressure_band": "medium",
+        "pressure_score": 0.786,
+        "reason_code": "ok"
+      },
+      "persona_ref": "runtime-engineer",
+      "scenario": "As the commit pipeline, I want pressure for an item due in three days."
+    },
+    {
+      "happy": true,
+      "input_example": {
+        "item": {
+          "due_date": "2026-08-01",
+          "id": "ai-2",
+          "status": "open"
+        },
+        "pressure_config": {
+          "horizon_days": 14,
+          "version": "1.0"
+        },
+        "reference_date": "2026-08-07"
+      },
+      "output_example": {
+        "days_until_due": -6,
+        "evaluation_trace": [
+          "days_until_due=-6",
+          "horizon=14",
+          "band=overdue"
+        ],
+        "item_id": "ai-2",
+        "pressure_band": "overdue",
+        "pressure_score": 1.0,
+        "reason_code": "ok"
+      },
+      "persona_ref": "collaboration-product-owner",
+      "scenario": "As the system, I want overdue items to receive maximum pressure."
+    },
+    {
+      "happy": false,
+      "input_example": {
+        "item": {
+          "due_date": "",
+          "id": "ai-m",
+          "status": "open"
+        },
+        "pressure_config": {
+          "horizon_days": 14,
+          "version": "1.0"
+        },
+        "reference_date": "2026-08-07"
+      },
+      "output_example": {
+        "days_until_due": 0,
+        "evaluation_trace": [],
+        "item_id": "ai-m",
+        "pressure_band": "unknown",
+        "pressure_score": 0,
+        "reason_code": "missing_due_date"
+      },
+      "persona_ref": "runtime-engineer",
+      "scenario": "As WF2, I want missing_due_date when due_date is empty so undated items fail closed."
+    },
+    {
+      "happy": false,
+      "input_example": {
+        "item": {
+          "due_date": "not-a-date",
+          "id": "ai-i",
+          "status": "open"
+        },
+        "pressure_config": {
+          "horizon_days": 14,
+          "version": "1.0"
+        },
+        "reference_date": "2026-08-07"
+      },
+      "output_example": {
+        "days_until_due": 0,
+        "evaluation_trace": [],
+        "item_id": "ai-i",
+        "pressure_band": "unknown",
+        "pressure_score": 0,
+        "reason_code": "invalid_date"
+      },
+      "persona_ref": "runtime-engineer",
+      "scenario": "As WF2, I want invalid_date when due_date cannot be parsed."
+    },
+    {
+      "happy": false,
+      "input_example": {
+        "item": {
+          "due_date": "2026-08-10",
+          "id": "ai-c",
+          "status": "open"
+        },
+        "pressure_config": {
+          "horizon_days": 14,
+          "version": "1.0"
+        },
+        "reference_date": ""
+      },
+      "output_example": {
+        "days_until_due": 0,
+        "evaluation_trace": [],
+        "item_id": "",
+        "pressure_band": "unknown",
+        "pressure_score": 0,
+        "reason_code": "config_error"
+      },
+      "persona_ref": "runtime-engineer",
+      "scenario": "As WF2, I want config_error when reference_date is empty."
+    }
+  ],
+  "version": "1.0.1"
+}
