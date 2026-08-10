@@ -3,7 +3,7 @@
   "schema_version": "1.0.0",
   "governing_spec": "534-ecca-event-products@1.0.0",
   "governing_issue": "traverse-framework/registry#170",
-  "generated_at": "2026-08-10T00:00:00Z",
+  "generated_at": "2026-08-10T20:00:00Z",
   "scope_note": "Covers this repository's own real published capabilities (capabilities/*/*/*/contract.json). traverse-framework/traverse#899's own inventory (contracts/governance/ecca-capability-inventory.json in that repo) covers a different, unrelated set of artifacts under that repo's contracts/examples/ and contracts/inference/ trees -- despite some capability_id values coincidentally matching, they are not the same content and #899 does not satisfy Spec 534 FR-020 for this repository's catalog. Extended 2026-08-10 for registry#168 to include all core.* capabilities and the first governed event product.",
   "capabilities": [
     {
