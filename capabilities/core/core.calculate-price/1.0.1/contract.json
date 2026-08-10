@@ -1,0 +1,924 @@
+{
+  "artifact": {
+    "digest": "sha256:a046e5d001ae78b8de339d40378e2c22f04384d601a1b801b52cf99a3e44f0b2",
+    "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/core.calculate-price-1.0.1/core-calculate-price.wasm"
+  },
+  "connector_requirements": [],
+  "consumes": [],
+  "dependencies": [],
+  "description": "Pure pricing capability: line quantity × unit_price, optional first matching percentage/fixed discount, optional exclusive tax, deterministic config_hash.\n\nImplemented and smoke-tested matrix (use_cases):\n- percentage discount + exclusive tax (ok)\n- fixed discount without tax (ok)\n- empty discount/tax rules returns base price (ok)\n- invalid_quantity when quantity <= 0\n- invalid_unit_price when unit_price < 0\n- invalid_config when currency is empty\n- currency_mismatch when top-level currency ≠ pricing_config.currency\n- empty_cart when lines is empty\n\nKnown limitations (intentional in 1.0.1):\n- Only the first matching discount rule is applied (no multi-rule stacking)\n- Discount rule `conditions` (e.g. customer segment) are ignored\n- Rounding modes other than half_up are not implemented; schema narrowed to half_up\n- Tax-inclusive extraction is not implemented (exclusive tax only)\n- calculation_error is not part of the published reason_code vocabulary",
+  "emits": [],
+  "event_trigger": null,
+  "evidence": [
+    {
+      "evidence_id": "core-calculate-price-1.0.1-contract-validation",
+      "status": "passed",
+      "type": "contract_validation"
+    }
+  ],
+  "execution": {
+    "binary_format": "wasm",
+    "constraints": {
+      "filesystem_access": "none",
+      "host_api_access": "none",
+      "network_access": "forbidden"
+    },
+    "entrypoint": {
+      "command": "run",
+      "kind": "wasi-command"
+    },
+    "preferred_targets": [
+      "local",
+      "edge",
+      "browser"
+    ]
+  },
+  "id": "core.calculate-price",
+  "inputs": {
+    "schema": {
+      "additionalProperties": false,
+      "properties": {
+        "context": {
+          "additionalProperties": true,
+          "default": {},
+          "type": "object"
+        },
+        "currency": {
+          "description": "ISO 4217 currency code",
+          "type": "string"
+        },
+        "customer": {
+          "additionalProperties": false,
+          "properties": {
+            "attributes": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "id": {
+              "type": "string"
+            }
+          },
+          "type": "object"
+        },
+        "lines": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "attributes": {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              "id": {
+                "type": "string"
+              },
+              "quantity": {
+                "exclusiveMinimum": 0,
+                "type": "number"
+              },
+              "sku": {
+                "type": "string"
+              },
+              "tax_code": {
+                "type": "string"
+              },
+              "unit_price": {
+                "minimum": 0,
+                "type": "number"
+              }
+            },
+            "required": [
+              "id",
+              "sku",
+              "quantity",
+              "unit_price"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "pricing_config": {
+          "additionalProperties": false,
+          "properties": {
+            "currency": {
+              "type": "string"
+            },
+            "decimal_places": {
+              "maximum": 6,
+              "minimum": 0,
+              "type": "integer"
+            },
+            "discount_rules": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "applies_to": {
+                    "items": {
+                      "type": "string"
+                    },
+                    "type": "array"
+                  },
+                  "conditions": {
+                    "additionalProperties": true,
+                    "type": "object"
+                  },
+                  "id": {
+                    "type": "string"
+                  },
+                  "priority": {
+                    "type": "integer"
+                  },
+                  "stackable": {
+                    "default": true,
+                    "type": "boolean"
+                  },
+                  "type": {
+                    "enum": [
+                      "percentage",
+                      "fixed"
+                    ],
+                    "type": "string"
+                  },
+                  "value": {
+                    "minimum": 0,
+                    "type": "number"
+                  }
+                },
+                "required": [
+                  "id",
+                  "priority",
+                  "type",
+                  "value"
+                ],
+                "type": "object"
+              },
+              "type": "array"
+            },
+            "rounding": {
+              "enum": [
+                "half_up"
+              ],
+              "type": "string"
+            },
+            "tax_rules": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "inclusive": {
+                    "default": false,
+                    "type": "boolean"
+                  },
+                  "rate": {
+                    "minimum": 0,
+                    "type": "number"
+                  },
+                  "tax_code": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "id",
+                  "tax_code",
+                  "rate"
+                ],
+                "type": "object"
+              },
+              "type": "array"
+            },
+            "version": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "version",
+            "currency",
+            "rounding",
+            "decimal_places",
+            "discount_rules",
+            "tax_rules"
+          ],
+          "type": "object"
+        }
+      },
+      "required": [
+        "currency",
+        "lines",
+        "pricing_config"
+      ],
+      "type": "object"
+    }
+  },
+  "kind": "capability_contract",
+  "lifecycle": "active",
+  "name": "calculate-price",
+  "namespace": "core",
+  "outputs": {
+    "schema": {
+      "additionalProperties": false,
+      "properties": {
+        "applied_rules": {
+          "items": {
+            "properties": {
+              "amount": {
+                "type": "number"
+              },
+              "rule_id": {
+                "type": "string"
+              },
+              "type": {
+                "enum": [
+                  "discount",
+                  "tax"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "rule_id",
+              "type",
+              "amount"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "confidence": {
+          "enum": [
+            "high",
+            "medium",
+            "low"
+          ],
+          "type": "string"
+        },
+        "config_hash": {
+          "description": "Deterministic hash of the pricing_config for audit correlation",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "currency": {
+          "type": "string"
+        },
+        "evaluation_trace": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "lines": {
+          "items": {
+            "properties": {
+              "applied_discounts": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "applied_taxes": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "discount_amount": {
+                "type": "number"
+              },
+              "gross": {
+                "type": "number"
+              },
+              "id": {
+                "type": "string"
+              },
+              "net": {
+                "type": "number"
+              },
+              "quantity": {
+                "type": "number"
+              },
+              "sku": {
+                "type": "string"
+              },
+              "tax_amount": {
+                "type": "number"
+              },
+              "taxable_base": {
+                "type": "number"
+              },
+              "unit_price": {
+                "type": "number"
+              }
+            },
+            "required": [
+              "id",
+              "sku",
+              "quantity",
+              "unit_price",
+              "gross",
+              "discount_amount",
+              "taxable_base",
+              "tax_amount",
+              "net",
+              "applied_discounts",
+              "applied_taxes"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "reason_code": {
+          "enum": [
+            "ok",
+            "invalid_quantity",
+            "invalid_unit_price",
+            "invalid_config",
+            "currency_mismatch",
+            "empty_cart"
+          ],
+          "type": "string"
+        },
+        "totals": {
+          "properties": {
+            "discount_total": {
+              "type": "number"
+            },
+            "gross": {
+              "type": "number"
+            },
+            "net": {
+              "type": "number"
+            },
+            "tax_total": {
+              "type": "number"
+            },
+            "taxable_base": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "gross",
+            "discount_total",
+            "taxable_base",
+            "tax_total",
+            "net"
+          ],
+          "type": "object"
+        }
+      },
+      "required": [
+        "currency",
+        "lines",
+        "totals",
+        "applied_rules",
+        "evaluation_trace",
+        "reason_code",
+        "confidence"
+      ],
+      "type": "object"
+    }
+  },
+  "owner": {
+    "contact": "capability-authors@traverse-framework.com",
+    "team": "traverse-core"
+  },
+  "permissions": [
+    {
+      "id": "core.calculate-price"
+    }
+  ],
+  "permitted_targets": [
+    "local",
+    "edge",
+    "browser",
+    "cloud"
+  ],
+  "policies": [
+    {
+      "id": "fail-closed-on-invalid-input"
+    },
+    {
+      "id": "pure-computation-only"
+    }
+  ],
+  "postconditions": [
+    {
+      "description": "Identical inputs always produce identical outputs",
+      "id": "deterministic"
+    },
+    {
+      "description": "Sum of line nets equals totals.net (within rounding tolerance)",
+      "id": "totals-consistent"
+    },
+    {
+      "description": "evaluation_trace is always populated",
+      "id": "trace-always-present"
+    },
+    {
+      "description": "A machine-readable reason_code is always present",
+      "id": "reason-code-always-present"
+    }
+  ],
+  "preconditions": [
+    {
+      "description": "At least one line item must be present",
+      "id": "lines-not-empty"
+    },
+    {
+      "description": "Every line.quantity must be > 0",
+      "id": "quantity-positive"
+    },
+    {
+      "description": "Every line.unit_price must be >= 0",
+      "id": "unit-price-non-negative"
+    },
+    {
+      "description": "pricing_config must contain version, currency, rounding, decimal_places, discount_rules and tax_rules",
+      "id": "pricing-config-valid"
+    },
+    {
+      "description": "Top-level currency must match pricing_config.currency",
+      "id": "currency-consistent"
+    }
+  ],
+  "provenance": {
+    "adr_refs": [
+      "persona-council-review-2026-08-08"
+    ],
+    "author": "loop-founders + traverse-capability-author",
+    "created_at": "2026-08-08T05:50:00Z",
+    "exception_refs": [],
+    "source": "ai-assisted",
+    "spec_ref": "core.calculate-price@1.0.1"
+  },
+  "schema_version": "1.0.0",
+  "service_type": "stateless",
+  "side_effects": [
+    {
+      "description": "Pure computation. No network, filesystem or host state is accessed or mutated.",
+      "kind": "memory_only"
+    }
+  ],
+  "state_schema": null,
+  "summary": "Deterministic price/quote engine. Given line items, quantities, customer context and a versioned pricing configuration, returns unit prices, discounts, taxes and totals with an audit trail.",
+  "use_cases": [
+    {
+      "happy": true,
+      "input_example": {
+        "context": {},
+        "currency": "USD",
+        "customer": {
+          "attributes": {
+            "segment": "retail"
+          },
+          "id": "cust-42"
+        },
+        "lines": [
+          {
+            "id": "line-1",
+            "quantity": 2,
+            "sku": "SKU-100",
+            "tax_code": "STANDARD",
+            "unit_price": 50.0
+          }
+        ],
+        "pricing_config": {
+          "currency": "USD",
+          "decimal_places": 2,
+          "discount_rules": [
+            {
+              "applies_to": [
+                "SKU-100"
+              ],
+              "id": "summer-10",
+              "priority": 100,
+              "stackable": false,
+              "type": "percentage",
+              "value": 10
+            }
+          ],
+          "rounding": "half_up",
+          "tax_rules": [
+            {
+              "id": "us-standard",
+              "inclusive": false,
+              "rate": 0.08,
+              "tax_code": "STANDARD"
+            }
+          ],
+          "version": "1.0"
+        }
+      },
+      "output_example": {
+        "applied_rules": [
+          {
+            "amount": 10.0,
+            "rule_id": "summer-10",
+            "type": "discount"
+          },
+          {
+            "amount": 7.2,
+            "rule_id": "us-standard",
+            "type": "tax"
+          }
+        ],
+        "confidence": "high",
+        "config_hash": "fnv1a64:placeholder",
+        "currency": "USD",
+        "evaluation_trace": [
+          "currency=USD rounding=half_up"
+        ],
+        "lines": [
+          {
+            "applied_discounts": [
+              "summer-10"
+            ],
+            "applied_taxes": [
+              "us-standard"
+            ],
+            "discount_amount": 10.0,
+            "gross": 100.0,
+            "id": "line-1",
+            "net": 97.2,
+            "quantity": 2,
+            "sku": "SKU-100",
+            "tax_amount": 7.2,
+            "taxable_base": 90.0,
+            "unit_price": 50.0
+          }
+        ],
+        "reason_code": "ok",
+        "totals": {
+          "discount_total": 10.0,
+          "gross": 100.0,
+          "net": 97.2,
+          "tax_total": 7.2,
+          "taxable_base": 90.0
+        }
+      },
+      "persona_ref": "runtime-engineer",
+      "scenario": "As a checkout-flow developer, I want percentage discount + exclusive tax so the UI can show a clear total."
+    },
+    {
+      "happy": true,
+      "input_example": {
+        "context": {},
+        "currency": "USD",
+        "customer": {
+          "id": "cust-99"
+        },
+        "lines": [
+          {
+            "id": "sub-1",
+            "quantity": 1,
+            "sku": "PLAN-PRO",
+            "unit_price": 99.0
+          }
+        ],
+        "pricing_config": {
+          "currency": "USD",
+          "decimal_places": 2,
+          "discount_rules": [
+            {
+              "id": "loyalty-5",
+              "priority": 50,
+              "stackable": true,
+              "type": "fixed",
+              "value": 5.0
+            }
+          ],
+          "rounding": "half_up",
+          "tax_rules": [],
+          "version": "1.0"
+        }
+      },
+      "output_example": {
+        "applied_rules": [
+          {
+            "amount": 5.0,
+            "rule_id": "loyalty-5",
+            "type": "discount"
+          }
+        ],
+        "confidence": "high",
+        "config_hash": "fnv1a64:placeholder",
+        "currency": "USD",
+        "evaluation_trace": [
+          "currency=USD rounding=half_up"
+        ],
+        "lines": [
+          {
+            "applied_discounts": [
+              "loyalty-5"
+            ],
+            "applied_taxes": [],
+            "discount_amount": 5.0,
+            "gross": 99.0,
+            "id": "sub-1",
+            "net": 94.0,
+            "quantity": 1,
+            "sku": "PLAN-PRO",
+            "tax_amount": 0,
+            "taxable_base": 94.0,
+            "unit_price": 99.0
+          }
+        ],
+        "reason_code": "ok",
+        "totals": {
+          "discount_total": 5.0,
+          "gross": 99.0,
+          "net": 94.0,
+          "tax_total": 0,
+          "taxable_base": 94.0
+        }
+      },
+      "persona_ref": "runtime-engineer",
+      "scenario": "As a billing engineer, I want a fixed discount without tax to reduce the line net deterministically."
+    },
+    {
+      "happy": true,
+      "input_example": {
+        "context": {},
+        "currency": "USD",
+        "customer": {
+          "id": "cust-1"
+        },
+        "lines": [
+          {
+            "id": "line-1",
+            "quantity": 1,
+            "sku": "SKU-100",
+            "unit_price": 50.0
+          }
+        ],
+        "pricing_config": {
+          "currency": "USD",
+          "decimal_places": 2,
+          "discount_rules": [],
+          "rounding": "half_up",
+          "tax_rules": [],
+          "version": "1.0"
+        }
+      },
+      "output_example": {
+        "applied_rules": [],
+        "confidence": "high",
+        "config_hash": "fnv1a64:placeholder",
+        "currency": "USD",
+        "evaluation_trace": [
+          "currency=USD rounding=half_up"
+        ],
+        "lines": [
+          {
+            "applied_discounts": [],
+            "applied_taxes": [],
+            "discount_amount": 0,
+            "gross": 50.0,
+            "id": "line-1",
+            "net": 50.0,
+            "quantity": 1,
+            "sku": "SKU-100",
+            "tax_amount": 0,
+            "taxable_base": 50.0,
+            "unit_price": 50.0
+          }
+        ],
+        "reason_code": "ok",
+        "totals": {
+          "discount_total": 0,
+          "gross": 50.0,
+          "net": 50.0,
+          "tax_total": 0,
+          "taxable_base": 50.0
+        }
+      },
+      "persona_ref": "meeting-organizer",
+      "scenario": "As a client developer, I want empty discount/tax rules to return the base price with reason_code ok."
+    },
+    {
+      "happy": false,
+      "input_example": {
+        "context": {},
+        "currency": "USD",
+        "customer": {
+          "id": "cust-1"
+        },
+        "lines": [
+          {
+            "id": "line-1",
+            "quantity": 0,
+            "sku": "SKU-100",
+            "unit_price": 50.0
+          }
+        ],
+        "pricing_config": {
+          "currency": "USD",
+          "decimal_places": 2,
+          "discount_rules": [],
+          "rounding": "half_up",
+          "tax_rules": [],
+          "version": "1.0"
+        }
+      },
+      "output_example": {
+        "applied_rules": [],
+        "confidence": "high",
+        "config_hash": null,
+        "currency": "USD",
+        "evaluation_trace": [
+          "precondition failed: quantity must be > 0 for line-1"
+        ],
+        "lines": [],
+        "reason_code": "invalid_quantity",
+        "totals": {
+          "discount_total": 0,
+          "gross": 0,
+          "net": 0,
+          "tax_total": 0,
+          "taxable_base": 0
+        }
+      },
+      "persona_ref": "runtime-engineer",
+      "scenario": "As a checkout-flow developer, I want quantity <= 0 rejected with invalid_quantity."
+    },
+    {
+      "happy": false,
+      "input_example": {
+        "context": {},
+        "currency": "USD",
+        "customer": {
+          "id": "cust-1"
+        },
+        "lines": [
+          {
+            "id": "line-1",
+            "quantity": 1,
+            "sku": "SKU-X",
+            "unit_price": -10.0
+          }
+        ],
+        "pricing_config": {
+          "currency": "USD",
+          "decimal_places": 2,
+          "discount_rules": [],
+          "rounding": "half_up",
+          "tax_rules": [],
+          "version": "1.0"
+        }
+      },
+      "output_example": {
+        "applied_rules": [],
+        "confidence": "high",
+        "config_hash": null,
+        "currency": "USD",
+        "evaluation_trace": [
+          "precondition failed: unit_price must be >= 0 for line-1"
+        ],
+        "lines": [],
+        "reason_code": "invalid_unit_price",
+        "totals": {
+          "discount_total": 0,
+          "gross": 0,
+          "net": 0,
+          "tax_total": 0,
+          "taxable_base": 0
+        }
+      },
+      "persona_ref": "runtime-engineer",
+      "scenario": "As a platform engineer, I want a negative unit_price rejected with invalid_unit_price."
+    },
+    {
+      "happy": false,
+      "input_example": {
+        "context": {},
+        "currency": "",
+        "customer": {
+          "id": "cust-1"
+        },
+        "lines": [
+          {
+            "id": "line-1",
+            "quantity": 1,
+            "sku": "SKU-100",
+            "unit_price": 50.0
+          }
+        ],
+        "pricing_config": {
+          "currency": "USD",
+          "decimal_places": 2,
+          "discount_rules": [],
+          "rounding": "half_up",
+          "tax_rules": [],
+          "version": "1.0"
+        }
+      },
+      "output_example": {
+        "applied_rules": [],
+        "confidence": "high",
+        "config_hash": null,
+        "currency": "USD",
+        "evaluation_trace": [
+          "precondition failed: currency missing"
+        ],
+        "lines": [],
+        "reason_code": "invalid_config",
+        "totals": {
+          "discount_total": 0,
+          "gross": 0,
+          "net": 0,
+          "tax_total": 0,
+          "taxable_base": 0
+        }
+      },
+      "persona_ref": "runtime-engineer",
+      "scenario": "As a runtime, I want empty currency rejected with invalid_config."
+    },
+    {
+      "happy": false,
+      "input_example": {
+        "context": {},
+        "currency": "EUR",
+        "customer": {
+          "id": "cust-1"
+        },
+        "lines": [
+          {
+            "id": "line-1",
+            "quantity": 1,
+            "sku": "SKU-100",
+            "unit_price": 50.0
+          }
+        ],
+        "pricing_config": {
+          "currency": "USD",
+          "decimal_places": 2,
+          "discount_rules": [],
+          "rounding": "half_up",
+          "tax_rules": [],
+          "version": "1.0"
+        }
+      },
+      "output_example": {
+        "applied_rules": [],
+        "confidence": "high",
+        "config_hash": null,
+        "currency": "EUR",
+        "evaluation_trace": [
+          "precondition failed: currency mismatch"
+        ],
+        "lines": [],
+        "reason_code": "currency_mismatch",
+        "totals": {
+          "discount_total": 0,
+          "gross": 0,
+          "net": 0,
+          "tax_total": 0,
+          "taxable_base": 0
+        }
+      },
+      "persona_ref": "runtime-engineer",
+      "scenario": "As a multi-currency engineer, I want currency_mismatch when request currency differs from pricing_config.currency."
+    },
+    {
+      "happy": false,
+      "input_example": {
+        "context": {},
+        "currency": "USD",
+        "customer": {
+          "id": "cust-1"
+        },
+        "lines": [],
+        "pricing_config": {
+          "currency": "USD",
+          "decimal_places": 2,
+          "discount_rules": [],
+          "rounding": "half_up",
+          "tax_rules": [],
+          "version": "1.0"
+        }
+      },
+      "output_example": {
+        "applied_rules": [],
+        "confidence": "high",
+        "config_hash": null,
+        "currency": "USD",
+        "evaluation_trace": [
+          "precondition failed: lines must be non-empty"
+        ],
+        "lines": [],
+        "reason_code": "empty_cart",
+        "totals": {
+          "discount_total": 0,
+          "gross": 0,
+          "net": 0,
+          "tax_total": 0,
+          "taxable_base": 0
+        }
+      },
+      "persona_ref": "runtime-engineer",
+      "scenario": "As a checkout-flow developer, I want an empty cart rejected with empty_cart."
+    }
+  ],
+  "version": "1.0.1"
+}
