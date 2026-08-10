@@ -1,0 +1,448 @@
+{
+  "kind": "capability_contract",
+  "schema_version": "1.0.0",
+  "id": "core.validate-action-item",
+  "namespace": "core",
+  "name": "validate-action-item",
+  "version": "1.1.0",
+  "lifecycle": "active",
+  "owner": {
+    "team": "loop",
+    "contact": "founders@loop.dev"
+  },
+  "summary": "Validates a single action item for required fields, owner existence, due-date sanity and duplicate detection before it becomes a commitment.",
+  "description": "Gatekeeper for action-item commitments: title/owner/due-date rules and duplicate detection under validation_config. Pure and deterministic.\n\nImplemented and smoke-tested matrix (use_cases):\n- complete item validates (ok)\n- past due rejected when allow_past_due=false (validation_failed)\n- missing owner when require_owner=true (validation_failed)\n- duplicate title+owner (duplicate)\n- duplicate title-only check mode (duplicate)\n- invalid duplicate_check config (invalid_config)\n\nKnown limitations (intentional in 1.1.0):\n- Does not verify owner_id exists in a directory; only presence/absence\n- Date parsing is YYYY-MM-DD lexical compare only",
+  "use_cases": [
+    {
+      "scenario": "As a meeting organizer confirming extracted items, I want a complete item to validate cleanly, so that good commitments can be committed without friction.",
+      "input_example": {
+        "action_item": {
+          "title": "Send proposal",
+          "owner_id": "user-ada",
+          "due_date": "2026-08-09",
+          "source": "meeting"
+        },
+        "existing_open_items": [],
+        "validation_config": {
+          "version": "1.0",
+          "require_owner": true,
+          "require_due_date": false,
+          "allow_past_due": false,
+          "duplicate_check": "title_and_owner"
+        },
+        "reference_date": "2026-08-07"
+      },
+      "output_example": {
+        "valid": true,
+        "errors": [],
+        "normalized": {
+          "title": "Send proposal",
+          "owner_id": "user-ada",
+          "due_date": "2026-08-09"
+        },
+        "reason_code": "ok",
+        "evaluation_trace": [
+          "all checks passed"
+        ]
+      },
+      "happy": true,
+      "persona_ref": "meeting-organizer"
+    },
+    {
+      "scenario": "As a system, I want an item with a past due date rejected when allow_past_due is false, so that stale due dates cannot sneak through.",
+      "input_example": {
+        "action_item": {
+          "title": "Old task",
+          "owner_id": "user-ada",
+          "due_date": "2026-08-01"
+        },
+        "existing_open_items": [],
+        "validation_config": {
+          "version": "1.0",
+          "require_owner": true,
+          "require_due_date": true,
+          "allow_past_due": false,
+          "duplicate_check": "title_and_owner"
+        },
+        "reference_date": "2026-08-07"
+      },
+      "output_example": {
+        "valid": false,
+        "errors": [
+          {
+            "field": "due_date",
+            "code": "past_due",
+            "message": "due_date is in the past"
+          }
+        ],
+        "normalized": null,
+        "reason_code": "validation_failed",
+        "evaluation_trace": [
+          "due_date 2026-08-01 < reference 2026-08-07"
+        ]
+      },
+      "happy": false,
+      "persona_ref": "runtime-engineer"
+    },
+    {
+      "scenario": "As a system, I want a missing owner rejected when require_owner is true, so that ownerless commitments never enter the board.",
+      "input_example": {
+        "action_item": {
+          "title": "Draft agenda",
+          "due_date": "2026-08-10"
+        },
+        "existing_open_items": [],
+        "validation_config": {
+          "version": "1.0",
+          "require_owner": true,
+          "require_due_date": false,
+          "allow_past_due": false,
+          "duplicate_check": "none"
+        },
+        "reference_date": "2026-08-07"
+      },
+      "output_example": {
+        "valid": false,
+        "errors": [
+          {
+            "field": "owner_id",
+            "code": "missing_owner",
+            "message": "owner_id is required"
+          }
+        ],
+        "normalized": null,
+        "reason_code": "validation_failed",
+        "evaluation_trace": [
+          "require_owner=true and owner_id missing"
+        ]
+      },
+      "happy": false,
+      "persona_ref": "runtime-engineer"
+    },
+    {
+      "scenario": "As a system, I want a duplicate title+owner against open items rejected, so that the same commitment is not tracked twice.",
+      "input_example": {
+        "action_item": {
+          "title": "Send proposal",
+          "owner_id": "user-ada",
+          "due_date": "2026-08-12"
+        },
+        "existing_open_items": [
+          {
+            "title": "Send proposal",
+            "owner_id": "user-ada",
+            "due_date": "2026-08-09"
+          }
+        ],
+        "validation_config": {
+          "version": "1.0",
+          "require_owner": true,
+          "require_due_date": false,
+          "allow_past_due": false,
+          "duplicate_check": "title_and_owner"
+        },
+        "reference_date": "2026-08-07"
+      },
+      "output_example": {
+        "valid": false,
+        "errors": [
+          {
+            "field": "title",
+            "code": "duplicate",
+            "message": "matching open item already exists"
+          }
+        ],
+        "normalized": null,
+        "reason_code": "duplicate",
+        "evaluation_trace": [
+          "duplicate_check=title_and_owner matched existing open item"
+        ]
+      },
+      "happy": false,
+      "persona_ref": "runtime-engineer"
+    },
+    {
+      "scenario": "As a system, I want duplicate_check=title to reject matching titles regardless of owner, so that title-only uniqueness can be enforced.",
+      "input_example": {
+        "action_item": {
+          "title": "Send proposal",
+          "owner_id": "user-bob",
+          "due_date": "2026-08-12"
+        },
+        "existing_open_items": [
+          {
+            "title": "Send proposal",
+            "owner_id": "user-ada",
+            "due_date": "2026-08-09"
+          }
+        ],
+        "validation_config": {
+          "version": "1.0",
+          "require_owner": true,
+          "require_due_date": false,
+          "allow_past_due": false,
+          "duplicate_check": "title"
+        },
+        "reference_date": "2026-08-07"
+      },
+      "output_example": {
+        "valid": false,
+        "errors": [
+          {
+            "field": "title",
+            "code": "duplicate",
+            "message": "matching open item already exists"
+          }
+        ],
+        "normalized": null,
+        "reason_code": "duplicate",
+        "evaluation_trace": [
+          "duplicate_check=title matched existing open item"
+        ]
+      },
+      "happy": false,
+      "persona_ref": "runtime-engineer"
+    },
+    {
+      "scenario": "As a system, I want an unknown duplicate_check value rejected with invalid_config, so that bad validation config fails closed.",
+      "input_example": {
+        "action_item": {
+          "title": "Send proposal",
+          "owner_id": "user-ada",
+          "due_date": "2026-08-12"
+        },
+        "existing_open_items": [],
+        "validation_config": {
+          "version": "1.0",
+          "require_owner": true,
+          "require_due_date": false,
+          "allow_past_due": false,
+          "duplicate_check": "bogus"
+        },
+        "reference_date": "2026-08-07"
+      },
+      "output_example": {
+        "valid": false,
+        "errors": [],
+        "normalized": null,
+        "reason_code": "invalid_config",
+        "evaluation_trace": [
+          "invalid_config: duplicate_check"
+        ]
+      },
+      "happy": false,
+      "persona_ref": "runtime-engineer"
+    }
+  ],
+  "inputs": {
+    "schema": {
+      "type": "object",
+      "required": [
+        "action_item",
+        "validation_config",
+        "reference_date"
+      ],
+      "properties": {
+        "action_item": {
+          "type": "object",
+          "required": [
+            "title"
+          ],
+          "properties": {
+            "title": {
+              "type": "string",
+              "minLength": 1
+            },
+            "owner_id": {
+              "type": "string"
+            },
+            "due_date": {
+              "type": "string"
+            },
+            "source": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": true
+        },
+        "existing_open_items": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          },
+          "default": []
+        },
+        "validation_config": {
+          "type": "object",
+          "required": [
+            "version"
+          ],
+          "properties": {
+            "version": {
+              "type": "string"
+            },
+            "require_owner": {
+              "type": "boolean",
+              "default": true
+            },
+            "require_due_date": {
+              "type": "boolean",
+              "default": false
+            },
+            "allow_past_due": {
+              "type": "boolean",
+              "default": false
+            },
+            "duplicate_check": {
+              "type": "string",
+              "enum": [
+                "none",
+                "title",
+                "title_and_owner"
+              ]
+            }
+          }
+        },
+        "reference_date": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "outputs": {
+    "schema": {
+      "type": "object",
+      "required": [
+        "valid",
+        "reason_code"
+      ],
+      "properties": {
+        "valid": {
+          "type": "boolean"
+        },
+        "errors": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "field",
+              "code",
+              "message"
+            ],
+            "properties": {
+              "field": {
+                "type": "string"
+              },
+              "code": {
+                "type": "string"
+              },
+              "message": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "normalized": {
+          "type": [
+            "object",
+            "null"
+          ]
+        },
+        "reason_code": {
+          "type": "string",
+          "enum": [
+            "ok",
+            "validation_failed",
+            "duplicate",
+            "invalid_config"
+          ]
+        },
+        "evaluation_trace": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "preconditions": [
+    {
+      "id": "title-present",
+      "description": "action_item.title must be non-empty"
+    }
+  ],
+  "postconditions": [
+    {
+      "id": "deterministic",
+      "description": "Identical inputs produce identical outputs"
+    }
+  ],
+  "side_effects": [
+    {
+      "kind": "memory_only",
+      "description": "Pure validation"
+    }
+  ],
+  "emits": [],
+  "consumes": [],
+  "permissions": [
+    {
+      "id": "core.validate-action-item"
+    }
+  ],
+  "execution": {
+    "binary_format": "wasm",
+    "entrypoint": {
+      "kind": "wasi-command",
+      "command": "run"
+    },
+    "preferred_targets": [
+      "local",
+      "edge",
+      "browser"
+    ],
+    "constraints": {
+      "host_api_access": "none",
+      "network_access": "forbidden",
+      "filesystem_access": "none"
+    }
+  },
+  "policies": [
+    {
+      "id": "fail-closed-on-invalid"
+    }
+  ],
+  "dependencies": [],
+  "provenance": {
+    "source": "ai-assisted",
+    "author": "loop-founders + traverse-capability-author",
+    "created_at": "2026-08-08T06:00:00Z",
+    "spec_ref": "core.validate-action-item@1.1.0",
+    "adr_refs": [
+      "persona-council-review-2026-08-08"
+    ],
+    "exception_refs": []
+  },
+  "evidence": [
+    {
+      "evidence_id": "core-validate-action-item-1.1.0-contract-validation",
+      "type": "contract_validation",
+      "status": "passed"
+    }
+  ],
+  "service_type": "stateless",
+  "permitted_targets": [
+    "local",
+    "edge",
+    "browser",
+    "cloud"
+  ],
+  "artifact_type": "native",
+  "artifact": {
+    "digest": "sha256:844081f9329040f28a6cba49400f949834894aa49247a07e92728e78d4ccc29c",
+    "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/core.validate-action-item-1.1.0/core-validate-action-item.wasm"
+  }
+}
