@@ -1,0 +1,344 @@
+{
+  "artifact": {
+    "digest": "sha256:776940c947298b22db406e36fca944d2f6596822a5bd365265a541a1cce4b56e",
+    "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/core.select-items-for-followup-1.1.1/core-select-items-for-followup.wasm"
+  },
+  "connector_requirements": [],
+  "consumes": [],
+  "dependencies": [],
+  "description": "Hero capability of Loop (council-revised). Key improvements from 1.0.0:\n- Respects per-user quiet hours and snooze until timestamps\n- Enforces max nudges per user per day\n- Escalation only after repeated ignored nudges + high pressure\n- Explicit skip reasons (quiet_hours, snoozed, budget_exceeded, recently_active, low_pressure)\n- Still pure and deterministic — no messages are sent, only the selection decision is produced.\n\nImplemented and smoke-tested matrix (use_cases):\n- quiet-hours skip\n- escalate selection for overdue high-pressure items\n- config_error when reference_datetime is empty\n\nKnown limitations (intentional in 1.1.1):\n- No message delivery; selection decision only",
+  "emits": [],
+  "event_trigger": null,
+  "evidence": [
+    {
+      "evidence_id": "core-select-items-for-followup-1.1.1-contract-validation",
+      "status": "passed",
+      "type": "contract_validation"
+    }
+  ],
+  "execution": {
+    "binary_format": "wasm",
+    "constraints": {
+      "filesystem_access": "none",
+      "host_api_access": "none",
+      "network_access": "forbidden"
+    },
+    "entrypoint": {
+      "command": "run",
+      "kind": "wasi-command"
+    },
+    "preferred_targets": [
+      "local",
+      "edge",
+      "browser"
+    ]
+  },
+  "id": "core.select-items-for-followup",
+  "inputs": {
+    "schema": {
+      "properties": {
+        "followup_config": {
+          "properties": {
+            "direct_days_overdue": {
+              "type": "integer"
+            },
+            "escalate_after_nudges": {
+              "type": "integer"
+            },
+            "min_pressure_for_soft": {
+              "type": "number"
+            },
+            "respect_quiet_hours": {
+              "type": "boolean"
+            },
+            "soft_days_before_due": {
+              "type": "integer"
+            },
+            "version": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "version"
+          ],
+          "type": "object"
+        },
+        "open_items": {
+          "items": {
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "reference_datetime": {
+          "type": "string"
+        },
+        "user_preferences": {
+          "additionalProperties": true,
+          "type": "object"
+        }
+      },
+      "required": [
+        "open_items",
+        "reference_datetime",
+        "followup_config"
+      ],
+      "type": "object"
+    }
+  },
+  "kind": "capability_contract",
+  "lifecycle": "active",
+  "name": "select-items-for-followup",
+  "namespace": "core",
+  "outputs": {
+    "schema": {
+      "properties": {
+        "evaluation_trace": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "reason_code": {
+          "enum": [
+            "ok",
+            "config_error"
+          ],
+          "type": "string"
+        },
+        "selected": {
+          "items": {
+            "properties": {
+              "intensity": {
+                "enum": [
+                  "soft",
+                  "direct",
+                  "escalate"
+                ],
+                "type": "string"
+              },
+              "item_id": {
+                "type": "string"
+              },
+              "reason": {
+                "type": "string"
+              },
+              "recommended_channel": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "item_id",
+              "intensity",
+              "reason"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "skipped": {
+          "items": {
+            "properties": {
+              "detail": {
+                "type": "string"
+              },
+              "item_id": {
+                "type": "string"
+              },
+              "reason": {
+                "type": "string"
+              }
+            },
+            "type": "object"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "selected",
+        "skipped",
+        "reason_code"
+      ],
+      "type": "object"
+    }
+  },
+  "owner": {
+    "contact": "founders@loop.dev",
+    "team": "loop"
+  },
+  "permissions": [
+    {
+      "id": "core.select-items-for-followup"
+    }
+  ],
+  "permitted_targets": [
+    "local",
+    "edge",
+    "browser",
+    "cloud"
+  ],
+  "policies": [
+    {
+      "id": "anti-spam-by-design"
+    }
+  ],
+  "postconditions": [
+    {
+      "description": "Identical inputs produce identical outputs",
+      "id": "deterministic"
+    }
+  ],
+  "preconditions": [],
+  "provenance": {
+    "adr_refs": [
+      "persona-council-review-2026-08-08"
+    ],
+    "author": "loop-founders + traverse-capability-author",
+    "created_at": "2026-08-08T06:20:00Z",
+    "exception_refs": [],
+    "source": "ai-assisted",
+    "spec_ref": "core.select-items-for-followup@1.1.1"
+  },
+  "schema_version": "1.0.0",
+  "service_type": "stateless",
+  "side_effects": [
+    {
+      "description": "Pure selection decision",
+      "kind": "memory_only"
+    }
+  ],
+  "state_schema": null,
+  "summary": "Decides which open action items need attention now. Council-revised with quiet hours, snooze support, per-user nudge budgets and higher escalation bar.",
+  "use_cases": [
+    {
+      "happy": true,
+      "input_example": {
+        "followup_config": {
+          "direct_days_overdue": 1,
+          "escalate_after_nudges": 3,
+          "min_pressure_for_soft": 0.4,
+          "respect_quiet_hours": true,
+          "soft_days_before_due": 2,
+          "version": "1.1"
+        },
+        "open_items": [
+          {
+            "due_date": "2026-08-08",
+            "id": "ai-1",
+            "last_activity_at": "2026-08-05T10:00:00Z",
+            "nudge_count": 0,
+            "owner_id": "user-ada",
+            "pressure_score": 0.85,
+            "snoozed_until": null,
+            "status": "open"
+          }
+        ],
+        "reference_datetime": "2026-08-07T22:30:00Z",
+        "user_preferences": {
+          "user-ada": {
+            "max_nudges_per_day": 2,
+            "nudges_sent_today": 0,
+            "quiet_hours": {
+              "end": "08:00",
+              "start": "20:00",
+              "timezone": "America/Los_Angeles"
+            }
+          }
+        }
+      },
+      "output_example": {
+        "evaluation_trace": [
+          "1 item evaluated",
+          "skipped due to quiet_hours"
+        ],
+        "reason_code": "ok",
+        "selected": [],
+        "skipped": [
+          {
+            "detail": "owner is inside quiet hours 20:00-08:00",
+            "item_id": "ai-1",
+            "reason": "quiet_hours"
+          }
+        ]
+      },
+      "persona_ref": "runtime-engineer",
+      "scenario": "As the scheduled job, I want to respect quiet hours and snooze so that we never annoy people at the wrong time."
+    },
+    {
+      "happy": true,
+      "input_example": {
+        "followup_config": {
+          "direct_days_overdue": 1,
+          "escalate_after_nudges": 3,
+          "min_pressure_for_soft": 0.4,
+          "respect_quiet_hours": true,
+          "soft_days_before_due": 2,
+          "version": "1.1"
+        },
+        "open_items": [
+          {
+            "due_date": "2026-08-01",
+            "id": "ai-9",
+            "last_activity_at": "2026-07-28T09:00:00Z",
+            "nudge_count": 3,
+            "owner_id": "user-bob",
+            "pressure_score": 0.95,
+            "snoozed_until": null,
+            "status": "open"
+          }
+        ],
+        "reference_datetime": "2026-08-07T10:00:00Z",
+        "user_preferences": {
+          "user-bob": {
+            "max_nudges_per_day": 3,
+            "nudges_sent_today": 0,
+            "quiet_hours": null
+          }
+        }
+      },
+      "output_example": {
+        "evaluation_trace": [
+          "escalation threshold met"
+        ],
+        "reason_code": "ok",
+        "selected": [
+          {
+            "intensity": "escalate",
+            "item_id": "ai-9",
+            "reason": "3 prior nudges ignored + overdue + high pressure",
+            "recommended_channel": "manager"
+          }
+        ],
+        "skipped": []
+      },
+      "persona_ref": "runtime-engineer",
+      "scenario": "As the system, I want escalation only after clear neglect signals."
+    },
+    {
+      "happy": false,
+      "input_example": {
+        "followup_config": {
+          "direct_days_overdue": 1,
+          "escalate_after_nudges": 3,
+          "min_pressure_for_soft": 0.4,
+          "respect_quiet_hours": true,
+          "soft_days_before_due": 2,
+          "version": "1.1"
+        },
+        "open_items": [],
+        "reference_datetime": "",
+        "user_preferences": {}
+      },
+      "output_example": {
+        "evaluation_trace": [
+          "required fields missing"
+        ],
+        "reason_code": "config_error",
+        "selected": [],
+        "skipped": []
+      },
+      "persona_ref": "runtime-engineer",
+      "scenario": "As the scheduled job, I want config_error when reference_datetime is empty so the run fails closed."
+    }
+  ],
+  "version": "1.1.1"
+}
