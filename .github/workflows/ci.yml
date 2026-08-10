@@ -44,6 +44,20 @@ jobs:
         with:
           fetch-depth: 0
 
+      # FR-016 / registry#168: capability_validation.py shells out to the Rust
+      # validate_event_products binary for events/**/product.json (descriptor
+      # rules stay single-sourced in traverse-registry).
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: "1.94.0"
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+
+      - name: Build event-product validator
+        run: cargo build --locked -p traverse-registry --bin validate_event_products
+
       - name: Run capability validation unit tests
         run: python3 -m unittest scripts/ci/tests/test_capability_validation.py -v
 
@@ -51,6 +65,7 @@ jobs:
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          VALIDATE_EVENT_PRODUCTS_BIN: ${{ github.workspace }}/target/debug/validate_event_products
         run: |
           if [ "${{ github.event_name }}" = "pull_request" ]; then
             python3 scripts/ci/capability_validation.py "$BASE_SHA" "$HEAD_SHA"

@@ -8,9 +8,11 @@ capability (`capability-src/catalog-builder/`) cannot walk `capabilities/`
 itself -- the governed WASM ABI only allows a single input/single output
 via `fd_read`/`fd_write`, no directory listing, no filesystem access -- so
 this plain script does the tree walk and hands the capability one JSON
-object to transform: `{"capabilities": [...], "personas": [...]}` (the
-`personas` array added for specs/017-persona-registry, decision-log entry
-53 -- same "carry the entire record" reasoning as capabilities, below).
+object to transform: `{"capabilities": [...], "personas": [...], "events": [...]}`
+(the `personas` array added for specs/017-persona-registry, decision-log entry
+53 -- same "carry the entire record" reasoning as capabilities, below; the
+`events` array added for foundation FR-016 / registry#168 so catalog-builder
+can later render ECCA event products).
 
 Mirrors scripts/ci/build_index.py's walk (every capabilities/**/contract.json,
 including deprecated versions, each carrying its own `deprecated` flag) --
@@ -161,8 +163,43 @@ def gather_personas() -> list:
     return entries
 
 
+def gather_events() -> list:
+    """Minimal FR-016 gather for catalog-builder (#160 unblock / #168).
+
+    Emits a compact `events` array (id/version/summary/publishers/subscribers/
+    exposure/lifecycle) rather than the full product.json -- enough for a later
+    catalog render without coupling this script to every ECCA additive field.
+    """
+    events_dir = Path("events")
+    entries = []
+
+    if not events_dir.is_dir():
+        return entries
+
+    for product_path in sorted(events_dir.rglob("product.json")):
+        product = json.loads(product_path.read_text())
+        contract = product.get("contract") or {}
+        entries.append(
+            {
+                "id": contract.get("id"),
+                "version": contract.get("version"),
+                "summary": contract.get("summary"),
+                "publishers": contract.get("publishers") or [],
+                "subscribers": contract.get("subscribers") or [],
+                "exposure": product.get("exposure"),
+                "lifecycle": contract.get("lifecycle"),
+            }
+        )
+
+    return entries
+
+
 def gather_catalog_data() -> dict:
-    return {"capabilities": gather_capabilities(), "personas": gather_personas()}
+    return {
+        "capabilities": gather_capabilities(),
+        "personas": gather_personas(),
+        "events": gather_events(),
+    }
 
 
 def main() -> int:
@@ -173,7 +210,11 @@ def main() -> int:
     output_path = Path(sys.argv[1])
     data = gather_catalog_data()
     output_path.write_text(json.dumps(data, indent=2) + "\n")
-    print(f"Gathered {len(data['capabilities'])} capability record(s) and {len(data['personas'])} persona record(s) at {output_path}")
+    print(
+        f"Gathered {len(data['capabilities'])} capability record(s), "
+        f"{len(data['personas'])} persona record(s), and "
+        f"{len(data['events'])} event record(s) at {output_path}"
+    )
     return 0
 
 

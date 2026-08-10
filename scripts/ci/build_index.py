@@ -37,6 +37,13 @@ the whole published record -- so each entry gets a `workflow_digest`/
 content that doesn't follow the real `workflows/<namespace>/<id>/<version>/`
 layout, the same way this script never walks `examples/applications/`.
 
+Also implements specs/001-registry-foundation/spec.md FR-016 (decision-log
+entry 56 / registry#168): an `events[]` array for ECCA event products at
+`events/<namespace>/<id>/<version>/product.json`. Like workflows, the JSON
+file is the whole published record, so each entry carries `product_digest`/
+`product_url` provenance fields (plus optional `deprecated` from a sibling
+`deprecated.json`).
+
 Usage: build_index.py <previous_index_version_or_0> <source_commit_sha> <output_path> [repo_slug]
 """
 
@@ -115,6 +122,7 @@ def build_index(previous_index_version: int, source_commit: str, repo_slug: str 
         "source_commit": source_commit,
         "capabilities": entries,
         "workflows": build_workflow_entries(source_commit, repo_slug),
+        "events": build_event_entries(source_commit, repo_slug),
     }
 
 
@@ -156,6 +164,46 @@ def build_workflow_entries(source_commit: str, repo_slug: str) -> list:
     return entries
 
 
+def build_event_entries(source_commit: str, repo_slug: str) -> list:
+    """FR-016: events[] entries analogous to workflows[] (product_digest/url)."""
+    events_dir = Path("events")
+    entries = []
+
+    if not events_dir.is_dir():
+        return entries
+
+    for product_path in sorted(events_dir.rglob("product.json")):
+        try:
+            raw_bytes = product_path.read_bytes()
+            product = json.loads(raw_bytes)
+        except Exception as exc:
+            raise IndexBuildError(
+                "index.event_product_unreadable",
+                str(product_path),
+                f"Unable to read/parse product.json: {exc}",
+            )
+
+        contract = product.get("contract") or {}
+        deprecated_path = product_path.parent / "deprecated.json"
+        deprecated = deprecated_path.is_file()
+
+        product_digest = f"sha256:{hashlib.sha256(raw_bytes).hexdigest()}"
+        product_url = f"https://raw.githubusercontent.com/{repo_slug}/{source_commit}/{product_path.as_posix()}"
+
+        entries.append(
+            {
+                "namespace": contract.get("namespace"),
+                "id": contract.get("id"),
+                "version": contract.get("version"),
+                "product_digest": product_digest,
+                "product_url": product_url,
+                "deprecated": deprecated,
+            }
+        )
+
+    return entries
+
+
 def main() -> int:
     if len(sys.argv) not in (4, 5):
         print(
@@ -177,8 +225,8 @@ def main() -> int:
 
     output_path.write_text(json.dumps(index, indent=2) + "\n")
     print(
-        f"Built index_version={index['index_version']} with {len(index['capabilities'])} capabilities "
-        f"and {len(index['workflows'])} workflows at {output_path}"
+        f"Built index_version={index['index_version']} with {len(index['capabilities'])} capabilities, "
+        f"{len(index['workflows'])} workflows, and {len(index['events'])} events at {output_path}"
     )
     return 0
 

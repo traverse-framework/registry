@@ -230,5 +230,95 @@ class BuildIndexWorkflowFR013Tests(unittest.TestCase):
             self.assertEqual(len(index["workflows"]), 1)
 
 
+def write_event_product(
+    tmp_dir: str,
+    product: dict,
+    namespace="core",
+    event_id="core.example.event-created",
+    version="1.0.0",
+) -> Path:
+    path = Path(tmp_dir) / "events" / namespace / event_id / version / "product.json"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(product))
+    return path
+
+
+def valid_event_product():
+    return {
+        "contract": {
+            "id": "core.example.event-created",
+            "namespace": "core",
+            "version": "1.0.0",
+            "summary": "Example event",
+        },
+        "exposure": "internal",
+    }
+
+
+class BuildIndexEventFR016Tests(unittest.TestCase):
+    """registry#168: events[] array, spec 001 FR-016."""
+
+    def _run_in(self, tmp_dir: str, *args, **kwargs):
+        cwd = os.getcwd()
+        os.chdir(tmp_dir)
+        try:
+            return build_index_module.build_index(*args, **kwargs)
+        finally:
+            os.chdir(cwd)
+
+    def test_entry_includes_product_digest_and_url(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = write_event_product(tmp, valid_event_product())
+            raw_bytes = path.read_bytes()
+            expected_digest = f"sha256:{hashlib.sha256(raw_bytes).hexdigest()}"
+
+            index = self._run_in(tmp, 0, "deadbeef", "traverse-framework/registry")
+
+            self.assertEqual(len(index["events"]), 1)
+            entry = index["events"][0]
+            self.assertEqual(entry["product_digest"], expected_digest)
+            self.assertEqual(
+                entry["product_url"],
+                "https://raw.githubusercontent.com/traverse-framework/registry/deadbeef/"
+                "events/core/core.example.event-created/1.0.0/product.json",
+            )
+            self.assertEqual(entry["namespace"], "core")
+            self.assertEqual(entry["id"], "core.example.event-created")
+            self.assertEqual(entry["version"], "1.0.0")
+            self.assertFalse(entry["deprecated"])
+
+    def test_deprecated_event_is_flagged(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = write_event_product(tmp, valid_event_product())
+            (path.parent / "deprecated.json").write_text(json.dumps({"reason": "test"}))
+
+            index = self._run_in(tmp, 0, "deadbeef")
+
+            self.assertEqual(len(index["events"]), 1)
+            self.assertTrue(index["events"][0]["deprecated"])
+
+    def test_unreadable_event_product_aborts_build(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "events" / "core" / "core.example.event-created" / "1.0.0" / "product.json"
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text("{ not valid json")
+
+            with self.assertRaises(build_index_module.IndexBuildError) as ctx:
+                self._run_in(tmp, 0, "deadbeef")
+            self.assertEqual(ctx.exception.code, "index.event_product_unreadable")
+
+    def test_capabilities_workflows_and_events_coexist(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            write_contract(tmp, valid_contract())
+            write_workflow(tmp, valid_workflow())
+            write_event_product(tmp, valid_event_product())
+
+            index = self._run_in(tmp, 0, "deadbeef")
+
+            self.assertEqual(len(index["capabilities"]), 1)
+            self.assertEqual(len(index["workflows"]), 1)
+            self.assertEqual(len(index["events"]), 1)
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -65,6 +65,7 @@ unusable publish at PR time instead.
 """
 
 import json
+import os
 import re
 import subprocess
 import sys
@@ -851,11 +852,12 @@ def check_workflow_capability_references(errors: list) -> None:
 
 
 def check_immutability(base_sha: str, head_sha: str, errors: list) -> None:
-    """FR: no PR may modify an existing contract.json/workflow.json once
-    published (specs/001 FR-002/FR-013, specs/005 FR-002)."""
+    """FR: no PR may modify an existing contract.json/workflow.json/product.json
+    once published (specs/001 FR-002/FR-013/FR-016, specs/005 FR-002)."""
     for governed_dir, filename, error_code in (
         ("capabilities/", "contract.json", "capabilities.contract_modified"),
         ("workflows/", "workflow.json", "workflows.workflow_modified"),
+        ("events/", "product.json", "events.product_modified"),
     ):
         diff = subprocess.check_output(
             ["git", "diff", "--name-status", f"{base_sha}...{head_sha}", "--", governed_dir],
@@ -988,6 +990,57 @@ def check_dependency_resolvability(errors: list) -> None:
                 )
 
 
+def run_event_product_validation(errors: list) -> None:
+    """FR-016: delegate ECCA event-product tree validation to the Rust binary
+    so descriptor rules stay single-sourced in traverse-registry (not
+    reimplemented in Python). Honors VALIDATE_EVENT_PRODUCTS_BIN when set
+    (CI installs a built binary); otherwise `cargo run`s the bin target.
+    """
+    events_dir = Path("events")
+    if not events_dir.is_dir():
+        return
+
+    env_bin = os.environ.get("VALIDATE_EVENT_PRODUCTS_BIN")
+    if env_bin:
+        cmd = [env_bin, "--root", str(Path.cwd())]
+    else:
+        cmd = [
+            "cargo",
+            "run",
+            "--quiet",
+            "--locked",
+            "-p",
+            "traverse-registry",
+            "--bin",
+            "validate_event_products",
+            "--",
+            "--root",
+            str(Path.cwd()),
+        ]
+
+    try:
+        result = subprocess.run(cmd, capture_output=True, text=True, check=False)
+    except FileNotFoundError as exc:
+        fail(
+            errors,
+            "events.validator_unavailable",
+            "events/",
+            f"Unable to invoke event-product validator ({exc})",
+        )
+        return
+
+    if result.returncode == 0:
+        return
+
+    detail = (result.stderr or result.stdout or "").strip()
+    fail(
+        errors,
+        "events.validation_failed",
+        "events/",
+        detail or f"validate_event_products exited {result.returncode}",
+    )
+
+
 def main() -> int:
     errors: list = []
     capabilities_dir = Path("capabilities")
@@ -1009,6 +1062,8 @@ def main() -> int:
         for workflow_path in real_workflow_paths(workflows_dir):
             validate_workflow(workflow_path, errors)
         check_workflow_capability_references(errors)
+
+    run_event_product_validation(errors)
 
     base_sha = None
     head_sha = None
