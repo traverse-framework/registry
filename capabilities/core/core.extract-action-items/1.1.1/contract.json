@@ -1,0 +1,271 @@
+{
+  "artifact": {
+    "digest": "sha256:1f815c8debd26d9f17cc895e49154e204b05b637df6d66760c59002f1ef0a503",
+    "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/core.extract-action-items-1.1.1/core-extract-action-items.wasm"
+  },
+  "connector_requirements": [],
+  "consumes": [],
+  "dependencies": [],
+  "description": "Council-improved extraction capability. Key changes from 1.0.0:\n- Higher default confidence threshold\n- Explicit 'needs_human_review' list for borderline items\n- Better rejection of vague or decision-only sentences\n- Clearer relative date resolution anchored to meeting_date\n- Returns source sentence + confidence for every candidate so the UI can show provenance\n\nStill pure and deterministic. No external model calls.\n\nImplemented and smoke-tested matrix (use_cases):\n- mixed extraction with high-confidence items and vague rejection\n- no_action_items_found for discussion-only notes\n\nKnown limitations (intentional in 1.1.1):\n- Deterministic heuristic extractor only; no external model calls",
+  "emits": [],
+  "event_trigger": null,
+  "evidence": [
+    {
+      "evidence_id": "core-extract-action-items-1.1.1-contract-validation",
+      "status": "passed",
+      "type": "contract_validation"
+    }
+  ],
+  "execution": {
+    "binary_format": "wasm",
+    "constraints": {
+      "filesystem_access": "none",
+      "host_api_access": "none",
+      "network_access": "forbidden"
+    },
+    "entrypoint": {
+      "command": "run",
+      "kind": "wasi-command"
+    },
+    "preferred_targets": [
+      "local",
+      "edge",
+      "browser"
+    ]
+  },
+  "id": "core.extract-action-items",
+  "inputs": {
+    "schema": {
+      "properties": {
+        "extraction_config": {
+          "properties": {
+            "date_parsing": {
+              "type": "string"
+            },
+            "min_confidence": {
+              "type": "number"
+            },
+            "owner_strategy": {
+              "type": "string"
+            },
+            "reject_vague": {
+              "type": "boolean"
+            },
+            "review_threshold": {
+              "type": "number"
+            },
+            "version": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "version",
+            "min_confidence"
+          ],
+          "type": "object"
+        },
+        "meeting_date": {
+          "type": "string"
+        },
+        "participants": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "text": {
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "text",
+        "extraction_config"
+      ],
+      "type": "object"
+    }
+  },
+  "kind": "capability_contract",
+  "lifecycle": "active",
+  "name": "extract-action-items",
+  "namespace": "core",
+  "outputs": {
+    "schema": {
+      "properties": {
+        "action_items": {
+          "type": "array"
+        },
+        "confidence": {
+          "type": "string"
+        },
+        "evaluation_trace": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "needs_human_review": {
+          "type": "array"
+        },
+        "reason_code": {
+          "enum": [
+            "ok",
+            "no_action_items_found"
+          ],
+          "type": "string"
+        },
+        "rejected_candidates": {
+          "type": "array"
+        }
+      },
+      "required": [
+        "action_items",
+        "needs_human_review",
+        "reason_code"
+      ],
+      "type": "object"
+    }
+  },
+  "owner": {
+    "contact": "founders@loop.dev",
+    "team": "loop"
+  },
+  "permissions": [
+    {
+      "id": "core.extract-action-items"
+    }
+  ],
+  "permitted_targets": [
+    "local",
+    "edge",
+    "browser",
+    "cloud"
+  ],
+  "policies": [
+    {
+      "id": "pure-computation-only"
+    }
+  ],
+  "postconditions": [
+    {
+      "description": "Identical inputs produce identical outputs",
+      "id": "deterministic"
+    },
+    {
+      "description": "action_items only contain items >= min_confidence",
+      "id": "confidence-gated"
+    }
+  ],
+  "preconditions": [
+    {
+      "description": "text must be non-empty",
+      "id": "text-present"
+    }
+  ],
+  "provenance": {
+    "adr_refs": [
+      "persona-council-review-2026-08-08"
+    ],
+    "author": "loop-founders + traverse-capability-author",
+    "created_at": "2026-08-08T06:20:00Z",
+    "exception_refs": [],
+    "source": "ai-assisted",
+    "spec_ref": "core.extract-action-items@1.1.1"
+  },
+  "schema_version": "1.0.0",
+  "service_type": "stateless",
+  "side_effects": [
+    {
+      "description": "Pure extraction",
+      "kind": "memory_only"
+    }
+  ],
+  "state_schema": null,
+  "summary": "Extracts clean action items from meeting notes with strict confidence gating, separate 'needs review' bucket, and improved relative-date handling. Council-revised.",
+  "use_cases": [
+    {
+      "happy": true,
+      "input_example": {
+        "extraction_config": {
+          "date_parsing": "relative_and_absolute",
+          "min_confidence": 0.75,
+          "owner_strategy": "name_match_first",
+          "reject_vague": true,
+          "review_threshold": 0.55,
+          "version": "1.1"
+        },
+        "meeting_date": "2026-08-07",
+        "participants": [
+          "Ada Lovelace",
+          "Bob Smith"
+        ],
+        "text": "Ada will send the revised proposal by Friday. We should probably look at the API at some point. Bob to review security notes next week."
+      },
+      "output_example": {
+        "action_items": [
+          {
+            "confidence": 0.93,
+            "priority_hint": "normal",
+            "source_sentence": "Ada will send the revised proposal by Friday.",
+            "suggested_due_date": "2026-08-09",
+            "suggested_owner": "Ada Lovelace",
+            "title": "Send the revised proposal"
+          },
+          {
+            "confidence": 0.88,
+            "priority_hint": "normal",
+            "source_sentence": "Bob to review security notes next week.",
+            "suggested_due_date": "2026-08-14",
+            "suggested_owner": "Bob Smith",
+            "title": "Review security notes"
+          }
+        ],
+        "evaluation_trace": [
+          "2 high-confidence items",
+          "1 borderline moved to needs_human_review"
+        ],
+        "needs_human_review": [
+          {
+            "confidence": 0.58,
+            "reason": "vague_language",
+            "source_sentence": "We should probably look at the API at some point.",
+            "title": "Look at the API"
+          }
+        ],
+        "reason_code": "ok",
+        "rejected_candidates": []
+      },
+      "persona_ref": "collaboration-product-owner",
+      "scenario": "As a team lead, I want only high-confidence action items auto-suggested and borderline ones flagged for my review."
+    },
+    {
+      "happy": false,
+      "input_example": {
+        "extraction_config": {
+          "date_parsing": "relative_and_absolute",
+          "min_confidence": 0.75,
+          "owner_strategy": "name_match_first",
+          "reject_vague": true,
+          "review_threshold": 0.55,
+          "version": "1.1"
+        },
+        "meeting_date": "2026-08-07",
+        "participants": [],
+        "text": "We had a good discussion and aligned on the direction. No specific next steps today."
+      },
+      "output_example": {
+        "action_items": [],
+        "evaluation_trace": [
+          "no sentences met action-item patterns"
+        ],
+        "needs_human_review": [],
+        "reason_code": "no_action_items_found",
+        "rejected_candidates": []
+      },
+      "persona_ref": "meeting-organizer",
+      "scenario": "As a user, I want pure discussion with no commitments to produce an empty high-confidence list."
+    }
+  ],
+  "version": "1.1.1"
+}
