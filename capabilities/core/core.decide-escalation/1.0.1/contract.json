@@ -1,0 +1,317 @@
+{
+  "artifact": {
+    "digest": "sha256:fb270f5c4ff7f7371b58cc675f66e7f469cfcdc09ce895875207079bcda97d4b",
+    "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/core.decide-escalation-1.0.1/core-decide-escalation.wasm"
+  },
+  "connector_requirements": [],
+  "consumes": [],
+  "dependencies": [],
+  "description": "Pure WF5 capability. Consumes a health snapshot (from core.aggregate-team-action-health) and applies multi-signal thresholds to decide digest vs escalate.\n\nImplemented and smoke-tested matrix (use_cases):\n- digest when only one signal is met\n- escalate when multiple signals are met\n- invalid_input when overdue_count is negative\n\nKnown limitations (intentional in 1.0.1):\n- reason_code config_error removed; the guest does not emit that code\n- Decision only; no notification delivery",
+  "emits": [],
+  "event_trigger": null,
+  "evidence": [
+    {
+      "evidence_id": "core-decide-escalation-1.0.1-contract-validation",
+      "status": "passed",
+      "type": "contract_validation"
+    }
+  ],
+  "execution": {
+    "binary_format": "wasm",
+    "constraints": {
+      "filesystem_access": "none",
+      "host_api_access": "none",
+      "network_access": "forbidden"
+    },
+    "entrypoint": {
+      "command": "run",
+      "kind": "wasi-command"
+    },
+    "preferred_targets": [
+      "local",
+      "edge",
+      "browser"
+    ]
+  },
+  "id": "core.decide-escalation",
+  "inputs": {
+    "schema": {
+      "properties": {
+        "escalation_config": {
+          "properties": {
+            "max_on_track_pct_for_escalate": {
+              "type": "number"
+            },
+            "min_overdue_for_escalate": {
+              "type": "integer"
+            },
+            "min_overloaded_owners": {
+              "type": "integer"
+            },
+            "require_multiple_signals": {
+              "type": "boolean"
+            },
+            "version": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "version"
+          ],
+          "type": "object"
+        },
+        "health": {
+          "properties": {
+            "on_track_pct": {
+              "type": "number"
+            },
+            "overdue_count": {
+              "type": "integer"
+            },
+            "overloaded_owners": {
+              "type": "array"
+            },
+            "top_pressure_items": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "total_open": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "total_open",
+            "overdue_count"
+          ],
+          "type": "object"
+        }
+      },
+      "required": [
+        "health",
+        "escalation_config"
+      ],
+      "type": "object"
+    }
+  },
+  "kind": "capability_contract",
+  "lifecycle": "active",
+  "name": "decide-escalation",
+  "namespace": "core",
+  "outputs": {
+    "schema": {
+      "properties": {
+        "decision": {
+          "enum": [
+            "escalate",
+            "digest"
+          ],
+          "type": "string"
+        },
+        "escalate_item_ids": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "evaluation_trace": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "reason_code": {
+          "enum": [
+            "ok",
+            "invalid_input"
+          ],
+          "type": "string"
+        },
+        "signals": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "signals_met": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "decision",
+        "reason_code"
+      ],
+      "type": "object"
+    }
+  },
+  "owner": {
+    "contact": "founders@loop.dev",
+    "team": "loop"
+  },
+  "permissions": [
+    {
+      "id": "core.decide-escalation"
+    }
+  ],
+  "permitted_targets": [
+    "local",
+    "edge",
+    "browser",
+    "cloud"
+  ],
+  "policies": [],
+  "postconditions": [
+    {
+      "description": "Identical inputs produce identical outputs",
+      "id": "deterministic"
+    }
+  ],
+  "preconditions": [],
+  "provenance": {
+    "adr_refs": [
+      "persona-council-review-2026-08-08"
+    ],
+    "author": "loop-founders + traverse-capability-author",
+    "created_at": "2026-08-08T06:00:00Z",
+    "exception_refs": [],
+    "source": "ai-assisted",
+    "spec_ref": "core.decide-escalation@1.0.1"
+  },
+  "schema_version": "1.0.0",
+  "service_type": "stateless",
+  "side_effects": [
+    {
+      "description": "Pure escalation decision",
+      "kind": "memory_only"
+    }
+  ],
+  "state_schema": null,
+  "summary": "Decides escalate vs weekly digest from team action health, with a deliberately high bar.",
+  "use_cases": [
+    {
+      "happy": true,
+      "input_example": {
+        "escalation_config": {
+          "max_on_track_pct_for_escalate": 50.0,
+          "min_overdue_for_escalate": 2,
+          "min_overloaded_owners": 1,
+          "require_multiple_signals": true,
+          "version": "1.0"
+        },
+        "health": {
+          "on_track_pct": 66.6,
+          "overdue_count": 1,
+          "overloaded_owners": [
+            {
+              "open_count": 2,
+              "owner_id": "user-ada"
+            }
+          ],
+          "top_pressure_items": [
+            "ai-3",
+            "ai-1"
+          ],
+          "total_open": 3
+        }
+      },
+      "output_example": {
+        "decision": "digest",
+        "escalate_item_ids": [],
+        "evaluation_trace": [
+          "signals_met=1",
+          "require_multiple=true",
+          "decision=digest"
+        ],
+        "reason_code": "ok",
+        "signals": [
+          "overloaded_owners"
+        ],
+        "signals_met": 1
+      },
+      "persona_ref": "collaboration-product-owner",
+      "scenario": "As a manager experience, I want a single overdue item to stay in digest when other signals are calm."
+    },
+    {
+      "happy": true,
+      "input_example": {
+        "escalation_config": {
+          "max_on_track_pct_for_escalate": 50.0,
+          "min_overdue_for_escalate": 2,
+          "min_overloaded_owners": 2,
+          "require_multiple_signals": true,
+          "version": "1.0"
+        },
+        "health": {
+          "on_track_pct": 40.0,
+          "overdue_count": 3,
+          "overloaded_owners": [
+            {
+              "open_count": 3,
+              "owner_id": "user-ada"
+            },
+            {
+              "open_count": 2,
+              "owner_id": "user-bob"
+            }
+          ],
+          "top_pressure_items": [
+            "ai-9",
+            "ai-7"
+          ],
+          "total_open": 5
+        }
+      },
+      "output_example": {
+        "decision": "escalate",
+        "escalate_item_ids": [
+          "ai-9",
+          "ai-7"
+        ],
+        "evaluation_trace": [
+          "signals_met=3",
+          "require_multiple=true",
+          "decision=escalate"
+        ],
+        "reason_code": "ok",
+        "signals": [
+          "overdue_count",
+          "overloaded_owners",
+          "on_track_pct"
+        ],
+        "signals_met": 3
+      },
+      "persona_ref": "runtime-engineer",
+      "scenario": "As the system, I want real-time escalation only when multiple health signals fire."
+    },
+    {
+      "happy": false,
+      "input_example": {
+        "escalation_config": {
+          "min_overdue_for_escalate": 2,
+          "min_overloaded_owners": 1,
+          "require_multiple_signals": true,
+          "version": "1.0"
+        },
+        "health": {
+          "on_track_pct": 66.6,
+          "overdue_count": -1,
+          "overloaded_owners": [],
+          "top_pressure_items": [],
+          "total_open": 3
+        }
+      },
+      "output_example": {
+        "decision": "digest",
+        "escalate_item_ids": [],
+        "evaluation_trace": [],
+        "reason_code": "invalid_input",
+        "signals": [],
+        "signals_met": 0
+      },
+      "persona_ref": "runtime-engineer",
+      "scenario": "As WF5, I want invalid_input when overdue_count is negative."
+    }
+  ],
+  "version": "1.0.1"
+}
