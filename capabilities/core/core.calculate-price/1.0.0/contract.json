@@ -1,0 +1,468 @@
+{
+  "artifact": {
+    "digest": "sha256:a046e5d001ae78b8de339d40378e2c22f04384d601a1b801b52cf99a3e44f0b2",
+    "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/core.calculate-price-1.0.0/core-calculate-price.wasm"
+  },
+  "connector_requirements": [],
+  "consumes": [],
+  "dependencies": [],
+  "description": "core.calculate-price is a pure, side-effect-free pricing capability designed for maximum reusability across e-commerce, SaaS billing, booking engines, B2B quoting and subscription systems.\n\nIt deliberately separates pricing rules from evaluation. The caller supplies a complete, versioned pricing configuration (currency, rounding mode, discount rules, tax rules) at invocation time. The same WASM binary can therefore enforce completely different commercial models without recompilation.\n\nKey design principles (Persona-Council reviewed):\n- Pure arithmetic + rule evaluation only. No external tax or catalog services.\n- Fully deterministic: identical inputs always produce identical outputs.\n- Fail-closed on invalid quantities, negative prices or malformed configuration.\n- Explicit ordering and stacking behaviour for discounts.\n- Tax calculated on the post-discount taxable base (configurable).\n- Full audit trail: every applied rule, intermediate amounts and a config hash.\n- Multi-currency aware with explicit rounding mode.\n\nThe capability never mutates state and never contacts external systems. All decision logic lives inside the supplied configuration + the deterministic evaluator.\n\nKnown intentional limitations (disclosed):\n- Does not fetch live FX rates or remote tax jurisdiction data – those must be resolved by the caller and passed in the configuration or context.\n- Complex percentage-of-percentage discount interactions are limited to the ordered stack defined in the config to keep behaviour predictable.\n- Not a full CPQ (Configure-Price-Quote) engine; it assumes line items are already selected.",
+  "emits": [],
+  "event_trigger": null,
+  "evidence": [],
+  "execution": {
+    "binary_format": "wasm",
+    "constraints": {
+      "filesystem_access": "none",
+      "host_api_access": "none",
+      "network_access": "forbidden"
+    },
+    "entrypoint": {
+      "command": "run",
+      "kind": "wasi-command"
+    },
+    "preferred_targets": [
+      "local",
+      "edge",
+      "browser"
+    ]
+  },
+  "id": "core.calculate-price",
+  "inputs": {
+    "schema": {
+      "additionalProperties": false,
+      "properties": {
+        "context": {
+          "additionalProperties": true,
+          "default": {},
+          "type": "object"
+        },
+        "currency": {
+          "description": "ISO 4217 currency code",
+          "maxLength": 3,
+          "minLength": 3,
+          "type": "string"
+        },
+        "customer": {
+          "additionalProperties": false,
+          "properties": {
+            "attributes": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "id": {
+              "type": "string"
+            }
+          },
+          "type": "object"
+        },
+        "lines": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "attributes": {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              "id": {
+                "type": "string"
+              },
+              "quantity": {
+                "exclusiveMinimum": 0,
+                "type": "number"
+              },
+              "sku": {
+                "type": "string"
+              },
+              "tax_code": {
+                "type": "string"
+              },
+              "unit_price": {
+                "minimum": 0,
+                "type": "number"
+              }
+            },
+            "required": [
+              "id",
+              "sku",
+              "quantity",
+              "unit_price"
+            ],
+            "type": "object"
+          },
+          "minItems": 1,
+          "type": "array"
+        },
+        "pricing_config": {
+          "additionalProperties": false,
+          "properties": {
+            "currency": {
+              "type": "string"
+            },
+            "decimal_places": {
+              "maximum": 6,
+              "minimum": 0,
+              "type": "integer"
+            },
+            "discount_rules": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "applies_to": {
+                    "items": {
+                      "type": "string"
+                    },
+                    "type": "array"
+                  },
+                  "conditions": {
+                    "additionalProperties": true,
+                    "type": "object"
+                  },
+                  "id": {
+                    "type": "string"
+                  },
+                  "priority": {
+                    "type": "integer"
+                  },
+                  "stackable": {
+                    "default": true,
+                    "type": "boolean"
+                  },
+                  "type": {
+                    "enum": [
+                      "percentage",
+                      "fixed"
+                    ],
+                    "type": "string"
+                  },
+                  "value": {
+                    "minimum": 0,
+                    "type": "number"
+                  }
+                },
+                "required": [
+                  "id",
+                  "priority",
+                  "type",
+                  "value"
+                ],
+                "type": "object"
+              },
+              "type": "array"
+            },
+            "rounding": {
+              "enum": [
+                "half_up",
+                "half_down",
+                "half_even",
+                "floor",
+                "ceiling"
+              ],
+              "type": "string"
+            },
+            "tax_rules": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "inclusive": {
+                    "default": false,
+                    "type": "boolean"
+                  },
+                  "rate": {
+                    "minimum": 0,
+                    "type": "number"
+                  },
+                  "tax_code": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "id",
+                  "tax_code",
+                  "rate"
+                ],
+                "type": "object"
+              },
+              "type": "array"
+            },
+            "version": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "version",
+            "currency",
+            "rounding",
+            "decimal_places",
+            "discount_rules",
+            "tax_rules"
+          ],
+          "type": "object"
+        }
+      },
+      "required": [
+        "currency",
+        "lines",
+        "pricing_config"
+      ],
+      "type": "object"
+    }
+  },
+  "kind": "capability_contract",
+  "lifecycle": "active",
+  "name": "calculate-price",
+  "namespace": "core",
+  "outputs": {
+    "schema": {
+      "additionalProperties": false,
+      "properties": {
+        "applied_rules": {
+          "items": {
+            "properties": {
+              "amount": {
+                "type": "number"
+              },
+              "rule_id": {
+                "type": "string"
+              },
+              "type": {
+                "enum": [
+                  "discount",
+                  "tax"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "rule_id",
+              "type",
+              "amount"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "confidence": {
+          "enum": [
+            "high",
+            "medium",
+            "low"
+          ],
+          "type": "string"
+        },
+        "config_hash": {
+          "description": "Deterministic hash of the pricing_config for audit correlation",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "currency": {
+          "type": "string"
+        },
+        "evaluation_trace": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "lines": {
+          "items": {
+            "properties": {
+              "applied_discounts": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "applied_taxes": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "discount_amount": {
+                "type": "number"
+              },
+              "gross": {
+                "type": "number"
+              },
+              "id": {
+                "type": "string"
+              },
+              "net": {
+                "type": "number"
+              },
+              "quantity": {
+                "type": "number"
+              },
+              "sku": {
+                "type": "string"
+              },
+              "tax_amount": {
+                "type": "number"
+              },
+              "taxable_base": {
+                "type": "number"
+              },
+              "unit_price": {
+                "type": "number"
+              }
+            },
+            "required": [
+              "id",
+              "sku",
+              "quantity",
+              "unit_price",
+              "gross",
+              "discount_amount",
+              "taxable_base",
+              "tax_amount",
+              "net",
+              "applied_discounts",
+              "applied_taxes"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "reason_code": {
+          "enum": [
+            "ok",
+            "invalid_quantity",
+            "invalid_unit_price",
+            "invalid_config",
+            "currency_mismatch",
+            "empty_cart",
+            "calculation_error"
+          ],
+          "type": "string"
+        },
+        "totals": {
+          "properties": {
+            "discount_total": {
+              "type": "number"
+            },
+            "gross": {
+              "type": "number"
+            },
+            "net": {
+              "type": "number"
+            },
+            "tax_total": {
+              "type": "number"
+            },
+            "taxable_base": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "gross",
+            "discount_total",
+            "taxable_base",
+            "tax_total",
+            "net"
+          ],
+          "type": "object"
+        }
+      },
+      "required": [
+        "currency",
+        "lines",
+        "totals",
+        "applied_rules",
+        "evaluation_trace",
+        "reason_code",
+        "confidence"
+      ],
+      "type": "object"
+    }
+  },
+  "owner": {
+    "contact": "capability-authors@traverse-framework.com",
+    "team": "traverse-core"
+  },
+  "permissions": [
+    {
+      "id": "core.calculate-price"
+    }
+  ],
+  "permitted_targets": [
+    "local",
+    "edge",
+    "browser",
+    "cloud"
+  ],
+  "policies": [
+    {
+      "id": "fail-closed-on-invalid-input"
+    },
+    {
+      "id": "pure-computation-only"
+    }
+  ],
+  "postconditions": [
+    {
+      "description": "Identical inputs always produce identical outputs",
+      "id": "deterministic"
+    },
+    {
+      "description": "Sum of line nets equals totals.net (within rounding tolerance)",
+      "id": "totals-consistent"
+    },
+    {
+      "description": "evaluation_trace is always populated",
+      "id": "trace-always-present"
+    },
+    {
+      "description": "A machine-readable reason_code is always present",
+      "id": "reason-code-always-present"
+    }
+  ],
+  "preconditions": [
+    {
+      "description": "At least one line item must be present",
+      "id": "lines-not-empty"
+    },
+    {
+      "description": "Every line.quantity must be > 0",
+      "id": "quantity-positive"
+    },
+    {
+      "description": "Every line.unit_price must be >= 0",
+      "id": "unit-price-non-negative"
+    },
+    {
+      "description": "pricing_config must contain version, currency, rounding, decimal_places, discount_rules and tax_rules",
+      "id": "pricing-config-valid"
+    },
+    {
+      "description": "Top-level currency must match pricing_config.currency",
+      "id": "currency-consistent"
+    }
+  ],
+  "provenance": {
+    "adr_refs": [
+      "persona-council-review-2026-08-08"
+    ],
+    "author": "loop-founders + traverse-capability-author",
+    "created_at": "2026-08-08T05:50:00Z",
+    "exception_refs": [],
+    "source": "ai-assisted",
+    "spec_ref": "core.calculate-price@1.0.0"
+  },
+  "schema_version": "1.0.0",
+  "service_type": "stateless",
+  "side_effects": [
+    {
+      "description": "Pure computation. No network, filesystem or host state is accessed or mutated.",
+      "kind": "memory_only"
+    }
+  ],
+  "state_schema": null,
+  "summary": "Deterministic price/quote engine. Given line items, quantities, customer context and a versioned pricing configuration, returns unit prices, discounts, taxes and totals with an audit trail.",
+  "version": "1.0.0"
+}
