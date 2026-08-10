@@ -1,0 +1,232 @@
+{
+  "artifact": {
+    "digest": "sha256:31e61af5ac0b328b22a0328c6c8d56228496fe39134dcc45e093b41f1457e64b",
+    "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/core.aggregate-team-action-health-1.0.1/core-aggregate-team-action-health.wasm"
+  },
+  "connector_requirements": [],
+  "consumes": [],
+  "dependencies": [],
+  "description": "Pure aggregation capability used by the Manager Visibility workflow. Returns a compact health snapshot that can be rendered in a dashboard or weekly digest.\n\nImplemented and smoke-tested matrix (use_cases):\n- team pulse aggregation with overloaded owners and top pressure items\n- invalid_input when reference_date is empty\n\nKnown limitations (intentional in 1.0.1):\n- Aggregation is memory-only; no persistence or notification side effects",
+  "emits": [],
+  "event_trigger": null,
+  "evidence": [
+    {
+      "evidence_id": "core-aggregate-team-action-health-1.0.1-contract-validation",
+      "status": "passed",
+      "type": "contract_validation"
+    }
+  ],
+  "execution": {
+    "binary_format": "wasm",
+    "constraints": {
+      "filesystem_access": "none",
+      "host_api_access": "none",
+      "network_access": "forbidden"
+    },
+    "entrypoint": {
+      "command": "run",
+      "kind": "wasi-command"
+    },
+    "preferred_targets": [
+      "local",
+      "edge",
+      "browser"
+    ]
+  },
+  "id": "core.aggregate-team-action-health",
+  "inputs": {
+    "schema": {
+      "properties": {
+        "aggregation_config": {
+          "required": [
+            "version"
+          ],
+          "type": "object"
+        },
+        "items": {
+          "items": {
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "reference_date": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "items",
+        "reference_date",
+        "aggregation_config"
+      ],
+      "type": "object"
+    }
+  },
+  "kind": "capability_contract",
+  "lifecycle": "active",
+  "name": "aggregate-team-action-health",
+  "namespace": "core",
+  "outputs": {
+    "schema": {
+      "properties": {
+        "evaluation_trace": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "on_track_pct": {
+          "type": "number"
+        },
+        "overdue_count": {
+          "type": "integer"
+        },
+        "overloaded_owners": {
+          "type": "array"
+        },
+        "reason_code": {
+          "enum": [
+            "ok",
+            "invalid_input"
+          ],
+          "type": "string"
+        },
+        "top_pressure_items": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "total_open": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "total_open",
+        "reason_code"
+      ],
+      "type": "object"
+    }
+  },
+  "owner": {
+    "contact": "founders@loop.dev",
+    "team": "loop"
+  },
+  "permissions": [
+    {
+      "id": "core.aggregate-team-action-health"
+    }
+  ],
+  "permitted_targets": [
+    "local",
+    "edge",
+    "browser",
+    "cloud"
+  ],
+  "policies": [],
+  "postconditions": [
+    {
+      "description": "Identical inputs produce identical outputs",
+      "id": "deterministic"
+    }
+  ],
+  "preconditions": [],
+  "provenance": {
+    "adr_refs": [
+      "persona-council-review-2026-08-08"
+    ],
+    "author": "loop-founders + traverse-capability-author",
+    "created_at": "2026-08-08T06:00:00Z",
+    "exception_refs": [],
+    "source": "ai-assisted",
+    "spec_ref": "core.aggregate-team-action-health@1.0.1"
+  },
+  "schema_version": "1.0.0",
+  "service_type": "stateless",
+  "side_effects": [
+    {
+      "description": "Pure aggregation",
+      "kind": "memory_only"
+    }
+  ],
+  "state_schema": null,
+  "summary": "Aggregates open action items of a team into a health summary for managers (on-track %, overdue, overloaded owners, top pressure items).",
+  "use_cases": [
+    {
+      "happy": true,
+      "input_example": {
+        "aggregation_config": {
+          "overdue_threshold_days": 0,
+          "version": "1.0"
+        },
+        "items": [
+          {
+            "due_date": "2026-08-08",
+            "id": "ai-1",
+            "owner_id": "user-ada",
+            "pressure_score": 0.9,
+            "status": "open"
+          },
+          {
+            "due_date": "2026-08-15",
+            "id": "ai-2",
+            "owner_id": "user-ada",
+            "pressure_score": 0.3,
+            "status": "in_progress"
+          },
+          {
+            "due_date": "2026-08-01",
+            "id": "ai-3",
+            "owner_id": "user-bob",
+            "pressure_score": 0.95,
+            "status": "open"
+          }
+        ],
+        "reference_date": "2026-08-07"
+      },
+      "output_example": {
+        "evaluation_trace": [
+          "aggregated 3 items"
+        ],
+        "on_track_pct": 33.3,
+        "overdue_count": 1,
+        "overloaded_owners": [
+          {
+            "open_count": 2,
+            "owner_id": "user-ada"
+          }
+        ],
+        "reason_code": "ok",
+        "top_pressure_items": [
+          "ai-3",
+          "ai-1"
+        ],
+        "total_open": 3
+      },
+      "persona_ref": "collaboration-product-owner",
+      "scenario": "As a manager, I want a quick pulse of my team's action items."
+    },
+    {
+      "happy": false,
+      "input_example": {
+        "aggregation_config": {
+          "overdue_threshold_days": 0,
+          "version": "1.0"
+        },
+        "items": [],
+        "reference_date": ""
+      },
+      "output_example": {
+        "evaluation_trace": [],
+        "on_track_pct": 0,
+        "overdue_count": 0,
+        "overloaded_owners": [],
+        "reason_code": "invalid_input",
+        "top_pressure_items": [],
+        "total_open": 0
+      },
+      "persona_ref": "runtime-engineer",
+      "scenario": "As a workflow author, I want invalid_input when reference_date is empty so bad schedules fail closed."
+    }
+  ],
+  "version": "1.0.1"
+}
