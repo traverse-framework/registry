@@ -1,0 +1,323 @@
+{
+  "artifact": {
+    "digest": "sha256:167022884613fde17404f9cada73d3bcc8e9da38a93c926f09a6d41c46b5cf28",
+    "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/core.evaluate-completion-quality-1.0.1/core-evaluate-completion-quality.wasm"
+  },
+  "connector_requirements": [],
+  "consumes": [],
+  "dependencies": [],
+  "description": "Pure WF4 capability. Evaluates completion_note length and evidence_refs against pressure_score and config. High-pressure completions without evidence return needs_evidence.\n\nImplemented and smoke-tested matrix (use_cases):\n- pass with evidence under high pressure\n- needs_evidence verdict when evidence is missing under high pressure\n- invalid_status when status is not done/completed\n- invalid_input when item.id is empty\n\nKnown limitations (intentional in 1.0.1):\n- reason_code config_error removed; the guest does not emit that code\n- Evidence quality is presence-only; content is not validated",
+  "emits": [],
+  "event_trigger": null,
+  "evidence": [
+    {
+      "evidence_id": "core-evaluate-completion-quality-1.0.1-contract-validation",
+      "status": "passed",
+      "type": "contract_validation"
+    }
+  ],
+  "execution": {
+    "binary_format": "wasm",
+    "constraints": {
+      "filesystem_access": "none",
+      "host_api_access": "none",
+      "network_access": "forbidden"
+    },
+    "entrypoint": {
+      "command": "run",
+      "kind": "wasi-command"
+    },
+    "preferred_targets": [
+      "local",
+      "edge",
+      "browser"
+    ]
+  },
+  "id": "core.evaluate-completion-quality",
+  "inputs": {
+    "schema": {
+      "properties": {
+        "item": {
+          "properties": {
+            "completion_note": {
+              "type": "string"
+            },
+            "evidence_refs": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "id": {
+              "type": "string"
+            },
+            "pressure_score": {
+              "type": "number"
+            },
+            "status": {
+              "type": "string"
+            },
+            "title": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "id",
+            "status"
+          ],
+          "type": "object"
+        },
+        "quality_config": {
+          "properties": {
+            "high_pressure_threshold": {
+              "type": "number"
+            },
+            "min_note_length": {
+              "type": "integer"
+            },
+            "require_evidence_when_high_pressure": {
+              "type": "boolean"
+            },
+            "version": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "version"
+          ],
+          "type": "object"
+        }
+      },
+      "required": [
+        "item",
+        "quality_config"
+      ],
+      "type": "object"
+    }
+  },
+  "kind": "capability_contract",
+  "lifecycle": "active",
+  "name": "evaluate-completion-quality",
+  "namespace": "core",
+  "outputs": {
+    "schema": {
+      "properties": {
+        "evaluation_trace": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "gaps": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "item_id": {
+          "type": "string"
+        },
+        "quality_score": {
+          "type": "number"
+        },
+        "reason_code": {
+          "enum": [
+            "ok",
+            "invalid_status",
+            "invalid_input"
+          ],
+          "type": "string"
+        },
+        "verdict": {
+          "enum": [
+            "pass",
+            "needs_evidence",
+            "fail"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "quality_score",
+        "verdict",
+        "reason_code"
+      ],
+      "type": "object"
+    }
+  },
+  "owner": {
+    "contact": "founders@loop.dev",
+    "team": "loop"
+  },
+  "permissions": [
+    {
+      "id": "core.evaluate-completion-quality"
+    }
+  ],
+  "permitted_targets": [
+    "local",
+    "edge",
+    "browser",
+    "cloud"
+  ],
+  "policies": [],
+  "postconditions": [
+    {
+      "description": "Identical inputs produce identical outputs",
+      "id": "deterministic"
+    }
+  ],
+  "preconditions": [],
+  "provenance": {
+    "adr_refs": [
+      "persona-council-review-2026-08-08"
+    ],
+    "author": "loop-founders + traverse-capability-author",
+    "created_at": "2026-08-08T06:00:00Z",
+    "exception_refs": [],
+    "source": "ai-assisted",
+    "spec_ref": "core.evaluate-completion-quality@1.0.1"
+  },
+  "schema_version": "1.0.0",
+  "service_type": "stateless",
+  "side_effects": [
+    {
+      "description": "Pure quality evaluation",
+      "kind": "memory_only"
+    }
+  ],
+  "state_schema": null,
+  "summary": "Scores completion quality for a done action item, with a stronger evidence bar under high pressure.",
+  "use_cases": [
+    {
+      "happy": true,
+      "input_example": {
+        "item": {
+          "completion_note": "Sent revised proposal to stakeholders",
+          "evidence_refs": [
+            "doc-123"
+          ],
+          "id": "ai-1",
+          "pressure_score": 0.9,
+          "status": "done",
+          "title": "Send the revised proposal"
+        },
+        "quality_config": {
+          "high_pressure_threshold": 0.7,
+          "min_note_length": 8,
+          "require_evidence_when_high_pressure": true,
+          "version": "1.0"
+        }
+      },
+      "output_example": {
+        "evaluation_trace": [
+          "high_pressure=true",
+          "evidence=1",
+          "note_len=37"
+        ],
+        "gaps": [],
+        "item_id": "ai-1",
+        "quality_score": 1.0,
+        "reason_code": "ok",
+        "verdict": "pass"
+      },
+      "persona_ref": "collaboration-product-owner",
+      "scenario": "As the completion path, I want a high-pressure item with evidence to pass."
+    },
+    {
+      "happy": true,
+      "input_example": {
+        "item": {
+          "completion_note": "done",
+          "evidence_refs": [],
+          "id": "ai-2",
+          "pressure_score": 0.95,
+          "status": "done",
+          "title": "Fix production bug"
+        },
+        "quality_config": {
+          "high_pressure_threshold": 0.7,
+          "min_note_length": 8,
+          "require_evidence_when_high_pressure": true,
+          "version": "1.0"
+        }
+      },
+      "output_example": {
+        "evaluation_trace": [
+          "high_pressure=true",
+          "evidence=0",
+          "note_len=4"
+        ],
+        "gaps": [
+          "short_note",
+          "missing_evidence"
+        ],
+        "item_id": "ai-2",
+        "quality_score": 0.0,
+        "reason_code": "ok",
+        "verdict": "needs_evidence"
+      },
+      "persona_ref": "runtime-engineer",
+      "scenario": "As the system, I want high-pressure completions without evidence to fail closed."
+    },
+    {
+      "happy": false,
+      "input_example": {
+        "item": {
+          "completion_note": "still working",
+          "evidence_refs": [],
+          "id": "ai-1",
+          "pressure_score": 0.5,
+          "status": "open",
+          "title": "X"
+        },
+        "quality_config": {
+          "high_pressure_threshold": 0.7,
+          "min_note_length": 8,
+          "require_evidence_when_high_pressure": true,
+          "version": "1.0"
+        }
+      },
+      "output_example": {
+        "evaluation_trace": [],
+        "gaps": [],
+        "item_id": "ai-1",
+        "quality_score": 0,
+        "reason_code": "invalid_status",
+        "verdict": "fail"
+      },
+      "persona_ref": "runtime-engineer",
+      "scenario": "As WF4, I want invalid_status when the item is not marked done/completed."
+    },
+    {
+      "happy": false,
+      "input_example": {
+        "item": {
+          "completion_note": "done enough",
+          "evidence_refs": [],
+          "id": "",
+          "pressure_score": 0.5,
+          "status": "done",
+          "title": "X"
+        },
+        "quality_config": {
+          "high_pressure_threshold": 0.7,
+          "min_note_length": 8,
+          "require_evidence_when_high_pressure": true,
+          "version": "1.0"
+        }
+      },
+      "output_example": {
+        "evaluation_trace": [],
+        "gaps": [],
+        "item_id": "",
+        "quality_score": 0,
+        "reason_code": "invalid_input",
+        "verdict": "fail"
+      },
+      "persona_ref": "runtime-engineer",
+      "scenario": "As WF4, I want invalid_input when item.id is empty."
+    }
+  ],
+  "version": "1.0.1"
+}
