@@ -1,0 +1,288 @@
+{
+  "artifact": {
+    "digest": "sha256:13c7612cfe4b5c23d261b392deb1136897242ab9562023abe9ea440197eebfff",
+    "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/core.generate-nudge-message-1.0.1/core-generate-nudge-message.wasm"
+  },
+  "connector_requirements": [],
+  "consumes": [],
+  "dependencies": [],
+  "description": "Pure message generation. Takes item details + intensity + tone configuration and returns a ready-to-send message body plus subject/preview. No delivery occurs inside the capability.\n\nImplemented and smoke-tested matrix (use_cases):\n- soft + friendly tone reminder\n- escalate + direct tone escalation message\n- direct + neutral tone request\n- config_error when item.title is empty\n\nKnown limitations (intentional in 1.0.1):\n- reason_code invalid_intensity removed from the declared surface; intensity is a schema enum so host validation rejects unknown values before the guest runs\n- Delivery / sending is out of scope; callers must send the returned message",
+  "emits": [],
+  "event_trigger": null,
+  "evidence": [
+    {
+      "evidence_id": "core-generate-nudge-message-1.0.1-contract-validation",
+      "status": "passed",
+      "type": "contract_validation"
+    }
+  ],
+  "execution": {
+    "binary_format": "wasm",
+    "constraints": {
+      "filesystem_access": "none",
+      "host_api_access": "none",
+      "network_access": "forbidden"
+    },
+    "entrypoint": {
+      "command": "run",
+      "kind": "wasi-command"
+    },
+    "preferred_targets": [
+      "local",
+      "edge",
+      "browser"
+    ]
+  },
+  "id": "core.generate-nudge-message",
+  "inputs": {
+    "schema": {
+      "properties": {
+        "intensity": {
+          "enum": [
+            "soft",
+            "direct",
+            "escalate"
+          ],
+          "type": "string"
+        },
+        "item": {
+          "type": "object"
+        },
+        "message_config": {
+          "properties": {
+            "include_due_date": {
+              "type": "boolean"
+            },
+            "language": {
+              "type": "string"
+            },
+            "tone": {
+              "enum": [
+                "friendly",
+                "neutral",
+                "direct"
+              ],
+              "type": "string"
+            },
+            "version": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "version"
+          ],
+          "type": "object"
+        }
+      },
+      "required": [
+        "item",
+        "intensity",
+        "message_config"
+      ],
+      "type": "object"
+    }
+  },
+  "kind": "capability_contract",
+  "lifecycle": "active",
+  "name": "generate-nudge-message",
+  "namespace": "core",
+  "outputs": {
+    "schema": {
+      "properties": {
+        "evaluation_trace": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "message": {
+          "type": "string"
+        },
+        "preview": {
+          "type": "string"
+        },
+        "reason_code": {
+          "enum": [
+            "ok",
+            "config_error"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "message",
+        "reason_code"
+      ],
+      "type": "object"
+    }
+  },
+  "owner": {
+    "contact": "founders@loop.dev",
+    "team": "loop"
+  },
+  "permissions": [
+    {
+      "id": "core.generate-nudge-message"
+    }
+  ],
+  "permitted_targets": [
+    "local",
+    "edge",
+    "browser",
+    "cloud"
+  ],
+  "policies": [],
+  "postconditions": [
+    {
+      "description": "Identical inputs produce identical outputs",
+      "id": "deterministic"
+    }
+  ],
+  "preconditions": [],
+  "provenance": {
+    "adr_refs": [
+      "persona-council-review-2026-08-08"
+    ],
+    "author": "loop-founders + traverse-capability-author",
+    "created_at": "2026-08-08T06:00:00Z",
+    "exception_refs": [],
+    "source": "ai-assisted",
+    "spec_ref": "core.generate-nudge-message@1.0.1"
+  },
+  "schema_version": "1.0.0",
+  "service_type": "stateless",
+  "side_effects": [
+    {
+      "description": "Pure generation",
+      "kind": "memory_only"
+    }
+  ],
+  "state_schema": null,
+  "summary": "Generates a short, human, context-aware nudge message for an action item at a given intensity.",
+  "use_cases": [
+    {
+      "happy": true,
+      "input_example": {
+        "intensity": "soft",
+        "item": {
+          "due_date": "2026-08-09",
+          "id": "ai-1",
+          "nudge_count": 0,
+          "owner_name": "Ada",
+          "status": "open",
+          "title": "Send the revised proposal"
+        },
+        "message_config": {
+          "include_due_date": true,
+          "language": "en",
+          "tone": "friendly",
+          "version": "1.0"
+        }
+      },
+      "output_example": {
+        "evaluation_trace": [
+          "intensity=soft",
+          "tone=friendly"
+        ],
+        "message": "Hey Ada — friendly reminder that “Send the revised proposal” is due tomorrow. Let us know if you need anything!",
+        "preview": "Reminder: Send the revised proposal",
+        "reason_code": "ok"
+      },
+      "persona_ref": "runtime-engineer",
+      "scenario": "As the follow-up engine, I want a soft reminder that feels helpful rather than nagging."
+    },
+    {
+      "happy": true,
+      "input_example": {
+        "intensity": "escalate",
+        "item": {
+          "due_date": "2026-08-01",
+          "id": "ai-9",
+          "nudge_count": 3,
+          "owner_name": "Bob",
+          "status": "open",
+          "title": "Close security review"
+        },
+        "message_config": {
+          "include_due_date": true,
+          "language": "en",
+          "tone": "direct",
+          "version": "1.0"
+        }
+      },
+      "output_example": {
+        "evaluation_trace": [
+          "intensity=escalate",
+          "tone=direct"
+        ],
+        "message": "Escalation: \"Close security review\" still needs attention from Bob (due 2026-08-01).",
+        "preview": "Reminder: Close security review",
+        "reason_code": "ok"
+      },
+      "persona_ref": "collaboration-product-owner",
+      "scenario": "As the follow-up engine, I want an escalate-intensity message when an item has been ignored repeatedly."
+    },
+    {
+      "happy": true,
+      "input_example": {
+        "intensity": "direct",
+        "item": {
+          "due_date": "2026-08-12",
+          "id": "ai-2",
+          "nudge_count": 1,
+          "owner_name": "Ada",
+          "status": "open",
+          "title": "Ship docs"
+        },
+        "message_config": {
+          "include_due_date": true,
+          "language": "en",
+          "tone": "neutral",
+          "version": "1.0"
+        }
+      },
+      "output_example": {
+        "evaluation_trace": [
+          "intensity=direct",
+          "tone=neutral"
+        ],
+        "message": "Ada: Please complete \"Ship docs\" by 2026-08-12.",
+        "preview": "Reminder: Ship docs",
+        "reason_code": "ok"
+      },
+      "persona_ref": "runtime-engineer",
+      "scenario": "As the follow-up engine, I want a direct, neutral reminder when soft nudges are insufficient."
+    },
+    {
+      "happy": false,
+      "input_example": {
+        "intensity": "soft",
+        "item": {
+          "due_date": "2026-08-09",
+          "id": "ai-x",
+          "nudge_count": 0,
+          "owner_name": "Ada",
+          "status": "open",
+          "title": ""
+        },
+        "message_config": {
+          "include_due_date": true,
+          "language": "en",
+          "tone": "friendly",
+          "version": "1.0"
+        }
+      },
+      "output_example": {
+        "evaluation_trace": [
+          "item.title required"
+        ],
+        "message": "",
+        "preview": "",
+        "reason_code": "config_error"
+      },
+      "persona_ref": "runtime-engineer",
+      "scenario": "As the follow-up engine, I want a config_error when the item title is missing so I can skip generation."
+    }
+  ],
+  "version": "1.0.1"
+}
