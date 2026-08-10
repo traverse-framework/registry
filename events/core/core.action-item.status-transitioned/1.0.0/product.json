@@ -1,0 +1,102 @@
+{
+  "contract": {
+    "kind": "event_contract",
+    "schema_version": "1.0.0",
+    "id": "core.action-item.status-transitioned",
+    "namespace": "core",
+    "name": "status-transitioned",
+    "version": "1.0.0",
+    "lifecycle": "active",
+    "owner": {
+      "team": "loop",
+      "contact": "founders@loop.dev"
+    },
+    "summary": "Published when an action item's status has transitioned.",
+    "description": "Governed domain event emitted when core.transition-action-status accepts a status change. Carries the action item identity, prior and new status, and the actor who requested the transition so independent consumers can react without re-querying the capability.",
+    "payload": {
+      "schema": {
+        "type": "object",
+        "required": [
+          "action_item_id",
+          "from_status",
+          "to_status",
+          "actor_id"
+        ],
+        "properties": {
+          "action_item_id": {
+            "type": "string"
+          },
+          "from_status": {
+            "type": "string"
+          },
+          "to_status": {
+            "type": "string"
+          },
+          "actor_id": {
+            "type": "string"
+          }
+        }
+      },
+      "compatibility": "backward-compatible"
+    },
+    "classification": {
+      "domain": "core.action-item",
+      "bounded_context": "action-items",
+      "event_type": "domain",
+      "tags": [
+        "action-items",
+        "status"
+      ]
+    },
+    "publishers": [
+      {
+        "capability_id": "core.transition-action-status",
+        "version": "1.1.0"
+      }
+    ],
+    "subscribers": [],
+    "policies": [
+      {
+        "id": "default-action-item-event-safety"
+      }
+    ],
+    "tags": [
+      "action-items",
+      "status"
+    ],
+    "provenance": {
+      "source": "greenfield",
+      "author": "loop",
+      "created_at": "2026-08-10T00:00:00Z"
+    },
+    "evidence": []
+  },
+  "support_route": "https://support.traverse.dev/events/core.action-item.status-transitioned",
+  "exposure": "internal",
+  "field_classifications": [
+    {
+      "field_path": "action_item_id",
+      "classification": "none"
+    },
+    {
+      "field_path": "from_status",
+      "classification": "none"
+    },
+    {
+      "field_path": "to_status",
+      "classification": "none"
+    },
+    {
+      "field_path": "actor_id",
+      "classification": "personal"
+    }
+  ],
+  "replacement": null,
+  "cloud_events_source": "traverse://capability/core.transition-action-status",
+  "cloud_events_subject_field": "action_item_id",
+  "deduplication_id_field": "envelope.id",
+  "ordering_scope_field": "action_item_id",
+  "correlation_id_field": "envelope.correlation_id",
+  "causation_id_field": null,
+  "retention_policy": "retain 90 days"
+}

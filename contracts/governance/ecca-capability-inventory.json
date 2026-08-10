@@ -3,85 +3,311 @@
   "schema_version": "1.0.0",
   "governing_spec": "534-ecca-event-products@1.0.0",
   "governing_issue": "traverse-framework/registry#170",
-  "generated_at": "2026-08-05T00:00:00Z",
-  "scope_note": "Covers this repository's own real published capabilities (capabilities/*/*/*/contract.json). traverse-framework/traverse#899's own inventory (contracts/governance/ecca-capability-inventory.json in that repo) covers a different, unrelated set of artifacts under that repo's contracts/examples/ and contracts/inference/ trees -- despite some capability_id values coincidentally matching, they are not the same content and #899 does not satisfy Spec 534 FR-020 for this repository's catalog.",
+  "generated_at": "2026-08-10T00:00:00Z",
+  "scope_note": "Covers this repository's own real published capabilities (capabilities/*/*/*/contract.json). traverse-framework/traverse#899's own inventory (contracts/governance/ecca-capability-inventory.json in that repo) covers a different, unrelated set of artifacts under that repo's contracts/examples/ and contracts/inference/ trees -- despite some capability_id values coincidentally matching, they are not the same content and #899 does not satisfy Spec 534 FR-020 for this repository's catalog. Extended 2026-08-10 for registry#168 to include all core.* capabilities and the first governed event product.",
   "capabilities": [
     {
       "capability_id": "doc-approval.analyze",
-      "published_versions": ["1.0.0", "1.0.1", "1.1.0", "1.2.0", "1.3.0", "1.3.1"],
+      "published_versions": [
+        "1.0.0",
+        "1.0.1",
+        "1.1.0",
+        "1.2.0",
+        "1.3.0",
+        "1.3.1"
+      ],
       "path": "capabilities/doc-approval/doc-approval.analyze/1.3.1/contract.json",
       "classification": "no-event-required",
       "evidence": "side_effects=[memory_only] across every published version; empty emits/consumes; result returns directly to the caller with no asynchronous domain fact broadcast to independent consumers."
     },
     {
       "capability_id": "doc-approval.recommend",
-      "published_versions": ["1.0.0", "1.0.1", "1.1.0", "1.2.0", "1.2.1"],
+      "published_versions": [
+        "1.0.0",
+        "1.0.1",
+        "1.1.0",
+        "1.2.0",
+        "1.2.1"
+      ],
       "path": "capabilities/doc-approval/doc-approval.recommend/1.2.1/contract.json",
       "classification": "no-event-required",
       "evidence": "side_effects=[memory_only] across every published version; empty emits/consumes; result returns directly to the caller with no asynchronous domain fact broadcast to independent consumers."
     },
     {
       "capability_id": "formatting.format-currency",
-      "published_versions": ["1.0.0", "1.1.0", "1.1.1"],
+      "published_versions": [
+        "1.0.0",
+        "1.1.0",
+        "1.1.1"
+      ],
       "path": "capabilities/formatting/formatting.format-currency/1.1.1/contract.json",
       "classification": "no-event-required",
       "evidence": "side_effects=[memory_only] across every published version; empty emits/consumes; a pure formatting function with no externally meaningful asynchronous effect."
     },
     {
       "capability_id": "meeting-notes.process",
-      "published_versions": ["1.0.0", "1.0.1", "1.1.0", "1.2.0", "1.3.0", "1.3.1"],
+      "published_versions": [
+        "1.0.0",
+        "1.0.1",
+        "1.1.0",
+        "1.2.0",
+        "1.3.0",
+        "1.3.1"
+      ],
       "path": "capabilities/meeting-notes/meeting-notes.process/1.3.1/contract.json",
       "classification": "no-event-required",
       "evidence": "side_effects=[memory_only] across every published version; empty emits/consumes; result returns directly to the caller with no asynchronous domain fact broadcast to independent consumers."
     },
     {
       "capability_id": "traverse-starter.process",
-      "published_versions": ["1.0.0", "1.0.1", "1.1.0", "1.2.0", "1.2.1"],
+      "published_versions": [
+        "1.0.0",
+        "1.0.1",
+        "1.1.0",
+        "1.2.0",
+        "1.2.1"
+      ],
       "path": "capabilities/traverse-starter/traverse-starter.process/1.2.1/contract.json",
       "classification": "no-event-required",
       "evidence": "side_effects=[memory_only] across every published version; empty emits/consumes; result returns directly to the caller with no asynchronous domain fact broadcast to independent consumers."
     },
     {
       "capability_id": "traverse-starter.summarize",
-      "published_versions": ["1.0.0", "1.0.1", "1.1.0", "1.2.0", "1.2.1"],
+      "published_versions": [
+        "1.0.0",
+        "1.0.1",
+        "1.1.0",
+        "1.2.0",
+        "1.2.1"
+      ],
       "path": "capabilities/traverse-starter/traverse-starter.summarize/1.2.1/contract.json",
       "classification": "no-event-required",
       "evidence": "side_effects=[memory_only] across every published version; empty emits/consumes; result returns directly to the caller with no asynchronous domain fact broadcast to independent consumers."
     },
     {
       "capability_id": "traverse-starter.validate",
-      "published_versions": ["1.0.0", "1.0.1", "1.1.0", "1.2.0", "1.2.1"],
+      "published_versions": [
+        "1.0.0",
+        "1.0.1",
+        "1.1.0",
+        "1.2.0",
+        "1.2.1"
+      ],
       "path": "capabilities/traverse-starter/traverse-starter.validate/1.2.1/contract.json",
       "classification": "no-event-required",
       "evidence": "side_effects=[memory_only] across every published version; empty emits/consumes; result returns directly to the caller with no asynchronous domain fact broadcast to independent consumers."
     },
     {
       "capability_id": "validation.normalize-phone-number",
-      "published_versions": ["1.0.0", "1.1.0", "1.2.0", "1.2.1"],
+      "published_versions": [
+        "1.0.0",
+        "1.1.0",
+        "1.2.0",
+        "1.2.1"
+      ],
       "path": "capabilities/validation/validation.normalize-phone-number/1.2.1/contract.json",
       "classification": "no-event-required",
       "evidence": "side_effects=[memory_only] across every published version; empty emits/consumes; a pure validation function with no externally meaningful asynchronous effect."
     },
     {
       "capability_id": "validation.score-password-strength",
-      "published_versions": ["1.0.0", "1.1.0", "1.1.1"],
+      "published_versions": [
+        "1.0.0",
+        "1.1.0",
+        "1.1.1"
+      ],
       "path": "capabilities/validation/validation.score-password-strength/1.1.1/contract.json",
       "classification": "no-event-required",
       "evidence": "side_effects=[memory_only] across every published version; empty emits/consumes; a pure validation function with no externally meaningful asynchronous effect."
     },
     {
       "capability_id": "validation.validate-email",
-      "published_versions": ["1.0.0", "1.1.0", "1.2.0", "1.2.1"],
+      "published_versions": [
+        "1.0.0",
+        "1.1.0",
+        "1.2.0",
+        "1.2.1"
+      ],
       "path": "capabilities/validation/validation.validate-email/1.2.1/contract.json",
       "classification": "no-event-required",
       "evidence": "side_effects=[memory_only] across every published version; empty emits/consumes; a pure validation function with no externally meaningful asynchronous effect."
     },
     {
       "capability_id": "validation.validate-luhn",
-      "published_versions": ["1.0.0", "1.1.0", "1.1.1"],
+      "published_versions": [
+        "1.0.0",
+        "1.1.0",
+        "1.1.1"
+      ],
       "path": "capabilities/validation/validation.validate-luhn/1.1.1/contract.json",
       "classification": "no-event-required",
       "evidence": "side_effects=[memory_only] across every published version; empty emits/consumes; a pure validation function with no externally meaningful asynchronous effect."
+    },
+    {
+      "capability_id": "core.aggregate-team-action-health",
+      "published_versions": [
+        "1.0.0",
+        "1.1.0"
+      ],
+      "path": "capabilities/core/core.aggregate-team-action-health/1.1.0/contract.json",
+      "classification": "no-event-required",
+      "evidence": "side_effects=[memory_only] across every published version; empty emits/consumes; result returns directly to the caller with no asynchronous domain fact broadcast to independent consumers."
+    },
+    {
+      "capability_id": "core.assign-ownership",
+      "published_versions": [
+        "1.0.0",
+        "1.1.0"
+      ],
+      "path": "capabilities/core/core.assign-ownership/1.1.0/contract.json",
+      "classification": "no-event-required",
+      "evidence": "side_effects=[memory_only] across every published version; empty emits/consumes; result returns directly to the caller with no asynchronous domain fact broadcast to independent consumers."
+    },
+    {
+      "capability_id": "core.authorize",
+      "published_versions": [
+        "1.0.0",
+        "1.2.0"
+      ],
+      "path": "capabilities/core/core.authorize/1.2.0/contract.json",
+      "classification": "no-event-required",
+      "evidence": "side_effects=[memory_only] across every published version; empty emits/consumes; result returns directly to the caller with no asynchronous domain fact broadcast to independent consumers."
+    },
+    {
+      "capability_id": "core.calculate-deadline-pressure",
+      "published_versions": [
+        "1.0.0",
+        "1.1.0"
+      ],
+      "path": "capabilities/core/core.calculate-deadline-pressure/1.1.0/contract.json",
+      "classification": "no-event-required",
+      "evidence": "side_effects=[memory_only] across every published version; empty emits/consumes; result returns directly to the caller with no asynchronous domain fact broadcast to independent consumers."
+    },
+    {
+      "capability_id": "core.calculate-price",
+      "published_versions": [
+        "1.0.0",
+        "1.1.0"
+      ],
+      "path": "capabilities/core/core.calculate-price/1.1.0/contract.json",
+      "classification": "no-event-required",
+      "evidence": "side_effects=[memory_only] across every published version; empty emits/consumes; result returns directly to the caller with no asynchronous domain fact broadcast to independent consumers."
+    },
+    {
+      "capability_id": "core.decide-escalation",
+      "published_versions": [
+        "1.0.0",
+        "1.1.0"
+      ],
+      "path": "capabilities/core/core.decide-escalation/1.1.0/contract.json",
+      "classification": "no-event-required",
+      "evidence": "side_effects=[memory_only] across every published version; empty emits/consumes; result returns directly to the caller with no asynchronous domain fact broadcast to independent consumers."
+    },
+    {
+      "capability_id": "core.evaluate-completion-quality",
+      "published_versions": [
+        "1.0.0",
+        "1.1.0"
+      ],
+      "path": "capabilities/core/core.evaluate-completion-quality/1.1.0/contract.json",
+      "classification": "no-event-required",
+      "evidence": "side_effects=[memory_only] across every published version; empty emits/consumes; result returns directly to the caller with no asynchronous domain fact broadcast to independent consumers."
+    },
+    {
+      "capability_id": "core.extract-action-items",
+      "published_versions": [
+        "1.1.0",
+        "1.2.0"
+      ],
+      "path": "capabilities/core/core.extract-action-items/1.2.0/contract.json",
+      "classification": "no-event-required",
+      "evidence": "side_effects=[memory_only] across every published version; empty emits/consumes; result returns directly to the caller with no asynchronous domain fact broadcast to independent consumers."
+    },
+    {
+      "capability_id": "core.generate-nudge-message",
+      "published_versions": [
+        "1.0.0",
+        "1.1.0"
+      ],
+      "path": "capabilities/core/core.generate-nudge-message/1.1.0/contract.json",
+      "classification": "no-event-required",
+      "evidence": "side_effects=[memory_only] across every published version; empty emits/consumes; result returns directly to the caller with no asynchronous domain fact broadcast to independent consumers."
+    },
+    {
+      "capability_id": "core.normalize-participants",
+      "published_versions": [
+        "1.0.0",
+        "1.1.0"
+      ],
+      "path": "capabilities/core/core.normalize-participants/1.1.0/contract.json",
+      "classification": "no-event-required",
+      "evidence": "side_effects=[memory_only] across every published version; empty emits/consumes; result returns directly to the caller with no asynchronous domain fact broadcast to independent consumers."
+    },
+    {
+      "capability_id": "core.notify-stakeholders",
+      "published_versions": [
+        "1.0.0",
+        "1.1.0"
+      ],
+      "path": "capabilities/core/core.notify-stakeholders/1.1.0/contract.json",
+      "classification": "no-event-required",
+      "evidence": "side_effects=[memory_only] across every published version; empty emits/consumes; result returns directly to the caller with no asynchronous domain fact broadcast to independent consumers."
+    },
+    {
+      "capability_id": "core.process-comment",
+      "published_versions": [
+        "1.0.0",
+        "1.0.1",
+        "1.1.0"
+      ],
+      "path": "capabilities/core/core.process-comment/1.1.0/contract.json",
+      "classification": "no-event-required",
+      "evidence": "side_effects=[memory_only] across every published version; empty emits/consumes; result returns directly to the caller with no asynchronous domain fact broadcast to independent consumers."
+    },
+    {
+      "capability_id": "core.record-nudge-event",
+      "published_versions": [
+        "1.0.0",
+        "1.1.0"
+      ],
+      "path": "capabilities/core/core.record-nudge-event/1.1.0/contract.json",
+      "classification": "no-event-required",
+      "evidence": "side_effects=[memory_only] across every published version; empty emits/consumes; result returns directly to the caller with no asynchronous domain fact broadcast to independent consumers."
+    },
+    {
+      "capability_id": "core.select-items-for-followup",
+      "published_versions": [
+        "1.1.0",
+        "1.2.0"
+      ],
+      "path": "capabilities/core/core.select-items-for-followup/1.2.0/contract.json",
+      "classification": "no-event-required",
+      "evidence": "side_effects=[memory_only] across every published version; empty emits/consumes; result returns directly to the caller with no asynchronous domain fact broadcast to independent consumers."
+    },
+    {
+      "capability_id": "core.transition-action-status",
+      "published_versions": [
+        "1.0.0",
+        "1.1.0"
+      ],
+      "path": "capabilities/core/core.transition-action-status/1.1.0/contract.json",
+      "classification": "governed-event-declared",
+      "event_product": {
+        "event_id": "core.action-item.status-transitioned",
+        "version": "1.0.0",
+        "path": "events/core/core.action-item.status-transitioned/1.0.0/product.json"
+      },
+      "evidence": "Status transitions are domain facts independent consumers may observe. Governed event product core.action-item.status-transitioned@1.0.0 is published with this capability as publisher (registry#168). Published contract versions still carry empty emits[] (immutable); a future honesty bump may declare the emit on the capability contract itself."
+    },
+    {
+      "capability_id": "core.validate-action-item",
+      "published_versions": [
+        "1.0.0",
+        "1.1.0"
+      ],
+      "path": "capabilities/core/core.validate-action-item/1.1.0/contract.json",
+      "classification": "no-event-required",
+      "evidence": "side_effects=[memory_only] across every published version; empty emits/consumes; result returns directly to the caller with no asynchronous domain fact broadcast to independent consumers."
     }
   ]
 }

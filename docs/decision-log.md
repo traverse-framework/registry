@@ -273,6 +273,10 @@ No FR text changed -- this is scope-clarifying, not requirement-changing (FR-002
 
 **Tracked by**: registry `#215`; traverse `#1040` / Decision 58.
 
+56. **ECCA event-product publish path unblocked by owner demand (2026-08-10)**: registry `#168` originally recommended deferring a real `events/` tree + CI + index wire-up until organic capability demand appeared (library APIs in `traverse-registry` already existed under specs 012/016; nothing published real event content). Owner demand + Traverse handoff (`traverse#896`, capabilities ready) unblocked building the missing publish pipeline now rather than waiting: amend foundation **FR-016** for `events/<namespace>/<id>/<version>/product.json` and index `events[]`, add Rust `validate_event_products` CI binary (calling `validate_event_product_descriptor`), extend `build_index.py` / `gather_catalog_data.py`, publish the first real event product `core.action-item.status-transitioned@1.0.0` (publisher `core.transition-action-status@1.1.0`), and extend the FR-020 inventory with all `core.*` capabilities. Full catalog SPA UI for events remains `#160` follow-up.
+
+**Execution boundary**: publish path + first event + inventory/index/gather only. Does not change `traverse-contracts`, does not build `#160` catalog UI beyond gather data, and does not rewrite published capability `emits` arrays in place (immutable); inventory marks `core.transition-action-status` as `governed-event-declared` pointing at the new event.
+
 ## What Was Explicitly Deferred, Not Decided
 
 - ~~The exact schema field names/types for `owner`/`namespace` (reserved conceptually, not yet finalized in code)~~ — finalized 2026-07-06 in `specs/006-public-scope-and-identity` (Draft): `namespace` = string equal to the path segment; `owner` = the `traverse-contracts` `Owner` object shape

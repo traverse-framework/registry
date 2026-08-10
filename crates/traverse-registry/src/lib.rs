@@ -5,6 +5,7 @@ mod async_api;
 mod bundle;
 pub mod dependency_resolver;
 mod event_products;
+mod event_product_tree;
 mod events;
 mod federation;
 mod graph;
@@ -24,6 +25,7 @@ pub use dependency_resolver::{
     lookup_lock_record, resolve_dependencies, verify_lock_digests,
 };
 pub use event_products::*;
+pub use event_product_tree::*;
 pub use events::*;
 pub use federation::*;
 pub use graph::*;
