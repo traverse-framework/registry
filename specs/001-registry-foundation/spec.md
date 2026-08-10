@@ -3,7 +3,8 @@
 **Feature Branch**: `001-registry-foundation`
 **Created**: 2026-07-03
 **Status**: Approved
-**Input**: Brainstorm session establishing `traverse-framework/registry` as the public capability registry for Traverse, extracted from `traverse-framework/traverse`'s `crates/traverse-registry`. Full narrative record: `docs/decision-log.md`. Companion migration record: `traverse-framework/traverse` `specs/051-registry-extraction/spec.md`.
+**Version**: 1.1.0
+**Input**: Brainstorm session establishing `traverse-framework/registry` as the public capability registry for Traverse, extracted from `traverse-framework/traverse`'s `crates/traverse-registry`. Full narrative record: `docs/decision-log.md`. Companion migration record: `traverse-framework/traverse` `specs/051-registry-extraction/spec.md`. FR-011 amended 2026-08-10 (Decision 55 / traverse Decision 58): `use_cases` MUST for newly ADDED or CHANGED contracts with full schema surface coverage.
 
 ## Purpose
 
