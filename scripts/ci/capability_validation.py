@@ -43,6 +43,16 @@ inputs.schema.properties.action.enum, every enum value must appear as
 use_cases[].input_example.action for at least one use case. Diff-based for
 the same immutability reason as scenario/persona_ref checks.
 
+Also enforces specs/001-registry-foundation FR-011 (amended, decision-log
+entry 55 / traverse Decision 58 / Spec 102 v1.1, registry#215): every newly
+ADDED or CHANGED contract.json MUST carry a non-empty use_cases array that
+covers the declared schema surface -- every string enum under
+inputs.schema.properties (recursive), every top-level
+inputs.schema.required property, and every outputs.schema
+reason_code/status string enum value. Diff-based so already-published
+immutable versions that predate (or were stripped of) use_cases are never
+re-judged; correcting them requires an honesty patch-bump (new version).
+
 Also enforces specs/001-registry-foundation FR-007 and
 specs/007-artifact-hosting FR-001 (registry#187): a newly-ADDED
 contract.json MUST include artifact.digest (sha256:…) and artifact.url
@@ -499,6 +509,183 @@ def check_new_contracts_action_enum_coverage(base_sha: str, head_sha: str, error
             check_new_action_enum_covered_by_use_cases(Path(path), errors)
 
 
+def _collect_string_enums(schema_node: dict, path_prefix: tuple) -> list:
+    """Collect (path_tuple, [string enum values]) under a JSON Schema node.
+
+    Recurses through properties and through items.properties for array
+    object schemas. Array segments are marked with the literal '[]' so
+    example lookup can expand list elements at that path.
+    """
+    found = []
+    if not isinstance(schema_node, dict):
+        return found
+    properties = schema_node.get("properties")
+    if not isinstance(properties, dict):
+        return found
+    for name, prop_schema in properties.items():
+        if not isinstance(prop_schema, dict):
+            continue
+        path = path_prefix + (name,)
+        enum_values = prop_schema.get("enum")
+        if isinstance(enum_values, list):
+            strings = [value for value in enum_values if isinstance(value, str)]
+            if strings:
+                found.append((path, strings))
+        if isinstance(prop_schema.get("properties"), dict):
+            found.extend(_collect_string_enums(prop_schema, path))
+        items = prop_schema.get("items")
+        if isinstance(items, dict) and isinstance(items.get("properties"), dict):
+            found.extend(_collect_string_enums(items, path + ("[]",)))
+    return found
+
+
+def _example_values_at_path(example, path: tuple) -> list:
+    """Return concrete values found at path in an example object, expanding arrays."""
+    current = [example]
+    for segment in path:
+        next_current = []
+        for node in current:
+            if segment == "[]":
+                if isinstance(node, list):
+                    next_current.extend(node)
+                continue
+            if isinstance(node, dict) and segment in node:
+                next_current.append(node[segment])
+        current = next_current
+    return current
+
+
+def check_new_use_cases_surface_coverage(path: Path, errors: list) -> None:
+    """spec 001 FR-011 (decision-log entry 55) / traverse Spec 102 FR-001–FR-004:
+    a newly ADDED or CHANGED contract.json must have non-empty use_cases that
+    cover input string enums (recursive), top-level required input properties,
+    and output reason_code/status string enums.
+    """
+    try:
+        contract = json.loads(path.read_text())
+    except Exception:
+        return
+
+    use_cases = contract.get("use_cases")
+    if not isinstance(use_cases, list) or not use_cases:
+        fail(
+            errors,
+            "contract.missing_use_cases",
+            str(path),
+            "newly ADDED/CHANGED contract.json must include a non-empty "
+            "use_cases array covering the declared schema surface "
+            "(spec 001 FR-011 / traverse Spec 102-contract-surface-coverage FR-004)",
+        )
+        return
+
+    input_examples = []
+    output_examples = []
+    for use_case in use_cases:
+        if not isinstance(use_case, dict):
+            continue
+        input_example = use_case.get("input_example")
+        if isinstance(input_example, dict):
+            input_examples.append(input_example)
+        output_example = use_case.get("output_example")
+        if isinstance(output_example, dict):
+            output_examples.append(output_example)
+
+    input_schema = contract.get("inputs", {}).get("schema")
+    if isinstance(input_schema, dict):
+        for enum_path, enum_values in _collect_string_enums(input_schema, ()):
+            covered = set()
+            for example in input_examples:
+                for value in _example_values_at_path(example, enum_path):
+                    if isinstance(value, str):
+                        covered.add(value)
+            uncovered = [value for value in enum_values if value not in covered]
+            if uncovered:
+                path_label = ".".join(enum_path)
+                fail(
+                    errors,
+                    "contract.input_enum_uncovered_by_use_cases",
+                    str(path),
+                    f"inputs.schema property '{path_label}' enum values lack "
+                    "covering use_cases[].input_example: "
+                    + ", ".join(uncovered)
+                    + " (traverse Spec 102-contract-surface-coverage FR-001)",
+                )
+
+        required = input_schema.get("required")
+        if isinstance(required, list):
+            missing_required = []
+            for prop_name in required:
+                if not isinstance(prop_name, str):
+                    continue
+                covered = False
+                for example in input_examples:
+                    if prop_name in example and example[prop_name] is not None:
+                        covered = True
+                        break
+                if not covered:
+                    missing_required.append(prop_name)
+            if missing_required:
+                fail(
+                    errors,
+                    "contract.required_input_uncovered_by_use_cases",
+                    str(path),
+                    "inputs.schema.required properties lack covering "
+                    "use_cases[].input_example: "
+                    + ", ".join(missing_required)
+                    + " (traverse Spec 102-contract-surface-coverage FR-002)",
+                )
+
+    output_properties = (
+        contract.get("outputs", {})
+        .get("schema", {})
+        .get("properties")
+    )
+    if isinstance(output_properties, dict):
+        for field_name in ("reason_code", "status"):
+            field_schema = output_properties.get(field_name)
+            if not isinstance(field_schema, dict):
+                continue
+            enum_values = field_schema.get("enum")
+            if not isinstance(enum_values, list):
+                continue
+            declared = [value for value in enum_values if isinstance(value, str)]
+            if not declared:
+                continue
+            covered = set()
+            for example in output_examples:
+                value = example.get(field_name)
+                if isinstance(value, str):
+                    covered.add(value)
+            uncovered = [value for value in declared if value not in covered]
+            if uncovered:
+                fail(
+                    errors,
+                    "contract.output_enum_uncovered_by_use_cases",
+                    str(path),
+                    f"outputs.schema.properties.{field_name}.enum values lack "
+                    "covering use_cases[].output_example: "
+                    + ", ".join(uncovered)
+                    + " (traverse Spec 102-contract-surface-coverage FR-003)",
+                )
+
+
+def check_new_contracts_use_cases_surface_coverage(base_sha: str, head_sha: str, errors: list) -> None:
+    """Only validates newly ADDED or CHANGED contract.json files in this PR's
+    diff -- older immutable publishes may predate Spec 102 / FR-011 surface
+    coverage (decision-log entry 55)."""
+    diff = subprocess.check_output(
+        ["git", "diff", "--name-status", f"{base_sha}...{head_sha}", "--", "capabilities/"],
+        text=True,
+    )
+    for line in diff.splitlines():
+        if not line.strip():
+            continue
+        parts = line.split("\t")
+        status, path = parts[0], parts[-1]
+        if path.endswith("contract.json") and (status == "A" or status.startswith("M")):
+            check_new_use_cases_surface_coverage(Path(path), errors)
+
+
 def check_new_contract_artifact_reference(path: Path, errors: list) -> None:
     """spec 001 FR-007 / spec 007 FR-001 / registry#187: a newly-added
     contract.json must carry a fetchable artifact reference. Deliberately
@@ -842,6 +1029,10 @@ def main() -> int:
             fail(errors, "git.diff_failed", "capabilities/", f"Unable to compute diff: {exc}")
         try:
             check_new_contracts_action_enum_coverage(base_sha, head_sha, errors)
+        except subprocess.CalledProcessError as exc:
+            fail(errors, "git.diff_failed", "capabilities/", f"Unable to compute diff: {exc}")
+        try:
+            check_new_contracts_use_cases_surface_coverage(base_sha, head_sha, errors)
         except subprocess.CalledProcessError as exc:
             fail(errors, "git.diff_failed", "capabilities/", f"Unable to compute diff: {exc}")
         try:

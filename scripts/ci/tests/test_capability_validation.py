@@ -312,7 +312,10 @@ class CheckNewScenarioFormatTests(unittest.TestCase):
             codes = [e["code"] for e in errors]
             self.assertIn("contract.scenario_not_user_story", codes)
 
-    def test_contract_without_use_cases_is_not_flagged(self):
+    def test_contract_without_use_cases_is_not_flagged_by_scenario_format(self):
+        """Scenario-format check stays silent when use_cases is absent;
+        surface-coverage (decision-log entry 55 / #215) is what fails
+        closed on missing use_cases for ADDED/CHANGED contracts."""
         with tempfile.TemporaryDirectory() as tmp:
             path = write_contract(tmp, valid_contract())
             errors: list = []
@@ -501,7 +504,10 @@ class CheckNewUseCasePersonaRefTests(unittest.TestCase):
             codes = [e["code"] for e in errors]
             self.assertIn("contract.use_case_persona_ref_unresolvable", codes)
 
-    def test_contract_without_use_cases_is_not_flagged(self):
+    def test_contract_without_use_cases_is_not_flagged_by_persona_ref(self):
+        """persona_ref check stays silent when use_cases is absent;
+        surface-coverage (decision-log entry 55 / #215) is what fails
+        closed on missing use_cases for ADDED/CHANGED contracts."""
         with tempfile.TemporaryDirectory() as tmp:
             path = write_contract(tmp, valid_contract())
             errors: list = []
@@ -575,6 +581,215 @@ class CheckNewActionEnumCoverageTests(unittest.TestCase):
             capability_validation.check_new_action_enum_covered_by_use_cases(path, errors)
             codes = [e["code"] for e in errors]
             self.assertIn("contract.action_enum_non_string", codes)
+
+
+def write_surface_coverage_contract(
+    tmp_dir: str,
+    *,
+    use_cases,
+    input_schema=None,
+    output_schema=None,
+) -> Path:
+    contract = valid_contract()
+    if input_schema is not None:
+        contract["inputs"] = {"schema": input_schema}
+    if output_schema is not None:
+        contract["outputs"] = {"schema": output_schema}
+    if use_cases is not None:
+        contract["use_cases"] = use_cases
+    return write_contract(tmp_dir, contract)
+
+
+class CheckNewUseCasesSurfaceCoverageTests(unittest.TestCase):
+    """check_new_use_cases_surface_coverage implements decision-log entry 55 /
+    registry#215 / traverse Spec 102 FR-001–FR-004 for newly ADDED/CHANGED
+    contracts. Diff-based wrapper is check_new_contracts_use_cases_surface_coverage."""
+
+    def test_contract_without_use_cases_is_flagged(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = write_contract(tmp, valid_contract())
+            errors: list = []
+            capability_validation.check_new_use_cases_surface_coverage(path, errors)
+            codes = [e["code"] for e in errors]
+            self.assertIn("contract.missing_use_cases", codes)
+
+    def test_empty_use_cases_is_flagged(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = write_surface_coverage_contract(tmp, use_cases=[])
+            errors: list = []
+            capability_validation.check_new_use_cases_surface_coverage(path, errors)
+            codes = [e["code"] for e in errors]
+            self.assertIn("contract.missing_use_cases", codes)
+
+    def test_full_surface_coverage_passes(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = write_surface_coverage_contract(
+                tmp,
+                input_schema={
+                    "type": "object",
+                    "required": ["action", "message_config"],
+                    "properties": {
+                        "action": {"type": "string", "enum": ["create", "edit"]},
+                        "message_config": {
+                            "type": "object",
+                            "properties": {
+                                "tone": {
+                                    "type": "string",
+                                    "enum": ["friendly", "direct"],
+                                }
+                            },
+                        },
+                    },
+                },
+                output_schema={
+                    "type": "object",
+                    "properties": {
+                        "reason_code": {
+                            "type": "string",
+                            "enum": ["ok", "invalid_input"],
+                        },
+                        "status": {"type": "string", "enum": ["accepted", "rejected"]},
+                    },
+                },
+                use_cases=[
+                    {
+                        "scenario": "As a developer, I want to create, so that coverage holds.",
+                        "input_example": {
+                            "action": "create",
+                            "message_config": {"tone": "friendly"},
+                        },
+                        "output_example": {
+                            "reason_code": "ok",
+                            "status": "accepted",
+                        },
+                        "happy": True,
+                    },
+                    {
+                        "scenario": "As a developer, I want to edit, so that coverage holds.",
+                        "input_example": {
+                            "action": "edit",
+                            "message_config": {"tone": "direct"},
+                        },
+                        "output_example": {
+                            "reason_code": "invalid_input",
+                            "status": "rejected",
+                        },
+                        "happy": False,
+                    },
+                ],
+            )
+            errors: list = []
+            capability_validation.check_new_use_cases_surface_coverage(path, errors)
+            self.assertEqual(errors, [])
+
+    def test_uncovered_nested_input_enum_is_rejected(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = write_surface_coverage_contract(
+                tmp,
+                input_schema={
+                    "properties": {
+                        "message_config": {
+                            "type": "object",
+                            "properties": {
+                                "tone": {
+                                    "type": "string",
+                                    "enum": ["friendly", "direct"],
+                                }
+                            },
+                        }
+                    }
+                },
+                use_cases=[
+                    {
+                        "scenario": "As a developer, I want friendly tone, so that coverage holds.",
+                        "input_example": {"message_config": {"tone": "friendly"}},
+                        "output_example": {"ok": True},
+                        "happy": True,
+                    }
+                ],
+            )
+            errors: list = []
+            capability_validation.check_new_use_cases_surface_coverage(path, errors)
+            codes = [e["code"] for e in errors]
+            self.assertIn("contract.input_enum_uncovered_by_use_cases", codes)
+            self.assertTrue(any("direct" in e["message"] for e in errors))
+
+    def test_uncovered_required_input_is_rejected(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = write_surface_coverage_contract(
+                tmp,
+                input_schema={
+                    "required": ["action", "title"],
+                    "properties": {
+                        "action": {"type": "string", "enum": ["create"]},
+                        "title": {"type": "string"},
+                    },
+                },
+                use_cases=[
+                    {
+                        "scenario": "As a developer, I want to create, so that coverage holds.",
+                        "input_example": {"action": "create"},
+                        "output_example": {"ok": True},
+                        "happy": True,
+                    }
+                ],
+            )
+            errors: list = []
+            capability_validation.check_new_use_cases_surface_coverage(path, errors)
+            codes = [e["code"] for e in errors]
+            self.assertIn("contract.required_input_uncovered_by_use_cases", codes)
+            self.assertTrue(any("title" in e["message"] for e in errors))
+
+    def test_uncovered_output_reason_code_enum_is_rejected(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = write_surface_coverage_contract(
+                tmp,
+                output_schema={
+                    "properties": {
+                        "reason_code": {
+                            "type": "string",
+                            "enum": ["ok", "invalid_input"],
+                        }
+                    }
+                },
+                use_cases=[
+                    {
+                        "scenario": "As a developer, I want success, so that coverage holds.",
+                        "input_example": {},
+                        "output_example": {"reason_code": "ok"},
+                        "happy": True,
+                    }
+                ],
+            )
+            errors: list = []
+            capability_validation.check_new_use_cases_surface_coverage(path, errors)
+            codes = [e["code"] for e in errors]
+            self.assertIn("contract.output_enum_uncovered_by_use_cases", codes)
+            self.assertTrue(any("invalid_input" in e["message"] for e in errors))
+
+    def test_uncovered_output_status_enum_is_rejected(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = write_surface_coverage_contract(
+                tmp,
+                output_schema={
+                    "properties": {
+                        "status": {"type": "string", "enum": ["accepted", "rejected"]}
+                    }
+                },
+                use_cases=[
+                    {
+                        "scenario": "As a developer, I want acceptance, so that coverage holds.",
+                        "input_example": {},
+                        "output_example": {"status": "accepted"},
+                        "happy": True,
+                    }
+                ],
+            )
+            errors: list = []
+            capability_validation.check_new_use_cases_surface_coverage(path, errors)
+            codes = [e["code"] for e in errors]
+            self.assertIn("contract.output_enum_uncovered_by_use_cases", codes)
+            self.assertTrue(any("rejected" in e["message"] for e in errors))
 
 
 def write_artifact_contract(
