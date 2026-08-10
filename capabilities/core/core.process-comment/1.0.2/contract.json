@@ -1,0 +1,1372 @@
+{
+  "artifact": {
+    "digest": "sha256:66cd639b24d595282394fbe29eb7c6d816136fdb0dba170883083fe106b0b153",
+    "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/core.process-comment-1.0.2/core-process-comment.wasm"
+  },
+  "connector_requirements": [],
+  "consumes": [],
+  "dependencies": [],
+  "description": "Policy-driven comment processor for create/edit/reply/delete/react with mentions, quarantine, soft-delete, and tenant isolation.\n\nImplemented and smoke-tested matrix (use_cases):\n- create with @mention and https link + notify obligations\n- edit denied when own_only and actor is not creator\n- reply denied when parent_depth+1 >= max_thread_depth\n- create allowed with quarantine when body matches moderation.blocklist\n- react add normalized to a reaction set\n- soft-delete retains body and records deleted_by\n- create denied on tenant mismatch\n- create/edit/reply denied for empty/whitespace body\n- body_too_long when body exceeds max_body_length\n- invalid_reaction when react lacks emoji\n- insufficient_role when actor role not permitted\n\nKnown limitations (intentional in 1.0.2):\n- resolve / unresolve / pin / unpin are not part of the schema surface\n- mention_resolution narrowed to strict; permissive/disabled removed\n- visibility_model narrowed to resource-acl|channel\n- reaction.op narrowed to add (remove not published)\n- invalid_action / invalid_parent / policy_error / not_authorized removed from published reason_code vocabulary\n- hard_delete_unsupported and invalid_input/invalid_actor fail-closed paths exist but are not published reason_codes\n- allowed_markups is accepted but body markup is not sanitized\n- The capability never persists data or sends notifications; callers must honor obligations",
+  "emits": [],
+  "event_trigger": null,
+  "evidence": [
+    {
+      "evidence_id": "core-process-comment-1.0.2-contract-validation",
+      "status": "passed",
+      "type": "contract_validation"
+    }
+  ],
+  "execution": {
+    "binary_format": "wasm",
+    "constraints": {
+      "filesystem_access": "none",
+      "host_api_access": "none",
+      "network_access": "forbidden"
+    },
+    "entrypoint": {
+      "command": "run",
+      "kind": "wasi-command"
+    },
+    "preferred_targets": [
+      "local",
+      "edge",
+      "browser"
+    ]
+  },
+  "id": "core.process-comment",
+  "inputs": {
+    "schema": {
+      "additionalProperties": false,
+      "properties": {
+        "action": {
+          "description": "Comment action. v1.0.1 retains only actions covered by published use_cases (create, edit, reply, delete, react).",
+          "enum": [
+            "create",
+            "edit",
+            "reply",
+            "delete",
+            "react"
+          ],
+          "type": "string"
+        },
+        "actor": {
+          "additionalProperties": false,
+          "properties": {
+            "attributes": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "id": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "roles": {
+              "default": [],
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "id"
+          ],
+          "type": "object"
+        },
+        "comment": {
+          "additionalProperties": false,
+          "properties": {
+            "body": {
+              "type": "string"
+            },
+            "created_by": {
+              "type": "string"
+            },
+            "id": {
+              "type": "string"
+            },
+            "metadata": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "parent_depth": {
+              "minimum": 0,
+              "type": "integer"
+            },
+            "parent_id": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "reaction": {
+              "properties": {
+                "emoji": {
+                  "type": "string"
+                },
+                "op": {
+                  "enum": [
+                    "add"
+                  ],
+                  "type": "string"
+                }
+              },
+              "type": "object"
+            }
+          },
+          "type": "object"
+        },
+        "comment_policy": {
+          "additionalProperties": false,
+          "properties": {
+            "actions": {
+              "additionalProperties": {
+                "properties": {
+                  "own_only": {
+                    "type": "boolean"
+                  },
+                  "roles": {
+                    "items": {
+                      "type": "string"
+                    },
+                    "type": "array"
+                  }
+                },
+                "type": "object"
+              },
+              "type": "object"
+            },
+            "allowed_markups": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "enforce_tenant_isolation": {
+              "default": true,
+              "type": "boolean"
+            },
+            "max_body_length": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "max_thread_depth": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "mention_resolution": {
+              "enum": [
+                "strict"
+              ],
+              "type": "string"
+            },
+            "moderation": {
+              "properties": {
+                "blocklist": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "require_approval_roles": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                }
+              },
+              "type": "object"
+            },
+            "soft_delete": {
+              "default": true,
+              "type": "boolean"
+            },
+            "version": {
+              "type": "string"
+            },
+            "visibility_model": {
+              "enum": [
+                "resource-acl",
+                "channel"
+              ],
+              "type": "string"
+            }
+          },
+          "required": [
+            "version",
+            "max_body_length",
+            "max_thread_depth",
+            "actions"
+          ],
+          "type": "object"
+        },
+        "context": {
+          "additionalProperties": true,
+          "default": {},
+          "type": "object"
+        },
+        "resource": {
+          "additionalProperties": false,
+          "properties": {
+            "attributes": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "id": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "id"
+          ],
+          "type": "object"
+        }
+      },
+      "required": [
+        "action",
+        "actor",
+        "resource",
+        "comment",
+        "comment_policy"
+      ],
+      "type": "object"
+    }
+  },
+  "kind": "capability_contract",
+  "lifecycle": "active",
+  "name": "process-comment",
+  "namespace": "core",
+  "outputs": {
+    "schema": {
+      "additionalProperties": false,
+      "properties": {
+        "confidence": {
+          "enum": [
+            "high",
+            "medium",
+            "low"
+          ],
+          "type": "string"
+        },
+        "decision": {
+          "enum": [
+            "allow",
+            "deny"
+          ],
+          "type": "string"
+        },
+        "evaluation_trace": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "normalized_comment": {
+          "description": "Fully validated and enriched comment object ready for persistence (null on deny)",
+          "type": [
+            "object",
+            "null"
+          ]
+        },
+        "obligations": {
+          "items": {
+            "properties": {
+              "metadata": {
+                "type": "object"
+              },
+              "reason": {
+                "type": "string"
+              },
+              "severity": {
+                "enum": [
+                  "required",
+                  "recommended",
+                  "optional"
+                ],
+                "type": "string"
+              },
+              "targets": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "type": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "type",
+              "severity"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "policy_hash": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "reason": {
+          "type": "string"
+        },
+        "reason_code": {
+          "enum": [
+            "ok",
+            "insufficient_role",
+            "not_owner",
+            "empty_body",
+            "body_too_long",
+            "max_thread_depth_exceeded",
+            "tenant_isolation_violation",
+            "moderation_quarantine",
+            "invalid_reaction"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "decision",
+        "reason",
+        "reason_code",
+        "obligations",
+        "evaluation_trace",
+        "confidence"
+      ],
+      "type": "object"
+    }
+  },
+  "owner": {
+    "contact": "capability-authors@traverse-framework.com",
+    "team": "traverse-core"
+  },
+  "permissions": [
+    {
+      "id": "core.process-comment"
+    }
+  ],
+  "permitted_targets": [
+    "local",
+    "edge",
+    "browser",
+    "cloud"
+  ],
+  "policies": [
+    {
+      "id": "fail-closed-default"
+    },
+    {
+      "id": "pure-computation-only"
+    },
+    {
+      "id": "tenant-isolation-enforced"
+    }
+  ],
+  "postconditions": [
+    {
+      "description": "Identical inputs always produce identical outputs",
+      "id": "deterministic"
+    },
+    {
+      "description": "Exactly one of allow or deny is returned",
+      "id": "decision-binary"
+    },
+    {
+      "description": "When decision=allow, normalized_comment is present and consistent with the action",
+      "id": "normalized-on-allow"
+    },
+    {
+      "description": "evaluation_trace is always populated",
+      "id": "trace-always-present"
+    },
+    {
+      "description": "A machine-readable reason_code is always present",
+      "id": "reason-code-always-present"
+    }
+  ],
+  "preconditions": [
+    {
+      "description": "action must be one of the supported values",
+      "id": "action-supported"
+    },
+    {
+      "description": "actor.id must be a non-empty string",
+      "id": "actor-id-present"
+    },
+    {
+      "description": "resource.type and resource.id must be present",
+      "id": "resource-present"
+    },
+    {
+      "description": "comment_policy must contain version, max_body_length, max_thread_depth and actions",
+      "id": "policy-valid"
+    },
+    {
+      "description": "create, edit and reply require a body string",
+      "id": "body-required-for-write"
+    }
+  ],
+  "provenance": {
+    "adr_refs": [
+      "0001-rust-wasm-foundation"
+    ],
+    "author": "traverse-capability-author + persona-council",
+    "created_at": "2026-08-08T06:40:00Z",
+    "exception_refs": [],
+    "source": "ai-assisted",
+    "spec_ref": "516-agent-artifact-execution@1.0.0"
+  },
+  "schema_version": "1.0.0",
+  "service_type": "stateless",
+  "side_effects": [
+    {
+      "description": "Pure computation. No network, filesystem, persistence or notification delivery occurs inside the capability.",
+      "kind": "memory_only"
+    }
+  ],
+  "state_schema": null,
+  "summary": "Policy-driven comment processor for create/edit/reply/delete/react with mentions, quarantine, soft-delete, and tenant isolation.",
+  "use_cases": [
+    {
+      "happy": true,
+      "input_example": {
+        "action": "create",
+        "actor": {
+          "attributes": {
+            "display_name": "Ada Lovelace",
+            "tenant_id": "t-100"
+          },
+          "id": "user-42",
+          "roles": [
+            "member"
+          ]
+        },
+        "comment": {
+          "body": "Hey @user-7 and @user-11, please review the latest draft. See https://example.com/spec",
+          "metadata": {},
+          "parent_id": null
+        },
+        "comment_policy": {
+          "actions": {
+            "create": {
+              "roles": [
+                "member",
+                "admin"
+              ]
+            },
+            "delete": {
+              "own_only": true,
+              "roles": [
+                "member",
+                "admin"
+              ]
+            },
+            "edit": {
+              "own_only": true,
+              "roles": [
+                "member",
+                "admin"
+              ]
+            },
+            "pin": {
+              "roles": [
+                "admin"
+              ]
+            },
+            "react": {
+              "roles": [
+                "member",
+                "admin"
+              ]
+            },
+            "resolve": {
+              "roles": [
+                "admin",
+                "owner"
+              ]
+            }
+          },
+          "allowed_markups": [
+            "bold",
+            "italic",
+            "code",
+            "link"
+          ],
+          "max_body_length": 10000,
+          "max_thread_depth": 8,
+          "mention_resolution": "strict",
+          "moderation": {
+            "blocklist": [],
+            "require_approval_roles": []
+          },
+          "soft_delete": true,
+          "version": "2026.08.1",
+          "visibility_model": "resource-acl"
+        },
+        "context": {
+          "client": "web",
+          "request_id": "req-abc"
+        },
+        "resource": {
+          "attributes": {
+            "tenant_id": "t-100",
+            "visibility": "team"
+          },
+          "id": "doc-99",
+          "type": "document"
+        }
+      },
+      "output_example": {
+        "confidence": "high",
+        "decision": "allow",
+        "evaluation_trace": [
+          "action=create",
+          "actor roles include member → create allowed",
+          "body length 78 <= 10000",
+          "extracted 2 mentions, both valid under strict resolution",
+          "extracted 1 link",
+          "depth 0 within max_thread_depth 8",
+          "visibility resolved to team via resource-acl"
+        ],
+        "normalized_comment": {
+          "action": "create",
+          "body": "Hey @user-7 and @user-11, please review the latest draft. See https://example.com/spec",
+          "body_plain": "Hey @user-7 and @user-11, please review the latest draft. See https://example.com/spec",
+          "created_by": "user-42",
+          "deleted": false,
+          "depth": 0,
+          "id": null,
+          "links": [
+            "https://example.com/spec"
+          ],
+          "mentions": [
+            {
+              "id": "user-7",
+              "type": "user",
+              "valid": true
+            },
+            {
+              "id": "user-11",
+              "type": "user",
+              "valid": true
+            }
+          ],
+          "metadata": {},
+          "parent_id": null,
+          "pinned": false,
+          "reactions": [],
+          "resolved": false,
+          "thread_root_id": null,
+          "visibility": "team"
+        },
+        "obligations": [
+          {
+            "reason": "mentioned",
+            "severity": "required",
+            "targets": [
+              "user-7",
+              "user-11"
+            ],
+            "type": "notify"
+          },
+          {
+            "severity": "required",
+            "type": "audit_log"
+          },
+          {
+            "severity": "recommended",
+            "type": "index_for_search"
+          }
+        ],
+        "policy_hash": "sha256:c0mm3nt-2026.08.1",
+        "reason": "Actor has create permission and body passed all validations",
+        "reason_code": "ok"
+      },
+      "persona_ref": "collaboration-platform-engineer",
+      "scenario": "As a collaboration platform engineer, I want a user to create a top-level comment with mentions so that the system receives a fully validated, sanitized comment object ready for persistence and notification."
+    },
+    {
+      "happy": false,
+      "input_example": {
+        "action": "edit",
+        "actor": {
+          "attributes": {
+            "tenant_id": "t-100"
+          },
+          "id": "user-99",
+          "roles": [
+            "member"
+          ]
+        },
+        "comment": {
+          "body": "Updated text",
+          "created_by": "user-42",
+          "id": "cmt-55",
+          "parent_id": null
+        },
+        "comment_policy": {
+          "actions": {
+            "edit": {
+              "own_only": true,
+              "roles": [
+                "member",
+                "admin"
+              ]
+            }
+          },
+          "allowed_markups": [
+            "bold",
+            "italic",
+            "code",
+            "link"
+          ],
+          "max_body_length": 10000,
+          "max_thread_depth": 8,
+          "mention_resolution": "strict",
+          "moderation": {
+            "blocklist": [],
+            "require_approval_roles": []
+          },
+          "soft_delete": true,
+          "version": "2026.08.1",
+          "visibility_model": "resource-acl"
+        },
+        "context": {},
+        "resource": {
+          "attributes": {
+            "tenant_id": "t-100"
+          },
+          "id": "doc-99",
+          "type": "document"
+        }
+      },
+      "output_example": {
+        "confidence": "high",
+        "decision": "deny",
+        "evaluation_trace": [
+          "action=edit",
+          "policy own_only=true",
+          "comment.created_by=user-42, actor.id=user-99 → mismatch",
+          "deny"
+        ],
+        "normalized_comment": null,
+        "obligations": [
+          {
+            "metadata": {
+              "denied_action": "edit"
+            },
+            "severity": "required",
+            "type": "audit_log"
+          }
+        ],
+        "policy_hash": "sha256:c0mm3nt-2026.08.1",
+        "reason": "edit requires own_only and actor is not the creator",
+        "reason_code": "not_owner"
+      },
+      "persona_ref": "security-architect",
+      "scenario": "As a security architect, I want an edit attempt by a non-owner to be denied when the policy requires own_only, so that users cannot modify other people's comments."
+    },
+    {
+      "happy": false,
+      "input_example": {
+        "action": "reply",
+        "actor": {
+          "attributes": {
+            "tenant_id": "t-100"
+          },
+          "id": "user-42",
+          "roles": [
+            "member"
+          ]
+        },
+        "comment": {
+          "body": "One more level",
+          "parent_depth": 7,
+          "parent_id": "cmt-depth-7"
+        },
+        "comment_policy": {
+          "actions": {
+            "reply": {
+              "roles": [
+                "member",
+                "admin"
+              ]
+            }
+          },
+          "allowed_markups": [
+            "bold",
+            "italic"
+          ],
+          "max_body_length": 10000,
+          "max_thread_depth": 8,
+          "mention_resolution": "strict",
+          "moderation": {
+            "blocklist": [],
+            "require_approval_roles": []
+          },
+          "soft_delete": true,
+          "version": "2026.08.1",
+          "visibility_model": "resource-acl"
+        },
+        "context": {},
+        "resource": {
+          "attributes": {
+            "tenant_id": "t-100"
+          },
+          "id": "doc-99",
+          "type": "document"
+        }
+      },
+      "output_example": {
+        "confidence": "high",
+        "decision": "deny",
+        "evaluation_trace": [
+          "action=reply",
+          "parent_depth=7 → proposed depth=8",
+          "max_thread_depth=8 → deny"
+        ],
+        "normalized_comment": null,
+        "obligations": [
+          {
+            "severity": "required",
+            "type": "audit_log"
+          }
+        ],
+        "policy_hash": "sha256:c0mm3nt-2026.08.1",
+        "reason": "reply would create depth 8 which equals or exceeds max_thread_depth 8",
+        "reason_code": "max_thread_depth_exceeded"
+      },
+      "persona_ref": "collaboration-platform-engineer",
+      "scenario": "As a collaboration platform engineer, I want a reply that would exceed the configured max_thread_depth to be rejected so that threads cannot grow unbounded."
+    },
+    {
+      "happy": true,
+      "input_example": {
+        "action": "create",
+        "actor": {
+          "attributes": {
+            "tenant_id": "t-100"
+          },
+          "id": "user-77",
+          "roles": [
+            "member"
+          ]
+        },
+        "comment": {
+          "body": "This contains a blocked-term that should be flagged",
+          "parent_id": null
+        },
+        "comment_policy": {
+          "actions": {
+            "create": {
+              "roles": [
+                "member",
+                "admin"
+              ]
+            }
+          },
+          "allowed_markups": [
+            "bold",
+            "italic"
+          ],
+          "max_body_length": 10000,
+          "max_thread_depth": 8,
+          "mention_resolution": "strict",
+          "moderation": {
+            "blocklist": [
+              "blocked-term"
+            ],
+            "require_approval_roles": [
+              "moderator"
+            ]
+          },
+          "soft_delete": true,
+          "version": "2026.08.1",
+          "visibility_model": "channel"
+        },
+        "context": {},
+        "resource": {
+          "attributes": {
+            "tenant_id": "t-100"
+          },
+          "id": "ch-general",
+          "type": "channel"
+        }
+      },
+      "output_example": {
+        "confidence": "high",
+        "decision": "allow",
+        "evaluation_trace": [
+          "action=create allowed by role",
+          "body matched blocklist term 'blocked-term'",
+          "decision=allow with quarantine obligation"
+        ],
+        "normalized_comment": {
+          "action": "create",
+          "body": "This contains a blocked-term that should be flagged",
+          "body_plain": "This contains a blocked-term that should be flagged",
+          "created_by": "user-77",
+          "deleted": false,
+          "depth": 0,
+          "id": null,
+          "links": [],
+          "mentions": [],
+          "metadata": {
+            "quarantine": true
+          },
+          "parent_id": null,
+          "pinned": false,
+          "reactions": [],
+          "resolved": false,
+          "thread_root_id": null,
+          "visibility": "channel"
+        },
+        "obligations": [
+          {
+            "reason": "blocklist_match",
+            "severity": "required",
+            "type": "quarantine"
+          },
+          {
+            "severity": "required",
+            "targets": [
+              "role:moderator"
+            ],
+            "type": "notify"
+          },
+          {
+            "severity": "required",
+            "type": "audit_log"
+          }
+        ],
+        "policy_hash": "sha256:c0mm3nt-2026.08.1",
+        "reason": "Body matched moderation blocklist – allowed with quarantine obligation",
+        "reason_code": "moderation_quarantine"
+      },
+      "persona_ref": "content-moderation-specialist",
+      "scenario": "As a content moderation specialist, I want a comment containing a blocklisted term to be allowed only with a quarantine obligation so that moderators can review it before it becomes widely visible."
+    },
+    {
+      "happy": true,
+      "input_example": {
+        "action": "react",
+        "actor": {
+          "attributes": {
+            "tenant_id": "t-100"
+          },
+          "id": "user-42",
+          "roles": [
+            "member"
+          ]
+        },
+        "comment": {
+          "id": "cmt-55",
+          "reaction": {
+            "emoji": "thumbsup",
+            "op": "add"
+          }
+        },
+        "comment_policy": {
+          "actions": {
+            "react": {
+              "roles": [
+                "member",
+                "admin"
+              ]
+            }
+          },
+          "allowed_markups": [],
+          "max_body_length": 10000,
+          "max_thread_depth": 8,
+          "mention_resolution": "strict",
+          "moderation": {
+            "blocklist": [],
+            "require_approval_roles": []
+          },
+          "soft_delete": true,
+          "version": "2026.08.1",
+          "visibility_model": "resource-acl"
+        },
+        "context": {},
+        "resource": {
+          "attributes": {
+            "tenant_id": "t-100"
+          },
+          "id": "doc-99",
+          "type": "document"
+        }
+      },
+      "output_example": {
+        "confidence": "high",
+        "decision": "allow",
+        "evaluation_trace": [
+          "action=react op=add emoji=thumbsup",
+          "actor has react permission",
+          "reaction normalized"
+        ],
+        "normalized_comment": {
+          "action": "react",
+          "created_by": null,
+          "id": "cmt-55",
+          "reactions": [
+            {
+              "count": 1,
+              "emoji": "thumbsup",
+              "user_ids": [
+                "user-42"
+              ]
+            }
+          ]
+        },
+        "obligations": [
+          {
+            "severity": "recommended",
+            "type": "audit_log"
+          },
+          {
+            "metadata": {
+              "event": "reaction_added"
+            },
+            "severity": "recommended",
+            "type": "realtime_fanout"
+          }
+        ],
+        "policy_hash": "sha256:c0mm3nt-2026.08.1",
+        "reason": "Reaction add allowed",
+        "reason_code": "ok"
+      },
+      "persona_ref": "client-developer",
+      "scenario": "As a client developer, I want adding a reaction to be an idempotent, atomic action that returns the updated reaction set so that the UI can optimistically update without race conditions."
+    },
+    {
+      "happy": true,
+      "input_example": {
+        "action": "delete",
+        "actor": {
+          "attributes": {
+            "tenant_id": "t-100"
+          },
+          "id": "user-42",
+          "roles": [
+            "member"
+          ]
+        },
+        "comment": {
+          "body": "Original text that must be retained",
+          "created_by": "user-42",
+          "id": "cmt-55"
+        },
+        "comment_policy": {
+          "actions": {
+            "delete": {
+              "own_only": true,
+              "roles": [
+                "member",
+                "admin"
+              ]
+            }
+          },
+          "allowed_markups": [],
+          "max_body_length": 10000,
+          "max_thread_depth": 8,
+          "mention_resolution": "strict",
+          "moderation": {
+            "blocklist": [],
+            "require_approval_roles": []
+          },
+          "soft_delete": true,
+          "version": "2026.08.1",
+          "visibility_model": "resource-acl"
+        },
+        "context": {},
+        "resource": {
+          "attributes": {
+            "tenant_id": "t-100"
+          },
+          "id": "doc-99",
+          "type": "document"
+        }
+      },
+      "output_example": {
+        "confidence": "high",
+        "decision": "allow",
+        "evaluation_trace": [
+          "action=delete",
+          "soft_delete=true in policy",
+          "actor is creator → allow",
+          "body retained for audit"
+        ],
+        "normalized_comment": {
+          "action": "delete",
+          "body": "Original text that must be retained",
+          "body_plain": "Original text that must be retained",
+          "created_by": "user-42",
+          "deleted": true,
+          "deleted_at": null,
+          "deleted_by": "user-42",
+          "id": "cmt-55"
+        },
+        "obligations": [
+          {
+            "metadata": {
+              "soft_delete": true
+            },
+            "severity": "required",
+            "type": "audit_log"
+          },
+          {
+            "severity": "required",
+            "type": "retain_for_ediscovery"
+          }
+        ],
+        "policy_hash": "sha256:c0mm3nt-2026.08.1",
+        "reason": "Soft-delete allowed for owner",
+        "reason_code": "ok"
+      },
+      "persona_ref": "compliance-officer",
+      "scenario": "As a compliance officer, I want a soft-delete to preserve the original body and record who deleted it so that eDiscovery remains possible."
+    },
+    {
+      "happy": false,
+      "input_example": {
+        "action": "create",
+        "actor": {
+          "attributes": {
+            "tenant_id": "t-100"
+          },
+          "id": "user-42",
+          "roles": [
+            "admin"
+          ]
+        },
+        "comment": {
+          "body": "Trying to comment across tenants",
+          "parent_id": null
+        },
+        "comment_policy": {
+          "actions": {
+            "create": {
+              "roles": [
+                "member",
+                "admin"
+              ]
+            }
+          },
+          "allowed_markups": [],
+          "enforce_tenant_isolation": true,
+          "max_body_length": 10000,
+          "max_thread_depth": 8,
+          "mention_resolution": "strict",
+          "moderation": {
+            "blocklist": [],
+            "require_approval_roles": []
+          },
+          "soft_delete": true,
+          "version": "2026.08.1",
+          "visibility_model": "resource-acl"
+        },
+        "context": {},
+        "resource": {
+          "attributes": {
+            "tenant_id": "t-200"
+          },
+          "id": "doc-99",
+          "type": "document"
+        }
+      },
+      "output_example": {
+        "confidence": "high",
+        "decision": "deny",
+        "evaluation_trace": [
+          "enforce_tenant_isolation=true",
+          "actor.tenant_id=t-100, resource.tenant_id=t-200 → deny"
+        ],
+        "normalized_comment": null,
+        "obligations": [
+          {
+            "metadata": {
+              "security_event": true
+            },
+            "severity": "required",
+            "type": "audit_log"
+          }
+        ],
+        "policy_hash": "sha256:c0mm3nt-2026.08.1",
+        "reason": "actor.tenant_id does not match resource.tenant_id",
+        "reason_code": "tenant_isolation_violation"
+      },
+      "persona_ref": "platform-engineer",
+      "scenario": "As a multi-tenant platform engineer, I want a cross-tenant comment attempt to be denied even if the user has the correct role, so that tenant isolation is absolute."
+    },
+    {
+      "happy": false,
+      "input_example": {
+        "action": "create",
+        "actor": {
+          "attributes": {
+            "tenant_id": "t-100"
+          },
+          "id": "user-42",
+          "roles": [
+            "member"
+          ]
+        },
+        "comment": {
+          "body": "   ",
+          "parent_id": null
+        },
+        "comment_policy": {
+          "actions": {
+            "create": {
+              "roles": [
+                "member"
+              ]
+            }
+          },
+          "allowed_markups": [],
+          "max_body_length": 10000,
+          "max_thread_depth": 8,
+          "mention_resolution": "strict",
+          "moderation": {
+            "blocklist": [],
+            "require_approval_roles": []
+          },
+          "soft_delete": true,
+          "version": "2026.08.1",
+          "visibility_model": "resource-acl"
+        },
+        "context": {},
+        "resource": {
+          "attributes": {
+            "tenant_id": "t-100"
+          },
+          "id": "doc-99",
+          "type": "document"
+        }
+      },
+      "output_example": {
+        "confidence": "high",
+        "decision": "deny",
+        "evaluation_trace": [
+          "action=create",
+          "body trimmed length = 0 → deny"
+        ],
+        "normalized_comment": null,
+        "obligations": [],
+        "policy_hash": "sha256:c0mm3nt-2026.08.1",
+        "reason": "body is empty or whitespace only",
+        "reason_code": "empty_body"
+      },
+      "persona_ref": "client-developer",
+      "scenario": "As a client developer, I want an empty or whitespace-only body to be rejected with a clear reason code so that the UI can show an inline validation error."
+    },
+    {
+      "happy": false,
+      "input_example": {
+        "action": "create",
+        "actor": {
+          "attributes": {
+            "tenant_id": "t-100"
+          },
+          "id": "user-42",
+          "roles": [
+            "member"
+          ]
+        },
+        "comment": {
+          "body": "xxxxxxxxxxxxxxxxxxxxx",
+          "parent_id": null
+        },
+        "comment_policy": {
+          "actions": {
+            "create": {
+              "roles": [
+                "member"
+              ]
+            }
+          },
+          "allowed_markups": [],
+          "max_body_length": 20,
+          "max_thread_depth": 8,
+          "mention_resolution": "strict",
+          "moderation": {
+            "blocklist": [],
+            "require_approval_roles": []
+          },
+          "soft_delete": true,
+          "version": "2026.08.1",
+          "visibility_model": "resource-acl"
+        },
+        "context": {},
+        "resource": {
+          "attributes": {
+            "tenant_id": "t-100"
+          },
+          "id": "doc-99",
+          "type": "document"
+        }
+      },
+      "output_example": {
+        "confidence": "high",
+        "decision": "deny",
+        "evaluation_trace": [
+          "body length check failed"
+        ],
+        "normalized_comment": null,
+        "obligations": [
+          {
+            "severity": "required",
+            "type": "audit_log"
+          }
+        ],
+        "policy_hash": "sha256:c0mm3nt-2026.08.1",
+        "reason": "body exceeds max_body_length",
+        "reason_code": "body_too_long"
+      },
+      "persona_ref": "client-developer",
+      "scenario": "As a client developer, I want a body exceeding max_body_length rejected with body_too_long."
+    },
+    {
+      "happy": false,
+      "input_example": {
+        "action": "react",
+        "actor": {
+          "attributes": {
+            "tenant_id": "t-100"
+          },
+          "id": "user-42",
+          "roles": [
+            "member"
+          ]
+        },
+        "comment": {
+          "id": "cmt-55",
+          "reaction": {
+            "op": "add"
+          }
+        },
+        "comment_policy": {
+          "actions": {
+            "react": {
+              "roles": [
+                "member"
+              ]
+            }
+          },
+          "allowed_markups": [],
+          "max_body_length": 10000,
+          "max_thread_depth": 8,
+          "mention_resolution": "strict",
+          "moderation": {
+            "blocklist": [],
+            "require_approval_roles": []
+          },
+          "soft_delete": true,
+          "version": "2026.08.1",
+          "visibility_model": "resource-acl"
+        },
+        "context": {},
+        "resource": {
+          "attributes": {
+            "tenant_id": "t-100"
+          },
+          "id": "doc-99",
+          "type": "document"
+        }
+      },
+      "output_example": {
+        "confidence": "high",
+        "decision": "deny",
+        "evaluation_trace": [
+          "missing reaction.emoji"
+        ],
+        "normalized_comment": null,
+        "obligations": [
+          {
+            "severity": "required",
+            "type": "audit_log"
+          }
+        ],
+        "policy_hash": "sha256:c0mm3nt-2026.08.1",
+        "reason": "reaction.emoji required",
+        "reason_code": "invalid_reaction"
+      },
+      "persona_ref": "client-developer",
+      "scenario": "As a client developer, I want a react without emoji rejected with invalid_reaction."
+    },
+    {
+      "happy": false,
+      "input_example": {
+        "action": "create",
+        "actor": {
+          "attributes": {
+            "tenant_id": "t-100"
+          },
+          "id": "user-42",
+          "roles": [
+            "guest"
+          ]
+        },
+        "comment": {
+          "body": "Hello",
+          "parent_id": null
+        },
+        "comment_policy": {
+          "actions": {
+            "create": {
+              "roles": [
+                "member",
+                "admin"
+              ]
+            }
+          },
+          "allowed_markups": [],
+          "max_body_length": 10000,
+          "max_thread_depth": 8,
+          "mention_resolution": "strict",
+          "moderation": {
+            "blocklist": [],
+            "require_approval_roles": []
+          },
+          "soft_delete": true,
+          "version": "2026.08.1",
+          "visibility_model": "resource-acl"
+        },
+        "context": {},
+        "resource": {
+          "attributes": {
+            "tenant_id": "t-100"
+          },
+          "id": "doc-99",
+          "type": "document"
+        }
+      },
+      "output_example": {
+        "confidence": "high",
+        "decision": "deny",
+        "evaluation_trace": [
+          "action role check failed"
+        ],
+        "normalized_comment": null,
+        "obligations": [
+          {
+            "severity": "required",
+            "type": "audit_log"
+          }
+        ],
+        "policy_hash": "sha256:c0mm3nt-2026.08.1",
+        "reason": "actor role not permitted for action",
+        "reason_code": "insufficient_role"
+      },
+      "persona_ref": "security-architect",
+      "scenario": "As a security architect, I want create denied with insufficient_role when the actor role is not permitted."
+    }
+  ],
+  "version": "1.0.2"
+}
