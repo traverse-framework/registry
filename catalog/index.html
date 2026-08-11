@@ -3,11 +3,11 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Traverse Registry Catalog</title>
-<meta name="description" content="Every published Traverse registry capability -- deterministic, ABI-compliant WASM business logic, versioned and immutable once merged. Search, browse use cases, test coverage, and interfaces.">
+<title>Traverse Universal Capability Catalog</title>
+<meta name="description" content="Every published Traverse registry universal capability -- deterministic, ABI-compliant WASM business logic, versioned and immutable once merged. Search, browse use cases, test coverage, and interfaces.">
 <meta property="og:type" content="website">
-<meta property="og:title" content="Traverse Registry Catalog">
-<meta property="og:description" content="Every published Traverse registry capability -- deterministic, ABI-compliant WASM business logic, versioned and immutable once merged.">
+<meta property="og:title" content="Traverse Universal Capability Catalog">
+<meta property="og:description" content="Every published Traverse registry universal capability -- deterministic, ABI-compliant WASM business logic, versioned and immutable once merged.">
 <meta property="og:url" content="https://registry.traverse-framework.com/">
 <link rel="canonical" href="https://registry.traverse-framework.com/">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -19,11 +19,19 @@
 <body>
 <nav class="nav">
   <div class="nav-inner">
-    <div class="nav-logo"><span>Traverse<span class="nav-logo-dot">.</span></span><span class="nav-label">REGISTRY CATALOG</span></div>
-    <button class="nav-theme-btn" id="theme-toggle" title="Toggle light/dark" aria-label="Toggle light/dark">◐</button>
+    <a href="#" class="nav-logo">
+      <img src="https://traverse-framework.com/assets/img/logo/traverse_mountain_dark_128.png" alt="" width="22" height="22" class="logo-mark logo-mark-dark">
+      <img src="https://traverse-framework.com/assets/img/logo/traverse_mountain_light_128.png" alt="" width="22" height="22" class="logo-mark logo-mark-light">
+      Traverse<span class="nav-logo-dot">.</span><span class="nav-label">UNIVERSAL CAPABILITY CATALOG</span>
+    </a>
+    <div class="nav-right">
+      <a href="https://github.com/traverse-framework/registry" target="_blank" rel="noopener" class="btn-ghost-sm">GitHub →</a>
+      <button class="nav-theme-btn" id="theme-toggle" title="Toggle light/dark" aria-label="Toggle light/dark">◐</button>
+    </div>
   </div>
 </nav>
 <div class="container" id="app"></div>
+<footer class="site-footer" id="site-footer"></footer>
 
 <script>
 (function () {
@@ -51,6 +59,51 @@
     document.documentElement.setAttribute("data-theme", next);
     localStorage.setItem("catalog-theme", next);
   });
+
+  // Persistent, rendered once (not per-route) -- mirrors traverse-framework/website's
+  // own footer structure/columns (brand, Explore, Traverse, More), same
+  // header-alignment ask as the nav logo treatment.
+  function renderFooter() {
+    var footerEl = document.getElementById("site-footer");
+    if (!footerEl) { return; }
+    footerEl.appendChild(el("div", { className: "footer-inner" }, [
+      el("div", { className: "footer-brand" }, [
+        el("a", { href: "#", className: "nav-logo" }, [
+          el("img", { src: "https://traverse-framework.com/assets/img/logo/traverse_mountain_dark_128.png", alt: "", width: "20", height: "20", className: "logo-mark logo-mark-dark" }),
+          el("img", { src: "https://traverse-framework.com/assets/img/logo/traverse_mountain_light_128.png", alt: "", width: "20", height: "20", className: "logo-mark logo-mark-light" }),
+          document.createTextNode("Traverse"),
+          el("span", { className: "nav-logo-dot", textContent: "." }),
+        ]),
+        el("p", { textContent: "Universal capability registry for the Traverse contract-driven WASM runtime." }),
+      ]),
+      footerColumn("Explore", [
+        ["#/personas", "Personas"],
+        ["#/service-types", "Service types"],
+        ["#/events", "Event products"],
+      ]),
+      footerColumn("Traverse", [
+        ["https://traverse-framework.com", "Main website", true],
+        ["https://github.com/traverse-framework/registry", "GitHub", true],
+      ]),
+      footerColumn("More", [
+        ["https://universalmicroservices.com", "UMA / the book", true],
+      ]),
+    ]));
+    footerEl.appendChild(el("div", { className: "footer-bottom" }, [
+      el("span", { textContent: "© 2026 Enrico Piovesan · Traverse Framework" }),
+    ]));
+  }
+
+  function footerColumn(title, links) {
+    return el("div", { className: "footer-col" }, [
+      el("div", { className: "footer-col-title", textContent: title }),
+      el("ul", { className: "footer-links" }, links.map(function (link) {
+        var props = { href: link[0], textContent: link[1] };
+        if (link[2]) { props.target = "_blank"; props.rel = "noopener"; }
+        return el("li", {}, [el("a", props)]);
+      })),
+    ]);
+  }
 
   function el(tag, props, children) {
     var node = document.createElement(tag);
@@ -144,15 +197,15 @@
   function renderListView() {
     appEl.textContent = "";
     appEl.appendChild(el("div", { className: "section-label", textContent: "DISCOVER" }));
-    appEl.appendChild(el("h1", { className: "t-h1", textContent: "Capability Catalog" }));
-    appEl.appendChild(el("p", { className: "t-muted", textContent: "Every published Traverse registry capability -- deterministic, ABI-compliant WASM business logic, versioned and immutable once merged." }));
+    appEl.appendChild(el("h1", { className: "t-h1", textContent: "Universal Capability Catalog" }));
+    appEl.appendChild(el("p", { className: "t-muted", textContent: "Every published universal capability in the Traverse registry -- deterministic, ABI-compliant WASM business logic, versioned and immutable once merged." }));
     appEl.appendChild(el("div", { style: "display:flex; gap:1rem; flex-wrap:wrap" }, [
       el("a", { className: "back-link", href: "#/events", textContent: "Browse event products →" }),
       el("a", { className: "back-link", href: "#/personas", textContent: "Browse personas →" }),
       el("a", { className: "back-link", href: "#/service-types", textContent: "Browse service types →" }),
     ]));
 
-    var searchInput = el("input", { type: "search", id: "search", placeholder: "Search capabilities (e.g. \"currency\", \"email\", \"validate\")…" });
+    var searchInput = el("input", { type: "search", id: "search", placeholder: "Search universal capabilities (e.g. \"currency\", \"email\", \"validate\")…" });
     searchInput.value = searchQuery;
     searchInput.addEventListener("input", function () {
       searchQuery = searchInput.value;
@@ -183,7 +236,7 @@
     resultsEl.textContent = "";
     var groups = visibleGroups();
     if (groups.length === 0) {
-      resultsEl.appendChild(el("p", { className: "empty", textContent: "No matching capabilities." }));
+      resultsEl.appendChild(el("p", { className: "empty", textContent: "No matching universal capabilities." }));
       return;
     }
     groups.forEach(function (group) {
@@ -889,6 +942,7 @@
       trackPageview();
     }
   });
+  renderFooter();
   appEl.appendChild(el("p", { className: "empty", textContent: "Loading catalog…" }));
 
   fetch("./catalog.json")

@@ -246,7 +246,14 @@ PAGE_TEMPLATE = """<!doctype html>
 <body>
 <nav class="nav">
   <div class="nav-inner">
-    <a href="/" class="nav-logo"><span>Traverse<span class="nav-logo-dot">.</span></span><span class="nav-label">REGISTRY CATALOG</span></a>
+    <a href="/" class="nav-logo">
+      <img src="https://traverse-framework.com/assets/img/logo/traverse_mountain_dark_128.png" alt="" width="22" height="22" class="logo-mark logo-mark-dark">
+      <img src="https://traverse-framework.com/assets/img/logo/traverse_mountain_light_128.png" alt="" width="22" height="22" class="logo-mark logo-mark-light">
+      Traverse<span class="nav-logo-dot">.</span><span class="nav-label">UNIVERSAL CAPABILITY CATALOG</span>
+    </a>
+    <div class="nav-right">
+      <a href="https://github.com/traverse-framework/registry" target="_blank" rel="noopener" class="btn-ghost-sm">GitHub →</a>
+    </div>
   </div>
 </nav>
 <div class="container">
@@ -269,6 +276,42 @@ PAGE_TEMPLATE = """<!doctype html>
 <details><summary>Full contract.json</summary>{raw_contract_block}</details>
 <p style="margin-top:2rem"><a href="/#/capability/{encoded_reference}">Open in the interactive catalog →</a></p>
 </div>
+<footer class="site-footer">
+<div class="footer-inner">
+<div class="footer-brand">
+<a href="/" class="nav-logo">
+<img src="https://traverse-framework.com/assets/img/logo/traverse_mountain_dark_128.png" alt="" width="20" height="20" class="logo-mark logo-mark-dark">
+<img src="https://traverse-framework.com/assets/img/logo/traverse_mountain_light_128.png" alt="" width="20" height="20" class="logo-mark logo-mark-light">
+Traverse<span class="nav-logo-dot">.</span>
+</a>
+<p>Universal capability registry for the Traverse contract-driven WASM runtime.</p>
+</div>
+<div class="footer-col">
+<div class="footer-col-title">Explore</div>
+<ul class="footer-links">
+<li><a href="/#/personas">Personas</a></li>
+<li><a href="/#/service-types">Service types</a></li>
+<li><a href="/#/events">Event products</a></li>
+</ul>
+</div>
+<div class="footer-col">
+<div class="footer-col-title">Traverse</div>
+<ul class="footer-links">
+<li><a href="https://traverse-framework.com" target="_blank" rel="noopener">Main website</a></li>
+<li><a href="https://github.com/traverse-framework/registry" target="_blank" rel="noopener">GitHub</a></li>
+</ul>
+</div>
+<div class="footer-col">
+<div class="footer-col-title">More</div>
+<ul class="footer-links">
+<li><a href="https://universalmicroservices.com" target="_blank" rel="noopener">UMA / the book</a></li>
+</ul>
+</div>
+</div>
+<div class="footer-bottom">
+<span>© 2026 Enrico Piovesan · Traverse Framework</span>
+</div>
+</footer>
 </body>
 </html>
 """
@@ -363,7 +406,14 @@ PERSONA_PAGE_TEMPLATE = """<!doctype html>
 <body>
 <nav class="nav">
   <div class="nav-inner">
-    <a href="/" class="nav-logo"><span>Traverse<span class="nav-logo-dot">.</span></span><span class="nav-label">REGISTRY CATALOG</span></a>
+    <a href="/" class="nav-logo">
+      <img src="https://traverse-framework.com/assets/img/logo/traverse_mountain_dark_128.png" alt="" width="22" height="22" class="logo-mark logo-mark-dark">
+      <img src="https://traverse-framework.com/assets/img/logo/traverse_mountain_light_128.png" alt="" width="22" height="22" class="logo-mark logo-mark-light">
+      Traverse<span class="nav-logo-dot">.</span><span class="nav-label">UNIVERSAL CAPABILITY CATALOG</span>
+    </a>
+    <div class="nav-right">
+      <a href="https://github.com/traverse-framework/registry" target="_blank" rel="noopener" class="btn-ghost-sm">GitHub →</a>
+    </div>
   </div>
 </nav>
 <div class="container">
@@ -378,6 +428,42 @@ PERSONA_PAGE_TEMPLATE = """<!doctype html>
 {used_by_html}
 <p style="margin-top:2rem"><a href="/#/persona/{encoded_reference}">Open in the interactive catalog →</a></p>
 </div>
+<footer class="site-footer">
+<div class="footer-inner">
+<div class="footer-brand">
+<a href="/" class="nav-logo">
+<img src="https://traverse-framework.com/assets/img/logo/traverse_mountain_dark_128.png" alt="" width="20" height="20" class="logo-mark logo-mark-dark">
+<img src="https://traverse-framework.com/assets/img/logo/traverse_mountain_light_128.png" alt="" width="20" height="20" class="logo-mark logo-mark-light">
+Traverse<span class="nav-logo-dot">.</span>
+</a>
+<p>Universal capability registry for the Traverse contract-driven WASM runtime.</p>
+</div>
+<div class="footer-col">
+<div class="footer-col-title">Explore</div>
+<ul class="footer-links">
+<li><a href="/#/personas">Personas</a></li>
+<li><a href="/#/service-types">Service types</a></li>
+<li><a href="/#/events">Event products</a></li>
+</ul>
+</div>
+<div class="footer-col">
+<div class="footer-col-title">Traverse</div>
+<ul class="footer-links">
+<li><a href="https://traverse-framework.com" target="_blank" rel="noopener">Main website</a></li>
+<li><a href="https://github.com/traverse-framework/registry" target="_blank" rel="noopener">GitHub</a></li>
+</ul>
+</div>
+<div class="footer-col">
+<div class="footer-col-title">More</div>
+<ul class="footer-links">
+<li><a href="https://universalmicroservices.com" target="_blank" rel="noopener">UMA / the book</a></li>
+</ul>
+</div>
+</div>
+<div class="footer-bottom">
+<span>© 2026 Enrico Piovesan · Traverse Framework</span>
+</div>
+</footer>
 </body>
 </html>
 """
@@ -472,7 +558,14 @@ SERVICE_TYPE_PAGE_TEMPLATE = """<!doctype html>
 <body>
 <nav class="nav">
   <div class="nav-inner">
-    <a href="/" class="nav-logo"><span>Traverse<span class="nav-logo-dot">.</span></span><span class="nav-label">REGISTRY CATALOG</span></a>
+    <a href="/" class="nav-logo">
+      <img src="https://traverse-framework.com/assets/img/logo/traverse_mountain_dark_128.png" alt="" width="22" height="22" class="logo-mark logo-mark-dark">
+      <img src="https://traverse-framework.com/assets/img/logo/traverse_mountain_light_128.png" alt="" width="22" height="22" class="logo-mark logo-mark-light">
+      Traverse<span class="nav-logo-dot">.</span><span class="nav-label">UNIVERSAL CAPABILITY CATALOG</span>
+    </a>
+    <div class="nav-right">
+      <a href="https://github.com/traverse-framework/registry" target="_blank" rel="noopener" class="btn-ghost-sm">GitHub →</a>
+    </div>
   </div>
 </nav>
 <div class="container">
@@ -484,6 +577,42 @@ SERVICE_TYPE_PAGE_TEMPLATE = """<!doctype html>
 {capabilities_html}
 <p style="margin-top:2rem"><a href="/#/service-type/{id}">Open in the interactive catalog →</a></p>
 </div>
+<footer class="site-footer">
+<div class="footer-inner">
+<div class="footer-brand">
+<a href="/" class="nav-logo">
+<img src="https://traverse-framework.com/assets/img/logo/traverse_mountain_dark_128.png" alt="" width="20" height="20" class="logo-mark logo-mark-dark">
+<img src="https://traverse-framework.com/assets/img/logo/traverse_mountain_light_128.png" alt="" width="20" height="20" class="logo-mark logo-mark-light">
+Traverse<span class="nav-logo-dot">.</span>
+</a>
+<p>Universal capability registry for the Traverse contract-driven WASM runtime.</p>
+</div>
+<div class="footer-col">
+<div class="footer-col-title">Explore</div>
+<ul class="footer-links">
+<li><a href="/#/personas">Personas</a></li>
+<li><a href="/#/service-types">Service types</a></li>
+<li><a href="/#/events">Event products</a></li>
+</ul>
+</div>
+<div class="footer-col">
+<div class="footer-col-title">Traverse</div>
+<ul class="footer-links">
+<li><a href="https://traverse-framework.com" target="_blank" rel="noopener">Main website</a></li>
+<li><a href="https://github.com/traverse-framework/registry" target="_blank" rel="noopener">GitHub</a></li>
+</ul>
+</div>
+<div class="footer-col">
+<div class="footer-col-title">More</div>
+<ul class="footer-links">
+<li><a href="https://universalmicroservices.com" target="_blank" rel="noopener">UMA / the book</a></li>
+</ul>
+</div>
+</div>
+<div class="footer-bottom">
+<span>© 2026 Enrico Piovesan · Traverse Framework</span>
+</div>
+</footer>
 </body>
 </html>
 """

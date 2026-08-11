@@ -53,15 +53,51 @@ body {
   display: flex; align-items: center; justify-content: space-between; width: 100%;
   max-width: var(--max-w); margin: 0 auto; padding: 0 2rem;
 }
-.nav-logo { display: flex; align-items: center; gap: 0.5rem; font-family: var(--font-display); font-size: 1rem; font-weight: 700; letter-spacing: -0.03em; }
+.nav-logo { display: flex; align-items: center; gap: 0.5rem; font-family: var(--font-display); font-size: 1rem; font-weight: 700; letter-spacing: -0.03em; text-decoration: none; color: var(--fg); }
 .nav-logo-dot { color: var(--accent); }
 .nav-label { font-family: var(--font-mono); font-size: 0.7rem; letter-spacing: 0.06em; color: var(--fg-muted); border-left: 1px solid var(--border); padding-left: 0.75rem; margin-left: 0.5rem; }
+@media (max-width: 640px) { .nav-label { display: none; } }
+/* Logo mark images -- same asset traverse-framework/website uses, dark/light
+   variants swapped by theme so the mark's own background blends into the
+   page rather than showing a mismatched edge (mirrors that site's rule). */
+.logo-mark { width: 20px; height: 20px; object-fit: contain; }
+.logo-mark-light { display: none; }
+[data-theme="light"] .logo-mark-dark { display: none; }
+[data-theme="light"] .logo-mark-light { display: block; }
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) .logo-mark-dark { display: none; }
+  :root:not([data-theme="dark"]) .logo-mark-light { display: block; }
+}
+.nav-right { display: flex; align-items: center; gap: 0.6rem; }
+.btn-ghost-sm {
+  font-family: var(--font-mono); font-size: 0.75rem; color: var(--fg-muted);
+  border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 0.4rem 0.7rem;
+  text-decoration: none; transition: color 0.15s, border-color 0.15s;
+}
+.btn-ghost-sm:hover { color: var(--fg); border-color: var(--border-hover); }
 .nav-theme-btn {
   width: 32px; height: 32px; display: flex; align-items: center; justify-content: center;
   border-radius: var(--radius-sm); color: var(--fg-muted); border: 1px solid var(--border);
   background: var(--bg-card); font-size: 0.9rem; transition: color 0.15s, background 0.15s;
 }
 .nav-theme-btn:hover { color: var(--fg); background: var(--bg-input); }
+
+/* ─── Footer ──────────────────────────────────────────────────────────── */
+.site-footer { border-top: 1px solid var(--border); background: var(--bg-elevated); margin-top: 3rem; }
+.footer-inner {
+  max-width: var(--max-w); margin: 0 auto; padding: 3rem 2rem 2rem;
+  display: grid; grid-template-columns: 2fr 1fr 1fr 1fr; gap: 2rem;
+}
+@media (max-width: 720px) { .footer-inner { grid-template-columns: 1fr 1fr; } }
+.footer-brand p { font-size: 0.85rem; color: var(--fg-muted); margin-top: 0.75rem; line-height: 1.6; max-width: 32ch; }
+.footer-col-title { font-family: var(--font-mono); font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--fg-subtle); margin-bottom: 0.75rem; }
+.footer-links { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.5rem; }
+.footer-links a { font-size: 0.85rem; color: var(--fg-muted); text-decoration: none; transition: color 0.15s; }
+.footer-links a:hover { color: var(--accent); }
+.footer-bottom {
+  max-width: var(--max-w); margin: 0 auto; padding: 1.5rem 2rem;
+  border-top: 1px solid var(--border); font-size: 0.75rem; color: var(--fg-subtle);
+}
 
 /* ─── Typography ──────────────────────────────────────────────────────── */
 .t-h1 { font-family: var(--font-display); font-size: clamp(1.75rem, 4vw, 2.5rem); font-weight: 700; letter-spacing: -0.03em; line-height: 1.1; }
