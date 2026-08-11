@@ -50,6 +50,8 @@ import html
 import json
 import sys
 from pathlib import Path
+from typing import Optional
+from urllib.parse import quote
 
 
 def esc(value) -> str:
@@ -122,18 +124,52 @@ def owner_html(owner: dict) -> str:
     return field_row_html("Owner", f"{esc(team)} · {link}")
 
 
-def events_html(contract: dict) -> str:
-    emits = contract.get("emits") or []
+def find_event_by_id(catalog_events: list, event_id: str) -> Optional[dict]:
+    matches = [
+        entry
+        for entry in catalog_events
+        if (entry.get("product") or {}).get("contract", {}).get("id") == event_id
+    ]
+    if not matches:
+        return None
+    matches.sort(
+        key=lambda entry: tuple(
+            int(part)
+            for part in str(entry["product"]["contract"]["version"]).split(".")
+            if part.isdigit()
+        )
+    )
+    return matches[-1]
+
+
+def events_html(contract: dict, catalog_events: list) -> str:
+    publishes = contract.get("emits") or []
     consumes = contract.get("consumes") or []
-    if not emits and not consumes:
-        return '<p class="empty">This capability does not declare any emitted or consumed events.</p>'
+    if not publishes and not consumes:
+        return (
+            '<p class="empty">This capability does not declare any '
+            "published or consumed events.</p>"
+        )
 
     def event_list(label: str, items: list) -> str:
         if not items:
             return field_row_html(label, '<span class="t-muted">none</span>')
-        return field_row_html(label, json_block(items))
+        links = []
+        for item in items:
+            event_id = item if isinstance(item, str) else (item or {}).get("event_id") or (item or {}).get("id")
+            published = find_event_by_id(catalog_events, event_id) if event_id else None
+            if published:
+                version = published["product"]["contract"].get("version", "")
+                href = f"/#/event/{quote(published['reference'], safe='')}"
+                version_suffix = f" @{esc(version)}" if version else ""
+                links.append(
+                    f'<div><a href="{esc(href)}">{esc(event_id)}</a>{version_suffix}</div>'
+                )
+            else:
+                links.append(f'<div class="t-mono">{esc(json.dumps(item))}</div>')
+        return field_row_html(label, "".join(links))
 
-    return event_list("Emits", emits) + event_list("Consumes", consumes)
+    return event_list("Publishes", publishes) + event_list("Consumes", consumes)
 
 
 def json_block(value) -> str:
@@ -274,8 +310,15 @@ PAGE_TEMPLATE = """<!doctype html>
 """
 
 
-def render_capability_page(base_url: str, entry: dict, group_versions: list, personas_by_id: dict) -> str:
+def render_capability_page(
+    base_url: str,
+    entry: dict,
+    group_versions: list,
+    personas_by_id: dict,
+    catalog_events: Optional[list] = None,
+) -> str:
     contract = entry["contract"]
+    catalog_events = catalog_events or []
 
     header_badges = [f'<span class="badge badge-accent">{esc(contract["namespace"])}</span>', f'<span class="badge">v{esc(contract["version"])}</span>']
     if contract.get("lifecycle"):
@@ -335,7 +378,7 @@ def render_capability_page(base_url: str, entry: dict, group_versions: list, per
         use_cases_html=use_cases_html,
         coverage_html=coverage_block(entry.get("test_coverage")),
         interface_html="".join(interface_parts),
-        events_html=events_html(contract),
+        events_html=events_html(contract, catalog_events),
         version_history_html=version_history_block(base_url, group_versions, entry["reference"]),
         raw_contract_block=json_block(redacted_contract(contract)),
         encoded_reference=esc(entry["reference"]).replace("/", "%2F").replace("@", "%40"),
@@ -539,6 +582,7 @@ def generate(catalog_path: Path, base_url: str, output_dir: Path) -> list:
     catalog = json.loads(catalog_path.read_text())
     capabilities = catalog.get("capabilities", [])
     personas = catalog.get("personas", [])
+    catalog_events = catalog.get("events", [])
     personas_by_id = current_personas_by_id(personas)
 
     by_group: dict = {}
@@ -549,7 +593,9 @@ def generate(catalog_path: Path, base_url: str, output_dir: Path) -> list:
     generated_paths = []
     for entry in capabilities:
         group_key = f"{entry['contract']['namespace']}/{entry['contract']['id']}"
-        page_html = render_capability_page(base_url, entry, by_group[group_key], personas_by_id)
+        page_html = render_capability_page(
+            base_url, entry, by_group[group_key], personas_by_id, catalog_events
+        )
         page_path = output_dir / capability_page_path(entry["contract"]) / "index.html"
         page_path.parent.mkdir(parents=True, exist_ok=True)
         page_path.write_text(page_html)

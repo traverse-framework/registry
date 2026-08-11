@@ -18,6 +18,10 @@ sha2 = "0.11"
 name = "validate_event_products"
 path = "src/bin/validate_event_products.rs"
 
+[[bin]]
+name = "export_async_api"
+path = "src/bin/export_async_api.rs"
+
 [dev-dependencies]
 [lints]
 workspace = true

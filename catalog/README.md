@@ -71,7 +71,11 @@ needing to grow a new field mapping every time the contract schema does:
     {
       "reference": "core/core.action-item.status-transitioned@1.0.0",
       "deprecated": false,
-      "product": { "...": "the full events/.../product.json EventProductDescriptor" }
+      "product": { "...": "the full events/.../product.json EventProductDescriptor" },
+      "observed_lineage": {
+        "interactions": [{ "event_id": "...", "role": "publisher", "...": "..." }],
+        "drift": [{ "kind": "undeclared_subscriber", "...": "..." }]
+      }
     }
   ],
   "search_index": {
@@ -83,6 +87,17 @@ needing to grow a new field mapping every time the contract schema does:
 Event products (registry#160 / specs/016 FR-014) are listed under `#/events` with
 filters for event, capability, domain, owner, lifecycle, and exposure
 classification. They are not folded into the capability `search_index`.
+
+`observed_lineage` is fixture-backed for v1 (registry#256 / specs/016 FR-013):
+`contracts/governance/observed-lineage-fixture.json` is joined by
+`gather_catalog_data.py` and passed through catalog-builder. It is structurally
+disjoint from `product` (declared state). Event detail pages show declared
+publishers/subscribers vs observed interactions, with a drift badge when
+evidence exists.
+
+AsyncAPI documents (specs/016 FR-015) are regenerated into
+`catalog/asyncapi/<id>@<version>.json` by the `export_async_api` binary during
+the `build-catalog` job; event detail pages link **Download AsyncAPI**.
 
 `test_coverage` is **real, measured data** (`cargo llvm-cov --json --summary-only`
 against the crate under `capability-src/` whose source currently backs the

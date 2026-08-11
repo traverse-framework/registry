@@ -12,7 +12,8 @@ object to transform: `{"capabilities": [...], "personas": [...], "events": [...]
 (the `personas` array added for specs/017-persona-registry, decision-log entry
 53 -- same "carry the entire record" reasoning as capabilities, below; the
 `events` array added for foundation FR-016 / registry#168 so catalog-builder
-can later render ECCA event products).
+can render ECCA event products; registry#256 also joins fixture-backed
+`observed_lineage` onto each event for declared-vs-observed catalog UI).
 
 Mirrors scripts/ci/build_index.py's walk (every capabilities/**/contract.json,
 including deprecated versions, each carrying its own `deprecated` flag) --
@@ -163,6 +164,11 @@ def gather_personas() -> list:
     return entries
 
 
+OBSERVED_LINEAGE_FIXTURE = Path(
+    "contracts/governance/observed-lineage-fixture.json"
+)
+
+
 def gather_events() -> list:
     """FR-016 / registry#160: walk events/**/product.json for catalog-builder.
 
@@ -171,6 +177,11 @@ def gather_events() -> list:
     gather_capabilities -- the catalog's event detail page and FR-014 filters
     (event/capability/domain/owner/lifecycle/classification) need owner,
     domain, field_classifications, support_route, etc., not just a summary.
+
+    Also attaches fixture-backed `observed_lineage` (registry#256 / specs/016
+    FR-013–014) when `contracts/governance/observed-lineage-fixture.json`
+    exists -- structurally disjoint from `product`, mirroring
+    ObservedLineageStore isolation until runtime ingest lands.
     """
     events_dir = Path("events")
     entries = []
@@ -188,7 +199,94 @@ def gather_events() -> list:
             }
         )
 
+    attach_observed_lineage(entries)
     return entries
+
+
+def load_observed_lineage_fixture() -> list:
+    if not OBSERVED_LINEAGE_FIXTURE.is_file():
+        return []
+    try:
+        payload = json.loads(OBSERVED_LINEAGE_FIXTURE.read_text())
+    except (OSError, json.JSONDecodeError) as exc:
+        print(
+            f"warning: unable to load observed-lineage fixture: {exc}",
+            file=sys.stderr,
+        )
+        return []
+    interactions = payload.get("interactions")
+    if not isinstance(interactions, list):
+        return []
+    return interactions
+
+
+def attach_observed_lineage(entries: list) -> None:
+    """Join fixture interactions onto each event and derive drift evidence.
+
+    Drift rules mirror `ObservedLineageStore::record`: an observed publisher
+    (subscriber) whose capability_id is absent from the event product's
+    declared publishers (subscribers) produces UndeclaredPublisher
+    (UndeclaredSubscriber) evidence. Declared-state validation is untouched.
+    """
+    interactions = load_observed_lineage_fixture()
+    for entry in entries:
+        product = entry.get("product") or {}
+        contract = product.get("contract") or {}
+        event_id = contract.get("id")
+        event_version = contract.get("version")
+        if not event_id or not event_version:
+            entry["observed_lineage"] = {"interactions": [], "drift": []}
+            continue
+
+        matching = [
+            item
+            for item in interactions
+            if isinstance(item, dict)
+            and item.get("event_id") == event_id
+            and item.get("event_version") == event_version
+        ]
+        declared_publishers = {
+            ref.get("capability_id")
+            for ref in (contract.get("publishers") or [])
+            if isinstance(ref, dict) and ref.get("capability_id")
+        }
+        declared_subscribers = {
+            ref.get("capability_id")
+            for ref in (contract.get("subscribers") or [])
+            if isinstance(ref, dict) and ref.get("capability_id")
+        }
+
+        drift = []
+        for item in matching:
+            capability_id = item.get("capability_id")
+            role = item.get("role")
+            if not capability_id or role not in ("publisher", "subscriber"):
+                continue
+            if role == "publisher" and capability_id not in declared_publishers:
+                drift.append(
+                    {
+                        "kind": "undeclared_publisher",
+                        "event_id": event_id,
+                        "event_version": event_version,
+                        "capability_id": capability_id,
+                        "observed_at": item.get("observed_at"),
+                    }
+                )
+            elif role == "subscriber" and capability_id not in declared_subscribers:
+                drift.append(
+                    {
+                        "kind": "undeclared_subscriber",
+                        "event_id": event_id,
+                        "event_version": event_version,
+                        "capability_id": capability_id,
+                        "observed_at": item.get("observed_at"),
+                    }
+                )
+
+        entry["observed_lineage"] = {
+            "interactions": matching,
+            "drift": drift,
+        }
 
 
 def gather_catalog_data() -> dict:
