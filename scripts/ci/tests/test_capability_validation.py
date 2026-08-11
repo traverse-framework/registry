@@ -869,5 +869,87 @@ class CheckNewContractArtifactReferenceTests(unittest.TestCase):
             self.assertIn("contract.invalid_artifact_url", codes)
 
 
+
+class CheckEccaCapabilityInventoryCoverageTests(unittest.TestCase):
+    """Spec 534 FR-020 / registry#253: inventory must cover every published capability."""
+
+    def _write_inventory(self, tmp: Path, entries: list) -> Path:
+        inv_path = tmp / "contracts" / "governance" / "ecca-capability-inventory.json"
+        inv_path.parent.mkdir(parents=True, exist_ok=True)
+        inv_path.write_text(
+            json.dumps(
+                {
+                    "kind": "ecca_capability_inventory",
+                    "schema_version": "1.0.0",
+                    "capabilities": entries,
+                }
+            )
+        )
+        return inv_path
+
+    def test_complete_inventory_passes(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            write_contract(
+                tmp,
+                {
+                    "id": "example-capability",
+                    "namespace": "core",
+                    "owner": {"team": "platform"},
+                    "version": "1.0.0",
+                },
+            )
+            product = root / "events" / "core" / "example.event" / "1.0.0" / "product.json"
+            product.parent.mkdir(parents=True, exist_ok=True)
+            product.write_text("{}")
+            self._write_inventory(
+                root,
+                [
+                    {
+                        "capability_id": "example-capability",
+                        "published_versions": ["1.0.0"],
+                        "path": "capabilities/core/example-capability/1.0.0/contract.json",
+                        "classification": "no-event-required",
+                        "evidence": "memory_only; empty emits",
+                    }
+                ],
+            )
+            errors: list = []
+            cwd = Path.cwd()
+            try:
+                import os
+
+                os.chdir(root)
+                capability_validation.check_ecca_capability_inventory_coverage(errors)
+            finally:
+                os.chdir(cwd)
+            self.assertEqual(errors, [])
+
+    def test_missing_inventory_entry_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            write_contract(
+                tmp,
+                {
+                    "id": "example-capability",
+                    "namespace": "core",
+                    "owner": {"team": "platform"},
+                    "version": "1.0.0",
+                },
+            )
+            self._write_inventory(root, [])
+            errors: list = []
+            cwd = Path.cwd()
+            try:
+                import os
+
+                os.chdir(root)
+                capability_validation.check_ecca_capability_inventory_coverage(errors)
+            finally:
+                os.chdir(cwd)
+            codes = [e["code"] for e in errors]
+            self.assertIn("inventory.unpublished_capability_unclassified", codes)
+
+
 if __name__ == "__main__":
     unittest.main()

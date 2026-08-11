@@ -53,6 +53,11 @@ reason_code/status string enum value. Diff-based so already-published
 immutable versions that predate (or were stripped of) use_cases are never
 re-judged; correcting them requires an honesty patch-bump (new version).
 
+Also enforces Spec 534 FR-020 inventory completeness (registry#170/#253):
+every published capability ID under capabilities/*/*/*/contract.json MUST have
+a classification entry in contracts/governance/ecca-capability-inventory.json.
+Whole-tree — silent skips/drift are prohibited.
+
 Also enforces specs/001-registry-foundation FR-007 and
 specs/007-artifact-hosting FR-001 (registry#187): a newly-ADDED
 contract.json MUST include artifact.digest (sha256:…) and artifact.url
@@ -813,6 +818,139 @@ def validate_workflow(path: Path, errors: list) -> None:
         fail(errors, "workflow.invalid_semver", str(path), f"'{version}' is not a valid semver string")
 
 
+
+def published_capability_ids(capabilities_dir: Path = Path("capabilities")) -> set:
+    """Unique capability IDs that have at least one published contract.json."""
+    ids: set = set()
+    if not capabilities_dir.is_dir():
+        return ids
+    for contract_path in capabilities_dir.rglob("contract.json"):
+        parts = contract_path.parts
+        try:
+            idx = parts.index("capabilities")
+            ids.add(parts[idx + 2])
+        except (ValueError, IndexError):
+            continue
+    return ids
+
+
+def check_ecca_capability_inventory_coverage(errors: list) -> None:
+    """Spec 534 FR-020 (registry#170/#253): inventory MUST classify every published
+    capability. Skipping or patching around this file is not allowed — CI fails
+    when coverage drifts."""
+    inventory_path = Path("contracts/governance/ecca-capability-inventory.json")
+    if not inventory_path.is_file():
+        fail(
+            errors,
+            "inventory.missing",
+            str(inventory_path),
+            "FR-020 inventory file is required and must not be skipped",
+        )
+        return
+
+    try:
+        inventory = json.loads(inventory_path.read_text())
+    except Exception as exc:
+        fail(
+            errors,
+            "inventory.invalid_json",
+            str(inventory_path),
+            f"Unable to parse inventory JSON: {exc}",
+        )
+        return
+
+    entries = inventory.get("capabilities")
+    if not isinstance(entries, list):
+        fail(
+            errors,
+            "inventory.invalid_shape",
+            str(inventory_path),
+            "inventory.capabilities must be an array",
+        )
+        return
+
+    inventoried: set = set()
+    for index, entry in enumerate(entries):
+        if not isinstance(entry, dict):
+            fail(
+                errors,
+                "inventory.invalid_entry",
+                str(inventory_path),
+                f"capabilities[{index}] must be an object",
+            )
+            continue
+        capability_id = entry.get("capability_id")
+        if not isinstance(capability_id, str) or not capability_id.strip():
+            fail(
+                errors,
+                "inventory.missing_capability_id",
+                str(inventory_path),
+                f"capabilities[{index}] missing capability_id",
+            )
+            continue
+        if capability_id in inventoried:
+            fail(
+                errors,
+                "inventory.duplicate_capability_id",
+                str(inventory_path),
+                f"duplicate inventory entry for '{capability_id}'",
+            )
+        inventoried.add(capability_id)
+
+        classification = entry.get("classification")
+        if classification not in {"no-event-required", "governed-event-declared"}:
+            fail(
+                errors,
+                "inventory.invalid_classification",
+                str(inventory_path),
+                f"'{capability_id}' classification must be "
+                "no-event-required or governed-event-declared",
+            )
+        evidence = entry.get("evidence")
+        if not isinstance(evidence, str) or not evidence.strip():
+            fail(
+                errors,
+                "inventory.missing_evidence",
+                str(inventory_path),
+                f"'{capability_id}' is missing evidence",
+            )
+        entry_path = entry.get("path")
+        if isinstance(entry_path, str) and entry_path and not Path(entry_path).is_file():
+            fail(
+                errors,
+                "inventory.path_missing",
+                str(inventory_path),
+                f"'{capability_id}' path '{entry_path}' does not exist",
+            )
+        if classification == "governed-event-declared":
+            product = entry.get("event_product") or {}
+            product_path = product.get("path") if isinstance(product, dict) else None
+            if not isinstance(product_path, str) or not product_path.strip():
+                fail(
+                    errors,
+                    "inventory.missing_event_product",
+                    str(inventory_path),
+                    f"'{capability_id}' governed-event-declared requires event_product.path",
+                )
+            elif not Path(product_path).is_file():
+                fail(
+                    errors,
+                    "inventory.event_product_missing",
+                    str(inventory_path),
+                    f"'{capability_id}' event_product.path '{product_path}' does not exist",
+                )
+
+    published = published_capability_ids()
+    missing = sorted(published - inventoried)
+    for capability_id in missing:
+        fail(
+            errors,
+            "inventory.unpublished_capability_unclassified",
+            str(inventory_path),
+            f"Published capability '{capability_id}' has no FR-020 inventory entry "
+            "(inventory write must not be skipped)",
+        )
+
 def check_workflow_capability_references(errors: list) -> None:
     """A workflow's nodes must reference capability versions that actually
     exist in this registry -- the workflow equivalent of
@@ -1064,6 +1202,8 @@ def main() -> int:
         check_workflow_capability_references(errors)
 
     run_event_product_validation(errors)
+
+    check_ecca_capability_inventory_coverage(errors)
 
     base_sha = None
     head_sha = None

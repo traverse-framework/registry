@@ -1,29 +1,26 @@
 # ECCA Capability Migration Report
 
-Governing spec: Spec 534 FR-020. Tracking issue: `traverse-framework/registry#170`.
+Governing spec: Spec 534 FR-020. Tracking issue: `traverse-framework/registry#170`
+(completeness gate: `traverse-framework/registry#253`).
 
 ## Scope
 
-All 11 unique capability ids currently published in `capabilities/*/*/*/contract.json`
-(49 published versions total, spanning every historical version of each id).
+All 28 unique capability ids currently published in `capabilities/*/*/*/contract.json`
+(97 published versions total, spanning every historical version of each id).
 
 ## Outcome
 
 | Outcome | Count |
 |---|---|
-| `no-event-required` (evidence-backed) | 11 |
-| `governed-event-declared` | 0 |
+| `no-event-required` (evidence-backed) | 27 |
+| `governed-event-declared` | 1 |
 | Blocked | 0 |
 | Exceptions | 0 |
 
-Every one of the 11 capabilities has `side_effects: [memory_only]` and empty
-`emits`/`consumes` on every published version — each is a pure, deterministic
-transformation (validation, formatting, analysis, recommendation, or
-summarization) that returns its result directly to the caller. None has an
-externally meaningful asynchronous effect, so none requires a governed event
-product. No capability was forced to declare an artificial event to satisfy
-a quota (Spec 534 QG-004) — this report is the evidence that conclusion is
-warranted, not assumed.
+Most capabilities have empty `emits`/`consumes` and return results synchronously to
+the caller, so they classify `no-event-required` with evidence. The Loop capability
+`core.transition-action-status` declares governed event
+`core.action-item.status-transitioned@1.0.0` (`governed-event-declared`).
 
 Full per-capability evidence: `contracts/governance/ecca-capability-inventory.json`.
 
@@ -43,8 +40,7 @@ inventory are what does.
 
 ## Regression coverage
 
-No new capability may be republished under a changed emits/consumes
-declaration without going through the existing `capability_validation.py`
-gate and, once a real event product exists, `validate_event_product_descriptor`.
-No enforcement code changes were needed for this inventory pass itself,
-since every capability here has zero declared events to validate.
+`scripts/ci/capability_validation.py` runs
+`check_ecca_capability_inventory_coverage` on every CI pass. A published
+capability without an inventory entry fails the gate — inventory writes
+must not be skipped or patched around.
