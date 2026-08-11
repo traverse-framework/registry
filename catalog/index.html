@@ -350,7 +350,14 @@
   }
 
   function fieldRow(label, valueNode) {
-    if (!valueNode) { return null; }
+    // An empty DocumentFragment, not null: many call sites do
+    // appEl.appendChild(fieldRow(...)) directly (not through el()'s own
+    // null-safe children loop), so returning null throws
+    // "parameter 1 is not of type 'Node'" the first time a real falsy
+    // field value (e.g. a null causation_id_field) reaches one of them.
+    // An empty fragment is a valid Node that appends nothing -- same
+    // visible result, no crash.
+    if (!valueNode) { return document.createDocumentFragment(); }
     return el("div", { className: "field-row" }, [
       el("span", { className: "field-label", textContent: label }),
       el("span", { className: "field-value" }, [valueNode]),
