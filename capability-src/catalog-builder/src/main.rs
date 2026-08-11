@@ -8,7 +8,7 @@
 //! output via `fd_read`/`fd_write`, no filesystem access, so this crate
 //! cannot walk those trees itself):
 //! `{capabilities: [{deprecated, contract, test_coverage}],
-//! personas: [{persona}], events: [{deprecated, product}]}`.
+//! personas: [{persona}], events: [{deprecated, product, observed_lineage?}]}`.
 //! Output: one JSON object with a deterministically sorted `capabilities`
 //! list (each entry carrying the *entire* source contract, not a hand-picked
 //! field subset -- the catalog's per-capability detail page needs "all the
@@ -17,7 +17,8 @@
 //! deterministically sorted `personas` list (specs/017-persona-registry,
 //! decision-log entry 53), and a deterministically sorted `events` list
 //! (specs/016 FR-014 / registry#160; each entry carries the entire
-//! EventProductDescriptor), which registry#106's GitHub Pages template
+//! EventProductDescriptor plus optional fixture-backed `observed_lineage`
+//! for registry#256), which registry#106's GitHub Pages template
 //! renders and searches client-side.
 
 #![cfg_attr(not(test), no_std)]
@@ -138,14 +139,20 @@ fn build_events(event_records: &[Value]) -> Vec<Value> {
             .and_then(Value::as_bool)
             .unwrap_or(false);
 
-        events.push(object(alloc::vec![
+        // observed_lineage is optional and structurally disjoint from product
+        // (specs/016 FR-013); pass through when gather attached the fixture.
+        let mut fields = alloc::vec![
             (
                 "reference",
                 Value::String(capability_reference(namespace, id, version)),
             ),
             ("deprecated", Value::Bool(deprecated)),
             ("product", product.clone()),
-        ]));
+        ];
+        if let Some(observed_lineage) = record.get("observed_lineage") {
+            fields.push(("observed_lineage", observed_lineage.clone()));
+        }
+        events.push(object(fields));
     }
 
     events.sort_by(|a, b| {
@@ -672,5 +679,52 @@ mod tests {
         let input = events_input(vec![object(vec![("deprecated", Value::Bool(false))])]);
         let catalog = build_catalog(&input);
         assert!(catalog.get("events").unwrap().as_array().unwrap().is_empty());
+    }
+
+    #[test]
+    fn observed_lineage_is_passed_through_when_present() {
+        let product = event_product(
+            "core",
+            "core.action-item.status-transitioned",
+            "1.0.0",
+            "Status transitioned",
+            "internal",
+        );
+        let observed = object(vec![
+            (
+                "interactions",
+                Value::Array(vec![object(vec![
+                    (
+                        "event_id",
+                        Value::String(String::from("core.action-item.status-transitioned")),
+                    ),
+                    ("event_version", Value::String(String::from("1.0.0"))),
+                    (
+                        "capability_id",
+                        Value::String(String::from("core.transition-action-status")),
+                    ),
+                    ("role", Value::String(String::from("publisher"))),
+                    ("observed_at", Value::String(String::from("2026-08-10T12:00:00Z"))),
+                ])]),
+            ),
+            (
+                "drift",
+                Value::Array(vec![object(vec![
+                    ("kind", Value::String(String::from("undeclared_subscriber"))),
+                    (
+                        "capability_id",
+                        Value::String(String::from("core.unexpected-status-watcher")),
+                    ),
+                ])]),
+            ),
+        ]);
+        let record = object(vec![
+            ("deprecated", Value::Bool(false)),
+            ("product", product),
+            ("observed_lineage", observed.clone()),
+        ]);
+        let catalog = build_catalog(&events_input(vec![record]));
+        let events = catalog.get("events").unwrap().as_array().unwrap();
+        assert_eq!(events[0].get("observed_lineage").unwrap(), &observed);
     }
 }
