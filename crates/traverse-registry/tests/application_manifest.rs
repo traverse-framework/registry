@@ -2732,6 +2732,208 @@ fn application_registration_supports_public_scope_lookup_path() {
     );
 }
 
+#[test]
+fn accepts_valid_connector_binding_covering_component_requirement() {
+    let fixture = AppFixture::new("connector-binding-valid");
+    let contract_path =
+        write_contract_with_connector_requirement(&fixture, "traverse.http", "^1.0.0");
+    let wasm_digest = fixture.write_wasm("connector binding component bytes");
+    fixture.write_component_manifest(&json!({
+        "contract_path": contract_path,
+        "wasm_digest": format!("sha256:{wasm_digest}")
+    }));
+    fixture.write_app_manifest_with_connector_bindings(
+        &json!([component_ref(
+            "expedition.readiness.validate-team-readiness-component",
+            "1.0.0",
+            &format!("sha256:{wasm_digest}"),
+            "components/validate-team-readiness/component.manifest.json",
+        )]),
+        &json!([{
+            "connector_id": "traverse.http",
+            "version_range": "^1.0.0",
+            "config_ref": "http.default"
+        }]),
+    );
+
+    let bundle = load_application_bundle_manifest(&fixture.app_manifest_path())
+        .expect("a compatible connector binding should validate");
+
+    assert_eq!(bundle.connector_bindings.len(), 1);
+    assert_eq!(bundle.connector_bindings[0].connector_id, "traverse.http");
+}
+
+#[test]
+fn rejects_missing_connector_binding_for_required_connector() {
+    let fixture = AppFixture::new("connector-binding-missing");
+    let contract_path =
+        write_contract_with_connector_requirement(&fixture, "traverse.http", "^1.0.0");
+    let wasm_digest = fixture.write_wasm("connector binding component bytes");
+    fixture.write_component_manifest(&json!({
+        "contract_path": contract_path,
+        "wasm_digest": format!("sha256:{wasm_digest}")
+    }));
+    fixture.write_app_manifest_with_connector_bindings(
+        &json!([component_ref(
+            "expedition.readiness.validate-team-readiness-component",
+            "1.0.0",
+            &format!("sha256:{wasm_digest}"),
+            "components/validate-team-readiness/component.manifest.json",
+        )]),
+        &json!([]),
+    );
+
+    let failure = load_application_bundle_manifest(&fixture.app_manifest_path())
+        .expect_err("a required connector without any binding must be rejected");
+
+    assert_eq!(
+        failure.errors[0].code,
+        ApplicationManifestErrorCode::ConnectorBindingMissing
+    );
+}
+
+#[test]
+fn rejects_connector_binding_range_incompatible_with_requirement() {
+    let fixture = AppFixture::new("connector-binding-incompatible");
+    let contract_path =
+        write_contract_with_connector_requirement(&fixture, "traverse.http", "^1.0.0");
+    let wasm_digest = fixture.write_wasm("connector binding component bytes");
+    fixture.write_component_manifest(&json!({
+        "contract_path": contract_path,
+        "wasm_digest": format!("sha256:{wasm_digest}")
+    }));
+    fixture.write_app_manifest_with_connector_bindings(
+        &json!([component_ref(
+            "expedition.readiness.validate-team-readiness-component",
+            "1.0.0",
+            &format!("sha256:{wasm_digest}"),
+            "components/validate-team-readiness/component.manifest.json",
+        )]),
+        &json!([{
+            "connector_id": "traverse.http",
+            "version_range": "^2.0.0",
+            "config_ref": "http.default"
+        }]),
+    );
+
+    let failure = load_application_bundle_manifest(&fixture.app_manifest_path())
+        .expect_err("a disjoint connector binding range must be rejected");
+
+    assert_eq!(
+        failure.errors[0].code,
+        ApplicationManifestErrorCode::ConnectorBindingIncompatible
+    );
+}
+
+#[test]
+fn rejects_malformed_connector_binding_fields() {
+    let fixture = AppFixture::new("connector-binding-malformed");
+    let wasm_digest = fixture.write_wasm("connector binding component bytes");
+    fixture.write_component_manifest(&json!({ "wasm_digest": format!("sha256:{wasm_digest}") }));
+    fixture.write_app_manifest_with_connector_bindings(
+        &json!([component_ref(
+            "expedition.readiness.validate-team-readiness-component",
+            "1.0.0",
+            &format!("sha256:{wasm_digest}"),
+            "components/validate-team-readiness/component.manifest.json",
+        )]),
+        &json!([{
+            "connector_id": "traverse.http",
+            "version_range": "not a semver range",
+            "config_ref": "http.default"
+        }]),
+    );
+
+    let failure = load_application_bundle_manifest(&fixture.app_manifest_path())
+        .expect_err("an unparseable version_range must be rejected");
+
+    assert_eq!(
+        failure.errors[0].code,
+        ApplicationManifestErrorCode::ConnectorBindingMalformed
+    );
+}
+
+#[test]
+fn rejects_connector_binding_with_empty_config_ref() {
+    let fixture = AppFixture::new("connector-binding-empty-config-ref");
+    let wasm_digest = fixture.write_wasm("connector binding component bytes");
+    fixture.write_component_manifest(&json!({ "wasm_digest": format!("sha256:{wasm_digest}") }));
+    fixture.write_app_manifest_with_connector_bindings(
+        &json!([component_ref(
+            "expedition.readiness.validate-team-readiness-component",
+            "1.0.0",
+            &format!("sha256:{wasm_digest}"),
+            "components/validate-team-readiness/component.manifest.json",
+        )]),
+        &json!([{
+            "connector_id": "traverse.http",
+            "version_range": "^1.0.0",
+            "config_ref": ""
+        }]),
+    );
+
+    let failure = load_application_bundle_manifest(&fixture.app_manifest_path())
+        .expect_err("an empty config_ref must be rejected");
+
+    assert_eq!(
+        failure.errors[0].code,
+        ApplicationManifestErrorCode::ConnectorBindingMalformed
+    );
+}
+
+#[test]
+fn rejects_duplicate_connector_bindings_for_same_connector_id() {
+    let fixture = AppFixture::new("connector-binding-duplicate");
+    let wasm_digest = fixture.write_wasm("connector binding component bytes");
+    fixture.write_component_manifest(&json!({ "wasm_digest": format!("sha256:{wasm_digest}") }));
+    fixture.write_app_manifest_with_connector_bindings(
+        &json!([component_ref(
+            "expedition.readiness.validate-team-readiness-component",
+            "1.0.0",
+            &format!("sha256:{wasm_digest}"),
+            "components/validate-team-readiness/component.manifest.json",
+        )]),
+        &json!([
+            {
+                "connector_id": "traverse.http",
+                "version_range": "^1.0.0",
+                "config_ref": "http.default"
+            },
+            {
+                "connector_id": "traverse.http",
+                "version_range": "^1.5.0",
+                "config_ref": "http.secondary"
+            }
+        ]),
+    );
+
+    let failure = load_application_bundle_manifest(&fixture.app_manifest_path())
+        .expect_err("duplicate bindings for the same connector_id must be rejected");
+
+    assert_eq!(
+        failure.errors[0].code,
+        ApplicationManifestErrorCode::ConnectorBindingDuplicate
+    );
+}
+
+#[test]
+fn manifests_without_connector_requirements_do_not_require_bindings() {
+    let fixture = AppFixture::new("connector-binding-not-required");
+    let wasm_digest = fixture.write_wasm("connector binding component bytes");
+    fixture.write_component_manifest(&json!({ "wasm_digest": format!("sha256:{wasm_digest}") }));
+    fixture.write_app_manifest(&json!([component_ref(
+        "expedition.readiness.validate-team-readiness-component",
+        "1.0.0",
+        &format!("sha256:{wasm_digest}"),
+        "components/validate-team-readiness/component.manifest.json",
+    )]));
+
+    let bundle = load_application_bundle_manifest(&fixture.app_manifest_path())
+        .expect("a component with no connector_requirements needs no bindings");
+
+    assert!(bundle.connector_bindings.is_empty());
+}
+
 struct AppFixture {
     root: PathBuf,
 }
@@ -2797,6 +2999,40 @@ impl AppFixture {
             &json!({}),
             Some(state_machine),
         );
+    }
+
+    fn write_app_manifest_with_connector_bindings(
+        &self,
+        components: &serde_json::Value,
+        connector_bindings: &serde_json::Value,
+    ) {
+        let mut app = json!({
+            "app_id": "hello.world.app",
+            "version": "1.0.0",
+            "schema_version": "1.0.0",
+            "workspace_defaults": {
+                "workspace_id": "test",
+                "config_path": "workspace.config.json"
+            },
+            "components": components,
+            "workflows": [],
+            "model_dependencies": [],
+            "config_schema": {
+                "type": "object"
+            },
+            "default_config": {},
+            "placement_policy": {
+                "preferred_targets": ["local"]
+            },
+            "public_surfaces": ["cli"]
+        });
+        app.as_object_mut()
+            .expect("app manifest should be an object")
+            .insert(
+                "connector_bindings".to_string(),
+                connector_bindings.clone(),
+            );
+        fs::write(self.app_manifest_path(), app.to_string()).expect("app manifest should write");
     }
 
     fn write_app_manifest_with_config(
@@ -3145,6 +3381,32 @@ fn component_ref(id: &str, version: &str, digest: &str, manifest_path: &str) -> 
         "digest": digest,
         "manifest_path": manifest_path
     })
+}
+
+/// Writes a copy of the `validate-team-readiness` reference contract with a
+/// Spec 039 `connector_requirements` entry added, for Spec 103 connector
+/// binding tests that need a component whose capability actually requires a
+/// connector.
+fn write_contract_with_connector_requirement(
+    fixture: &AppFixture,
+    connector_id: &str,
+    version_range: &str,
+) -> PathBuf {
+    let base_path = readiness_contract_path();
+    let mut contract: Value = serde_json::from_str(
+        &fs::read_to_string(&base_path).expect("base contract fixture should read"),
+    )
+    .expect("base contract fixture should parse");
+    contract["connector_requirements"] = json!([{
+        "connector_id": connector_id,
+        "version": version_range
+    }]);
+    let path = fixture
+        .root
+        .join("contract-with-connector-requirement.json");
+    fs::write(&path, contract.to_string())
+        .expect("contract with connector requirement should write");
+    path
 }
 
 fn config_schema() -> serde_json::Value {

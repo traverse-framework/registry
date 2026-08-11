@@ -179,6 +179,36 @@ pub fn resolve_version_range(
     })
 }
 
+/// Approximates whether two semver ranges can be simultaneously satisfied by
+/// some version.
+///
+/// `semver::VersionReq` has no intersection operator, so this checks each
+/// range's own lower-bound ("floor") version against the other range: a
+/// true overlap always makes at least one direction match, and true
+/// disjoint ranges always make both directions fail. This is exact for the
+/// single-comparator caret/tilde/exact ranges used throughout this registry
+/// (e.g. `^1.0.0`) and only approximate for compound or upper-bound-only
+/// comparators.
+#[must_use]
+pub fn version_ranges_overlap(a: &str, b: &str) -> bool {
+    let (Ok(req_a), Ok(req_b)) = (VersionReq::parse(a), VersionReq::parse(b)) else {
+        return false;
+    };
+    let floor_a = comparator_floor_version(&req_a);
+    let floor_b = comparator_floor_version(&req_b);
+    floor_a.is_some_and(|version| req_b.matches(&version))
+        || floor_b.is_some_and(|version| req_a.matches(&version))
+}
+
+fn comparator_floor_version(req: &VersionReq) -> Option<Version> {
+    let comparator = req.comparators.first()?;
+    Some(Version::new(
+        comparator.major,
+        comparator.minor.unwrap_or(0),
+        comparator.patch.unwrap_or(0),
+    ))
+}
+
 #[cfg(test)]
 mod tests {
     #![allow(clippy::expect_used)]
@@ -595,5 +625,30 @@ mod tests {
         let full_scan =
             registry.discover(LookupScope::PublicOnly, &crate::DiscoveryQuery::default());
         assert_eq!(full_scan.len(), 253);
+    }
+
+    #[test]
+    fn version_ranges_overlap_detects_overlapping_caret_ranges() {
+        assert!(version_ranges_overlap("^1.0.0", "^1.2.0"));
+        assert!(version_ranges_overlap("^1.2.0", "^1.0.0"));
+        assert!(version_ranges_overlap("~1.2.0", "^1.0.0"));
+    }
+
+    #[test]
+    fn version_ranges_overlap_rejects_disjoint_caret_ranges() {
+        assert!(!version_ranges_overlap("^1.0.0", "^2.0.0"));
+        assert!(!version_ranges_overlap("^2.0.0", "^1.5.0"));
+    }
+
+    #[test]
+    fn version_ranges_overlap_rejects_unparseable_ranges() {
+        assert!(!version_ranges_overlap("not a range", "^1.0.0"));
+        assert!(!version_ranges_overlap("^1.0.0", "not a range"));
+    }
+
+    #[test]
+    fn version_ranges_overlap_matches_identical_exact_versions() {
+        assert!(version_ranges_overlap("=1.2.3", "=1.2.3"));
+        assert!(!version_ranges_overlap("=1.2.3", "=1.2.4"));
     }
 }

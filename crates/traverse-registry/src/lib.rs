@@ -4,6 +4,7 @@ mod application_manifest;
 mod async_api;
 mod async_api_export;
 mod bundle;
+mod connector_activation;
 pub mod dependency_resolver;
 mod event_products;
 mod event_product_tree;
@@ -22,6 +23,7 @@ pub use application_manifest::*;
 pub use async_api::*;
 pub use async_api_export::*;
 pub use bundle::*;
+pub use connector_activation::*;
 pub use dependency_resolver::{
     DigestMismatch, MAX_TRANSITIVE_DEPTH, ResolutionError, ResolvedDependencyLock,
     lookup_lock_record, resolve_dependencies, verify_lock_digests,
@@ -38,11 +40,13 @@ pub use public_registry_cache::*;
 pub use public_registry_state::*;
 pub use semver_resolver::{
     AmbiguousCandidate, RangeResolutionError, ResolvedRangeCapability, resolve_version_range,
+    version_ranges_overlap,
 };
 pub use workflows::*;
 pub use workspace_app_state::*;
 
 use semver::{Version, VersionReq};
+use serde_json::Value;
 use std::cmp::Ordering;
 use std::collections::{BTreeMap, BTreeSet};
 use traverse_contracts::{
@@ -191,6 +195,7 @@ pub struct ConnectorRegistryRecord {
     pub version: String,
     pub capabilities_provided: Vec<String>,
     pub supported_placement_targets: Vec<ExecutionTarget>,
+    pub required_config_schema: Value,
     pub contract_path: String,
     pub registered_at: String,
     pub governing_spec: String,
@@ -393,6 +398,7 @@ impl CapabilityRegistry {
             version: connector.version,
             capabilities_provided: connector.capabilities_provided,
             supported_placement_targets: connector.supported_placement_targets,
+            required_config_schema: connector.required_config_schema,
             contract_path: request.contract_path,
             registered_at: request.registered_at,
             governing_spec: request.governing_spec,
@@ -1576,6 +1582,7 @@ mod tests {
                 version: "not-semver".to_string(),
                 capabilities_provided: vec!["traverse.env.read".to_string()],
                 supported_placement_targets: vec![ExecutionTarget::Local],
+                required_config_schema: serde_json::json!({"type": "object"}),
                 contract_path: "contracts/connectors/traverse.env/connector_contract.json"
                     .to_string(),
                 registered_at: "2026-04-19T00:00:00Z".to_string(),

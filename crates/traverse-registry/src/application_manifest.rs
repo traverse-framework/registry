@@ -1,3 +1,4 @@
+use semver::VersionReq;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use sha2::{Digest, Sha256};
@@ -15,7 +16,7 @@ use crate::{
     CapabilityRegistration, CapabilityRegistry, ComposabilityMetadata, CompositionKind,
     CompositionPattern, EventRegistry, ImplementationKind, LookupScope, ModelResolutionEvidence,
     RegistryProvenance, RegistryScope, SourceKind, SourceReference, WorkflowDefinition,
-    WorkflowRegistration, WorkflowRegistry,
+    WorkflowRegistration, WorkflowRegistry, version_ranges_overlap,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -26,6 +27,7 @@ pub struct ApplicationBundleManifest {
     pub workspace_defaults: Value,
     pub components: Vec<ApplicationComponent>,
     pub workflows: Vec<ApplicationWorkflowRef>,
+    pub connector_bindings: Vec<ApplicationConnectorBinding>,
     pub model_dependencies: Vec<ApplicationModelDependency>,
     pub config_schema: Value,
     pub default_config: Value,
@@ -388,6 +390,17 @@ pub struct ApplicationWorkflowRef {
     pub path: String,
 }
 
+/// A Spec 103 application-level binding of an abstract Spec 039 connector
+/// requirement to a connector id, a compatible semver range, and a
+/// non-secret named reference into host-owned configuration. Never carries
+/// the private configuration value itself.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
+pub struct ApplicationConnectorBinding {
+    pub connector_id: String,
+    pub version_range: String,
+    pub config_ref: String,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 pub struct ApplicationEffectiveConfig {
     pub values: Value,
@@ -537,6 +550,10 @@ pub enum ApplicationManifestErrorCode {
     AppStateMachineUnreachableState,
     AppStateMachineUndefinedState,
     AppStateMachineUndefinedCapability,
+    ConnectorBindingMalformed,
+    ConnectorBindingDuplicate,
+    ConnectorBindingMissing,
+    ConnectorBindingIncompatible,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -559,6 +576,8 @@ struct ApplicationManifestSerde {
     workspace_defaults: Value,
     components: Vec<ApplicationComponentRef>,
     workflows: Vec<ApplicationWorkflowRef>,
+    #[serde(default)]
+    connector_bindings: Vec<ApplicationConnectorBinding>,
     model_dependencies: Vec<ApplicationModelDependencySerde>,
     config_schema: Value,
     default_config: Value,
@@ -760,6 +779,7 @@ pub fn load_application_bundle_manifest_with_resolver(
         .map(|component| load_component(manifest_dir, component, resolver))
         .collect::<Result<Vec<_>, _>>()?;
     let state_machine = validate_state_machine(&manifest, &components)?;
+    validate_connector_bindings(&manifest.connector_bindings, &components)?;
 
     Ok(ApplicationBundleManifest {
         app_id: manifest.app_id,
@@ -768,6 +788,7 @@ pub fn load_application_bundle_manifest_with_resolver(
         workspace_defaults: manifest.workspace_defaults,
         components,
         workflows: manifest.workflows,
+        connector_bindings: manifest.connector_bindings,
         model_dependencies,
         config_schema: manifest.config_schema,
         default_config: manifest.default_config,
@@ -990,6 +1011,7 @@ fn application_manifest_digest(manifest: &ApplicationBundleManifest) -> String {
             "manifest_path": component.reference.manifest_path,
         })).collect::<Vec<_>>(),
         "workflows": manifest.workflows,
+        "connector_bindings": manifest.connector_bindings,
         "model_dependencies": manifest.model_dependencies,
         "config_schema": manifest.config_schema,
         "default_config": manifest.default_config,
@@ -1090,6 +1112,76 @@ fn ensure_unique_component_refs(
             ));
         }
     }
+    Ok(())
+}
+
+/// Statically validates Spec 103 connector bindings against the abstract
+/// Spec 039 `connector_requirements` declared by each component's capability
+/// contract. Reads only portable, bundle-local data (never private host
+/// configuration), matching FR-002's "static bundle validation" scope.
+fn validate_connector_bindings(
+    bindings: &[ApplicationConnectorBinding],
+    components: &[ApplicationComponent],
+) -> Result<(), ApplicationManifestFailure> {
+    let mut seen_connector_ids = BTreeSet::new();
+    for binding in bindings {
+        let malformed = !has_text(&binding.connector_id)
+            || !has_text(&binding.config_ref)
+            || VersionReq::parse(&binding.version_range).is_err();
+        if malformed {
+            return Err(single_error(
+                ApplicationManifestErrorCode::ConnectorBindingMalformed,
+                format!("connector_bindings[{}]", binding.connector_id),
+                "connector binding requires a non-empty connector_id, config_ref, and a valid semver version_range".to_string(),
+            ));
+        }
+        if !seen_connector_ids.insert(binding.connector_id.clone()) {
+            return Err(single_error(
+                ApplicationManifestErrorCode::ConnectorBindingDuplicate,
+                format!("connector_bindings[{}]", binding.connector_id),
+                format!(
+                    "duplicate connector binding for connector_id {}",
+                    binding.connector_id
+                ),
+            ));
+        }
+    }
+
+    let mut required_ranges: BTreeMap<String, Vec<String>> = BTreeMap::new();
+    for component in components {
+        for requirement in &component.contract.connector_requirements {
+            required_ranges
+                .entry(requirement.connector_id.clone())
+                .or_default()
+                .push(requirement.version.clone());
+        }
+    }
+
+    for (connector_id, ranges) in &required_ranges {
+        let Some(binding) = bindings
+            .iter()
+            .find(|binding| &binding.connector_id == connector_id)
+        else {
+            return Err(single_error(
+                ApplicationManifestErrorCode::ConnectorBindingMissing,
+                format!("connector_bindings[{connector_id}]"),
+                format!("no connector binding declared for required connector {connector_id}"),
+            ));
+        };
+        for range in ranges {
+            if !version_ranges_overlap(&binding.version_range, range) {
+                return Err(single_error(
+                    ApplicationManifestErrorCode::ConnectorBindingIncompatible,
+                    format!("connector_bindings[{connector_id}]"),
+                    format!(
+                        "connector binding range {} is incompatible with required range {range} for {connector_id}",
+                        binding.version_range
+                    ),
+                ));
+            }
+        }
+    }
+
     Ok(())
 }
 
