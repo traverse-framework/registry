@@ -209,6 +209,23 @@ jobs:
             capability-src/doc-approval-analyze
             capability-src/doc-approval-recommend
             capability-src/meeting-notes-process
+            capability-src/core-aggregate-team-action-health
+            capability-src/core-assign-ownership
+            capability-src/core-authorize
+            capability-src/core-calculate-deadline-pressure
+            capability-src/core-calculate-price
+            capability-src/core-decide-escalation
+            capability-src/core-evaluate-completion-quality
+            capability-src/core-extract-action-items
+            capability-src/core-generate-nudge-message
+            capability-src/core-normalize-participants
+            capability-src/core-notify-stakeholders
+            capability-src/core-process-comment
+            capability-src/core-record-nudge-event
+            capability-src/core-select-items-for-followup
+            capability-src/core-transition-action-status
+            capability-src/core-validate-action-item
+            capability-src/platform-decide-state-transition
 
       - name: Install wasmtime
         run: |
