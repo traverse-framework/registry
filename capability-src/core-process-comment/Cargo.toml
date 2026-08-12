@@ -1,0 +1,17 @@
+[workspace]
+
+[package]
+name = "core-process-comment-capability"
+version = "0.1.0"
+edition = "2021"
+publish = false
+description = "Source mirror for core-process-comment coverage."
+
+[[bin]]
+name = "core-process-comment-capability"
+path = "src/main.rs"
+
+[profile.release]
+opt-level = "s"
+lto = true
+panic = "abort"

@@ -1,0 +1,17 @@
+[workspace]
+
+[package]
+name = "core-notify-stakeholders-capability"
+version = "0.1.0"
+edition = "2021"
+publish = false
+description = "Source mirror for core-notify-stakeholders coverage."
+
+[[bin]]
+name = "core-notify-stakeholders-capability"
+path = "src/main.rs"
+
+[profile.release]
+opt-level = "s"
+lto = true
+panic = "abort"

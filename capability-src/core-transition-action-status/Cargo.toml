@@ -1,0 +1,17 @@
+[workspace]
+
+[package]
+name = "core-transition-action-status-capability"
+version = "0.1.0"
+edition = "2021"
+publish = false
+description = "Source mirror for core-transition-action-status coverage."
+
+[[bin]]
+name = "core-transition-action-status-capability"
+path = "src/main.rs"
+
+[profile.release]
+opt-level = "s"
+lto = true
+panic = "abort"

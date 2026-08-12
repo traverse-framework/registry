@@ -1,0 +1,17 @@
+[workspace]
+
+[package]
+name = "core-normalize-participants-capability"
+version = "0.1.0"
+edition = "2021"
+publish = false
+description = "Source mirror for core-normalize-participants coverage."
+
+[[bin]]
+name = "core-normalize-participants-capability"
+path = "src/main.rs"
+
+[profile.release]
+opt-level = "s"
+lto = true
+panic = "abort"

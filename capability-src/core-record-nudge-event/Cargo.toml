@@ -1,0 +1,17 @@
+[workspace]
+
+[package]
+name = "core-record-nudge-event-capability"
+version = "0.1.0"
+edition = "2021"
+publish = false
+description = "Source mirror for core-record-nudge-event coverage."
+
+[[bin]]
+name = "core-record-nudge-event-capability"
+path = "src/main.rs"
+
+[profile.release]
+opt-level = "s"
+lto = true
+panic = "abort"

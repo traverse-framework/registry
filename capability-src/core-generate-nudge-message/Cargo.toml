@@ -1,0 +1,17 @@
+[workspace]
+
+[package]
+name = "core-generate-nudge-message-capability"
+version = "0.1.0"
+edition = "2021"
+publish = false
+description = "Source mirror for core-generate-nudge-message coverage."
+
+[[bin]]
+name = "core-generate-nudge-message-capability"
+path = "src/main.rs"
+
+[profile.release]
+opt-level = "s"
+lto = true
+panic = "abort"

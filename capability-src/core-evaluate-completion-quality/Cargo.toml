@@ -1,0 +1,17 @@
+[workspace]
+
+[package]
+name = "core-evaluate-completion-quality-capability"
+version = "0.1.0"
+edition = "2021"
+publish = false
+description = "Source mirror for core-evaluate-completion-quality coverage."
+
+[[bin]]
+name = "core-evaluate-completion-quality-capability"
+path = "src/main.rs"
+
+[profile.release]
+opt-level = "s"
+lto = true
+panic = "abort"

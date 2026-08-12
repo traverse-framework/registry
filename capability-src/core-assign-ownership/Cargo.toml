@@ -1,0 +1,17 @@
+[workspace]
+
+[package]
+name = "core-assign-ownership-capability"
+version = "0.1.0"
+edition = "2021"
+publish = false
+description = "Source mirror for core.assign-ownership coverage."
+
+[[bin]]
+name = "core-assign-ownership-capability"
+path = "src/main.rs"
+
+[profile.release]
+opt-level = "s"
+lto = true
+panic = "abort"
