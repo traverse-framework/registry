@@ -1,0 +1,17 @@
+[workspace]
+
+[package]
+name = "core-calculate-deadline-pressure-agent"
+version = "0.1.0"
+edition = "2021"
+publish = false
+description = "Catalog-source mirror of core.calculate-deadline-pressure for measured llvm-cov coverage (logic from traverse examples/core-calculate-deadline-pressure)."
+
+[[bin]]
+name = "core-calculate-deadline-pressure-agent"
+path = "src/main.rs"
+
+[profile.release]
+opt-level = "s"
+lto = true
+panic = "abort"

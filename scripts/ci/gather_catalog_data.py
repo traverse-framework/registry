@@ -62,6 +62,23 @@ CURRENT_CRATE_FOR_ID = {
     "doc-approval.analyze": "doc-approval-analyze",
     "doc-approval.recommend": "doc-approval-recommend",
     "meeting-notes.process": "meeting-notes-process",
+    "core.aggregate-team-action-health": "core-aggregate-team-action-health",
+    "core.assign-ownership": "core-assign-ownership",
+    "core.authorize": "core-authorize",
+    "core.calculate-deadline-pressure": "core-calculate-deadline-pressure",
+    "core.calculate-price": "core-calculate-price",
+    "core.decide-escalation": "core-decide-escalation",
+    "core.evaluate-completion-quality": "core-evaluate-completion-quality",
+    "core.extract-action-items": "core-extract-action-items",
+    "core.generate-nudge-message": "core-generate-nudge-message",
+    "core.normalize-participants": "core-normalize-participants",
+    "core.notify-stakeholders": "core-notify-stakeholders",
+    "core.process-comment": "core-process-comment",
+    "core.record-nudge-event": "core-record-nudge-event",
+    "core.select-items-for-followup": "core-select-items-for-followup",
+    "core.transition-action-status": "core-transition-action-status",
+    "core.validate-action-item": "core-validate-action-item",
+    "platform.decide-state-transition": "platform-decide-state-transition",
 }
 
 
