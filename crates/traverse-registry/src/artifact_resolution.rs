@@ -343,6 +343,8 @@ fn single_error(
 
 #[cfg(test)]
 mod tests {
+    #![allow(clippy::expect_used)]
+
     use super::*;
 
     fn candidate(
@@ -474,16 +476,22 @@ mod tests {
     #[test]
     fn no_drift_when_candidate_state_is_unchanged() {
         let original = candidate("pkg-a", "1.0.0", "core.example", Lifecycle::Active, vec![ExecutionTarget::Cloud]);
-        let evidence = resolve_executable_artifact(&request("core.example", None), &[original.clone()])
-            .expect("must resolve");
+        let evidence = resolve_executable_artifact(
+            &request("core.example", None),
+            std::slice::from_ref(&original),
+        )
+        .expect("must resolve");
         assert!(detect_artifact_drift(&evidence, &[original]).is_ok());
     }
 
     #[test]
     fn digest_change_is_detected_as_drift() {
         let original = candidate("pkg-a", "1.0.0", "core.example", Lifecycle::Active, vec![ExecutionTarget::Cloud]);
-        let evidence = resolve_executable_artifact(&request("core.example", None), &[original.clone()])
-            .expect("must resolve");
+        let evidence = resolve_executable_artifact(
+            &request("core.example", None),
+            std::slice::from_ref(&original),
+        )
+        .expect("must resolve");
         let mut changed = original;
         changed.digest = "sha256:different".to_string();
         let failure = detect_artifact_drift(&evidence, &[changed]).expect_err("digest change must drift");
@@ -493,8 +501,11 @@ mod tests {
     #[test]
     fn lifecycle_change_is_detected_as_drift() {
         let original = candidate("pkg-a", "1.0.0", "core.example", Lifecycle::Active, vec![ExecutionTarget::Cloud]);
-        let evidence = resolve_executable_artifact(&request("core.example", None), &[original.clone()])
-            .expect("must resolve");
+        let evidence = resolve_executable_artifact(
+            &request("core.example", None),
+            std::slice::from_ref(&original),
+        )
+        .expect("must resolve");
         let mut changed = original;
         changed.lifecycle = Lifecycle::Deprecated;
         let failure = detect_artifact_drift(&evidence, &[changed]).expect_err("lifecycle change must drift");
@@ -504,8 +515,11 @@ mod tests {
     #[test]
     fn placement_change_is_detected_as_drift() {
         let original = candidate("pkg-a", "1.0.0", "core.example", Lifecycle::Active, vec![ExecutionTarget::Cloud]);
-        let evidence = resolve_executable_artifact(&request("core.example", None), &[original.clone()])
-            .expect("must resolve");
+        let evidence = resolve_executable_artifact(
+            &request("core.example", None),
+            std::slice::from_ref(&original),
+        )
+        .expect("must resolve");
         let mut changed = original;
         changed.placement = vec![ExecutionTarget::Cloud, ExecutionTarget::Edge];
         let failure = detect_artifact_drift(&evidence, &[changed]).expect_err("placement change must drift");
@@ -515,8 +529,11 @@ mod tests {
     #[test]
     fn constraints_change_is_detected_as_drift() {
         let original = candidate("pkg-a", "1.0.0", "core.example", Lifecycle::Active, vec![ExecutionTarget::Cloud]);
-        let evidence = resolve_executable_artifact(&request("core.example", None), &[original.clone()])
-            .expect("must resolve");
+        let evidence = resolve_executable_artifact(
+            &request("core.example", None),
+            std::slice::from_ref(&original),
+        )
+        .expect("must resolve");
         let mut changed = original;
         changed.execution_constraints = "network:allowed".to_string();
         let failure = detect_artifact_drift(&evidence, &[changed]).expect_err("constraints change must drift");
