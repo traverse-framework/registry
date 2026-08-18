@@ -41,8 +41,8 @@ pub use observed_lineage::*;
 pub use public_registry_cache::*;
 pub use public_registry_state::*;
 pub use semver_resolver::{
-    AmbiguousCandidate, RangeResolutionError, ResolvedRangeCapability, resolve_version_range,
-    version_ranges_overlap,
+    AmbiguousCandidate, RangeResolutionError, ResolveTelemetry, ResolvedRangeCapability,
+    resolve_version_range, version_ranges_overlap,
 };
 pub use workflows::*;
 pub use workspace_app_state::*;

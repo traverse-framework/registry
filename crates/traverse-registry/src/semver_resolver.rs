@@ -1,8 +1,19 @@
 //! Semver range resolution for the capability registry (spec 037).
 
 use semver::{Version, VersionReq};
+use traverse_contracts::{UsageEvent, UsageEventKind, UsageTelemetrySink};
 
 use crate::{CapabilityRegistry, LookupScope, RegistryScope};
+
+/// Optional usage-telemetry context for [`resolve_version_range`] (spec
+/// `015-runtime-usage-telemetry-resolve-hook`). Bundles the sink with a
+/// caller-supplied timestamp so this crate never depends on a wall clock —
+/// consistent with every other `registered_at`-style field in this crate,
+/// and with `013-inherited-registry-governance`'s portability constraint.
+pub struct ResolveTelemetry<'a> {
+    pub sink: &'a dyn UsageTelemetrySink,
+    pub resolved_at: &'a str,
+}
 
 /// A fully resolved capability registration returned by range resolution.
 ///
@@ -57,6 +68,12 @@ pub struct AmbiguousCandidate {
 /// 6. If no versions satisfy → [`RangeResolutionError::NoVersionSatisfies`].
 /// 7. If `capability_id` is absent entirely → [`RangeResolutionError::CapabilityNotFound`].
 ///
+/// `telemetry`, when supplied, is invoked exactly once with a `resolve`
+/// event on a successful resolution and never on a failed or ambiguous one
+/// (spec `015-runtime-usage-telemetry-resolve-hook` FR-002/FR-003). Passing
+/// `None` produces output byte-for-byte identical to the pre-telemetry
+/// behavior (FR-001, SC-003).
+///
 /// # Errors
 ///
 /// Returns [`RangeResolutionError`] for any of the cases described above.
@@ -65,6 +82,7 @@ pub fn resolve_version_range(
     capability_id: &str,
     range_str: &str,
     lookup_scope: LookupScope,
+    telemetry: Option<ResolveTelemetry<'_>>,
 ) -> Result<ResolvedRangeCapability, RangeResolutionError> {
     let req =
         VersionReq::parse(range_str).map_err(|err| RangeResolutionError::InvalidRangeSyntax {
@@ -170,6 +188,14 @@ pub fn resolve_version_range(
             .ok_or(RangeResolutionError::NoVersionSatisfies {
                 range: range_str.to_string(),
             })?;
+
+    if let Some(telemetry) = telemetry {
+        telemetry.sink.record(UsageEvent {
+            kind: UsageEventKind::Resolve,
+            capability_ref: format!("{capability_id}@{version}"),
+            timestamp: telemetry.resolved_at.to_string(),
+        });
+    }
 
     Ok(ResolvedRangeCapability {
         capability_id: capability_id.to_string(),
@@ -424,7 +450,7 @@ mod tests {
     #[test]
     fn resolves_highest_satisfying_version() {
         let registry = registry_with_versions(CAP_ID, &["1.0.0", "1.1.0", "1.2.0"]);
-        let result = resolve_version_range(&registry, CAP_ID, "^1.0.0", LookupScope::PublicOnly)
+        let result = resolve_version_range(&registry, CAP_ID, "^1.0.0", LookupScope::PublicOnly, None)
             .expect("^1.0.0 should resolve");
         assert_eq!(result.version, "1.2.0");
         assert_eq!(result.capability_id, CAP_ID);
@@ -434,7 +460,7 @@ mod tests {
     #[test]
     fn no_version_satisfies_range() {
         let registry = registry_with_versions(CAP_ID, &["2.0.0"]);
-        let err = resolve_version_range(&registry, CAP_ID, "^1.0.0", LookupScope::PublicOnly)
+        let err = resolve_version_range(&registry, CAP_ID, "^1.0.0", LookupScope::PublicOnly, None)
             .expect_err("should fail with NoVersionSatisfies");
         assert!(
             matches!(err, RangeResolutionError::NoVersionSatisfies { range } if range == "^1.0.0")
@@ -462,7 +488,7 @@ mod tests {
             ))
             .expect("private registration should succeed");
 
-        let err = resolve_version_range(&registry, CAP_ID, "^1.0.0", LookupScope::PreferPrivate)
+        let err = resolve_version_range(&registry, CAP_ID, "^1.0.0", LookupScope::PreferPrivate, None)
             .expect_err("should fail with AmbiguousMatch");
         assert!(matches!(
             err,
@@ -476,7 +502,7 @@ mod tests {
     #[test]
     fn exact_version_string_resolves() {
         let registry = registry_with_versions(CAP_ID, &["1.2.3"]);
-        let result = resolve_version_range(&registry, CAP_ID, "1.2.3", LookupScope::PublicOnly)
+        let result = resolve_version_range(&registry, CAP_ID, "1.2.3", LookupScope::PublicOnly, None)
             .expect("exact version string should resolve");
         assert_eq!(result.version, "1.2.3");
     }
@@ -485,7 +511,7 @@ mod tests {
     #[test]
     fn wildcard_selects_highest_version() {
         let registry = registry_with_versions(CAP_ID, &["1.0.0", "1.1.0", "2.3.0", "0.9.0"]);
-        let result = resolve_version_range(&registry, CAP_ID, "*", LookupScope::PublicOnly)
+        let result = resolve_version_range(&registry, CAP_ID, "*", LookupScope::PublicOnly, None)
             .expect("* should resolve to highest");
         assert_eq!(result.version, "2.3.0");
     }
@@ -494,7 +520,7 @@ mod tests {
     #[test]
     fn malformed_range_returns_invalid_syntax_error() {
         let registry = registry_with_versions(CAP_ID, &["1.0.0"]);
-        let err = resolve_version_range(&registry, CAP_ID, ">>1.0", LookupScope::PublicOnly)
+        let err = resolve_version_range(&registry, CAP_ID, ">>1.0", LookupScope::PublicOnly, None)
             .expect_err("malformed range should fail");
         assert!(
             matches!(err, RangeResolutionError::InvalidRangeSyntax { range, .. } if range == ">>1.0")
@@ -510,6 +536,7 @@ mod tests {
             "test.range.nonexistent",
             "^1.0.0",
             LookupScope::PublicOnly,
+            None,
         )
         .expect_err("unknown capability should fail");
         assert!(
@@ -522,7 +549,7 @@ mod tests {
     #[test]
     fn prefer_private_resolves_public_only_capability() {
         let registry = registry_with_versions(CAP_ID, &["1.3.0", "1.4.0"]);
-        let result = resolve_version_range(&registry, CAP_ID, "^1.0.0", LookupScope::PreferPrivate)
+        let result = resolve_version_range(&registry, CAP_ID, "^1.0.0", LookupScope::PreferPrivate, None)
             .expect("should fall back to Public and resolve 1.4.0");
         assert_eq!(result.version, "1.4.0");
         assert_eq!(result.scope, RegistryScope::Public);
@@ -546,7 +573,7 @@ mod tests {
                 "beta",
             ))
             .expect("private registration should succeed");
-        let err = resolve_version_range(&registry, CAP_ID, "^2.0.0", LookupScope::PreferPrivate)
+        let err = resolve_version_range(&registry, CAP_ID, "^2.0.0", LookupScope::PreferPrivate, None)
             .expect_err("should return AmbiguousMatch");
         assert!(
             matches!(err, RangeResolutionError::AmbiguousMatch { ref candidates } if candidates.len() == 2
@@ -584,14 +611,14 @@ mod tests {
             ))
             .expect("private target registration should succeed");
 
-        let result = resolve_version_range(&registry, CAP_ID, "^1.0.0", LookupScope::PreferPrivate)
+        let result = resolve_version_range(&registry, CAP_ID, "^1.0.0", LookupScope::PreferPrivate, None)
             .expect("^1.0.0 should resolve despite surrounding noise");
         assert_eq!(result.version, "1.5.0");
         assert_eq!(result.scope, RegistryScope::Private);
         assert_eq!(result.capability_id, CAP_ID);
 
         let public_only =
-            resolve_version_range(&registry, CAP_ID, "^1.0.0", LookupScope::PublicOnly)
+            resolve_version_range(&registry, CAP_ID, "^1.0.0", LookupScope::PublicOnly, None)
                 .expect("^1.0.0 should resolve in Public-only scope");
         assert_eq!(public_only.version, "1.2.0");
         assert_eq!(public_only.scope, RegistryScope::Public);
@@ -650,5 +677,166 @@ mod tests {
     fn version_ranges_overlap_matches_identical_exact_versions() {
         assert!(version_ranges_overlap("=1.2.3", "=1.2.3"));
         assert!(!version_ranges_overlap("=1.2.3", "=1.2.4"));
+    }
+
+    /// Test double for spec `015-runtime-usage-telemetry-resolve-hook`:
+    /// captures every event recorded through it for inspection.
+    #[derive(Default)]
+    struct RecordingSink {
+        events: std::sync::Mutex<Vec<UsageEvent>>,
+    }
+
+    impl UsageTelemetrySink for RecordingSink {
+        fn record(&self, event: UsageEvent) {
+            self.events
+                .lock()
+                .expect("recording sink mutex should not be poisoned")
+                .push(event);
+        }
+    }
+
+    // SC-001: a successful resolution with a supplied sink invokes it
+    // exactly once with the correct namespace/id@version.
+    #[test]
+    fn resolve_with_telemetry_invokes_sink_exactly_once_on_success() {
+        let registry = registry_with_versions(CAP_ID, &["1.0.0", "1.1.0", "1.2.0"]);
+        let sink = RecordingSink::default();
+
+        let result = resolve_version_range(
+            &registry,
+            CAP_ID,
+            "^1.0.0",
+            LookupScope::PublicOnly,
+            Some(ResolveTelemetry {
+                sink: &sink,
+                resolved_at: "2026-08-17T00:00:00Z",
+            }),
+        )
+        .expect("^1.0.0 should resolve");
+        assert_eq!(result.version, "1.2.0");
+
+        let events = sink.events.lock().expect("mutex should not be poisoned");
+        assert_eq!(events.len(), 1);
+        assert_eq!(events[0].kind, UsageEventKind::Resolve);
+        assert_eq!(events[0].capability_ref, format!("{CAP_ID}@1.2.0"));
+        assert_eq!(events[0].timestamp, "2026-08-17T00:00:00Z");
+    }
+
+    // SC-002 (capability not found branch): a failed resolution never
+    // invokes the sink, even when one is supplied.
+    #[test]
+    fn resolve_with_telemetry_does_not_invoke_sink_on_capability_not_found() {
+        let registry = CapabilityRegistry::new();
+        let sink = RecordingSink::default();
+
+        let _ = resolve_version_range(
+            &registry,
+            "test.range.nonexistent",
+            "^1.0.0",
+            LookupScope::PublicOnly,
+            Some(ResolveTelemetry {
+                sink: &sink,
+                resolved_at: "2026-08-17T00:00:00Z",
+            }),
+        )
+        .expect_err("unknown capability should fail");
+
+        assert!(
+            sink.events
+                .lock()
+                .expect("mutex should not be poisoned")
+                .is_empty()
+        );
+    }
+
+    // SC-002 (no satisfying version branch).
+    #[test]
+    fn resolve_with_telemetry_does_not_invoke_sink_on_no_version_satisfies() {
+        let registry = registry_with_versions(CAP_ID, &["1.0.0"]);
+        let sink = RecordingSink::default();
+
+        let _ = resolve_version_range(
+            &registry,
+            CAP_ID,
+            "^2.0.0",
+            LookupScope::PublicOnly,
+            Some(ResolveTelemetry {
+                sink: &sink,
+                resolved_at: "2026-08-17T00:00:00Z",
+            }),
+        )
+        .expect_err("no version should satisfy ^2.0.0");
+
+        assert!(
+            sink.events
+                .lock()
+                .expect("mutex should not be poisoned")
+                .is_empty()
+        );
+    }
+
+    // SC-002 (ambiguous match branch).
+    #[test]
+    fn resolve_with_telemetry_does_not_invoke_sink_on_ambiguous_match() {
+        let mut registry = CapabilityRegistry::new();
+        registry
+            .register(registration(
+                RegistryScope::Public,
+                base_contract(CAP_ID, "1.2.0"),
+                "digest-a",
+            ))
+            .expect("public registration should succeed");
+        registry
+            .register(registration(
+                RegistryScope::Private,
+                base_contract(CAP_ID, "1.2.0"),
+                "digest-b",
+            ))
+            .expect("private registration should succeed");
+        let sink = RecordingSink::default();
+
+        let _ = resolve_version_range(
+            &registry,
+            CAP_ID,
+            "^1.0.0",
+            LookupScope::PreferPrivate,
+            Some(ResolveTelemetry {
+                sink: &sink,
+                resolved_at: "2026-08-17T00:00:00Z",
+            }),
+        )
+        .expect_err("should fail with AmbiguousMatch");
+
+        assert!(
+            sink.events
+                .lock()
+                .expect("mutex should not be poisoned")
+                .is_empty()
+        );
+    }
+
+    // SC-003: passing no telemetry produces output byte-for-byte identical
+    // to a supplied-sink call's `Result`, for the same inputs.
+    #[test]
+    fn resolve_without_telemetry_matches_result_of_call_with_telemetry() {
+        let registry = registry_with_versions(CAP_ID, &["1.0.0", "1.1.0"]);
+        let sink = RecordingSink::default();
+
+        let without_telemetry =
+            resolve_version_range(&registry, CAP_ID, "^1.0.0", LookupScope::PublicOnly, None)
+                .expect("^1.0.0 should resolve");
+        let with_telemetry = resolve_version_range(
+            &registry,
+            CAP_ID,
+            "^1.0.0",
+            LookupScope::PublicOnly,
+            Some(ResolveTelemetry {
+                sink: &sink,
+                resolved_at: "2026-08-17T00:00:00Z",
+            }),
+        )
+        .expect("^1.0.0 should resolve");
+
+        assert_eq!(without_telemetry, with_telemetry);
     }
 }
