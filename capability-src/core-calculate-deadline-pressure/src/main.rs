@@ -140,17 +140,6 @@ fn skip_ws(s: &[u8]) -> &[u8] {
     rest
 }
 
-fn skip_ws_comma(s: &[u8]) -> usize {
-    let mut i = 0usize;
-    while i < s.len() {
-        match s[i] {
-            b' ' | b'\n' | b'\t' | b'\r' | b',' => i += 1,
-            _ => break,
-        }
-    }
-    i
-}
-
 fn balanced_end(s: &[u8], open: u8, close: u8) -> Option<usize> {
     let mut depth = 0i32;
     let mut in_str = false;
@@ -262,32 +251,6 @@ fn object_after_key_at_depth<'a>(hay: &'a [u8], key: &[u8], depth: i32) -> Optio
     Some(&rest[..=end])
 }
 
-fn array_after_key_at_depth<'a>(hay: &'a [u8], key: &[u8], depth: i32) -> Option<&'a [u8]> {
-    let pos = find_key_at_depth(hay, key, depth)?;
-    let after = &hay[pos + key.len()..];
-    let colon = after.iter().position(|b| *b == b':')?;
-    let rest = skip_ws(&after[colon + 1..]);
-    if rest.first() != Some(&b'[') {
-        return None;
-    }
-    let end = balanced_end(rest, b'[', b']')?;
-    Some(&rest[..=end])
-}
-
-fn extract_bool(hay: &[u8], key: &[u8]) -> Option<bool> {
-    let pos = find(hay, key)?;
-    let after = &hay[pos + key.len()..];
-    let colon = after.iter().position(|b| *b == b':')?;
-    let rest = skip_ws(&after[colon + 1..]);
-    if rest.starts_with(b"true") {
-        Some(true)
-    } else if rest.starts_with(b"false") {
-        Some(false)
-    } else {
-        None
-    }
-}
-
 fn extract_i32(hay: &[u8], key: &[u8]) -> Option<i32> {
     let pos = find(hay, key)?;
     let after = &hay[pos + key.len()..];
@@ -315,50 +278,6 @@ fn parse_i32(rest: &[u8]) -> Option<i32> {
         j += 1;
     }
     Some(if neg { -n } else { n })
-}
-
-fn parse_number_millis(hay: &[u8], key: &[u8]) -> Option<u32> {
-    let pos = find(hay, key)?;
-    let after = &hay[pos + key.len()..];
-    let colon = after.iter().position(|b| *b == b':')?;
-    let rest = skip_ws(&after[colon + 1..]);
-    if rest.is_empty() {
-        return None;
-    }
-    let mut whole: u32 = 0;
-    let mut frac: u32 = 0;
-    let mut frac_digits = 0u32;
-    let mut seen_dot = false;
-    let mut j = 0usize;
-    while j < rest.len() {
-        let b = rest[j];
-        if b == b',' || b == b'}' || b == b']' || b == b' ' || b == b'\n' {
-            break;
-        }
-        if b == b'.' {
-            seen_dot = true;
-            j += 1;
-            continue;
-        }
-        if b < b'0' || b > b'9' {
-            break;
-        }
-        let digit = (b - b'0') as u32;
-        if seen_dot {
-            if frac_digits < 3 {
-                frac = frac * 10 + digit;
-                frac_digits += 1;
-            }
-        } else {
-            whole = whole * 10 + digit;
-        }
-        j += 1;
-    }
-    while frac_digits < 3 {
-        frac *= 10;
-        frac_digits += 1;
-    }
-    Some(whole * 1000 + frac)
 }
 
 fn copy(out: &mut [u8], at: usize, bytes: &[u8]) -> usize {
@@ -418,56 +337,6 @@ fn write_i32(out: &mut [u8], mut i: usize, n: i32) -> usize {
     } else {
         write_u32(out, i, n as u32)
     }
-}
-
-fn ascii_lower(b: u8) -> u8 {
-    if b >= b'A' && b <= b'Z' {
-        b + 32
-    } else {
-        b
-    }
-}
-
-fn eq_ignore_case(a: &[u8], b: &[u8]) -> bool {
-    if a.len() != b.len() {
-        return false;
-    }
-    for i in 0..a.len() {
-        if ascii_lower(a[i]) != ascii_lower(b[i]) {
-            return false;
-        }
-    }
-    true
-}
-
-fn normalize_email(src: &[u8], dst: &mut [u8]) -> usize {
-    let mut i = 0usize;
-    let mut j = 0usize;
-    while i < src.len() && (src[i] == b' ' || src[i] == b'\t') {
-        i += 1;
-    }
-    let mut end = src.len();
-    while end > i && (src[end - 1] == b' ' || src[end - 1] == b'\t') {
-        end -= 1;
-    }
-    while i < end && j < dst.len() {
-        dst[j] = ascii_lower(src[i]);
-        i += 1;
-        j += 1;
-    }
-    j
-}
-
-fn trim_ascii(s: &[u8]) -> &[u8] {
-    let mut start = 0usize;
-    let mut end = s.len();
-    while start < end && matches!(s[start], b' ' | b'\t' | b'\n' | b'\r') {
-        start += 1;
-    }
-    while end > start && matches!(s[end - 1], b' ' | b'\t' | b'\n' | b'\r') {
-        end -= 1;
-    }
-    &s[start..end]
 }
 
 /// Days since 1970-01-01 for YYYY-MM-DD (Howard Hinnant civil_from_days inverse).
@@ -561,6 +430,219 @@ mod catalog_coverage_tests {
     fn use_case_05_sad() {
         let out = run("{\"item\":{\"id\":\"ai-c\",\"due_date\":\"2026-08-10\",\"status\":\"open\"},\"reference_date\":\"\",\"pressure_config\":{\"version\":\"1.0\",\"horizon_days\":14}}");
         assert!(out.contains("\"reason_code\":\"config_error\""), "expected config_error in {out}");
+    }
+
+    #[test]
+    fn use_case_06_sad_invalid_reference_date() {
+        let out = run("{\"item\":{\"id\":\"ai-r\",\"due_date\":\"2026-08-10\"},\"reference_date\":\"not-a-date\",\"pressure_config\":{\"horizon_days\":14}}");
+        assert!(out.contains("\"reason_code\":\"invalid_date\""), "expected invalid_date in {out}");
+    }
+
+    #[test]
+    fn use_case_07_sad_non_positive_horizon() {
+        let out = run("{\"item\":{\"id\":\"ai-h\",\"due_date\":\"2026-08-10\"},\"reference_date\":\"2026-08-07\",\"pressure_config\":{\"horizon_days\":-5}}");
+        assert!(out.contains("\"reason_code\":\"config_error\""), "expected config_error in {out}");
+    }
+
+    #[test]
+    fn use_case_08_happy_low_band_beyond_horizon() {
+        let out = run("{\"item\":{\"id\":\"ai-lo\",\"due_date\":\"2026-09-15\"},\"reference_date\":\"2026-08-07\",\"pressure_config\":{\"horizon_days\":14}}");
+        assert!(out.contains("\"pressure_band\":\"low\""), "expected low band in {out}");
+        assert!(out.contains("\"pressure_score\":0"), "expected zero score in {out}");
+    }
+
+    #[test]
+    fn use_case_09_happy_high_band() {
+        let out = run("{\"item\":{\"id\":\"ai-hi\",\"due_date\":\"2026-08-08\"},\"reference_date\":\"2026-08-07\",\"pressure_config\":{\"horizon_days\":14}}");
+        assert!(out.contains("\"pressure_band\":\"high\""), "expected high band in {out}");
+    }
+
+    #[test]
+    fn use_case_10_happy_low_band_within_horizon() {
+        let out = run("{\"item\":{\"id\":\"ai-low-in\",\"due_date\":\"2026-08-17\"},\"reference_date\":\"2026-08-07\",\"pressure_config\":{\"horizon_days\":14}}");
+        assert!(out.contains("\"pressure_band\":\"low\""), "expected low band in {out}");
+    }
+
+    #[test]
+    fn use_case_11_happy_tolerates_extra_whitespace_and_nested_config_object() {
+        let out = run("{\"item\": {\"id\":\"ai-ws\",\"due_date\":\"2026-08-10\"},\"reference_date\":\"2026-08-07\",\"pressure_config\":  {\"horizon_days\":14,\"meta\":{\"note\":\"x\"}}}");
+        assert!(out.contains("\"reason_code\":\"ok\""), "expected ok in {out}");
+    }
+
+    #[test]
+    fn use_case_12_happy_tolerates_escaped_backslash_before_target_keys() {
+        // A backslash inside an earlier string value (item.id) must not
+        // desynchronize the byte-scanner's search for later keys
+        // (reference_date, pressure_config) at the same nesting depth.
+        let out = run("{\"item\":{\"id\":\"ai\\\\x\",\"due_date\":\"2026-08-10\"},\"reference_date\":\"2026-08-07\",\"pressure_config\":{\"horizon_days\":14}}");
+        assert!(out.contains("\"reason_code\":\"ok\""), "expected ok in {out}");
+    }
+
+    #[test]
+    fn use_case_13_sad_missing_reference_date_key() {
+        let out = run("{\"item\":{\"id\":\"ai-mr\",\"due_date\":\"2026-08-10\"},\"pressure_config\":{\"horizon_days\":14}}");
+        assert!(out.contains("\"reason_code\":\"config_error\""), "expected config_error in {out}");
+    }
+
+    #[test]
+    fn use_case_14_sad_unbalanced_pressure_config_object() {
+        let out = run("{\"item\":{\"id\":\"ai-ub\",\"due_date\":\"2026-08-10\"},\"reference_date\":\"2026-08-07\",\"pressure_config\":{\"horizon_days\":14");
+        assert!(out.contains("\"reason_code\":\"config_error\""), "expected config_error in {out}");
+    }
+
+    #[test]
+    fn use_case_15_sad_pressure_config_not_an_object() {
+        let out = run("{\"item\":{\"id\":\"ai-nc\",\"due_date\":\"2026-08-10\"},\"reference_date\":\"2026-08-07\",\"pressure_config\":\"oops\"}");
+        assert!(out.contains("\"reason_code\":\"config_error\""), "expected config_error in {out}");
+    }
+
+    #[test]
+    fn use_case_16_happy_missing_item_id_key() {
+        let out = run("{\"item\":{\"due_date\":\"2026-08-10\"},\"reference_date\":\"2026-08-07\",\"pressure_config\":{\"horizon_days\":14}}");
+        assert!(out.contains("\"item_id\":\"\""), "expected empty item_id in {out}");
+        assert!(out.contains("\"reason_code\":\"ok\""), "expected ok in {out}");
+    }
+
+    #[test]
+    fn use_case_17_happy_non_numeric_horizon_falls_back_to_default() {
+        let out = run("{\"item\":{\"id\":\"ai-nh\",\"due_date\":\"2026-08-08\"},\"reference_date\":\"2026-08-07\",\"pressure_config\":{\"horizon_days\":\"bad\"}}");
+        assert!(out.contains("\"reason_code\":\"ok\""), "expected ok in {out}");
+    }
+
+    #[test]
+    fn evaluate_truncates_output_that_does_not_fit_the_buffer() {
+        let input = b"{\"item\":{\"id\":\"ai-1\",\"due_date\":\"2026-08-10\"},\"reference_date\":\"2026-08-07\",\"pressure_config\":{\"horizon_days\":14}}";
+        let mut out = [0u8; 4];
+        let n = unsafe { evaluate(input, &mut out) };
+        assert!(n <= out.len());
+    }
+
+    #[test]
+    fn copy_json_escaped_escapes_quotes_and_backslashes() {
+        let mut out = [0u8; 32];
+        let n = copy_json_escaped(&mut out, 0, b"a\"b\\c");
+        assert_eq!(&out[..n], b"a\\\"b\\\\c");
+    }
+
+    #[test]
+    fn copy_truncates_instead_of_overflowing_the_output_buffer() {
+        let mut out = [0u8; 2];
+        let end = copy(&mut out, 1, b"abc");
+        assert_eq!(end, 1, "copy must return the unchanged offset when it would overflow");
+    }
+
+    #[test]
+    fn string_value_after_handles_malformed_shapes() {
+        assert_eq!(string_value_after(b"no colon here"), b"");
+        assert_eq!(string_value_after(b":123"), b"");
+        assert_eq!(string_value_after(b":\"unterminated"), b"");
+        assert_eq!(string_value_after(b": \"ok\""), b"ok");
+    }
+
+    #[test]
+    fn parse_i32_rejects_empty_input() {
+        assert_eq!(parse_i32(b""), None);
+    }
+
+    #[test]
+    fn write_u32_writes_nothing_when_zero_does_not_fit_the_buffer() {
+        let mut out: [u8; 0] = [];
+        assert_eq!(write_u32(&mut out, 0, 0), 0);
+    }
+
+    #[test]
+    fn use_case_18_sad_out_of_range_month_in_due_date() {
+        let out = run("{\"item\":{\"id\":\"ai-om\",\"due_date\":\"2026-13-01\"},\"reference_date\":\"2026-08-07\",\"pressure_config\":{\"horizon_days\":14}}");
+        assert!(out.contains("\"reason_code\":\"invalid_date\""), "expected invalid_date in {out}");
+    }
+
+    #[test]
+    fn use_case_19_sad_missing_pressure_config_key() {
+        let out = run("{\"item\":{\"id\":\"ai-mc\",\"due_date\":\"2026-08-10\"},\"reference_date\":\"2026-08-07\"}");
+        assert!(out.contains("\"reason_code\":\"config_error\""), "expected config_error in {out}");
+    }
+
+    #[test]
+    fn use_case_20_sad_pressure_config_key_without_colon() {
+        let out = run("{\"item\":{\"id\":\"ai-nc2\",\"due_date\":\"2026-08-10\"},\"reference_date\":\"2026-08-07\",\"pressure_config\"}");
+        assert!(out.contains("\"reason_code\":\"config_error\""), "expected config_error in {out}");
+    }
+
+    #[test]
+    fn use_case_21_happy_missing_horizon_days_key_falls_back_to_default() {
+        let out = run("{\"item\":{\"id\":\"ai-mh\",\"due_date\":\"2026-08-08\"},\"reference_date\":\"2026-08-07\",\"pressure_config\":{\"version\":\"1.0\"}}");
+        assert!(out.contains("\"reason_code\":\"ok\""), "expected ok in {out}");
+    }
+
+    #[test]
+    fn use_case_22_happy_horizon_days_key_without_colon_falls_back_to_default() {
+        let out = run("{\"item\":{\"id\":\"ai-hc\",\"due_date\":\"2026-08-08\"},\"reference_date\":\"2026-08-07\",\"pressure_config\":{\"horizon_days\"}}");
+        assert!(out.contains("\"reason_code\":\"ok\""), "expected ok in {out}");
+    }
+
+    #[test]
+    fn use_case_23_happy_january_due_date() {
+        // Exercises parse_ymd_days' month<=2 civil-calendar adjustment branch.
+        let out = run("{\"item\":{\"id\":\"ai-jan\",\"due_date\":\"2026-01-15\"},\"reference_date\":\"2026-01-07\",\"pressure_config\":{\"horizon_days\":14}}");
+        assert!(out.contains("\"reason_code\":\"ok\""), "expected ok in {out}");
+    }
+
+    #[test]
+    fn copy_json_escaped_handles_an_empty_input() {
+        let mut out = [0u8; 4];
+        assert_eq!(copy_json_escaped(&mut out, 0, b""), 0);
+    }
+
+    #[test]
+    fn copy_json_escaped_drops_plain_bytes_that_do_not_fit_the_buffer() {
+        let mut out = [0u8; 1];
+        assert_eq!(copy_json_escaped(&mut out, 1, b"x"), 1);
+    }
+
+    #[test]
+    fn use_case_24_sad_non_numeric_year_in_due_date() {
+        let out = run("{\"item\":{\"id\":\"ai-ny\",\"due_date\":\"abcd-01-01\"},\"reference_date\":\"2026-08-07\",\"pressure_config\":{\"horizon_days\":14}}");
+        assert!(out.contains("\"reason_code\":\"invalid_date\""), "expected invalid_date in {out}");
+    }
+
+    #[test]
+    fn use_case_25_sad_non_numeric_month_in_due_date() {
+        let out = run("{\"item\":{\"id\":\"ai-nm\",\"due_date\":\"2026-xx-01\"},\"reference_date\":\"2026-08-07\",\"pressure_config\":{\"horizon_days\":14}}");
+        assert!(out.contains("\"reason_code\":\"invalid_date\""), "expected invalid_date in {out}");
+    }
+
+    #[test]
+    fn use_case_26_sad_non_numeric_day_in_due_date() {
+        let out = run("{\"item\":{\"id\":\"ai-nd\",\"due_date\":\"2026-01-xx\"},\"reference_date\":\"2026-08-07\",\"pressure_config\":{\"horizon_days\":14}}");
+        assert!(out.contains("\"reason_code\":\"invalid_date\""), "expected invalid_date in {out}");
+    }
+
+    #[test]
+    fn parse_ymd_days_handles_pre_epoch_negative_years() {
+        // Exercises the y < 0 era-computation branch of the Howard Hinnant
+        // civil_from_days inverse; no realistic deadline input reaches
+        // this, so it is tested directly rather than through evaluate().
+        assert!(parse_ymd_days(b"-001-06-15").is_some());
+    }
+
+    #[test]
+    fn format_score_millis_covers_all_fractional_digit_shapes() {
+        let mut buf = [0u8; 8];
+
+        let n = format_score_millis(&mut buf, 0);
+        assert_eq!(&buf[..n], b"0.0");
+
+        let n = format_score_millis(&mut buf, 1000);
+        assert_eq!(&buf[..n], b"1.0");
+
+        let n = format_score_millis(&mut buf, 785);
+        assert_eq!(&buf[..n], b"0.785");
+
+        let n = format_score_millis(&mut buf, 700);
+        assert_eq!(&buf[..n], b"0.7");
+
+        let n = format_score_millis(&mut buf, 750);
+        assert_eq!(&buf[..n], b"0.75");
     }
 
 }
