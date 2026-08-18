@@ -355,7 +355,13 @@ fn write_number(n: f64, out: &mut String) {
     }
     let negative = n < 0.0;
     let magnitude = if negative { -n } else { n };
-    let scaled = (magnitude * 1_000_000.0) as i64; // truncating cast, not .round()
+    // `magnitude * 1_000_000.0` is often not exactly representable (e.g. 65.6
+    // stores as 65599999.99999999), so a bare truncating cast would silently
+    // round *down* to the wrong integer (65599999, printed as "65.599999").
+    // Adding half a unit before truncating is the standard round-half-up
+    // technique that fixes this without `f64::round` (still casts and
+    // integer arithmetic only, per this function's no-libm constraint).
+    let scaled = (magnitude * 1_000_000.0 + 0.5) as i64;
     let whole = scaled / 1_000_000;
     let frac = scaled % 1_000_000;
     if negative {
@@ -469,6 +475,43 @@ mod tests {
     /// so the "false" attempt failed too. This shipped silently in this
     /// crate's earlier published capabilities since none of them happened
     /// to have a boolean *input* field; caught only once one did.
+    /// Regression test for a real bug: `write_number` scaled a fraction by
+    /// 1_000_000.0 and truncated via `as i64` to extract six decimal
+    /// digits. `65.6 * 1_000_000.0` is `65599999.99999999` in `f64` (not
+    /// exactly representable), so truncating produced "65.599999" instead
+    /// of "65.600000" -- silently corrupting any written float whose
+    /// scaled value falls just under an integer boundary. Caught via the
+    /// live catalog's coverage badges (`registry.traverse-framework.com`)
+    /// displaying "65.599999% covered" for a capability whose actual
+    /// measured `cargo llvm-cov` line coverage was 65.6%; downstream JSON
+    /// parsers (Python, JS) collapse the always-six-digit output to its
+    /// shortest round-trip form for display ("65.3", not "65.300000"),
+    /// which is exactly why the corruption only showed up for values that
+    /// don't reduce cleanly.
+    #[test]
+    fn writes_floats_that_round_incorrectly_under_truncation() {
+        assert_eq!(write(&Value::Number(65.6)), "65.600000");
+        assert_eq!(write(&Value::Number(66.1)), "66.100000");
+        assert_eq!(write(&Value::Number(-65.6)), "-65.600000");
+    }
+
+    #[test]
+    fn writes_and_reparses_a_range_of_fractional_values_exactly() {
+        for tenths in 0..1000 {
+            #[allow(clippy::cast_precision_loss)]
+            let value = f64::from(tenths) / 10.0;
+            let written = write(&Value::Number(value));
+            let reparsed = parse(&written)
+                .expect("written float should reparse")
+                .as_f64()
+                .expect("reparsed value should be a number");
+            assert!(
+                (reparsed - value).abs() < 1e-9,
+                "value {value} round-tripped as {reparsed} (written as {written})"
+            );
+        }
+    }
+
     #[test]
     fn parses_false_correctly_alone_and_alongside_other_fields() {
         assert_eq!(parse(r#"{"a": false}"#).unwrap(), object(alloc::vec![("a", Value::Bool(false))]));
