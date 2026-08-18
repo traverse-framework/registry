@@ -98,7 +98,10 @@ fn resolve_layer(
 
         // Resolve via semver range.  Invalid range syntax is treated as a
         // missing dependency since the registry pre-validates version formats.
-        let resolved = resolve_version_range(registry, dep_id, version_range, lookup_scope)
+        // No telemetry sink: spec 015 scopes the resolve-hook to the
+        // top-level `registry sync`-equivalent resolution path, not this
+        // internal transitive-dependency walk (FR-006).
+        let resolved = resolve_version_range(registry, dep_id, version_range, lookup_scope, None)
             .map_err(|_| ResolutionError::MissingDependency {
                 capability_id: dep_id.clone(),
                 required_version: version_range.clone(),
