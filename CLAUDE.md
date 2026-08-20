@@ -71,3 +71,9 @@ Inherited from `traverse-framework/.github`'s `docs/ai-agent-hardening.md`: no `
 ## Working Style
 
 When operating autonomously (registry-ops loops, unattended ticket work), do not stop to ask for reversible, low-stakes choices — pick the sensible default, proceed, and note the assumption in the PR description if it's non-obvious. Reserve actual questions for irreversible actions, public API/security-posture changes, or genuine ambiguity a human must resolve (see the registry-ops skill's own guardrails on spec approval and cross-repo actions for the hard stops that always apply).
+
+When gathering repo state, batch independent read-only commands into a single Bash call (e.g. `git status --short && git log --oneline -5 && gh pr list --limit 5`) instead of one call each — split them only when one command's output determines the next.
+
+If something in the request contradicts what the code, specs, or a live check actually show, stop and surface the evidence (file paths, line numbers, command output) before implementing — don't silently implement the contradicted assumption and don't silently drop the request either. If the disagreement doesn't resolve from that evidence alone, record it as a `docs/decision-log.md` entry (or a tracking issue) rather than letting it evaporate at the end of the conversation.
+
+For open-ended investigation across this repo (gap analysis, audits), prefer parallel subagents per subsystem, then verify each finding against source before reporting it — collapse anything you can't point to a file:line for. Reserve serial, single-threaded work for anything that ships (implementation, PRs, merges), where collisions with parallel work are the actual risk.
