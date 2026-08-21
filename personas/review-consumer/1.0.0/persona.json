@@ -1,13 +1,19 @@
 {
+  "kind": "persona",
+  "schema_version": "1.0.0",
   "id": "review-consumer",
   "version": "1.0.0",
-  "name": "Review consumer",
+  "name": "Review Consumer",
   "summary": "Consumes deterministic review-state decisions derived from a current state and reviewer action.",
-  "responsibilities": [
-    "Provide current state and reviewer decision inputs",
-    "Rely on governed verify or reject transitions",
-    "Pass resulting state into later revision or persistence steps"
-  ],
-  "source": "Callweave",
-  "created_at": "2026-08-21T00:00:00Z"
+  "description": "Uses review.state-transition-decide to convert a current review state and reviewer decision into one governed next state. Needs explicit verify, reject, or keep-pending transitions without embedding persistence, notification, or workflow coordination inside the capability.",
+  "distinguished_from": [
+    {
+      "persona_id": "approval-consumer",
+      "how": "Consumes review-state transitions such as verified or rejected, rather than the later decision to apply or not apply a proposal."
+    },
+    {
+      "persona_id": "classification-consumer",
+      "how": "Needs reviewer-state transitions for governed review flows, rather than scored item classification outcomes."
+    }
+  ]
 }
