@@ -34,6 +34,15 @@
       "evidence": "side_effects=[memory_only] on published version 1.0.0; empty emits/consumes; deterministic classification outcome state returns directly to the caller with no asynchronous domain fact broadcast to independent consumers."
     },
     {
+      "capability_id": "classifier.release-gate-evaluate",
+      "published_versions": [
+        "1.0.0"
+      ],
+      "path": "capabilities/classifier/classifier.release-gate-evaluate/1.0.0/contract.json",
+      "classification": "no-event-required",
+      "evidence": "side_effects=[memory_only] on published version 1.0.0; empty emits/consumes; deterministic release-gate decision returns directly to the caller with no asynchronous domain fact broadcast to independent consumers."
+    },
+    {
       "capability_id": "cluster.curate",
       "published_versions": [
         "1.0.0"
