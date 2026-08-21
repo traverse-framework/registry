@@ -162,7 +162,7 @@
         "version": "1.0.0",
         "path": "events/core/core.action-item.status-transitioned/1.0.0/product.json"
       },
-      "evidence": "Status transitions are domain facts independent consumers may observe. Governed event product core.action-item.status-transitioned@1.0.0 remains published (immutable publishers list still cites capability 1.1.0; CI does not require rewriting publishers for later emitter versions). Capability contract 1.3.0 declares emits=[{event_id: core.action-item.status-transitioned, version: 1.0.0}], service_type=subscribable, requires action_item_id, and the WASM guest actually calls traverse_host::emit_event on accepted transitions (reason_code=ok) with payload {action_item_id, from_status, to_status, actor_id} \u2014 real emit, not declaration-only. Immutable prior versions: 1.0.0/1.1.0 empty emits[]; 1.2.0 declaration-only honesty."
+      "evidence": "Status transitions are domain facts independent consumers may observe. Governed event product core.action-item.status-transitioned@1.0.0 remains published (immutable publishers list still cites capability 1.1.0; CI does not require rewriting publishers for later emitter versions). Capability contract 1.3.0 declares emits=[{event_id: core.action-item.status-transitioned, version: 1.0.0}], service_type=subscribable, requires action_item_id, and the WASM guest actually calls traverse_host::emit_event on accepted transitions (reason_code=ok) with payload {action_item_id, from_status, to_status, actor_id} — real emit, not declaration-only. Immutable prior versions: 1.0.0/1.1.0 empty emits[]; 1.2.0 declaration-only honesty."
     },
     {
       "capability_id": "core.validate-action-item",
@@ -275,6 +275,15 @@
       "path": "capabilities/review/review.prepare/1.0.0/contract.json",
       "classification": "no-event-required",
       "evidence": "side_effects=[memory_only]; empty emits/consumes; deterministic privacy gate returns sanitized asset eligibility directly to the caller with no asynchronous domain fact broadcast to independent consumers."
+    },
+    {
+      "capability_id": "review.state-transition-decide",
+      "published_versions": [
+        "1.0.0"
+      ],
+      "path": "capabilities/review/review.state-transition-decide/1.0.0/contract.json",
+      "classification": "no-event-required",
+      "evidence": "side_effects=[memory_only] on published version 1.0.0; empty emits/consumes; deterministic review-state transition result returns directly to the caller with no asynchronous domain fact broadcast to independent consumers."
     },
     {
       "capability_id": "traverse-starter.process",
