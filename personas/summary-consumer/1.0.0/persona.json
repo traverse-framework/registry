@@ -1,13 +1,19 @@
 {
+  "kind": "persona",
+  "schema_version": "1.0.0",
   "id": "summary-consumer",
   "version": "1.0.0",
-  "name": "Summary consumer",
+  "name": "Summary Consumer",
   "summary": "Consumes deterministic bounded-period summaries derived from included and pending references.",
-  "responsibilities": [
-    "Supply bounded scope and period identifiers",
-    "Consume explicit aggregate counts",
-    "Use normalized summaries as inputs to later policy steps"
-  ],
-  "source": "Callweave",
-  "created_at": "2026-08-21T00:00:00Z"
+  "description": "Uses summary.aggregate to roll included and pending references into one bounded aggregate record with explicit counts, scope identity, and carry-forward facts. Needs deterministic period summaries without embedding visualization, storage, or policy routing into the capability.",
+  "distinguished_from": [
+    {
+      "persona_id": "period-operator",
+      "how": "Consumes aggregates over references within a bounded scope, rather than finalizing the bounded period record itself."
+    },
+    {
+      "persona_id": "uncertainty-consumer",
+      "how": "Needs deterministic aggregate counts and references, rather than converting those counts into an uncertainty score."
+    }
+  ]
 }
