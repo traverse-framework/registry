@@ -1,0 +1,19 @@
+{
+  "kind": "persona",
+  "schema_version": "1.0.0",
+  "id": "coverage-consumer",
+  "version": "1.0.0",
+  "name": "Coverage Consumer",
+  "summary": "Consumes completeness assessments derived from duration and source-health facts.",
+  "description": "Uses coverage.completeness-assess to distinguish complete, partial, and unavailable coverage from supplied duration and source-health facts. Needs a deterministic completeness signal without inferring more than the supplied coverage boundary supports.",
+  "distinguished_from": [
+    {
+      "persona_id": "retention-steward",
+      "how": "Interprets completeness and availability facts, rather than classifying preservation obligations for assets."
+    },
+    {
+      "persona_id": "artifact-consumer",
+      "how": "Needs deterministic completeness state for a bounded coverage window, rather than successor revision metadata for immutable artifacts."
+    }
+  ]
+}

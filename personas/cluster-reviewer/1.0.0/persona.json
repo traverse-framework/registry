@@ -1,0 +1,19 @@
+{
+  "kind": "persona",
+  "schema_version": "1.0.0",
+  "id": "cluster-reviewer",
+  "version": "1.0.0",
+  "name": "Cluster Reviewer",
+  "summary": "Reviews grouped items by inspecting deterministic embedding-based clusters rather than isolated items one by one.",
+  "description": "Uses embedding.cluster-organize to transform equal-length embeddings into stable local groups with representative members. Needs deterministic clustering structure only, without semantic labeling or domain-specific identification being inferred from the capability.",
+  "distinguished_from": [
+    {
+      "persona_id": "coverage-consumer",
+      "how": "Needs embedding-group structure and representative members, not completeness calculations over duration and source-health facts."
+    },
+    {
+      "persona_id": "callweave-reviewer",
+      "how": "Works with generic embedding clusters and representative members, rather than Callweave-specific review of unknown detections and ecology evidence."
+    }
+  ]
+}

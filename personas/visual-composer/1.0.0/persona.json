@@ -1,0 +1,15 @@
+{
+  "id": "visual-composer",
+  "version": "1.0.0",
+  "name": "Visual composer",
+  "role": "Consumes deterministic visual mapping outputs as composition inputs.",
+  "goals": [
+    "Turn summary facts into stable composition parameters",
+    "Keep visual ambiguity honest and explicit"
+  ],
+  "non_goals": [
+    "Render final pixels",
+    "Persist output artifacts",
+    "Choose app-specific workflow routing"
+  ]
+}

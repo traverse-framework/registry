@@ -1,0 +1,13 @@
+{
+  "id": "review-consumer",
+  "version": "1.0.0",
+  "name": "Review consumer",
+  "summary": "Consumes deterministic review-state decisions derived from a current state and reviewer action.",
+  "responsibilities": [
+    "Provide current state and reviewer decision inputs",
+    "Rely on governed verify or reject transitions",
+    "Pass resulting state into later revision or persistence steps"
+  ],
+  "source": "Callweave",
+  "created_at": "2026-08-21T00:00:00Z"
+}

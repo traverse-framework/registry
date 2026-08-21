@@ -1,0 +1,13 @@
+{
+  "id": "period-operator",
+  "version": "1.0.0",
+  "name": "Period operator",
+  "summary": "Operates bounded-period finalization logic and needs deterministic period records.",
+  "responsibilities": [
+    "Supply scoped period boundary facts",
+    "Rely on stable idempotency keys",
+    "Use normalized finalized-period records downstream"
+  ],
+  "source": "Callweave",
+  "created_at": "2026-08-21T00:00:00Z"
+}

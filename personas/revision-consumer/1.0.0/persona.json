@@ -1,0 +1,13 @@
+{
+  "id": "revision-consumer",
+  "version": "1.0.0",
+  "name": "Revision consumer",
+  "summary": "Consumes deterministic append-only revision successor assignments for versioned subjects.",
+  "responsibilities": [
+    "Provide subject identity and previous revision inputs",
+    "Rely on monotonic successor numbering",
+    "Use successor assignments in later durable-state workflows"
+  ],
+  "source": "Callweave",
+  "created_at": "2026-08-21T00:00:00Z"
+}

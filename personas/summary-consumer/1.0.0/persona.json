@@ -1,0 +1,13 @@
+{
+  "id": "summary-consumer",
+  "version": "1.0.0",
+  "name": "Summary consumer",
+  "summary": "Consumes deterministic bounded-period summaries derived from included and pending references.",
+  "responsibilities": [
+    "Supply bounded scope and period identifiers",
+    "Consume explicit aggregate counts",
+    "Use normalized summaries as inputs to later policy steps"
+  ],
+  "source": "Callweave",
+  "created_at": "2026-08-21T00:00:00Z"
+}

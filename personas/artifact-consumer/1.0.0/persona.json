@@ -1,0 +1,19 @@
+{
+  "kind": "persona",
+  "schema_version": "1.0.0",
+  "id": "artifact-consumer",
+  "version": "1.0.0",
+  "name": "Artifact Consumer",
+  "summary": "Consumes immutable artifacts and needs corrected successor revisions without overwriting prior versions.",
+  "description": "Works with immutable artifacts that may require bounded correction after publication or review. Uses artifact.revision-create to derive append-only successor metadata so a correction creates a new revision that supersedes an older one without destroying historical lineage.",
+  "distinguished_from": [
+    {
+      "persona_id": "callweave-artist",
+      "how": "Consumes or governs immutable artifact revisions generically; does not create ecology-specific daily artwork."
+    },
+    {
+      "persona_id": "callweave-reviewer",
+      "how": "Needs append-only artifact revision metadata and lineage preservation, rather than adjudicating unknown detections or updating a location-specific knowledge base."
+    }
+  ]
+}

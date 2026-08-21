@@ -1,0 +1,13 @@
+{
+  "id": "approval-consumer",
+  "version": "1.0.0",
+  "name": "Approval consumer",
+  "summary": "Consumes deterministic approval-application decisions for proposed changes.",
+  "responsibilities": [
+    "Provide proposal and reviewer decision inputs",
+    "Rely on explicit applied or non-applied outputs",
+    "Pass approved decisions to later successor steps"
+  ],
+  "source": "Callweave",
+  "created_at": "2026-08-21T00:00:00Z"
+}
