@@ -356,6 +356,15 @@
       "evidence": "side_effects=[memory_only] on latest published version; empty emits/consumes; result returns directly to the caller with no asynchronous domain fact broadcast to independent consumers."
     },
     {
+      "capability_id": "uncertainty.score",
+      "published_versions": [
+        "1.0.0"
+      ],
+      "path": "capabilities/uncertainty/uncertainty.score/1.0.0/contract.json",
+      "classification": "no-event-required",
+      "evidence": "side_effects=[memory_only] on published version 1.0.0; empty emits/consumes; deterministic uncertainty score returns directly to the caller with no asynchronous domain fact broadcast to independent consumers."
+    },
+    {
       "capability_id": "validation.normalize-phone-number",
       "published_versions": [
         "1.0.0",
