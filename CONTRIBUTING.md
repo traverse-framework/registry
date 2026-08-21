@@ -31,6 +31,14 @@ If you're adding a new `personas/<id>/<version>/persona.json`, scaffold it with
 `scripts/scaffold/new-persona.sh` rather than hand-writing it — it prompts for every
 required field (including `distinguished_from`) and self-validates before you commit.
 
+Publishing more than one capability in the same session? Branch each
+`publish/<capability>-<version>` branch from `origin/main` — never from another in-flight
+`publish/*` branch. This repo squash-merges PRs, which severs shared history between a
+merged branch and anything built on top of it; a branch stacked on another `publish/*`
+branch becomes unmergeable (or silently redundant) the moment the earlier one merges, with
+no warning until then. See `docs/decision-log.md` entry 62 for what this looked like in
+practice (`#280`/`#281`).
+
 ## Core Rules
 
 - Approved specs are versioned, immutable, and merge-gating.
