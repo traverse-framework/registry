@@ -7,6 +7,15 @@
   "scope_note": "Covers this repository's own real published capabilities (capabilities/*/*/*/contract.json). traverse-framework/traverse#899's own inventory (contracts/governance/ecca-capability-inventory.json in that repo) covers a different, unrelated set of artifacts under that repo's contracts/examples/ and contracts/inference/ trees -- despite some capability_id values coincidentally matching, they are not the same content and #899 does not satisfy Spec 534 FR-020 for this repository's catalog. Regenerated 2026-08-10 for registry#253 so every published capability ID is classified; CI now fails if inventory coverage drifts.",
   "capabilities": [
     {
+      "capability_id": "approval.decision-apply",
+      "published_versions": [
+        "1.0.0"
+      ],
+      "path": "capabilities/approval/approval.decision-apply/1.0.0/contract.json",
+      "classification": "no-event-required",
+      "evidence": "side_effects=[memory_only] on published version 1.0.0; empty emits/consumes; deterministic approval-application result returns directly to the caller with no asynchronous domain fact broadcast to independent consumers."
+    },
+    {
       "capability_id": "core.aggregate-team-action-health",
       "published_versions": [
         "1.0.0",
