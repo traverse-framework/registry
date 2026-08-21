@@ -1,0 +1,272 @@
+{
+  "artifact": {
+    "digest": "sha256:00ec99d9a2cc7a6ff14bf93c76b3c6c100fb829e35f53973caf2d82c342c26f8",
+    "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/review.state-transition-decide-1.0.0/state-transition-decide.wasm"
+  },
+  "connector_requirements": [],
+  "consumes": [],
+  "dependencies": [],
+  "description": "Pure standalone review-state policy. It applies a reviewer decision to a current state, enforces that only provisional items may be verified, and returns the next reviewed state with a reason code. It does not assign revisions, persist state, fetch prior records, or know any application workflow.",
+  "emits": [],
+  "event_trigger": null,
+  "evidence": [],
+  "execution": {
+    "binary_format": "wasm",
+    "constraints": {
+      "filesystem_access": "none",
+      "host_api_access": "none",
+      "network_access": "forbidden"
+    },
+    "entrypoint": {
+      "command": "run",
+      "kind": "wasi-command"
+    },
+    "preferred_targets": [
+      "local",
+      "browser",
+      "edge",
+      "device"
+    ]
+  },
+  "id": "review.state-transition-decide",
+  "inputs": {
+    "schema": {
+      "additionalProperties": false,
+      "properties": {
+        "current_state": {
+          "enum": [
+            "provisional",
+            "unknown",
+            "surprising",
+            "rejected"
+          ],
+          "type": "string"
+        },
+        "policy": {
+          "additionalProperties": false,
+          "properties": {
+            "version": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "version"
+          ],
+          "type": "object"
+        },
+        "review_decision": {
+          "enum": [
+            "verify",
+            "reject",
+            "provisional"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "current_state",
+        "review_decision",
+        "policy"
+      ],
+      "type": "object"
+    }
+  },
+  "kind": "capability_contract",
+  "lifecycle": "active",
+  "name": "state-transition-decide",
+  "namespace": "review",
+  "outputs": {
+    "schema": {
+      "additionalProperties": false,
+      "properties": {
+        "error_code": {
+          "enum": [
+            "verify_requires_provisional"
+          ],
+          "type": "string"
+        },
+        "error_message": {
+          "type": "string"
+        },
+        "next_state": {
+          "enum": [
+            "verified",
+            "rejected",
+            "provisional"
+          ],
+          "type": "string"
+        },
+        "policy_version": {
+          "type": "string"
+        },
+        "reason_code": {
+          "enum": [
+            "verified_from_provisional",
+            "rejected_by_reviewer",
+            "provisional_by_reviewer"
+          ],
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "applied",
+            "invalid_transition"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "status",
+        "policy_version"
+      ],
+      "type": "object"
+    }
+  },
+  "owner": {
+    "contact": "maintainers@callweave.local",
+    "team": "callweave"
+  },
+  "permissions": [
+    {
+      "id": "review.state-transition-decide.execute"
+    }
+  ],
+  "permitted_targets": [
+    "local",
+    "browser",
+    "edge",
+    "device"
+  ],
+  "policies": [
+    {
+      "id": "deterministic-policy-only"
+    },
+    {
+      "id": "verification-requires-provisional-state"
+    }
+  ],
+  "postconditions": [
+    {
+      "description": "Only provisional items can transition to verified.",
+      "id": "verification-is-governed"
+    }
+  ],
+  "preconditions": [
+    {
+      "description": "A current state, review decision, and non-empty policy version are supplied.",
+      "id": "review-state-and-policy-supplied"
+    }
+  ],
+  "provenance": {
+    "adr_refs": [],
+    "author": "Callweave",
+    "created_at": "2026-08-21T00:00:00Z",
+    "exception_refs": [],
+    "source": "greenfield",
+    "spec_ref": "100-capability-package-authoring@1.0.0"
+  },
+  "schema_version": "1.0.0",
+  "service_type": "stateless",
+  "side_effects": [
+    {
+      "description": "Pure calculation; no host, network, filesystem, model, state, or workflow access.",
+      "kind": "memory_only"
+    }
+  ],
+  "state_schema": null,
+  "summary": "Decide the next reviewed state from the current state and reviewer decision.",
+  "use_cases": [
+    {
+      "happy": true,
+      "input_example": {
+        "current_state": "provisional",
+        "policy": {
+          "version": "review-policy-1"
+        },
+        "review_decision": "verify"
+      },
+      "output_example": {
+        "next_state": "verified",
+        "policy_version": "review-policy-1",
+        "reason_code": "verified_from_provisional",
+        "status": "applied"
+      },
+      "persona_ref": "review-consumer",
+      "scenario": "As a review consumer, I want a provisional item verified only when the reviewer explicitly verifies it so that final acceptance remains governed."
+    },
+    {
+      "happy": false,
+      "input_example": {
+        "current_state": "unknown",
+        "policy": {
+          "version": "review-policy-1"
+        },
+        "review_decision": "verify"
+      },
+      "output_example": {
+        "error_code": "verify_requires_provisional",
+        "error_message": "only provisional items may be verified",
+        "policy_version": "review-policy-1",
+        "status": "invalid_transition"
+      },
+      "persona_ref": "review-consumer",
+      "scenario": "As a review consumer, I want a non-provisional item blocked from verification so that uncertain or rejected items cannot become verified by mistake."
+    },
+    {
+      "happy": true,
+      "input_example": {
+        "current_state": "unknown",
+        "policy": {
+          "version": "review-policy-1"
+        },
+        "review_decision": "reject"
+      },
+      "output_example": {
+        "next_state": "rejected",
+        "policy_version": "review-policy-1",
+        "reason_code": "rejected_by_reviewer",
+        "status": "applied"
+      },
+      "persona_ref": "review-consumer",
+      "scenario": "As a review consumer, I want a reject decision to produce a rejected state so that negative review outcomes remain explicit and traceable."
+    },
+    {
+      "happy": true,
+      "input_example": {
+        "current_state": "surprising",
+        "policy": {
+          "version": "review-policy-1"
+        },
+        "review_decision": "provisional"
+      },
+      "output_example": {
+        "next_state": "provisional",
+        "policy_version": "review-policy-1",
+        "reason_code": "provisional_by_reviewer",
+        "status": "applied"
+      },
+      "persona_ref": "review-consumer",
+      "scenario": "As a review consumer, I want a provisional decision to preserve a provisional state so that a reviewer can keep an item in bounded limbo without falsely rejecting it."
+    },
+    {
+      "happy": false,
+      "input_example": {
+        "current_state": "rejected",
+        "policy": {
+          "version": "review-policy-1"
+        },
+        "review_decision": "reject"
+      },
+      "output_example": {
+        "next_state": "rejected",
+        "policy_version": "review-policy-1",
+        "reason_code": "rejected_by_reviewer",
+        "status": "applied"
+      },
+      "persona_ref": "review-consumer",
+      "scenario": "As a review consumer, I want an already rejected item to remain rejected when the reviewer confirms rejection so that terminal negative outcomes stay explicit."
+    }
+  ],
+  "version": "1.0.0"
+}

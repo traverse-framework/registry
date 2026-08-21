@@ -1,0 +1,19 @@
+{
+  "kind": "persona",
+  "schema_version": "1.0.0",
+  "id": "visual-composer",
+  "version": "1.0.0",
+  "name": "Visual Composer",
+  "summary": "Consumes deterministic visual mapping outputs as composition inputs without rendering or storing final artifacts.",
+  "description": "Uses visual.parameter-map to convert bounded summary and uncertainty facts into stable composition parameters such as density, motion, or palette signals. Needs deterministic mapping inputs for later rendering stages, while keeping rendering and persistence outside the capability boundary.",
+  "distinguished_from": [
+    {
+      "persona_id": "summary-consumer",
+      "how": "Consumes visual composition parameters derived from summary facts, rather than the bounded aggregate summary record itself."
+    },
+    {
+      "persona_id": "uncertainty-consumer",
+      "how": "Uses uncertainty and summary facts to derive visual parameters, rather than producing the uncertainty score itself."
+    }
+  ]
+}

@@ -1,0 +1,19 @@
+{
+  "kind": "persona",
+  "schema_version": "1.0.0",
+  "id": "artifact-consumer",
+  "version": "1.0.0",
+  "name": "Artifact Consumer",
+  "summary": "Consumes immutable artifacts and needs corrected successor revisions without overwriting prior versions.",
+  "description": "Works with immutable artifacts that may require bounded correction after publication or review. Uses artifact.revision-create to derive append-only successor metadata so a correction creates a new revision that supersedes an older one without destroying historical lineage.",
+  "distinguished_from": [
+    {
+      "persona_id": "retention-steward",
+      "how": "Needs append-only successor revision metadata for immutable artifacts, rather than classifying whether an asset must be retained or is only eligible for later action."
+    },
+    {
+      "persona_id": "revision-consumer",
+      "how": "Focuses on artifact-level successor correction and lineage preservation, rather than assigning the next revision number for an arbitrary versioned subject."
+    }
+  ]
+}

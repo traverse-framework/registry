@@ -1,0 +1,19 @@
+{
+  "kind": "persona",
+  "schema_version": "1.0.0",
+  "id": "classifier-steward",
+  "version": "1.0.0",
+  "name": "Classifier Steward",
+  "summary": "Evaluates labeled classifier outcomes to decide whether a candidate model or ruleset can pass a governed release gate.",
+  "description": "Uses classifier.release-gate-evaluate to decide whether a classifier candidate satisfies a deterministic release policy from labeled evaluation outcomes. Needs positive-case coverage and false-negative controls before a separate host can rely on the candidate.",
+  "distinguished_from": [
+    {
+      "persona_id": "coverage-consumer",
+      "how": "Evaluates positive-case release thresholds for a classifier candidate, rather than completeness of bounded coverage facts."
+    },
+    {
+      "persona_id": "cluster-reviewer",
+      "how": "Applies labeled evaluation outcomes to release-gate decisions, rather than organizing embeddings into representative groups."
+    }
+  ]
+}

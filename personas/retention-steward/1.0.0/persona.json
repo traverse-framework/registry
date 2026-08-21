@@ -1,0 +1,19 @@
+{
+  "kind": "persona",
+  "schema_version": "1.0.0",
+  "id": "retention-steward",
+  "version": "1.0.0",
+  "name": "Retention Steward",
+  "summary": "Applies hold and dependency rules to decide whether assets must be preserved or are only eligible for later action.",
+  "description": "Owns retention policy outcomes for immutable assets. Uses retention.eligibility-classify to distinguish assets that must be held or retained from those that are merely eligible for a later downstream action, without directly deleting or exporting anything.",
+  "distinguished_from": [
+    {
+      "persona_id": "artifact-consumer",
+      "how": "Classifies preservation obligations and dependency state for assets, rather than creating successor revisions for corrected immutable artifacts."
+    },
+    {
+      "persona_id": "callweave-reviewer",
+      "how": "Applies generic retention and hold rules to assets, rather than reviewing domain-specific evidence or detection outcomes."
+    }
+  ]
+}

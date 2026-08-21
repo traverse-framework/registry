@@ -1,0 +1,19 @@
+{
+  "kind": "persona",
+  "schema_version": "1.0.0",
+  "id": "classification-consumer",
+  "version": "1.0.0",
+  "name": "Classification Consumer",
+  "summary": "Consumes governed classification outcomes derived from scored evidence, compatibility checks, and policy thresholds.",
+  "description": "Uses classification.outcome-resolve to convert scored evidence, candidate status, and compatibility facts into one governed outcome state. Needs deterministic provisional, surprising, unknown, or rejected outcomes without coupling the capability to any domain-specific source or workflow.",
+  "distinguished_from": [
+    {
+      "persona_id": "classifier-steward",
+      "how": "Consumes a per-item governed outcome decision from scored evidence, rather than evaluating whether a classifier candidate can pass a release gate."
+    },
+    {
+      "persona_id": "cluster-reviewer",
+      "how": "Needs one governed outcome for a scored item and candidate pair, rather than grouping embeddings into curated clusters."
+    }
+  ]
+}

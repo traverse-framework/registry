@@ -1,0 +1,19 @@
+{
+  "kind": "persona",
+  "schema_version": "1.0.0",
+  "id": "period-operator",
+  "version": "1.0.0",
+  "name": "Period Operator",
+  "summary": "Finalizes bounded periods into stable records with deterministic keys and normalized boundary facts.",
+  "description": "Uses period.finalize to normalize one bounded period into a deterministic finalized record with explicit start, end, closure state, and idempotency key. Needs stable period-close outputs without embedding any application-specific workflow routing into the capability.",
+  "distinguished_from": [
+    {
+      "persona_id": "summary-consumer",
+      "how": "Needs normalized finalized period records and closure keys, rather than aggregates computed over references inside a completed period."
+    },
+    {
+      "persona_id": "coverage-consumer",
+      "how": "Finalizes one bounded period record, rather than assessing whether a coverage window is complete, partial, or unavailable."
+    }
+  ]
+}
