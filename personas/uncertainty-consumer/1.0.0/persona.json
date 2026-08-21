@@ -1,13 +1,19 @@
 {
+  "kind": "persona",
+  "schema_version": "1.0.0",
   "id": "uncertainty-consumer",
   "version": "1.0.0",
-  "name": "Uncertainty consumer",
+  "name": "Uncertainty Consumer",
   "summary": "Consumes deterministic uncertainty scores derived from aggregate counts and coverage state.",
-  "responsibilities": [
-    "Provide aggregate count inputs",
-    "Consume bounded uncertainty scores",
-    "Use reason-coded uncertainty downstream"
-  ],
-  "source": "Callweave",
-  "created_at": "2026-08-21T00:00:00Z"
+  "description": "Uses uncertainty.score to convert bounded counts, coverage state, and pending-reference facts into one reason-coded uncertainty score. Needs explicit uncertainty that remains tied to supplied evidence boundaries rather than hidden heuristic workflow behavior.",
+  "distinguished_from": [
+    {
+      "persona_id": "summary-consumer",
+      "how": "Consumes a scored uncertainty result from aggregate facts, rather than the aggregate facts themselves."
+    },
+    {
+      "persona_id": "coverage-consumer",
+      "how": "Converts coverage and count facts into a bounded uncertainty score, rather than classifying the completeness state of a coverage window."
+    }
+  ]
 }
