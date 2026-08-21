@@ -14,6 +14,23 @@ Please read:
 
 Use `traverse-cli capability publish` (from the `traverse` repo) rather than hand-crafting a PR — it validates your contract locally and opens the PR for you. See `specs/001-registry-foundation/spec.md`, User Story 1.
 
+`traverse-cli`'s local validation can lag this repo's own CI gates — new requirements
+(e.g. `specs/017-persona-registry`, the FR-020 capability inventory) land here first and
+the CLI can report "passed" on a PR that CI then rejects (see `docs/decision-log.md`
+entry 61). **Before opening the PR**, reproduce CI's two required checks locally — same
+scripts CI runs, so a clean pass here means no CI round-trip:
+
+```bash
+bash scripts/ci/pre_pr_check.sh <path-to-draft-pr-body.md>
+```
+
+The file you pass must contain your draft PR description, including its
+`## Governing Spec` section — every changed file's governing spec(s) (per
+`specs/governance/approved-specs.json`) must be declared there, or `spec-alignment` fails.
+If you're adding a new `personas/<id>/<version>/persona.json`, scaffold it with
+`scripts/scaffold/new-persona.sh` rather than hand-writing it — it prompts for every
+required field (including `distinguished_from`) and self-validates before you commit.
+
 ## Core Rules
 
 - Approved specs are versioned, immutable, and merge-gating.

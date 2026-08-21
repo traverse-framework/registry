@@ -27,7 +27,8 @@ deterministic business logic, so none of them qualify.
 
 ```bash
 bash scripts/ci/spec_alignment_check.sh <pr-body-file>   # spec-alignment gate (requires BASE_SHA/HEAD_SHA env)
-python3 scripts/ci/capability_validation.py               # deterministic capability checks
+python3 scripts/ci/capability_validation.py               # deterministic capability checks (whole-tree only; pass BASE_SHA HEAD_SHA for the diff-based checks CI also runs, e.g. persona_ref, immutability — see pre_pr_check.sh below)
+bash scripts/ci/pre_pr_check.sh <pr-body-file>            # both gates above, wired exactly as CI wires them — the actual pre-PR command to run
 python3 scripts/ci/build_index.py <prev_version> <sha> <out>  # index build
 (cd capability-src/<name> && cargo test)                  # unit-tests one capability's logic (host target)
 cargo test -p traverse-registry --locked                  # crate unit + integration tests
@@ -47,8 +48,21 @@ local pass means no CI round-trip:
 ```bash
 cargo test -p traverse-registry --locked
 cargo clippy -p traverse-registry --all-targets --locked -- -D warnings
-python3 scripts/ci/capability_validation.py   # only if capabilities/ changed
+bash scripts/ci/pre_pr_check.sh <pr-body-file>   # only if capabilities/ or personas/ changed
 ```
+
+### Before opening any PR that touches `capabilities/` or `personas/`
+
+Run `bash scripts/ci/pre_pr_check.sh <path-to-draft-pr-body>` — it runs the exact two
+required CI gates (`capability-validation`, `spec-alignment`) with `BASE_SHA`/`HEAD_SHA`
+wired the same way CI wires them. Do not run `capability_validation.py` bare (no args) as
+your only check — that silently skips every diff-based rule (persona `persona_ref`,
+immutability, scenario format) because `main()` only enables them when both SHAs are
+passed. This is not hypothetical: registry `#278` failed CI on exactly the checks a bare
+run would have missed, despite `traverse-cli capability publish`'s own local validation
+reporting success — see `docs/decision-log.md` entry 61. New `personas/` records should
+be scaffolded with `scripts/scaffold/new-persona.sh`, not hand-written — it enforces
+`description`/`distinguished_from` and self-validates.
 
 ## Git & PR Workflow
 
