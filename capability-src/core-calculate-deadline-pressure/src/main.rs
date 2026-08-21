@@ -251,35 +251,6 @@ fn object_after_key_at_depth<'a>(hay: &'a [u8], key: &[u8], depth: i32) -> Optio
     Some(&rest[..=end])
 }
 
-<<<<<<< HEAD
-fn array_after_key_at_depth<'a>(hay: &'a [u8], key: &[u8], depth: i32) -> Option<&'a [u8]> {
-    let pos = find_key_at_depth(hay, key, depth)?;
-    let after = &hay[pos + key.len()..];
-    let colon = after.iter().position(|b| *b == b':')?;
-    let rest = skip_ws(&after[colon + 1..]);
-    if rest.first() != Some(&b'[') {
-        return None;
-    }
-    let end = balanced_end(rest, b'[', b']')?;
-    Some(&rest[..=end])
-}
-
-fn extract_bool(hay: &[u8], key: &[u8]) -> Option<bool> {
-    let pos = find(hay, key)?;
-    let after = &hay[pos + key.len()..];
-    let colon = after.iter().position(|b| *b == b':')?;
-    let rest = skip_ws(&after[colon + 1..]);
-    if rest.starts_with(b"true") {
-        Some(true)
-    } else if rest.starts_with(b"false") {
-        Some(false)
-    } else {
-        None
-    }
-}
-
-=======
->>>>>>> origin/main
 fn extract_i32(hay: &[u8], key: &[u8]) -> Option<i32> {
     let pos = find(hay, key)?;
     let after = &hay[pos + key.len()..];
@@ -309,53 +280,6 @@ fn parse_i32(rest: &[u8]) -> Option<i32> {
     Some(if neg { -n } else { n })
 }
 
-<<<<<<< HEAD
-fn parse_number_millis(hay: &[u8], key: &[u8]) -> Option<u32> {
-    let pos = find(hay, key)?;
-    let after = &hay[pos + key.len()..];
-    let colon = after.iter().position(|b| *b == b':')?;
-    let rest = skip_ws(&after[colon + 1..]);
-    if rest.is_empty() {
-        return None;
-    }
-    let mut whole: u32 = 0;
-    let mut frac: u32 = 0;
-    let mut frac_digits = 0u32;
-    let mut seen_dot = false;
-    let mut j = 0usize;
-    while j < rest.len() {
-        let b = rest[j];
-        if b == b',' || b == b'}' || b == b']' || b == b' ' || b == b'\n' {
-            break;
-        }
-        if b == b'.' {
-            seen_dot = true;
-            j += 1;
-            continue;
-        }
-        if b < b'0' || b > b'9' {
-            break;
-        }
-        let digit = (b - b'0') as u32;
-        if seen_dot {
-            if frac_digits < 3 {
-                frac = frac * 10 + digit;
-                frac_digits += 1;
-            }
-        } else {
-            whole = whole * 10 + digit;
-        }
-        j += 1;
-    }
-    while frac_digits < 3 {
-        frac *= 10;
-        frac_digits += 1;
-    }
-    Some(whole * 1000 + frac)
-}
-
-=======
->>>>>>> origin/main
 fn copy(out: &mut [u8], at: usize, bytes: &[u8]) -> usize {
     let end = at + bytes.len();
     if end > out.len() {
@@ -415,59 +339,6 @@ fn write_i32(out: &mut [u8], mut i: usize, n: i32) -> usize {
     }
 }
 
-<<<<<<< HEAD
-fn ascii_lower(b: u8) -> u8 {
-    if b >= b'A' && b <= b'Z' {
-        b + 32
-    } else {
-        b
-    }
-}
-
-fn eq_ignore_case(a: &[u8], b: &[u8]) -> bool {
-    if a.len() != b.len() {
-        return false;
-    }
-    for i in 0..a.len() {
-        if ascii_lower(a[i]) != ascii_lower(b[i]) {
-            return false;
-        }
-    }
-    true
-}
-
-fn normalize_email(src: &[u8], dst: &mut [u8]) -> usize {
-    let mut i = 0usize;
-    let mut j = 0usize;
-    while i < src.len() && (src[i] == b' ' || src[i] == b'\t') {
-        i += 1;
-    }
-    let mut end = src.len();
-    while end > i && (src[end - 1] == b' ' || src[end - 1] == b'\t') {
-        end -= 1;
-    }
-    while i < end && j < dst.len() {
-        dst[j] = ascii_lower(src[i]);
-        i += 1;
-        j += 1;
-    }
-    j
-}
-
-fn trim_ascii(s: &[u8]) -> &[u8] {
-    let mut start = 0usize;
-    let mut end = s.len();
-    while start < end && matches!(s[start], b' ' | b'\t' | b'\n' | b'\r') {
-        start += 1;
-    }
-    while end > start && matches!(s[end - 1], b' ' | b'\t' | b'\n' | b'\r') {
-        end -= 1;
-    }
-    &s[start..end]
-}
-
-=======
->>>>>>> origin/main
 /// Days since 1970-01-01 for YYYY-MM-DD (Howard Hinnant civil_from_days inverse).
 fn parse_ymd_days(s: &[u8]) -> Option<i32> {
     if s.len() < 10 || s[4] != b'-' || s[7] != b'-' {
@@ -561,8 +432,6 @@ mod catalog_coverage_tests {
         assert!(out.contains("\"reason_code\":\"config_error\""), "expected config_error in {out}");
     }
 
-<<<<<<< HEAD
-=======
     #[test]
     fn use_case_06_sad_invalid_reference_date() {
         let out = run("{\"item\":{\"id\":\"ai-r\",\"due_date\":\"2026-08-10\"},\"reference_date\":\"not-a-date\",\"pressure_config\":{\"horizon_days\":14}}");
@@ -776,5 +645,4 @@ mod catalog_coverage_tests {
         assert_eq!(&buf[..n], b"0.75");
     }
 
->>>>>>> origin/main
 }

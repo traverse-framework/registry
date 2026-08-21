@@ -258,38 +258,6 @@ fn find_key_at_depth(hay: &[u8], key: &[u8], target_depth: i32) -> Option<usize>
     None
 }
 
-<<<<<<< HEAD
-fn string_value_after<'a>(after_key: &'a [u8]) -> &'a [u8] {
-    let Some(colon) = after_key.iter().position(|b| *b == b':') else {
-        return b"";
-    };
-    let rest = skip_ws(&after_key[colon + 1..]);
-    if rest.first() != Some(&b'"') {
-        return b"";
-    }
-    let rest = &rest[1..];
-    let Some(end) = rest.iter().position(|b| *b == b'"') else {
-        return b"";
-    };
-    &rest[..end]
-}
-
-fn extract_string<'a>(hay: &'a [u8], key: &[u8]) -> &'a [u8] {
-    let Some(pos) = find(hay, key) else {
-        return b"";
-    };
-    string_value_after(&hay[pos + key.len()..])
-}
-
-fn extract_string_at_depth<'a>(hay: &'a [u8], key: &[u8], depth: i32) -> &'a [u8] {
-    let Some(pos) = find_key_at_depth(hay, key, depth) else {
-        return b"";
-    };
-    string_value_after(&hay[pos + key.len()..])
-}
-
-=======
->>>>>>> origin/main
 fn object_after_key_at_depth<'a>(hay: &'a [u8], key: &[u8], depth: i32) -> Option<&'a [u8]> {
     let pos = find_key_at_depth(hay, key, depth)?;
     let after = &hay[pos + key.len()..];
@@ -410,25 +378,6 @@ fn copy(out: &mut [u8], at: usize, bytes: &[u8]) -> usize {
     end
 }
 
-<<<<<<< HEAD
-fn copy_json_escaped(out: &mut [u8], mut i: usize, s: &[u8]) -> usize {
-    for &b in s {
-        match b {
-            b'"' => i = copy(out, i, b"\\\""),
-            b'\\' => i = copy(out, i, b"\\\\"),
-            _ => {
-                if i < out.len() {
-                    out[i] = b;
-                    i += 1;
-                }
-            }
-        }
-    }
-    i
-}
-
-=======
->>>>>>> origin/main
 fn write_u32(out: &mut [u8], mut i: usize, mut n: u32) -> usize {
     if n == 0 {
         if i < out.len() {
@@ -454,115 +403,6 @@ fn write_u32(out: &mut [u8], mut i: usize, mut n: u32) -> usize {
     i
 }
 
-<<<<<<< HEAD
-fn write_i32(out: &mut [u8], mut i: usize, n: i32) -> usize {
-    if n < 0 {
-        i = copy(out, i, b"-");
-        write_u32(out, i, (-n) as u32)
-    } else {
-        write_u32(out, i, n as u32)
-    }
-}
-
-fn ascii_lower(b: u8) -> u8 {
-    if b >= b'A' && b <= b'Z' {
-        b + 32
-    } else {
-        b
-    }
-}
-
-fn eq_ignore_case(a: &[u8], b: &[u8]) -> bool {
-    if a.len() != b.len() {
-        return false;
-    }
-    for i in 0..a.len() {
-        if ascii_lower(a[i]) != ascii_lower(b[i]) {
-            return false;
-        }
-    }
-    true
-}
-
-fn normalize_email(src: &[u8], dst: &mut [u8]) -> usize {
-    let mut i = 0usize;
-    let mut j = 0usize;
-    while i < src.len() && (src[i] == b' ' || src[i] == b'\t') {
-        i += 1;
-    }
-    let mut end = src.len();
-    while end > i && (src[end - 1] == b' ' || src[end - 1] == b'\t') {
-        end -= 1;
-    }
-    while i < end && j < dst.len() {
-        dst[j] = ascii_lower(src[i]);
-        i += 1;
-        j += 1;
-    }
-    j
-}
-
-fn trim_ascii(s: &[u8]) -> &[u8] {
-    let mut start = 0usize;
-    let mut end = s.len();
-    while start < end && matches!(s[start], b' ' | b'\t' | b'\n' | b'\r') {
-        start += 1;
-    }
-    while end > start && matches!(s[end - 1], b' ' | b'\t' | b'\n' | b'\r') {
-        end -= 1;
-    }
-    &s[start..end]
-}
-
-/// Days since 1970-01-01 for YYYY-MM-DD (Howard Hinnant civil_from_days inverse).
-fn parse_ymd_days(s: &[u8]) -> Option<i32> {
-    if s.len() < 10 || s[4] != b'-' || s[7] != b'-' {
-        return None;
-    }
-    let y = parse_i32(&s[0..4])?;
-    let m = parse_i32(&s[5..7])?;
-    let d = parse_i32(&s[8..10])?;
-    if m < 1 || m > 12 || d < 1 || d > 31 {
-        return None;
-    }
-    let y = y as i32 - if m <= 2 { 1 } else { 0 };
-    let era = if y >= 0 { y } else { y - 399 } / 400;
-    let yoe = (y - era * 400) as u32;
-    let mp = if m > 2 { (m - 3) as u32 } else { (m + 9) as u32 };
-    let doy = (153 * mp + 2) / 5 + d as u32 - 1;
-    let doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;
-    Some((era * 146097 + doe as i32) - 719468)
-}
-
-fn format_score_millis(out: &mut [u8], millis: u32) -> usize {
-    let whole = millis / 1000;
-    let frac = millis % 1000;
-    let mut i = write_u32(out, 0, whole);
-    i = copy(out, i, b".");
-    // always 3 digits for determinism in contract examples we may trim; write without trailing zeros carefully
-    // Use up to 3 digits, trim trailing zeros but keep at least one if frac!=0? Contract examples use 0.785 / 1.0
-    if frac == 0 {
-        i = copy(out, i, b"0");
-        return i;
-    }
-    let d0 = (frac / 100) as u8;
-    let d1 = ((frac / 10) % 10) as u8;
-    let d2 = (frac % 10) as u8;
-    out[i] = b'0' + d0;
-    i += 1;
-    if d1 != 0 || d2 != 0 {
-        out[i] = b'0' + d1;
-        i += 1;
-        if d2 != 0 {
-            out[i] = b'0' + d2;
-            i += 1;
-        }
-    }
-    i
-}
-
-=======
->>>>>>> origin/main
 #[cfg(not(test))]
 #[panic_handler]
 fn panic(_: &core::panic::PanicInfo<'_>) -> ! {
@@ -597,8 +437,6 @@ mod catalog_coverage_tests {
         assert!(out.contains("\"reason_code\":\"invalid_input\""), "expected invalid_input in {out}");
     }
 
-<<<<<<< HEAD
-=======
     #[test]
     fn use_case_04_sad_missing_health_key() {
         let out = run("{\"escalation_config\":{\"min_overdue_for_escalate\":2,\"min_overloaded_owners\":1,\"require_multiple_signals\":true}}");
@@ -772,5 +610,4 @@ mod catalog_coverage_tests {
         assert_eq!(write_u32(&mut out, 0, 0), 0);
     }
 
->>>>>>> origin/main
 }
