@@ -76,8 +76,13 @@ pub unsafe fn decide(input: &[u8], out: &mut [u8]) -> usize {
     let has_manager = has_role(input, b"manager");
     let has_finance = has_role(input, b"finance");
     let has_support = has_role(input, b"support") || has_role(input, b"support_agent");
-    let has_any_role = has_employee || has_manager || has_finance || has_support || has_role(input, b"customer")
-        || has_role(input, b"compliance") || has_role(input, b"project_manager");
+    let has_any_role = has_employee
+        || has_manager
+        || has_finance
+        || has_support
+        || has_role(input, b"customer")
+        || has_role(input, b"compliance")
+        || has_role(input, b"project_manager");
 
     let collected_legal = approval_collected(input, b"legal");
     let collected_finance = approval_collected(input, b"finance");
@@ -596,7 +601,9 @@ fn flag_true(hay: &[u8], key: &[u8]) -> bool {
         return false;
     };
     let mut rest = &after[colon + 1..];
-    while rest.first() == Some(&b' ') || rest.first() == Some(&b'\n') || rest.first() == Some(&b'\t')
+    while rest.first() == Some(&b' ')
+        || rest.first() == Some(&b'\n')
+        || rest.first() == Some(&b'\t')
     {
         rest = &rest[1..];
     }
@@ -608,7 +615,9 @@ fn json_array_after_key<'a>(hay: &'a [u8], key: &[u8]) -> Option<&'a [u8]> {
     let after = &hay[pos + key.len()..];
     let colon = after.iter().position(|b| *b == b':')?;
     let mut rest = &after[colon + 1..];
-    while rest.first() == Some(&b' ') || rest.first() == Some(&b'\n') || rest.first() == Some(&b'\t')
+    while rest.first() == Some(&b' ')
+        || rest.first() == Some(&b'\n')
+        || rest.first() == Some(&b'\t')
     {
         rest = &rest[1..];
     }
@@ -644,7 +653,9 @@ fn extract_string<'a>(hay: &'a [u8], key: &[u8]) -> &'a [u8] {
         return b"";
     };
     let mut rest = &after[colon + 1..];
-    while rest.first() == Some(&b' ') || rest.first() == Some(&b'\n') || rest.first() == Some(&b'\t')
+    while rest.first() == Some(&b' ')
+        || rest.first() == Some(&b'\n')
+        || rest.first() == Some(&b'\t')
     {
         rest = &rest[1..];
     }
@@ -724,9 +735,822 @@ mod catalog_coverage_tests {
         String::from_utf8_lossy(&out[..n]).into_owned()
     }
 
+    fn call_expense(
+        current: &[u8],
+        proposed: &[u8],
+        amount: Option<f64>,
+        has_manager: bool,
+        has_finance: bool,
+        dual: bool,
+        collected_legal: bool,
+        collected_finance: bool,
+    ) -> String {
+        let mut out = vec![0u8; 4096];
+        let n = unsafe {
+            decide_expense(
+                &mut out,
+                current,
+                proposed,
+                amount,
+                has_manager,
+                has_finance,
+                dual,
+                collected_legal,
+                collected_finance,
+                b"",
+            )
+        };
+        String::from_utf8_lossy(&out[..n]).into_owned()
+    }
+
+    fn call_order(current: &[u8], proposed: &[u8], now: &[u8], cancel_deadline: &[u8]) -> String {
+        let mut out = vec![0u8; 4096];
+        let n = unsafe { decide_order(&mut out, current, proposed, now, cancel_deadline, b"") };
+        String::from_utf8_lossy(&out[..n]).into_owned()
+    }
+
+    fn call_ticket(
+        current: &[u8],
+        proposed: &[u8],
+        priority: &[u8],
+        has_open_children: bool,
+    ) -> String {
+        let mut out = vec![0u8; 4096];
+        let n = unsafe {
+            decide_ticket(
+                &mut out,
+                current,
+                proposed,
+                priority,
+                has_open_children,
+                b"",
+            )
+        };
+        String::from_utf8_lossy(&out[..n]).into_owned()
+    }
+
     #[test]
     fn smoke_invalid_input_returns_json() {
         let out = run("{}");
         assert!(out.contains("reason_code") || out.contains("{"), "{out}");
+    }
+
+    // ---- top-level decide(): no roles ----
+
+    #[test]
+    fn decide_denies_when_no_roles_present() {
+        let out = run(
+            r#"{"entity_type":"expense","current_state":"draft","proposed_state":"submitted"}"#,
+        );
+        assert!(out.contains(r#""allowed":false"#));
+        assert!(out.contains(r#""decision":"denied""#));
+        assert!(out.contains(r#""code":"ACTOR_HAS_NO_ROLES""#));
+    }
+
+    #[test]
+    fn decide_denies_when_roles_array_present_but_empty() {
+        let out = run(
+            r#"{"entity_type":"expense","current_state":"draft","proposed_state":"submitted","roles":[]}"#,
+        );
+        assert!(out.contains(r#""code":"ACTOR_HAS_NO_ROLES""#));
+    }
+
+    // ---- top-level decide(): query mode / next_legal_states matrix ----
+
+    #[test]
+    fn query_mode_expense_draft_next_states() {
+        let out = run(
+            r#"{"entity_type":"expense","current_state":"draft","proposed_state":"anything","mode":"query","roles":["employee"]}"#,
+        );
+        assert!(out.contains(r#""next_legal_states":["submitted"]"#));
+        assert!(out.contains(r#""code":"QUERY_ONLY""#));
+        assert!(out.contains(r#""decision":"denied""#));
+    }
+
+    #[test]
+    fn query_mode_expense_submitted_with_manager() {
+        let out = run(
+            r#"{"entity_type":"expense","current_state":"submitted","proposed_state":"x","mode":"query","roles":["manager"]}"#,
+        );
+        assert!(out.contains(r#""next_legal_states":["approved"]"#));
+    }
+
+    #[test]
+    fn query_mode_expense_submitted_with_finance() {
+        let out = run(
+            r#"{"entity_type":"expense","current_state":"submitted","proposed_state":"x","mode":"query","roles":["finance"]}"#,
+        );
+        assert!(out.contains(r#""next_legal_states":["approved"]"#));
+    }
+
+    #[test]
+    fn query_mode_expense_submitted_no_approver_role() {
+        let out = run(
+            r#"{"entity_type":"expense","current_state":"submitted","proposed_state":"x","mode":"query","roles":["employee"]}"#,
+        );
+        assert!(out.contains(r#""next_legal_states":[]"#));
+    }
+
+    #[test]
+    fn query_mode_order_placed() {
+        let out = run(
+            r#"{"entity_type":"order","current_state":"placed","proposed_state":"x","mode":"query","roles":["employee"]}"#,
+        );
+        assert!(out.contains(r#""next_legal_states":["cancelled"]"#));
+    }
+
+    #[test]
+    fn query_mode_ticket_open() {
+        let out = run(
+            r#"{"entity_type":"ticket","current_state":"open","proposed_state":"x","mode":"query","roles":["employee"]}"#,
+        );
+        assert!(out.contains(r#""next_legal_states":["escalated","closed"]"#));
+    }
+
+    #[test]
+    fn query_mode_unmatched_combo_defaults_empty() {
+        let out = run(
+            r#"{"entity_type":"expense","current_state":"approved","proposed_state":"x","mode":"query","roles":["employee"]}"#,
+        );
+        assert!(out.contains(r#""next_legal_states":[]"#));
+    }
+
+    #[test]
+    fn query_triggered_by_empty_proposed_state() {
+        let out = run(r#"{"entity_type":"expense","current_state":"draft","roles":["employee"]}"#);
+        assert!(out.contains(r#""code":"QUERY_ONLY""#));
+        assert!(out.contains(r#""next_legal_states":["submitted"]"#));
+    }
+
+    #[test]
+    fn query_triggered_by_proposed_equal_current() {
+        let out = run(
+            r#"{"entity_type":"expense","current_state":"draft","proposed_state":"draft","roles":["employee"]}"#,
+        );
+        assert!(out.contains(r#""code":"QUERY_ONLY""#));
+        assert!(out.contains(r#""next_legal_states":["submitted"]"#));
+    }
+
+    // ---- top-level decide(): entity dispatch / unknown entity ----
+
+    #[test]
+    fn decide_denies_unknown_entity_type() {
+        let out = run(
+            r#"{"entity_type":"widget","current_state":"a","proposed_state":"b","roles":["employee"]}"#,
+        );
+        assert!(out.contains(r#""code":"UNKNOWN_ENTITY_TYPE""#));
+        assert!(out.contains(r#""decision":"denied""#));
+    }
+
+    #[test]
+    fn decide_routes_expense_and_passes_correlation_id() {
+        let out = run(
+            r#"{"entity_type":"expense","current_state":"draft","proposed_state":"submitted","roles":["employee"],"amount":10,"correlation_id":"corr-1"}"#,
+        );
+        assert!(out.contains(r#""code":"AUTO_APPROVED""#));
+        assert!(out.contains(r#""correlation_id":"corr-1""#));
+    }
+
+    #[test]
+    fn decide_routes_order() {
+        let out = run(
+            r#"{"entity_type":"order","current_state":"fulfilled","proposed_state":"draft","roles":["employee"]}"#,
+        );
+        assert!(out.contains(r#""code":"ILLEGAL_TRANSITION""#));
+    }
+
+    #[test]
+    fn decide_routes_ticket() {
+        let out = run(
+            r#"{"entity_type":"ticket","current_state":"open","proposed_state":"escalated","priority":"critical","roles":["employee"]}"#,
+        );
+        assert!(out.contains(r#""code":"PRIORITY_ESCALATION""#));
+    }
+
+    // ---- top-level decide(): alternate actor-role names feeding has_any_role ----
+
+    #[test]
+    fn decide_accepts_customer_role_as_valid_actor() {
+        let out = run(
+            r#"{"entity_type":"expense","current_state":"draft","proposed_state":"submitted","roles":["customer"],"amount":10}"#,
+        );
+        assert!(out.contains(r#""code":"AUTO_APPROVED""#));
+    }
+
+    #[test]
+    fn decide_accepts_compliance_role() {
+        let out = run(
+            r#"{"entity_type":"expense","current_state":"draft","proposed_state":"submitted","roles":["compliance"],"amount":10}"#,
+        );
+        assert!(out.contains(r#""code":"AUTO_APPROVED""#));
+    }
+
+    #[test]
+    fn decide_accepts_project_manager_role() {
+        let out = run(
+            r#"{"entity_type":"expense","current_state":"draft","proposed_state":"submitted","roles":["project_manager"],"amount":10}"#,
+        );
+        assert!(out.contains(r#""code":"AUTO_APPROVED""#));
+    }
+
+    #[test]
+    fn decide_accepts_support_role_plain() {
+        let out = run(
+            r#"{"entity_type":"expense","current_state":"draft","proposed_state":"submitted","roles":["support"],"amount":10}"#,
+        );
+        assert!(out.contains(r#""code":"AUTO_APPROVED""#));
+    }
+
+    #[test]
+    fn decide_accepts_support_agent_alt_role_name() {
+        let out = run(
+            r#"{"entity_type":"expense","current_state":"draft","proposed_state":"submitted","roles":["support_agent"],"amount":10}"#,
+        );
+        assert!(out.contains(r#""code":"AUTO_APPROVED""#));
+    }
+
+    // ---- decide_expense: draft -> submitted ----
+
+    #[test]
+    fn expense_draft_to_submitted_missing_amount() {
+        let out = call_expense(
+            b"draft",
+            b"submitted",
+            None,
+            false,
+            false,
+            false,
+            false,
+            false,
+        );
+        assert!(out.contains(r#""decision":"requires_additional_info""#));
+        assert!(out.contains(r#""code":"MISSING_AMOUNT""#));
+    }
+
+    #[test]
+    fn expense_draft_to_submitted_amount_at_limit_exceeds() {
+        let out = call_expense(
+            b"draft",
+            b"submitted",
+            Some(100.0),
+            false,
+            false,
+            false,
+            false,
+            false,
+        );
+        assert!(out.contains(r#""decision":"requires_approval""#));
+        assert!(out.contains(r#""code":"AMOUNT_EXCEEDS_LIMIT""#));
+        assert!(out.contains(
+            r#""required_approvals":[{"role":"finance","min_count":1,"logic":"all","reason":"high-value expense"}]"#
+        ));
+    }
+
+    #[test]
+    fn expense_draft_to_submitted_amount_above_limit_exceeds() {
+        let out = call_expense(
+            b"draft",
+            b"submitted",
+            Some(250.5),
+            false,
+            false,
+            false,
+            false,
+            false,
+        );
+        assert!(out.contains(r#""code":"AMOUNT_EXCEEDS_LIMIT""#));
+    }
+
+    #[test]
+    fn expense_draft_to_submitted_low_amount_auto_approved() {
+        let out = call_expense(
+            b"draft",
+            b"submitted",
+            Some(50.0),
+            false,
+            false,
+            false,
+            false,
+            false,
+        );
+        assert!(out.contains(r#""allowed":true"#));
+        assert!(out.contains(r#""code":"AUTO_APPROVED""#));
+    }
+
+    // ---- decide_expense: submitted -> approved, dual approval ----
+
+    #[test]
+    fn expense_dual_approval_both_missing() {
+        let out = call_expense(
+            b"submitted",
+            b"approved",
+            None,
+            false,
+            false,
+            true,
+            false,
+            false,
+        );
+        assert!(out.contains(r#""code":"PARTIAL_APPROVALS""#));
+        assert!(out.contains(
+            r#""required_approvals":[{"role":"legal","min_count":1,"logic":"all","reason":"dual approval"},{"role":"finance","min_count":1,"logic":"all","reason":"dual approval"}]"#
+        ));
+    }
+
+    #[test]
+    fn expense_dual_approval_only_legal_missing() {
+        let out = call_expense(
+            b"submitted",
+            b"approved",
+            None,
+            false,
+            false,
+            true,
+            false,
+            true,
+        );
+        assert!(out.contains(r#""code":"PARTIAL_APPROVALS""#));
+        assert!(out.contains(
+            r#""required_approvals":[{"role":"legal","min_count":1,"logic":"all","reason":"dual approval"}]"#
+        ));
+    }
+
+    #[test]
+    fn expense_dual_approval_only_finance_missing() {
+        let out = call_expense(
+            b"submitted",
+            b"approved",
+            None,
+            false,
+            false,
+            true,
+            true,
+            false,
+        );
+        assert!(out.contains(r#""code":"PARTIAL_APPROVALS""#));
+        assert!(out.contains(
+            r#""required_approvals":[{"role":"finance","min_count":1,"logic":"all","reason":"dual approval"}]"#
+        ));
+    }
+
+    #[test]
+    fn expense_dual_approval_complete() {
+        let out = call_expense(
+            b"submitted",
+            b"approved",
+            None,
+            false,
+            false,
+            true,
+            true,
+            true,
+        );
+        assert!(out.contains(r#""allowed":true"#));
+        assert!(out.contains(r#""code":"DUAL_APPROVAL_COMPLETE""#));
+    }
+
+    // ---- decide_expense: submitted -> approved, single approval ----
+
+    #[test]
+    fn expense_single_approval_by_finance() {
+        let out = call_expense(
+            b"submitted",
+            b"approved",
+            None,
+            false,
+            true,
+            false,
+            false,
+            false,
+        );
+        assert!(out.contains(r#""allowed":true"#));
+        assert!(out.contains(r#""code":"APPROVED_BY_FINANCE""#));
+    }
+
+    #[test]
+    fn expense_single_approval_manager_only_still_needs_finance() {
+        let out = call_expense(
+            b"submitted",
+            b"approved",
+            None,
+            true,
+            false,
+            false,
+            false,
+            false,
+        );
+        assert!(out.contains(r#""decision":"requires_approval""#));
+        assert!(out.contains(r#""code":"AMOUNT_EXCEEDS_LIMIT""#));
+    }
+
+    #[test]
+    fn expense_single_approval_insufficient_role() {
+        let out = call_expense(
+            b"submitted",
+            b"approved",
+            None,
+            false,
+            false,
+            false,
+            false,
+            false,
+        );
+        assert!(out.contains(r#""decision":"denied""#));
+        assert!(out.contains(r#""code":"INSUFFICIENT_ROLE""#));
+    }
+
+    // ---- decide_expense: unknown state / illegal transition ----
+
+    #[test]
+    fn expense_current_empty_is_unknown_state() {
+        let out = call_expense(b"", b"approved", None, false, false, false, false, false);
+        assert!(out.contains(r#""code":"UNKNOWN_STATE""#));
+    }
+
+    #[test]
+    fn expense_proposed_empty_is_unknown_state() {
+        // Reached only by calling decide_expense directly: decide()'s top-level
+        // query gate treats an empty proposed_state as query mode before this
+        // function is ever invoked, so this exercises the right-hand disjunct
+        // of `current.is_empty() || proposed.is_empty()` directly.
+        let out = call_expense(b"submitted", b"", None, false, false, false, false, false);
+        assert!(out.contains(r#""code":"UNKNOWN_STATE""#));
+    }
+
+    #[test]
+    fn expense_unmatched_pair_is_illegal_transition() {
+        let out = call_expense(
+            b"approved",
+            b"draft",
+            None,
+            false,
+            false,
+            false,
+            false,
+            false,
+        );
+        assert!(out.contains(r#""code":"ILLEGAL_TRANSITION""#));
+    }
+
+    // ---- decide_order ----
+
+    #[test]
+    fn order_fulfilled_to_draft_is_illegal() {
+        let out = call_order(b"fulfilled", b"draft", b"", b"");
+        assert!(out.contains(r#""code":"ILLEGAL_TRANSITION""#));
+    }
+
+    #[test]
+    fn order_cancel_missing_both_now_and_deadline() {
+        let out = call_order(b"placed", b"cancelled", b"", b"");
+        assert!(out.contains(r#""code":"MISSING_CANCEL_WINDOW""#));
+    }
+
+    #[test]
+    fn order_cancel_missing_only_deadline() {
+        let out = call_order(b"placed", b"cancelled", b"2024-01-01T00:00:00Z", b"");
+        assert!(out.contains(r#""code":"MISSING_CANCEL_WINDOW""#));
+    }
+
+    #[test]
+    fn order_cancel_within_window() {
+        let out = call_order(
+            b"placed",
+            b"cancelled",
+            b"2024-01-01T00:00:00Z",
+            b"2024-01-02T00:00:00Z",
+        );
+        assert!(out.contains(r#""allowed":true"#));
+        assert!(out.contains(r#""code":"CANCEL_WITHIN_WINDOW""#));
+    }
+
+    #[test]
+    fn order_cancel_exactly_at_deadline_is_within_window() {
+        let out = call_order(
+            b"placed",
+            b"cancelled",
+            b"2024-01-02T00:00:00Z",
+            b"2024-01-02T00:00:00Z",
+        );
+        assert!(out.contains(r#""code":"CANCEL_WITHIN_WINDOW""#));
+    }
+
+    #[test]
+    fn order_cancel_window_expired() {
+        let out = call_order(
+            b"placed",
+            b"cancelled",
+            b"2024-01-03T00:00:00Z",
+            b"2024-01-02T00:00:00Z",
+        );
+        assert!(out.contains(r#""decision":"denied""#));
+        assert!(out.contains(r#""code":"CANCEL_WINDOW_EXPIRED""#));
+    }
+
+    #[test]
+    fn order_unmatched_pair_is_illegal_transition() {
+        let out = call_order(b"placed", b"draft", b"", b"");
+        assert!(out.contains(r#""code":"ILLEGAL_TRANSITION""#));
+    }
+
+    // ---- decide_ticket ----
+
+    #[test]
+    fn ticket_escalation_critical_priority() {
+        let out = call_ticket(b"open", b"escalated", b"critical", false);
+        assert!(out.contains(r#""allowed":true"#));
+        assert!(out.contains(r#""code":"PRIORITY_ESCALATION""#));
+    }
+
+    #[test]
+    fn ticket_escalation_non_critical_priority() {
+        let out = call_ticket(b"open", b"escalated", b"low", false);
+        assert!(out.contains(r#""decision":"denied""#));
+        assert!(out.contains(r#""code":"PRIORITY_NOT_CRITICAL""#));
+    }
+
+    #[test]
+    fn ticket_close_with_open_children_denied() {
+        let out = call_ticket(b"open", b"closed", b"", true);
+        assert!(out.contains(r#""code":"HAS_OPEN_CHILDREN""#));
+    }
+
+    #[test]
+    fn ticket_close_without_open_children_allowed() {
+        let out = call_ticket(b"open", b"closed", b"", false);
+        assert!(out.contains(r#""allowed":true"#));
+        assert!(out.contains(r#""code":"TICKET_CLOSED""#));
+    }
+
+    #[test]
+    fn ticket_unmatched_pair_is_illegal_transition() {
+        let out = call_ticket(b"closed", b"open", b"", false);
+        assert!(out.contains(r#""code":"ILLEGAL_TRANSITION""#));
+    }
+
+    // ---- next_legal_states (direct) ----
+
+    #[test]
+    fn next_legal_states_direct_matrix() {
+        assert_eq!(
+            next_legal_states(b"expense", b"draft", false, false),
+            br#"["submitted"]"#.as_slice()
+        );
+        assert_eq!(
+            next_legal_states(b"expense", b"submitted", true, false),
+            br#"["approved"]"#.as_slice()
+        );
+        assert_eq!(
+            next_legal_states(b"expense", b"submitted", false, true),
+            br#"["approved"]"#.as_slice()
+        );
+        assert_eq!(
+            next_legal_states(b"expense", b"submitted", false, false),
+            br#"[]"#.as_slice()
+        );
+        assert_eq!(
+            next_legal_states(b"order", b"placed", false, false),
+            br#"["cancelled"]"#.as_slice()
+        );
+        assert_eq!(
+            next_legal_states(b"ticket", b"open", false, false),
+            br#"["escalated","closed"]"#.as_slice()
+        );
+        assert_eq!(
+            next_legal_states(b"expense", b"approved", false, false),
+            br#"[]"#.as_slice()
+        );
+    }
+
+    // ---- bytes_le ----
+
+    #[test]
+    fn bytes_le_compares_lexicographically() {
+        assert!(bytes_le(b"2024-01-01", b"2024-01-02"));
+        assert!(bytes_le(b"2024-01-02", b"2024-01-02"));
+        assert!(!bytes_le(b"2024-01-03", b"2024-01-02"));
+    }
+
+    // ---- copy / overflow guard ----
+
+    #[test]
+    fn copy_writes_when_it_fits() {
+        let mut buf = [0u8; 5];
+        let n = copy(&mut buf, 0, b"hi");
+        assert_eq!(n, 2);
+        assert_eq!(&buf[..2], b"hi");
+    }
+
+    #[test]
+    fn copy_returns_at_unchanged_when_buffer_too_small() {
+        let mut tiny = [0u8; 2];
+        let result = copy(&mut tiny, 0, b"hello");
+        assert_eq!(result, 0);
+        assert_eq!(&tiny, &[0, 0]);
+    }
+
+    #[test]
+    fn decide_with_tiny_output_buffer_does_not_panic() {
+        // The output buffer is far too small for a full decision payload.
+        // `copy` silently no-ops (returns the position unchanged) on any
+        // write that would overflow, rather than panicking — including the
+        // very first (oversized) write, whose failure to advance the
+        // position then lets a later, smaller write ("true", 4 bytes)
+        // land exactly at offset 0..4 since it fits on its own.
+        let mut out = [0u8; 4];
+        let input = br#"{"entity_type":"expense","current_state":"draft","proposed_state":"submitted","roles":["employee"],"amount":10}"#;
+        let n = unsafe { decide(input, &mut out) };
+        assert!(n <= out.len());
+        assert_eq!(&out[..n], b"true");
+    }
+
+    // ---- has_role ----
+
+    #[test]
+    fn has_role_present_and_absent() {
+        let hay: &[u8] = br#""roles":["manager","finance"]"#;
+        assert!(has_role(hay, b"manager"));
+        assert!(!has_role(hay, b"employee"));
+    }
+
+    #[test]
+    fn has_role_returns_false_when_roles_key_missing() {
+        assert!(!has_role(br#""foo":1"#, b"manager"));
+    }
+
+    #[test]
+    fn has_role_rejects_oversized_role_needle() {
+        let long_role = [b'a'; 100];
+        assert!(!has_role(br#""roles":["x"]"#, &long_role));
+    }
+
+    // ---- approval_collected ----
+
+    #[test]
+    fn approval_collected_present_and_absent() {
+        let hay: &[u8] = br#""already_collected_approvals":[{"role":"finance"}]"#;
+        assert!(approval_collected(hay, b"finance"));
+        assert!(!approval_collected(hay, b"legal"));
+    }
+
+    #[test]
+    fn approval_collected_returns_false_when_key_missing() {
+        assert!(!approval_collected(br#""foo":1"#, b"finance"));
+    }
+
+    #[test]
+    fn approval_collected_rejects_oversized_role_needle() {
+        let long_role = [b'a'; 100];
+        assert!(!approval_collected(
+            br#""already_collected_approvals":[{"role":"x"}]"#,
+            &long_role
+        ));
+    }
+
+    // ---- flag_true ----
+
+    #[test]
+    fn flag_true_variants() {
+        assert!(flag_true(
+            br#""requires_dual_approval":true"#,
+            b"\"requires_dual_approval\""
+        ));
+        assert!(!flag_true(
+            br#""requires_dual_approval":false"#,
+            b"\"requires_dual_approval\""
+        ));
+        assert!(!flag_true(br#""foo":true"#, b"\"requires_dual_approval\""));
+        assert!(!flag_true(
+            br#""requires_dual_approval"true"#,
+            b"\"requires_dual_approval\""
+        ));
+        assert!(flag_true(
+            b"\"requires_dual_approval\":   true",
+            b"\"requires_dual_approval\""
+        ));
+        assert!(flag_true(
+            b"\"requires_dual_approval\":\n\ttrue",
+            b"\"requires_dual_approval\""
+        ));
+    }
+
+    // ---- json_array_after_key ----
+
+    #[test]
+    fn json_array_after_key_missing_key() {
+        assert_eq!(json_array_after_key(br#""foo":[1]"#, b"\"roles\""), None);
+    }
+
+    #[test]
+    fn json_array_after_key_no_colon() {
+        assert_eq!(json_array_after_key(br#""roles"[1]"#, b"\"roles\""), None);
+    }
+
+    #[test]
+    fn json_array_after_key_no_bracket() {
+        assert_eq!(json_array_after_key(br#""roles":1"#, b"\"roles\""), None);
+    }
+
+    #[test]
+    fn json_array_after_key_tracks_nested_depth() {
+        let arr = json_array_after_key(br#""roles":[["a"],"b"]"#, b"\"roles\"").unwrap();
+        assert_eq!(arr, br#"[["a"],"b"]"#.as_slice());
+    }
+
+    // ---- contains / find ----
+
+    #[test]
+    fn contains_checks_substring() {
+        assert!(contains(b"abcdef", b"cde"));
+        assert!(!contains(b"abcdef", b"xyz"));
+    }
+
+    #[test]
+    fn find_finds_and_reports_missing() {
+        assert_eq!(find(b"hello world", b"world"), Some(6));
+        assert_eq!(find(b"hello world", b"xyz"), None);
+    }
+
+    // ---- extract_string ----
+
+    #[test]
+    fn extract_string_happy_path() {
+        assert_eq!(
+            extract_string(br#""entity_type":"expense""#, b"\"entity_type\""),
+            b"expense"
+        );
+    }
+
+    #[test]
+    fn extract_string_key_missing() {
+        assert_eq!(extract_string(br#""foo":"bar""#, b"\"entity_type\""), b"");
+    }
+
+    #[test]
+    fn extract_string_no_colon() {
+        assert_eq!(
+            extract_string(br#""entity_type""expense""#, b"\"entity_type\""),
+            b""
+        );
+    }
+
+    #[test]
+    fn extract_string_no_opening_quote() {
+        assert_eq!(
+            extract_string(br#""entity_type":expense""#, b"\"entity_type\""),
+            b""
+        );
+    }
+
+    #[test]
+    fn extract_string_no_closing_quote() {
+        assert_eq!(
+            extract_string(br#""entity_type":"expense"#, b"\"entity_type\""),
+            b""
+        );
+    }
+
+    // ---- extract_number ----
+
+    #[test]
+    fn extract_number_happy_path() {
+        assert_eq!(extract_number(br#""amount":42"#, b"\"amount\""), Some(42.0));
+    }
+
+    #[test]
+    fn extract_number_key_missing() {
+        assert_eq!(extract_number(br#""foo":1"#, b"\"amount\""), None);
+    }
+
+    #[test]
+    fn extract_number_no_colon() {
+        assert_eq!(extract_number(br#""amount"42"#, b"\"amount\""), None);
+    }
+
+    #[test]
+    fn extract_number_no_digits() {
+        assert_eq!(extract_number(br#""amount": abc"#, b"\"amount\""), None);
+    }
+
+    // ---- parse_f64 ----
+
+    #[test]
+    fn parse_f64_integer() {
+        assert_eq!(parse_f64(b"123"), Some(123.0));
+    }
+
+    #[test]
+    fn parse_f64_decimal() {
+        assert_eq!(parse_f64(b"12.5"), Some(12.5));
+    }
+
+    #[test]
+    fn parse_f64_multiple_dots_is_none() {
+        assert_eq!(parse_f64(b"1.2.3"), None);
+    }
+
+    #[test]
+    fn parse_f64_non_digit_is_none() {
+        assert_eq!(parse_f64(b"12a"), None);
     }
 }
