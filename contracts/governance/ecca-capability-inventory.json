@@ -340,6 +340,15 @@
       "evidence": "side_effects=[memory_only] on published version 1.0.0; empty emits/consumes; deterministic review-state transition result returns directly to the caller with no asynchronous domain fact broadcast to independent consumers."
     },
     {
+      "capability_id": "summary.aggregate",
+      "published_versions": [
+        "1.0.0"
+      ],
+      "path": "capabilities/summary/summary.aggregate/1.0.0/contract.json",
+      "classification": "no-event-required",
+      "evidence": "side_effects=[memory_only] on published version 1.0.0; empty emits/consumes; deterministic bounded-period aggregate summary returns directly to the caller with no asynchronous domain fact broadcast to independent consumers."
+    },
+    {
       "capability_id": "traverse-starter.process",
       "published_versions": [
         "1.0.0",
