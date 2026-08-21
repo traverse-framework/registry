@@ -7,10 +7,12 @@ Run with: python3 -m unittest scripts/ci/tests/test_capability_validation.py
 
 import importlib.util
 import json
+import os
 import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 MODULE_PATH = Path(__file__).resolve().parents[1] / "capability_validation.py"
 spec = importlib.util.spec_from_file_location("capability_validation", MODULE_PATH)
@@ -868,6 +870,144 @@ class CheckNewContractArtifactReferenceTests(unittest.TestCase):
             codes = [e["code"] for e in errors]
             self.assertIn("contract.invalid_artifact_url", codes)
 
+
+class ExpectedCapabilitySrcCrateTests(unittest.TestCase):
+    def test_dots_replaced_with_dashes(self):
+        self.assertEqual(
+            capability_validation.expected_capability_src_crate("artifact.revision-create"),
+            "artifact-revision-create",
+        )
+
+    def test_no_dots_unchanged(self):
+        self.assertEqual(
+            capability_validation.expected_capability_src_crate("validate-luhn"),
+            "validate-luhn",
+        )
+
+
+class CheckNewContractTestCoverageTests(unittest.TestCase):
+    """specs/018-capability-test-coverage FR-001 through FR-003."""
+
+    def _write_contract(self, tmp: Path, capability_id: str) -> Path:
+        path = Path(tmp) / "capabilities" / "example" / capability_id / "1.0.0" / "contract.json"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps({"id": capability_id}))
+        return path
+
+    def _write_crate(self, tmp: Path, crate_name: str) -> None:
+        crate_dir = Path(tmp) / "capability-src" / crate_name
+        crate_dir.mkdir(parents=True, exist_ok=True)
+        (crate_dir / "Cargo.toml").write_text("[package]\nname = \"x\"\n")
+
+    def _cov_result(self, functions=100.0, lines=100.0, regions=100.0, returncode=0, stderr=""):
+        payload = json.dumps(
+            {
+                "data": [
+                    {
+                        "totals": {
+                            "functions": {"percent": functions},
+                            "lines": {"percent": lines},
+                            "regions": {"percent": regions},
+                        }
+                    }
+                ]
+            }
+        )
+        return type(
+            "Result",
+            (),
+            {"returncode": returncode, "stdout": payload, "stderr": stderr},
+        )()
+
+    def test_missing_crate_directory_is_rejected(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = self._write_contract(tmp, "example.new-capability")
+            errors: list = []
+            cwd = os.getcwd()
+            try:
+                os.chdir(tmp)
+                capability_validation.check_new_contract_test_coverage(path, errors)
+            finally:
+                os.chdir(cwd)
+            codes = [e["code"] for e in errors]
+            self.assertIn("capability.missing_test_coverage_source", codes)
+
+    def test_full_coverage_passes(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = self._write_contract(tmp, "example.new-capability")
+            self._write_crate(tmp, "example-new-capability")
+            errors: list = []
+            cwd = os.getcwd()
+            try:
+                os.chdir(tmp)
+                with patch("capability_validation.subprocess.run", return_value=self._cov_result()):
+                    capability_validation.check_new_contract_test_coverage(path, errors)
+            finally:
+                os.chdir(cwd)
+            self.assertEqual(errors, [])
+
+    def test_insufficient_lines_coverage_is_rejected(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = self._write_contract(tmp, "example.new-capability")
+            self._write_crate(tmp, "example-new-capability")
+            errors: list = []
+            cwd = os.getcwd()
+            try:
+                os.chdir(tmp)
+                result = self._cov_result(functions=100.0, lines=80.0, regions=96.0)
+                with patch("capability_validation.subprocess.run", return_value=result):
+                    capability_validation.check_new_contract_test_coverage(path, errors)
+            finally:
+                os.chdir(cwd)
+            codes = [e["code"] for e in errors]
+            self.assertIn("capability.insufficient_test_coverage", codes)
+
+    def test_incomplete_function_coverage_is_rejected(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = self._write_contract(tmp, "example.new-capability")
+            self._write_crate(tmp, "example-new-capability")
+            errors: list = []
+            cwd = os.getcwd()
+            try:
+                os.chdir(tmp)
+                result = self._cov_result(functions=92.0, lines=99.0, regions=99.0)
+                with patch("capability_validation.subprocess.run", return_value=result):
+                    capability_validation.check_new_contract_test_coverage(path, errors)
+            finally:
+                os.chdir(cwd)
+            codes = [e["code"] for e in errors]
+            self.assertIn("capability.insufficient_test_coverage", codes)
+
+    def test_build_or_test_failure_is_rejected(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = self._write_contract(tmp, "example.new-capability")
+            self._write_crate(tmp, "example-new-capability")
+            errors: list = []
+            cwd = os.getcwd()
+            try:
+                os.chdir(tmp)
+                result = self._cov_result(returncode=1, stderr="error: could not compile")
+                with patch("capability_validation.subprocess.run", return_value=result):
+                    capability_validation.check_new_contract_test_coverage(path, errors)
+            finally:
+                os.chdir(cwd)
+            codes = [e["code"] for e in errors]
+            self.assertIn("capability.test_coverage_build_or_test_failed", codes)
+
+    def test_boundary_at_exactly_ninety_five_passes(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = self._write_contract(tmp, "example.new-capability")
+            self._write_crate(tmp, "example-new-capability")
+            errors: list = []
+            cwd = os.getcwd()
+            try:
+                os.chdir(tmp)
+                result = self._cov_result(functions=100.0, lines=95.0, regions=95.0)
+                with patch("capability_validation.subprocess.run", return_value=result):
+                    capability_validation.check_new_contract_test_coverage(path, errors)
+            finally:
+                os.chdir(cwd)
+            self.assertEqual(errors, [])
 
 
 class CheckEccaCapabilityInventoryCoverageTests(unittest.TestCase):

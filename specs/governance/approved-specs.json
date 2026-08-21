@@ -285,6 +285,17 @@
         "personas/",
         "specs/017-persona-registry/"
       ]
+    },
+    {
+      "id": "018-capability-test-coverage",
+      "version": "1.0.0",
+      "status": "approved",
+      "immutable": true,
+      "path": "specs/018-capability-test-coverage/spec.md",
+      "governs": [
+        "capability-src/",
+        "specs/018-capability-test-coverage/"
+      ]
     }
   ],
   "draft_specs": []

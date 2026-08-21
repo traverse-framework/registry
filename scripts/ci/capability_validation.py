@@ -67,6 +67,16 @@ were broken by) this requirement are never re-judged -- the same reason
 scenario/persona_ref checks are diff-based. The index builder already
 hard-fails active contracts missing these fields; this gate blocks the
 unusable publish at PR time instead.
+
+Also enforces specs/018-capability-test-coverage FR-001 through FR-003
+(registry#301/#302, decision-log entry 64): a newly-ADDED contract.json
+MUST have a corresponding capability-src/<id-with-dots-as-dashes>/
+crate whose test suite, measured via `cargo llvm-cov --summary-only
+--json`, achieves functions.percent == 100.0 and lines.percent >= 95.0
+and regions.percent >= 95.0. Diff-based for the same immutability
+reason as every other new-contract check above -- already-published
+capabilities (including 18 with no capability-src/ at all, and 15 more
+below this bar) are tracked separately, not retroactively judged.
 """
 
 import json
@@ -763,6 +773,133 @@ def check_new_contracts_have_artifact_reference(base_sha: str, head_sha: str, er
             check_new_contract_artifact_reference(Path(path), errors)
 
 
+COVERAGE_MIN_FUNCTIONS_PERCENT = 100.0
+COVERAGE_MIN_LINES_PERCENT = 95.0
+COVERAGE_MIN_REGIONS_PERCENT = 95.0
+
+
+def expected_capability_src_crate(capability_id: str) -> str:
+    """specs/018-capability-test-coverage FR-001: the canonical, deterministic
+    crate name for any capability published after this spec -- no hand-
+    maintained id-to-crate mapping needed going forward (unlike the legacy,
+    inconsistently-named crates gather_catalog_data.py's CURRENT_CRATE_FOR_ID
+    still tracks explicitly)."""
+    return capability_id.replace(".", "-")
+
+
+def check_new_contract_test_coverage(path: Path, errors: list) -> None:
+    """specs/018-capability-test-coverage FR-001 through FR-003: a newly-added
+    contract.json must have a capability-src/<crate>/ whose test suite
+    measures functions=100%, lines/regions>=95% via `cargo llvm-cov`. Not
+    called from validate_contract (whole-tree): 18 already-published
+    capabilities have no capability-src/ at all (registry#302) and 15 more
+    are below this bar (registry#301) -- diff-based, wired into main() like
+    every other new-contract check, so already-published capabilities are
+    never retroactively judged."""
+    try:
+        contract = json.loads(path.read_text())
+    except Exception:
+        return
+    capability_id = contract.get("id")
+    if not isinstance(capability_id, str) or not capability_id.strip():
+        return
+
+    crate_dir = Path("capability-src") / expected_capability_src_crate(capability_id)
+    manifest_path = crate_dir / "Cargo.toml"
+    if not manifest_path.is_file():
+        fail(
+            errors,
+            "capability.missing_test_coverage_source",
+            str(path),
+            f"newly-published capability '{capability_id}' has no "
+            f"{manifest_path} -- specs/018-capability-test-coverage requires "
+            "real Rust source with measured test coverage for every new "
+            "capability, internal or external (no attestation-only path)",
+        )
+        return
+
+    try:
+        result = subprocess.run(
+            [
+                "cargo",
+                "llvm-cov",
+                "--quiet",
+                "--json",
+                "--summary-only",
+                "--manifest-path",
+                str(manifest_path),
+            ],
+            capture_output=True,
+            text=True,
+            timeout=300,
+        )
+    except Exception as exc:
+        fail(
+            errors,
+            "capability.test_coverage_measurement_failed",
+            str(path),
+            f"unable to run cargo llvm-cov for '{capability_id}': {exc}",
+        )
+        return
+
+    if result.returncode != 0:
+        fail(
+            errors,
+            "capability.test_coverage_build_or_test_failed",
+            str(path),
+            f"cargo llvm-cov failed for '{capability_id}' "
+            f"({manifest_path}): {result.stderr.strip()[-2000:]}",
+        )
+        return
+
+    try:
+        totals = json.loads(result.stdout)["data"][0]["totals"]
+        functions_pct = totals["functions"]["percent"]
+        lines_pct = totals["lines"]["percent"]
+        regions_pct = totals["regions"]["percent"]
+    except Exception as exc:
+        fail(
+            errors,
+            "capability.test_coverage_report_unparseable",
+            str(path),
+            f"unable to parse cargo llvm-cov output for '{capability_id}': {exc}",
+        )
+        return
+
+    if (
+        functions_pct < COVERAGE_MIN_FUNCTIONS_PERCENT
+        or lines_pct < COVERAGE_MIN_LINES_PERCENT
+        or regions_pct < COVERAGE_MIN_REGIONS_PERCENT
+    ):
+        fail(
+            errors,
+            "capability.insufficient_test_coverage",
+            str(path),
+            f"'{capability_id}' ({manifest_path}) measures "
+            f"functions={functions_pct:.2f}% (need =={COVERAGE_MIN_FUNCTIONS_PERCENT}%), "
+            f"lines={lines_pct:.2f}% (need >={COVERAGE_MIN_LINES_PERCENT}%), "
+            f"regions={regions_pct:.2f}% (need >={COVERAGE_MIN_REGIONS_PERCENT}%) "
+            "-- specs/018-capability-test-coverage FR-003",
+        )
+
+
+def check_new_contracts_have_test_coverage(base_sha: str, head_sha: str, errors: list) -> None:
+    """Only validates newly-ADDED contract.json files in this PR's diff --
+    see check_new_contract_test_coverage's docstring for why this must not
+    run against the whole historical tree."""
+    diff = subprocess.check_output(
+        ["git", "diff", "--name-status", f"{base_sha}...{head_sha}", "--", "capabilities/"],
+        text=True,
+    )
+    for line in diff.splitlines():
+        if not line.strip():
+            continue
+        parts = line.split("\t")
+        status, path = parts[0], parts[-1]
+        if status == "A" and path.endswith("contract.json"):
+            check_new_contract_test_coverage(Path(path), errors)
+
+
 def real_workflow_paths(workflows_dir: Path):
     """Real, published workflow.json files only -- excludes
     workflows/examples/, which holds demo/fixture content
@@ -1232,6 +1369,10 @@ def main() -> int:
             fail(errors, "git.diff_failed", "capabilities/", f"Unable to compute diff: {exc}")
         try:
             check_new_contracts_have_artifact_reference(base_sha, head_sha, errors)
+        except subprocess.CalledProcessError as exc:
+            fail(errors, "git.diff_failed", "capabilities/", f"Unable to compute diff: {exc}")
+        try:
+            check_new_contracts_have_test_coverage(base_sha, head_sha, errors)
         except subprocess.CalledProcessError as exc:
             fail(errors, "git.diff_failed", "capabilities/", f"Unable to compute diff: {exc}")
 

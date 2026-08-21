@@ -46,14 +46,20 @@ jobs:
 
       # FR-016 / registry#168: capability_validation.py shells out to the Rust
       # validate_event_products binary for events/**/product.json (descriptor
-      # rules stay single-sourced in traverse-registry).
+      # rules stay single-sourced in traverse-registry). llvm-tools-preview /
+      # cargo-llvm-cov added for specs/018-capability-test-coverage's new
+      # per-capability coverage gate (mirrors build-catalog's existing recipe).
       - name: Set up Rust
         uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: "1.94.0"
+          components: llvm-tools-preview
 
       - name: Cache cargo
         uses: Swatinem/rust-cache@v2
+
+      - name: Install cargo-llvm-cov
+        uses: taiki-e/install-action@cargo-llvm-cov
 
       - name: Build event-product validator
         run: cargo build --locked -p traverse-registry --bin validate_event_products

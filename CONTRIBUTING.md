@@ -31,6 +31,36 @@ If you're adding a new `personas/<id>/<version>/persona.json`, scaffold it with
 `scripts/scaffold/new-persona.sh` rather than hand-writing it — it prompts for every
 required field (including `distinguished_from`) and self-validates before you commit.
 
+### Test coverage is mandatory, for every publisher
+
+Every new capability — whether you work in this repo's usual group or are an outside
+team publishing for the first time — **must include real Rust source with measured test
+coverage in this same PR**. A contract.json plus a compiled `.wasm` artifact is not
+enough (`specs/018-capability-test-coverage`, `docs/decision-log.md` entry 64):
+
+1. Add your implementation at `capability-src/<capability-id-with-every-"."-replaced-by-"-">/`
+   — e.g. `artifact.revision-create` → `capability-src/artifact-revision-create/`. This
+   exact naming rule is what CI checks for; there is no separate registration step.
+2. Write real `#[test]` cases covering every branch of your own logic (not the WASI I/O
+   harness — that's `#[cfg(not(test))]` and excluded from what's measured).
+3. Before opening the PR, check locally:
+   ```bash
+   rustup component add llvm-tools-preview
+   cargo install cargo-llvm-cov   # once, if you don't already have it
+   cargo llvm-cov --summary-only --json --manifest-path capability-src/<your-crate>/Cargo.toml
+   ```
+   CI requires `functions.percent == 100.0` and `lines.percent >= 95.0` and
+   `regions.percent >= 95.0` from that same command's output. A small allowance below
+   literal 100% on lines/regions exists because genuinely unreachable defensive branches
+   (e.g. an `unwrap_or` fallback a prior validation already rules out) are real in Rust —
+   functions have no such exception: every function you ship must be exercised by a test.
+
+There is no attestation-only path — CI runs your test suite itself rather than trusting a
+self-reported percentage, the same reason `docs/decision-log.md` entry 61 stopped trusting
+`traverse-cli`'s own local-validation claim. If your organization can't contribute source
+into this repo, your capability cannot be published here; publish elsewhere and reference
+it, rather than opening a contract-only PR that CI will reject.
+
 Publishing more than one capability in the same session? Branch each
 `publish/<capability>-<version>` branch from `origin/main` — never from another in-flight
 `publish/*` branch. This repo squash-merges PRs, which severs shared history between a
