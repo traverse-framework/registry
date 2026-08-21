@@ -16,6 +16,15 @@
       "evidence": "side_effects=[memory_only] on published version 1.0.0; empty emits/consumes; deterministic approval-application result returns directly to the caller with no asynchronous domain fact broadcast to independent consumers."
     },
     {
+      "capability_id": "artifact.revision-create",
+      "published_versions": [
+        "1.0.0"
+      ],
+      "path": "capabilities/artifact/artifact.revision-create/1.0.0/contract.json",
+      "classification": "no-event-required",
+      "evidence": "side_effects=[memory_only] on published version 1.0.0; empty emits/consumes; append-only successor revision metadata returns directly to the caller with no asynchronous domain fact broadcast to independent consumers."
+    },
+    {
       "capability_id": "core.aggregate-team-action-health",
       "published_versions": [
         "1.0.0",
