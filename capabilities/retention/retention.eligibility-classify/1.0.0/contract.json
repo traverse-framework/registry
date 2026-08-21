@@ -1,0 +1,261 @@
+{
+  "artifact": {
+    "digest": "sha256:17a417938262ff9c9994e014a88ffca61ed5ee66d57a5d10354239734a64f504",
+    "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/retention.eligibility-classify-1.0.0/eligibility-classify.wasm"
+  },
+  "connector_requirements": [],
+  "consumes": [],
+  "dependencies": [],
+  "description": "Pure standalone retention-policy calculation. It classifies whether an asset must be held, retained, or is eligible for later action. It never reads, deletes, exports, or stores assets.",
+  "emits": [],
+  "event_trigger": null,
+  "evidence": [],
+  "execution": {
+    "binary_format": "wasm",
+    "constraints": {
+      "filesystem_access": "none",
+      "host_api_access": "none",
+      "network_access": "forbidden"
+    },
+    "entrypoint": {
+      "command": "run",
+      "kind": "wasi-command"
+    },
+    "preferred_targets": [
+      "local",
+      "browser",
+      "edge",
+      "device"
+    ]
+  },
+  "id": "retention.eligibility-classify",
+  "inputs": {
+    "schema": {
+      "additionalProperties": false,
+      "properties": {
+        "asset": {
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "legal_hold": {
+              "type": "boolean"
+            },
+            "reference_count": {
+              "minimum": 0,
+              "type": "integer"
+            },
+            "review_hold": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "id",
+            "reference_count",
+            "legal_hold",
+            "review_hold"
+          ],
+          "type": "object"
+        },
+        "retention_policy": {
+          "additionalProperties": false,
+          "properties": {
+            "version": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "version"
+          ],
+          "type": "object"
+        }
+      },
+      "required": [
+        "asset",
+        "retention_policy"
+      ],
+      "type": "object"
+    }
+  },
+  "kind": "capability_contract",
+  "lifecycle": "active",
+  "name": "eligibility-classify",
+  "namespace": "retention",
+  "outputs": {
+    "schema": {
+      "additionalProperties": false,
+      "properties": {
+        "asset_id": {
+          "type": "string"
+        },
+        "policy_version": {
+          "type": "string"
+        },
+        "reason_code": {
+          "enum": [
+            "legal_hold",
+            "review_hold",
+            "active_reference",
+            "no_active_dependency"
+          ],
+          "type": "string"
+        },
+        "retention_state": {
+          "enum": [
+            "held",
+            "retained",
+            "eligible"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "asset_id",
+        "retention_state",
+        "reason_code",
+        "policy_version"
+      ],
+      "type": "object"
+    }
+  },
+  "owner": {
+    "contact": "maintainers@callweave.local",
+    "team": "callweave"
+  },
+  "permissions": [
+    {
+      "id": "retention.eligibility-classify.execute"
+    }
+  ],
+  "permitted_targets": [
+    "local",
+    "browser",
+    "edge",
+    "device"
+  ],
+  "policies": [],
+  "postconditions": [
+    {
+      "description": "The result is advisory eligibility only.",
+      "id": "no-deletion"
+    }
+  ],
+  "preconditions": [
+    {
+      "description": "A non-empty asset id and retention policy version are supplied, along with dependency and hold facts.",
+      "id": "asset-and-policy-supplied"
+    }
+  ],
+  "provenance": {
+    "adr_refs": [],
+    "author": "Callweave",
+    "created_at": "2026-08-21T00:00:00Z",
+    "exception_refs": [],
+    "source": "greenfield",
+    "spec_ref": "100-capability-package-authoring@1.0.0"
+  },
+  "schema_version": "1.0.0",
+  "service_type": "stateless",
+  "side_effects": [
+    {
+      "description": "Pure calculation.",
+      "kind": "memory_only"
+    }
+  ],
+  "state_schema": null,
+  "summary": "Classify asset retention eligibility from supplied dependency and hold facts.",
+  "use_cases": [
+    {
+      "happy": true,
+      "input_example": {
+        "asset": {
+          "id": "a-1",
+          "legal_hold": true,
+          "reference_count": 0,
+          "review_hold": false
+        },
+        "retention_policy": {
+          "version": "1.0.0"
+        }
+      },
+      "output_example": {
+        "asset_id": "a-1",
+        "policy_version": "1.0.0",
+        "reason_code": "legal_hold",
+        "retention_state": "held"
+      },
+      "persona_ref": "retention-steward",
+      "scenario": "As a retention steward, I want legal-held assets classified as held so that downstream systems never treat them as eligible for removal."
+    },
+    {
+      "happy": true,
+      "input_example": {
+        "asset": {
+          "id": "a-2",
+          "legal_hold": false,
+          "reference_count": 2,
+          "review_hold": false
+        },
+        "retention_policy": {
+          "version": "1.0.0"
+        }
+      },
+      "output_example": {
+        "asset_id": "a-2",
+        "policy_version": "1.0.0",
+        "reason_code": "active_reference",
+        "retention_state": "retained"
+      },
+      "persona_ref": "retention-steward",
+      "scenario": "As a retention steward, I want referenced assets classified as retained so that active dependencies preserve them."
+    },
+    {
+      "happy": true,
+      "input_example": {
+        "asset": {
+          "id": "a-3",
+          "legal_hold": false,
+          "reference_count": 0,
+          "review_hold": false
+        },
+        "retention_policy": {
+          "version": "1.0.0"
+        }
+      },
+      "output_example": {
+        "asset_id": "a-3",
+        "policy_version": "1.0.0",
+        "reason_code": "no_active_dependency",
+        "retention_state": "eligible"
+      },
+      "persona_ref": "retention-steward",
+      "scenario": "As a retention steward, I want unreferenced assets marked eligible rather than deleted so that removal remains a separate downstream decision."
+    },
+    {
+      "happy": false,
+      "input_example": {
+        "asset": {
+          "id": "a-4",
+          "legal_hold": false,
+          "reference_count": 0,
+          "review_hold": true
+        },
+        "retention_policy": {
+          "version": "1.0.0"
+        }
+      },
+      "output_example": {
+        "asset_id": "a-4",
+        "policy_version": "1.0.0",
+        "reason_code": "review_hold",
+        "retention_state": "held"
+      },
+      "persona_ref": "retention-steward",
+      "scenario": "As a retention steward, I want review-held assets classified as held so that review protection has the same precedence as a legal hold."
+    }
+  ],
+  "version": "1.0.0"
+}
