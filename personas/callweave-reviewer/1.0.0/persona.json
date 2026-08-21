@@ -1,0 +1,8 @@
+{
+  "kind": "persona",
+  "schema_version": "1.0.0",
+  "id": "callweave-reviewer",
+  "version": "1.0.0",
+  "name": "Reviewer",
+  "summary": "Reviews acoustic evidence, uncertain observations, and knowledge proposals."
+}

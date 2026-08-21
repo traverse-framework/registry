@@ -1,0 +1,8 @@
+{
+  "kind": "persona",
+  "schema_version": "1.0.0",
+  "id": "callweave-system-administrator",
+  "version": "1.0.0",
+  "name": "System Administrator",
+  "summary": "Manages models, local storage, recovery, exports, and release safety."
+}

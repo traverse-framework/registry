@@ -1,0 +1,8 @@
+{
+  "kind": "persona",
+  "schema_version": "1.0.0",
+  "id": "callweave-location-owner",
+  "version": "1.0.0",
+  "name": "Location Owner",
+  "summary": "Creates a private location profile and owns location-specific wildlife data."
+}

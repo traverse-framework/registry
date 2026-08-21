@@ -1,0 +1,8 @@
+{
+  "kind": "persona",
+  "schema_version": "1.0.0",
+  "id": "callweave-artist",
+  "version": "1.0.0",
+  "name": "Artist",
+  "summary": "Uses evidence-backed ecological summaries to create daily artwork."
+}
