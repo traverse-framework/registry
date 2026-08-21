@@ -1,0 +1,300 @@
+{
+  "artifact": {
+    "digest": "sha256:13be80099798b689beab1d7f95623a0612f15b57aa71d5156d8a700dc155f7d0",
+    "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/coverage.completeness-assess-1.0.0/completeness-assess.wasm"
+  },
+  "connector_requirements": [],
+  "consumes": [],
+  "dependencies": [],
+  "description": "Pure standalone coverage calculation. It distinguishes complete, partial, and unavailable coverage from supplied duration and source-health facts. It does not capture inputs, inspect a device, query storage, schedule work, or know any application workflow.",
+  "emits": [],
+  "event_trigger": null,
+  "evidence": [],
+  "execution": {
+    "binary_format": "wasm",
+    "constraints": {
+      "filesystem_access": "none",
+      "host_api_access": "none",
+      "network_access": "forbidden"
+    },
+    "entrypoint": {
+      "command": "run",
+      "kind": "wasi-command"
+    },
+    "preferred_targets": [
+      "local",
+      "browser",
+      "edge",
+      "device"
+    ]
+  },
+  "id": "coverage.completeness-assess",
+  "inputs": {
+    "schema": {
+      "additionalProperties": false,
+      "properties": {
+        "coverage_facts": {
+          "additionalProperties": false,
+          "properties": {
+            "captured_minutes": {
+              "minimum": 0,
+              "type": "integer"
+            },
+            "expected_minutes": {
+              "minimum": 0,
+              "type": "integer"
+            },
+            "processed_minutes": {
+              "minimum": 0,
+              "type": "integer"
+            },
+            "source_health": {
+              "enum": [
+                "healthy",
+                "unhealthy"
+              ],
+              "type": "string"
+            },
+            "valid_minutes": {
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "expected_minutes",
+            "captured_minutes",
+            "valid_minutes",
+            "processed_minutes",
+            "source_health"
+          ],
+          "type": "object"
+        },
+        "coverage_policy": {
+          "additionalProperties": false,
+          "properties": {
+            "complete_threshold_millis": {
+              "maximum": 1000,
+              "minimum": 0,
+              "type": "integer"
+            },
+            "version": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "version",
+            "complete_threshold_millis"
+          ],
+          "type": "object"
+        }
+      },
+      "required": [
+        "coverage_facts",
+        "coverage_policy"
+      ],
+      "type": "object"
+    }
+  },
+  "kind": "capability_contract",
+  "lifecycle": "active",
+  "name": "completeness-assess",
+  "namespace": "coverage",
+  "outputs": {
+    "schema": {
+      "additionalProperties": false,
+      "properties": {
+        "coverage_millis": {
+          "maximum": 1000,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "coverage_state": {
+          "enum": [
+            "complete",
+            "partial",
+            "unavailable"
+          ],
+          "type": "string"
+        },
+        "policy_version": {
+          "type": "string"
+        },
+        "reason_code": {
+          "enum": [
+            "coverage_complete",
+            "coverage_partial",
+            "source_unhealthy",
+            "invalid_scope"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "coverage_state",
+        "coverage_millis",
+        "reason_code",
+        "policy_version"
+      ],
+      "type": "object"
+    }
+  },
+  "owner": {
+    "contact": "maintainers@callweave.local",
+    "team": "callweave"
+  },
+  "permissions": [
+    {
+      "id": "coverage.completeness-assess.execute"
+    }
+  ],
+  "permitted_targets": [
+    "local",
+    "browser",
+    "edge",
+    "device"
+  ],
+  "policies": [
+    {
+      "id": "deterministic-policy-only"
+    },
+    {
+      "id": "absence-not-inferred"
+    }
+  ],
+  "postconditions": [
+    {
+      "description": "Identical facts and policy inputs yield identical output.",
+      "id": "deterministic"
+    },
+    {
+      "description": "An unavailable or partial result does not make a stronger claim than the supplied coverage facts support.",
+      "id": "absence-not-inferred"
+    }
+  ],
+  "preconditions": [
+    {
+      "description": "A non-empty policy version and bounded completion threshold are supplied.",
+      "id": "policy-is-versioned"
+    }
+  ],
+  "provenance": {
+    "adr_refs": [
+      "DECISION_RECORD.md"
+    ],
+    "author": "Callweave",
+    "created_at": "2026-08-21T00:00:00Z",
+    "exception_refs": [],
+    "source": "greenfield",
+    "spec_ref": "100-capability-package-authoring@1.0.0"
+  },
+  "schema_version": "1.0.0",
+  "service_type": "stateless",
+  "side_effects": [
+    {
+      "description": "Pure calculation; no host, network, filesystem, model, or state access.",
+      "kind": "memory_only"
+    }
+  ],
+  "state_schema": null,
+  "summary": "Assess the completeness of supplied coverage facts.",
+  "use_cases": [
+    {
+      "happy": true,
+      "input_example": {
+        "coverage_facts": {
+          "captured_minutes": 1440,
+          "expected_minutes": 1440,
+          "processed_minutes": 1435,
+          "source_health": "healthy",
+          "valid_minutes": 1435
+        },
+        "coverage_policy": {
+          "complete_threshold_millis": 950,
+          "version": "1.0.0"
+        }
+      },
+      "output_example": {
+        "coverage_millis": 996,
+        "coverage_state": "complete",
+        "policy_version": "1.0.0",
+        "reason_code": "coverage_complete"
+      },
+      "persona_ref": "coverage-consumer",
+      "scenario": "As a coverage consumer, I want fully captured and processed healthy coverage marked complete so that I can trust the completeness boundary."
+    },
+    {
+      "happy": true,
+      "input_example": {
+        "coverage_facts": {
+          "captured_minutes": 900,
+          "expected_minutes": 1440,
+          "processed_minutes": 850,
+          "source_health": "healthy",
+          "valid_minutes": 850
+        },
+        "coverage_policy": {
+          "complete_threshold_millis": 950,
+          "version": "1.0.0"
+        }
+      },
+      "output_example": {
+        "coverage_millis": 590,
+        "coverage_state": "partial",
+        "policy_version": "1.0.0",
+        "reason_code": "coverage_partial"
+      },
+      "persona_ref": "coverage-consumer",
+      "scenario": "As a coverage consumer, I want incomplete but healthy coverage marked partial so that reduced completeness is not confused with full availability."
+    },
+    {
+      "happy": false,
+      "input_example": {
+        "coverage_facts": {
+          "captured_minutes": 0,
+          "expected_minutes": 1440,
+          "processed_minutes": 0,
+          "source_health": "unhealthy",
+          "valid_minutes": 0
+        },
+        "coverage_policy": {
+          "complete_threshold_millis": 950,
+          "version": "1.0.0"
+        }
+      },
+      "output_example": {
+        "coverage_millis": 0,
+        "coverage_state": "unavailable",
+        "policy_version": "1.0.0",
+        "reason_code": "source_unhealthy"
+      },
+      "persona_ref": "coverage-consumer",
+      "scenario": "As a coverage consumer, I want an unhealthy source marked unavailable so that source failure is not interpreted as complete coverage."
+    },
+    {
+      "happy": false,
+      "input_example": {
+        "coverage_facts": {
+          "captured_minutes": 0,
+          "expected_minutes": 0,
+          "processed_minutes": 0,
+          "source_health": "healthy",
+          "valid_minutes": 0
+        },
+        "coverage_policy": {
+          "complete_threshold_millis": 950,
+          "version": "1.0.0"
+        }
+      },
+      "output_example": {
+        "coverage_millis": 0,
+        "coverage_state": "unavailable",
+        "policy_version": "1.0.0",
+        "reason_code": "invalid_scope"
+      },
+      "persona_ref": "coverage-consumer",
+      "scenario": "As a coverage consumer, I want an invalid expected duration marked unavailable so that completeness is never invented from an empty scope."
+    }
+  ],
+  "version": "1.0.0"
+}
