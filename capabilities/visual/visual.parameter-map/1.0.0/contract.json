@@ -1,0 +1,228 @@
+{
+  "artifact": {
+    "digest": "sha256:5c76c5b8b7594a66be644a78db88f0b12a56b5fe3d8edc3a96adcfbcf450702b",
+    "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/visual.parameter-map-1.0.0/parameter-map.wasm"
+  },
+  "connector_requirements": [],
+  "consumes": [],
+  "dependencies": [],
+  "description": "Pure standalone visual mapping. It transforms summary facts and a versioned style policy into reusable visual parameters. It does not render pixels, publish artifacts, store state, or know any application workflow.",
+  "emits": [],
+  "event_trigger": null,
+  "evidence": [],
+  "execution": {
+    "binary_format": "wasm",
+    "constraints": {
+      "filesystem_access": "none",
+      "host_api_access": "none",
+      "network_access": "forbidden"
+    },
+    "entrypoint": {
+      "command": "run",
+      "kind": "wasi-command"
+    },
+    "preferred_targets": [
+      "local",
+      "browser",
+      "edge",
+      "device"
+    ]
+  },
+  "id": "visual.parameter-map",
+  "inputs": {
+    "schema": {
+      "additionalProperties": false,
+      "properties": {
+        "style_policy": {
+          "additionalProperties": false,
+          "properties": {
+            "seed": {
+              "minimum": 0,
+              "type": "integer"
+            },
+            "version": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "version",
+            "seed"
+          ],
+          "type": "object"
+        },
+        "summary": {
+          "additionalProperties": false,
+          "properties": {
+            "coverage_millis": {
+              "maximum": 1000,
+              "minimum": 0,
+              "type": "integer"
+            },
+            "evidence_count": {
+              "minimum": 0,
+              "type": "integer"
+            },
+            "uncertainty_millis": {
+              "maximum": 1000,
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "evidence_count",
+            "coverage_millis",
+            "uncertainty_millis"
+          ],
+          "type": "object"
+        }
+      },
+      "required": [
+        "summary",
+        "style_policy"
+      ],
+      "type": "object"
+    }
+  },
+  "kind": "capability_contract",
+  "lifecycle": "active",
+  "name": "parameter-map",
+  "namespace": "visual",
+  "outputs": {
+    "schema": {
+      "additionalProperties": false,
+      "properties": {
+        "density_millis": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "derived_seed": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "motion_millis": {
+          "maximum": 1000,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "policy_version": {
+          "type": "string"
+        },
+        "uncertainty_treatment": {
+          "enum": [
+            "subtle",
+            "visible"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "derived_seed",
+        "density_millis",
+        "motion_millis",
+        "uncertainty_treatment",
+        "policy_version"
+      ],
+      "type": "object"
+    }
+  },
+  "owner": {
+    "contact": "maintainers@callweave.local",
+    "team": "callweave"
+  },
+  "permissions": [
+    {
+      "id": "visual.parameter-map.execute"
+    }
+  ],
+  "permitted_targets": [
+    "local",
+    "browser",
+    "edge",
+    "device"
+  ],
+  "policies": [
+    {
+      "id": "deterministic-style-policy-only"
+    }
+  ],
+  "postconditions": [
+    {
+      "description": "The same summary facts and style policy produce the same visual parameter output.",
+      "id": "deterministic-visual-parameters"
+    }
+  ],
+  "preconditions": [
+    {
+      "description": "Summary facts and a non-empty style policy version/seed are supplied.",
+      "id": "summary-and-style-policy-supplied"
+    }
+  ],
+  "provenance": {
+    "adr_refs": [],
+    "author": "Callweave",
+    "created_at": "2026-08-21T00:00:00Z",
+    "exception_refs": [],
+    "source": "greenfield",
+    "spec_ref": "100-capability-package-authoring@1.0.0"
+  },
+  "schema_version": "1.0.0",
+  "service_type": "stateless",
+  "side_effects": [
+    {
+      "description": "Pure calculation; no host, network, filesystem, model, state, or workflow access.",
+      "kind": "memory_only"
+    }
+  ],
+  "state_schema": null,
+  "summary": "Derive deterministic visual parameters from summary facts and a style policy.",
+  "use_cases": [
+    {
+      "happy": true,
+      "input_example": {
+        "style_policy": {
+          "seed": 17,
+          "version": "style-policy-1"
+        },
+        "summary": {
+          "coverage_millis": 900,
+          "evidence_count": 12,
+          "uncertainty_millis": 200
+        }
+      },
+      "output_example": {
+        "density_millis": 12,
+        "derived_seed": 29,
+        "motion_millis": 900,
+        "policy_version": "style-policy-1",
+        "uncertainty_treatment": "subtle"
+      },
+      "persona_ref": "visual-composer",
+      "scenario": "As a visual composer, I want stable visual parameters derived from daily summary facts so that repeated runs produce the same composition inputs."
+    },
+    {
+      "happy": true,
+      "input_example": {
+        "style_policy": {
+          "seed": 10,
+          "version": "style-policy-1"
+        },
+        "summary": {
+          "coverage_millis": 420,
+          "evidence_count": 3,
+          "uncertainty_millis": 800
+        }
+      },
+      "output_example": {
+        "density_millis": 3,
+        "derived_seed": 13,
+        "motion_millis": 420,
+        "policy_version": "style-policy-1",
+        "uncertainty_treatment": "visible"
+      },
+      "persona_ref": "visual-composer",
+      "scenario": "As a visual composer, I want higher uncertainty to surface a visibly stronger treatment so that the composition remains honest about ambiguity."
+    }
+  ],
+  "version": "1.0.0"
+}
