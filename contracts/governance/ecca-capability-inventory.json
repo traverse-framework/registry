@@ -222,6 +222,15 @@
       "evidence": "side_effects=[memory_only] on latest published version; empty emits/consumes; result returns directly to the caller with no asynchronous domain fact broadcast to independent consumers."
     },
     {
+      "capability_id": "embedding.cluster-organize",
+      "published_versions": [
+        "1.0.0"
+      ],
+      "path": "capabilities/embedding/embedding.cluster-organize/1.0.0/contract.json",
+      "classification": "no-event-required",
+      "evidence": "side_effects=[memory_only] on published version 1.0.0; empty emits/consumes; deterministic cluster structure and representatives return directly to the caller with no asynchronous domain fact broadcast to independent consumers."
+    },
+    {
       "capability_id": "formatting.format-currency",
       "published_versions": [
         "1.0.0",
