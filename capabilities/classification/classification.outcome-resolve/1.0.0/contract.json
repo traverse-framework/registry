@@ -1,0 +1,340 @@
+{
+  "artifact": {
+    "digest": "sha256:a3d2c6d6c203975ebee32bfd31f6353ba60dc1d2524df66caa87019fdbb54b42",
+    "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/classification.outcome-resolve-1.0.0/outcome-resolve.wasm"
+  },
+  "connector_requirements": [],
+  "consumes": [],
+  "dependencies": [],
+  "description": "Pure standalone classification policy. It converts supplied scored evidence, candidate status, compatibility assertions, and policy thresholds into one of provisional, unknown, surprising, or rejected. It does not run a model, inspect raw inputs, read storage, query sources, or know any application workflow.",
+  "emits": [],
+  "event_trigger": null,
+  "evidence": [],
+  "execution": {
+    "binary_format": "wasm",
+    "constraints": {
+      "filesystem_access": "none",
+      "host_api_access": "none",
+      "network_access": "forbidden"
+    },
+    "entrypoint": {
+      "command": "run",
+      "kind": "wasi-command"
+    },
+    "preferred_targets": [
+      "local",
+      "browser",
+      "edge",
+      "device"
+    ]
+  },
+  "id": "classification.outcome-resolve",
+  "inputs": {
+    "schema": {
+      "additionalProperties": false,
+      "properties": {
+        "candidate": {
+          "additionalProperties": true,
+          "properties": {
+            "label": {
+              "type": "string"
+            },
+            "status": {
+              "enum": [
+                "expected",
+                "rare",
+                "absent"
+              ],
+              "type": "string"
+            }
+          },
+          "required": [
+            "status"
+          ],
+          "type": "object"
+        },
+        "evidence": {
+          "additionalProperties": true,
+          "properties": {
+            "compatible": {
+              "type": "boolean"
+            },
+            "id": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "score_millis": {
+              "maximum": 1000,
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "id",
+            "compatible"
+          ],
+          "type": "object"
+        },
+        "policy": {
+          "additionalProperties": false,
+          "properties": {
+            "minimum_score_millis": {
+              "maximum": 1000,
+              "minimum": 0,
+              "type": "integer"
+            },
+            "version": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "version",
+            "minimum_score_millis"
+          ],
+          "type": "object"
+        }
+      },
+      "required": [
+        "evidence",
+        "policy"
+      ],
+      "type": "object"
+    }
+  },
+  "kind": "capability_contract",
+  "lifecycle": "active",
+  "name": "outcome-resolve",
+  "namespace": "classification",
+  "outputs": {
+    "schema": {
+      "additionalProperties": false,
+      "properties": {
+        "evidence_id": {
+          "type": "string"
+        },
+        "policy_version": {
+          "type": "string"
+        },
+        "reason": {
+          "enum": [
+            "score_meets_policy",
+            "score_below_policy",
+            "rare_candidate",
+            "candidate_not_listed",
+            "unscored_evidence",
+            "compatibility_incompatible"
+          ],
+          "type": "string"
+        },
+        "state": {
+          "enum": [
+            "provisional",
+            "unknown",
+            "surprising",
+            "rejected"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "evidence_id",
+        "state",
+        "reason",
+        "policy_version"
+      ],
+      "type": "object"
+    }
+  },
+  "owner": {
+    "contact": "maintainers@callweave.local",
+    "team": "callweave"
+  },
+  "permissions": [
+    {
+      "id": "classification.outcome-resolve.execute"
+    }
+  ],
+  "permitted_targets": [
+    "local",
+    "browser",
+    "edge",
+    "device"
+  ],
+  "policies": [
+    {
+      "id": "deterministic-policy-only"
+    },
+    {
+      "id": "absence-not-inferred"
+    }
+  ],
+  "postconditions": [
+    {
+      "description": "Exactly one governed state is returned for each evidence input.",
+      "id": "exclusive-state"
+    },
+    {
+      "description": "Evidence without score_millis can only resolve to unknown or rejected.",
+      "id": "unscored-is-never-promoted"
+    }
+  ],
+  "preconditions": [
+    {
+      "description": "A non-empty policy version and bounded score threshold are supplied.",
+      "id": "policy-is-versioned"
+    }
+  ],
+  "provenance": {
+    "adr_refs": [
+      "DECISION_RECORD.md"
+    ],
+    "author": "Callweave",
+    "created_at": "2026-08-21T00:00:00Z",
+    "exception_refs": [],
+    "source": "greenfield",
+    "spec_ref": "100-capability-package-authoring@1.0.0"
+  },
+  "schema_version": "1.0.0",
+  "service_type": "stateless",
+  "side_effects": [
+    {
+      "description": "Pure calculation; no host, network, filesystem, model, state, or workflow access.",
+      "kind": "memory_only"
+    }
+  ],
+  "state_schema": null,
+  "summary": "Resolve supplied scored evidence into one governed classification outcome.",
+  "use_cases": [
+    {
+      "happy": true,
+      "input_example": {
+        "candidate": {
+          "label": "expected label",
+          "status": "expected"
+        },
+        "evidence": {
+          "compatible": true,
+          "id": "ev-provisional",
+          "score_millis": 920
+        },
+        "policy": {
+          "minimum_score_millis": 800,
+          "version": "resolver-1"
+        }
+      },
+      "output_example": {
+        "evidence_id": "ev-provisional",
+        "policy_version": "resolver-1",
+        "reason": "score_meets_policy",
+        "state": "provisional"
+      },
+      "persona_ref": "classification-consumer",
+      "scenario": "As a classification consumer, I want expected scored evidence above policy threshold marked provisional so that downstream review can consider it."
+    },
+    {
+      "happy": false,
+      "input_example": {
+        "candidate": {
+          "label": "rare label",
+          "status": "rare"
+        },
+        "evidence": {
+          "compatible": true,
+          "id": "ev-rare",
+          "score_millis": 920
+        },
+        "policy": {
+          "minimum_score_millis": 800,
+          "version": "resolver-1"
+        }
+      },
+      "output_example": {
+        "evidence_id": "ev-rare",
+        "policy_version": "resolver-1",
+        "reason": "rare_candidate",
+        "state": "surprising"
+      },
+      "persona_ref": "classification-consumer",
+      "scenario": "As a classification consumer, I want rare scored evidence above policy threshold quarantined as surprising so that unusual high-confidence cases are reviewed instead of silently promoted."
+    },
+    {
+      "happy": false,
+      "input_example": {
+        "candidate": {
+          "label": "expected label",
+          "status": "expected"
+        },
+        "evidence": {
+          "compatible": true,
+          "id": "ev-unscored"
+        },
+        "policy": {
+          "minimum_score_millis": 800,
+          "version": "resolver-1"
+        }
+      },
+      "output_example": {
+        "evidence_id": "ev-unscored",
+        "policy_version": "resolver-1",
+        "reason": "unscored_evidence",
+        "state": "unknown"
+      },
+      "persona_ref": "classification-consumer",
+      "scenario": "As a classification consumer, I want unscored evidence kept unknown so that raw candidate claims never become governed outcomes."
+    },
+    {
+      "happy": false,
+      "input_example": {
+        "candidate": {
+          "label": "expected label",
+          "status": "expected"
+        },
+        "evidence": {
+          "compatible": false,
+          "id": "ev-incompatible",
+          "score_millis": 1000
+        },
+        "policy": {
+          "minimum_score_millis": 800,
+          "version": "resolver-1"
+        }
+      },
+      "output_example": {
+        "evidence_id": "ev-incompatible",
+        "policy_version": "resolver-1",
+        "reason": "compatibility_incompatible",
+        "state": "rejected"
+      },
+      "persona_ref": "classification-consumer",
+      "scenario": "As a classification consumer, I want incompatible evidence rejected so that impossible claims cannot enter downstream review."
+    },
+    {
+      "happy": false,
+      "input_example": {
+        "candidate": {
+          "label": "out-of-scope example",
+          "status": "absent"
+        },
+        "evidence": {
+          "compatible": true,
+          "id": "ev-absent",
+          "score_millis": 980
+        },
+        "policy": {
+          "minimum_score_millis": 800,
+          "version": "resolver-1"
+        }
+      },
+      "output_example": {
+        "evidence_id": "ev-absent",
+        "policy_version": "resolver-1",
+        "reason": "candidate_not_listed",
+        "state": "unknown"
+      },
+      "persona_ref": "classification-consumer",
+      "scenario": "As a classification consumer, I want absent candidates kept unknown so that out-of-scope labels are not promoted into governed outcomes."
+    }
+  ],
+  "version": "1.0.0"
+}
