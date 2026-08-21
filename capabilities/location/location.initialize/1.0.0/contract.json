@@ -256,7 +256,8 @@
         "location_id": "golden-bc",
         "policy_version": "location-policy-1"
       },
-      "scenario": "As a location owner, I want supplied occurrence facts normalized into a stable candidate set so that downstream detection policy starts from deterministic inputs."
+      "scenario": "As a location owner, I want supplied occurrence facts normalized into a stable candidate set so that downstream detection policy starts from deterministic inputs.",
+      "persona_ref": "callweave-location-owner"
     },
     {
       "happy": false,
@@ -278,7 +279,8 @@
       "output_example": {
         "error": "every source needs license, taxon, and status"
       },
-      "scenario": "As a location owner, I want malformed occurrence facts rejected so that a candidate set is never synthesized from incomplete records."
+      "scenario": "As a location owner, I want malformed occurrence facts rejected so that a candidate set is never synthesized from incomplete records.",
+      "persona_ref": "callweave-location-owner"
     }
   ],
   "version": "1.0.0"

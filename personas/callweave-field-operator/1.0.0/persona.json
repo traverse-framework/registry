@@ -4,5 +4,16 @@
   "id": "callweave-field-operator",
   "version": "1.0.0",
   "name": "Field Operator",
-  "summary": "Installs, calibrates, and maintains recording hardware."
+  "summary": "Installs, calibrates, and maintains recording hardware.",
+  "description": "Operates the local recording setup and prepares raw audio for analysis. Cares that deterministic pre-analysis checks catch malformed capture inputs before downstream classifiers or review tooling consume them.",
+  "distinguished_from": [
+    {
+      "persona_id": "callweave-location-owner",
+      "how": "Handles recording operations and capture quality, while the location owner defines the place-specific source policy and accepted species scope."
+    },
+    {
+      "persona_id": "callweave-runtime",
+      "how": "Works at the operational edge with audio capture inputs; does not own orchestration or execution of the capability graph."
+    }
+  ]
 }

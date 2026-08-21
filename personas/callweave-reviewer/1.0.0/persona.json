@@ -4,5 +4,16 @@
   "id": "callweave-reviewer",
   "version": "1.0.0",
   "name": "Reviewer",
-  "summary": "Reviews acoustic evidence, uncertain observations, and knowledge proposals."
+  "summary": "Reviews acoustic evidence, uncertain observations, and knowledge proposals.",
+  "description": "Reviews uncertain or unknown animal sounds after automated local-first analysis. Uses evidence packages and structured outputs to decide whether a candidate belongs in the database, should be rejected, or needs more evidence before the local catalog expands.",
+  "distinguished_from": [
+    {
+      "persona_id": "callweave-artist",
+      "how": "Evaluates evidence and taxonomy confidence for catalog updates; does not transform the daily result into artwork."
+    },
+    {
+      "persona_id": "callweave-system-administrator",
+      "how": "Makes evidence-level review decisions rather than administering installation-wide configuration, policies, or runtime controls."
+    }
+  ]
 }

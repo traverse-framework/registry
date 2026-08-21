@@ -4,5 +4,16 @@
   "id": "callweave-artist",
   "version": "1.0.0",
   "name": "Artist",
-  "summary": "Uses evidence-backed ecological summaries to create daily artwork."
+  "summary": "Uses evidence-backed ecological summaries to create daily artwork.",
+  "description": "Creates the daily art output from evidence-backed ecological summaries. Consumes a constrained local species set and confidence-backed detections so the artwork reflects the observed soundscape at a real location instead of an unconstrained imaginary fauna list.",
+  "distinguished_from": [
+    {
+      "persona_id": "callweave-location-owner",
+      "how": "Owns the place-specific recording policy and candidate species scope; does not create the artistic output from the resulting evidence."
+    },
+    {
+      "persona_id": "callweave-reviewer",
+      "how": "Interprets uncertain or unknown detections for database improvement; does not produce the final artistic rendering."
+    }
+  ]
 }
