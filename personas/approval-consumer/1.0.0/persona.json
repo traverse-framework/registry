@@ -1,13 +1,19 @@
 {
+  "kind": "persona",
+  "schema_version": "1.0.0",
   "id": "approval-consumer",
   "version": "1.0.0",
-  "name": "Approval consumer",
-  "summary": "Consumes deterministic approval-application decisions for proposed changes.",
-  "responsibilities": [
-    "Provide proposal and reviewer decision inputs",
-    "Rely on explicit applied or non-applied outputs",
-    "Pass approved decisions to later successor steps"
-  ],
-  "source": "Callweave",
-  "created_at": "2026-08-21T00:00:00Z"
+  "name": "Approval Consumer",
+  "summary": "Consumes governed approval-application decisions for proposed changes and downstream release actions.",
+  "description": "Uses approval.decision-apply to turn a proposal, reviewer decision, and guard facts into one deterministic applied or not-applied result. Needs an explicit approval outcome without coupling the capability to any specific application workflow or storage model.",
+  "distinguished_from": [
+    {
+      "persona_id": "review-consumer",
+      "how": "Consumes a final apply-or-do-not-apply decision after review, rather than a review-state transition decision itself."
+    },
+    {
+      "persona_id": "revision-consumer",
+      "how": "Needs a governed approval application outcome, rather than an append-only successor revision assignment for versioned subjects."
+    }
+  ]
 }
