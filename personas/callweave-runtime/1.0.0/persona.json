@@ -4,5 +4,16 @@
   "id": "callweave-runtime",
   "version": "1.0.0",
   "name": "Callweave Runtime",
-  "summary": "Executes governed capabilities deterministically and records traces."
+  "summary": "Executes governed capabilities deterministically and records traces.",
+  "description": "Executes the standalone capability graph across supported targets while preserving deterministic local-first behavior. Cares that pure capabilities remain portable, workflow-agnostic, and explicit about blocked host integrations such as microphone, storage, scheduling, and model connectors.",
+  "distinguished_from": [
+    {
+      "persona_id": "callweave-field-operator",
+      "how": "Runs the execution surface and orchestration semantics, while the field operator is concerned with obtaining and staging recordings."
+    },
+    {
+      "persona_id": "callweave-system-administrator",
+      "how": "Executes capabilities under an existing configuration but does not own installation policy or administrative setup changes."
+    }
+  ]
 }

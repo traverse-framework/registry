@@ -216,6 +216,15 @@
       "evidence": "side_effects=[memory_only] on latest published version; empty emits/consumes; result returns directly to the caller with no asynchronous domain fact broadcast to independent consumers."
     },
     {
+      "capability_id": "location.initialize",
+      "published_versions": [
+        "1.0.0"
+      ],
+      "path": "capabilities/location/location.initialize/1.0.0/contract.json",
+      "classification": "no-event-required",
+      "evidence": "side_effects=[memory_only]; empty emits/consumes; deterministic normalization result returns directly to the caller with no asynchronous domain fact broadcast to independent consumers."
+    },
+    {
       "capability_id": "meeting-notes.process",
       "published_versions": [
         "1.0.0",
