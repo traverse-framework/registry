@@ -276,6 +276,15 @@
       "evidence": "side_effects=[memory_only]; empty emits/consumes; deterministic replay-set calculation returns directly to the caller with no asynchronous domain fact broadcast to independent consumers."
     },
     {
+      "capability_id": "period.finalize",
+      "published_versions": [
+        "1.0.0"
+      ],
+      "path": "capabilities/period/period.finalize/1.0.0/contract.json",
+      "classification": "no-event-required",
+      "evidence": "side_effects=[memory_only] on published version 1.0.0; empty emits/consumes; deterministic finalized-period record returns directly to the caller with no asynchronous domain fact broadcast to independent consumers."
+    },
+    {
       "capability_id": "platform.decide-state-transition",
       "published_versions": [
         "1.1.0",

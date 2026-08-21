@@ -1,0 +1,256 @@
+{
+  "artifact": {
+    "digest": "sha256:01cb26718120619bed0f2a1c486c1e153e97bd0cdf7810351084cac47359649c",
+    "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/period.finalize-1.0.0/finalize.wasm"
+  },
+  "connector_requirements": [],
+  "consumes": [],
+  "dependencies": [],
+  "description": "Pure standalone period-finalization policy. It validates scope, period key, watermark, and policy version; computes a stable idempotency key; sorts included and pending references; and returns one normalized finalized-period record. It does not schedule itself, persist state, or know any application workflow.",
+  "emits": [],
+  "event_trigger": null,
+  "evidence": [],
+  "execution": {
+    "binary_format": "wasm",
+    "constraints": {
+      "filesystem_access": "none",
+      "host_api_access": "none",
+      "network_access": "forbidden"
+    },
+    "entrypoint": {
+      "command": "run",
+      "kind": "wasi-command"
+    },
+    "preferred_targets": [
+      "local",
+      "browser",
+      "edge",
+      "device"
+    ]
+  },
+  "id": "period.finalize",
+  "inputs": {
+    "schema": {
+      "additionalProperties": false,
+      "properties": {
+        "coverage_state": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "included_reference_ids": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "pending_reference_ids": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "period_key": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "policy": {
+          "additionalProperties": false,
+          "properties": {
+            "version": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "version"
+          ],
+          "type": "object"
+        },
+        "scope_id": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "watermark": {
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "scope_id",
+        "period_key",
+        "coverage_state",
+        "watermark",
+        "policy"
+      ],
+      "type": "object"
+    }
+  },
+  "kind": "capability_contract",
+  "lifecycle": "active",
+  "name": "finalize",
+  "namespace": "period",
+  "outputs": {
+    "schema": {
+      "additionalProperties": false,
+      "properties": {
+        "coverage_state": {
+          "type": "string"
+        },
+        "idempotency_key": {
+          "type": "string"
+        },
+        "included_reference_ids": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "pending_reference_ids": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "period_key": {
+          "type": "string"
+        },
+        "policy_version": {
+          "type": "string"
+        },
+        "scope_id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "idempotency_key",
+        "scope_id",
+        "period_key",
+        "coverage_state",
+        "included_reference_ids",
+        "pending_reference_ids",
+        "policy_version"
+      ],
+      "type": "object"
+    }
+  },
+  "owner": {
+    "contact": "maintainers@callweave.local",
+    "team": "callweave"
+  },
+  "permissions": [
+    {
+      "id": "period.finalize.execute"
+    }
+  ],
+  "permitted_targets": [
+    "local",
+    "browser",
+    "edge",
+    "device"
+  ],
+  "policies": [
+    {
+      "id": "deterministic-policy-only"
+    },
+    {
+      "id": "one-finalized-record-per-period-key"
+    }
+  ],
+  "postconditions": [
+    {
+      "description": "The idempotency key is always scope_id, period_key, and watermark joined by colons.",
+      "id": "idempotency-is-stable"
+    },
+    {
+      "description": "Included and pending reference ids are returned in sorted order.",
+      "id": "references-are-sorted"
+    }
+  ],
+  "preconditions": [
+    {
+      "description": "A non-empty scope id, period key, watermark, and policy version are supplied.",
+      "id": "period-boundary-is-supplied"
+    }
+  ],
+  "provenance": {
+    "adr_refs": [],
+    "author": "Callweave",
+    "created_at": "2026-08-21T00:00:00Z",
+    "exception_refs": [],
+    "source": "greenfield",
+    "spec_ref": "100-capability-package-authoring@1.0.0"
+  },
+  "schema_version": "1.0.0",
+  "service_type": "stateless",
+  "side_effects": [
+    {
+      "description": "Pure calculation; no host, network, filesystem, model, state, or workflow access.",
+      "kind": "memory_only"
+    }
+  ],
+  "state_schema": null,
+  "summary": "Create a deterministic finalized period record from supplied scope facts.",
+  "use_cases": [
+    {
+      "happy": true,
+      "input_example": {
+        "coverage_state": "partial",
+        "included_reference_ids": [
+          "obs-2",
+          "obs-1"
+        ],
+        "pending_reference_ids": [
+          "unk-1"
+        ],
+        "period_key": "2026-08-17",
+        "policy": {
+          "version": "policy-1"
+        },
+        "scope_id": "golden-bc",
+        "watermark": "capture-watermark-001"
+      },
+      "output_example": {
+        "coverage_state": "partial",
+        "idempotency_key": "golden-bc:2026-08-17:capture-watermark-001",
+        "included_reference_ids": [
+          "obs-1",
+          "obs-2"
+        ],
+        "pending_reference_ids": [
+          "unk-1"
+        ],
+        "period_key": "2026-08-17",
+        "policy_version": "policy-1",
+        "scope_id": "golden-bc"
+      },
+      "persona_ref": "period-operator",
+      "scenario": "As a period operator, I want one deterministic finalized record for a bounded period so that downstream work executes exactly once per scope, period, and watermark key."
+    },
+    {
+      "happy": true,
+      "input_example": {
+        "coverage_state": "complete",
+        "included_reference_ids": [],
+        "pending_reference_ids": [],
+        "period_key": "2026-08-17",
+        "policy": {
+          "version": "policy-1"
+        },
+        "scope_id": "quiet-site",
+        "watermark": "capture-watermark-002"
+      },
+      "output_example": {
+        "coverage_state": "complete",
+        "idempotency_key": "quiet-site:2026-08-17:capture-watermark-002",
+        "included_reference_ids": [],
+        "pending_reference_ids": [],
+        "period_key": "2026-08-17",
+        "policy_version": "policy-1",
+        "scope_id": "quiet-site"
+      },
+      "persona_ref": "period-operator",
+      "scenario": "As a period operator, I want empty included and pending references normalized consistently so that an empty period is still finalized deterministically."
+    }
+  ],
+  "version": "1.0.0"
+}
