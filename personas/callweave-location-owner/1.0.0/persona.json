@@ -1,0 +1,19 @@
+{
+  "kind": "persona",
+  "schema_version": "1.0.0",
+  "id": "callweave-location-owner",
+  "version": "1.0.0",
+  "name": "Location Owner",
+  "summary": "Creates a private location profile and owns location-specific wildlife data.",
+  "description": "Defines the location-specific candidate species scope so the system starts from fauna that plausibly occur at a precise place. Uses location.initialize to normalize supplied occurrence facts into a deterministic policy set and to reject incomplete source records before they influence downstream detection logic.",
+  "distinguished_from": [
+    {
+      "persona_id": "callweave-field-operator",
+      "how": "Defines the scope of valid local species and source records; does not primarily run microphones or manage capture operations."
+    },
+    {
+      "persona_id": "callweave-reviewer",
+      "how": "Sets the initial location policy and source facts, while the reviewer adjudicates uncertain evidence and unknown sounds afterward."
+    }
+  ]
+}

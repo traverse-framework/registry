@@ -1,0 +1,19 @@
+{
+  "kind": "persona",
+  "schema_version": "1.0.0",
+  "id": "callweave-system-administrator",
+  "version": "1.0.0",
+  "name": "System Administrator",
+  "summary": "Manages models, local storage, recovery, exports, and release safety.",
+  "description": "Configures and governs a Callweave installation for a location or deployment target. Owns policy versions, allowed source sets, and operational safeguards so the standalone capabilities can execute with explicit configuration instead of hidden workflow assumptions.",
+  "distinguished_from": [
+    {
+      "persona_id": "callweave-runtime",
+      "how": "Defines configuration and guardrails for the installation rather than executing the capability graph itself."
+    },
+    {
+      "persona_id": "callweave-location-owner",
+      "how": "Administers the deployment and policy envelope broadly, while the location owner focuses on local ecological scope and source facts for a specific place."
+    }
+  ]
+}
