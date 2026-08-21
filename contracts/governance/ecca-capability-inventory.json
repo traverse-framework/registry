@@ -240,6 +240,15 @@
       "evidence": "side_effects=[memory_only] on latest published version; empty emits/consumes; result returns directly to the caller with no asynchronous domain fact broadcast to independent consumers."
     },
     {
+      "capability_id": "model.improve",
+      "published_versions": [
+        "1.0.0"
+      ],
+      "path": "capabilities/model/model.improve/1.0.0/contract.json",
+      "classification": "no-event-required",
+      "evidence": "side_effects=[memory_only]; empty emits/consumes; deterministic release-gate decision returns directly to the caller with no asynchronous domain fact broadcast to independent consumers."
+    },
+    {
       "capability_id": "platform.decide-state-transition",
       "published_versions": [
         "1.1.0",
@@ -248,6 +257,15 @@
       "path": "capabilities/platform/platform.decide-state-transition/1.2.0/contract.json",
       "classification": "no-event-required",
       "evidence": "side_effects=[none] on latest published version; empty emits/consumes; result returns directly to the caller with no asynchronous domain fact broadcast to independent consumers."
+    },
+    {
+      "capability_id": "review.prepare",
+      "published_versions": [
+        "1.0.0"
+      ],
+      "path": "capabilities/review/review.prepare/1.0.0/contract.json",
+      "classification": "no-event-required",
+      "evidence": "side_effects=[memory_only]; empty emits/consumes; deterministic privacy gate returns sanitized asset eligibility directly to the caller with no asynchronous domain fact broadcast to independent consumers."
     },
     {
       "capability_id": "traverse-starter.process",

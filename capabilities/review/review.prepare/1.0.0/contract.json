@@ -217,7 +217,8 @@
         "cluster_id": "cluster-7",
         "policy_version": "review-policy-1"
       },
-      "scenario": "As a reviewer, I want a privacy-protected unknown cluster to expose only sanitized assets so that optional external advisory review stays bounded."
+      "scenario": "As a reviewer, I want a privacy-protected unknown cluster to expose only sanitized assets so that optional external advisory review stays bounded.",
+      "persona_ref": "callweave-reviewer"
     },
     {
       "happy": false,
@@ -242,7 +243,8 @@
         "policy_version": "review-policy-1",
         "reason": "privacy_not_protected"
       },
-      "scenario": "As a reviewer, I want an unprotected cluster blocked from review preparation so that uncertain privacy status fails closed."
+      "scenario": "As a reviewer, I want an unprotected cluster blocked from review preparation so that uncertain privacy status fails closed.",
+      "persona_ref": "callweave-reviewer"
     },
     {
       "happy": false,
@@ -267,7 +269,8 @@
         "policy_version": "review-policy-1",
         "reason": "privacy_not_protected"
       },
-      "scenario": "As a reviewer, I want a policy-blocked cluster prevented from review preparation so that explicitly denied privacy outcomes cannot be shared externally."
+      "scenario": "As a reviewer, I want a policy-blocked cluster prevented from review preparation so that explicitly denied privacy outcomes cannot be shared externally.",
+      "persona_ref": "callweave-reviewer"
     }
   ],
   "version": "1.0.0"

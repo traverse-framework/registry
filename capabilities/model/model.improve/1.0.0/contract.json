@@ -248,7 +248,8 @@
         "reason": "release_gate_passed",
         "release_id": "release-birdnet-adapter-2"
       },
-      "scenario": "As a system administrator, I want a verified candidate that passes held-out precision and recall thresholds approved so that a local release can be activated separately."
+      "scenario": "As a system administrator, I want a verified candidate that passes held-out precision and recall thresholds approved so that a local release can be activated separately.",
+      "persona_ref": "callweave-system-administrator"
     },
     {
       "happy": false,
@@ -275,7 +276,8 @@
         "decision": "reject",
         "reason": "artifact_not_verified"
       },
-      "scenario": "As a system administrator, I want an unverified artifact rejected before evaluation thresholds matter so that unchecked model files cannot be promoted."
+      "scenario": "As a system administrator, I want an unverified artifact rejected before evaluation thresholds matter so that unchecked model files cannot be promoted.",
+      "persona_ref": "callweave-system-administrator"
     },
     {
       "happy": false,
@@ -302,7 +304,8 @@
         "decision": "reject",
         "reason": "evaluation_below_threshold"
       },
-      "scenario": "As a system administrator, I want a verified candidate below recall threshold rejected so that weak evaluations do not silently replace a known-good model."
+      "scenario": "As a system administrator, I want a verified candidate below recall threshold rejected so that weak evaluations do not silently replace a known-good model.",
+      "persona_ref": "callweave-system-administrator"
     },
     {
       "happy": false,
@@ -329,7 +332,8 @@
         "decision": "reject",
         "reason": "artifact_not_verified"
       },
-      "scenario": "As a system administrator, I want an explicitly rejected candidate blocked from release so that previously failed artifacts cannot be republished through the release gate."
+      "scenario": "As a system administrator, I want an explicitly rejected candidate blocked from release so that previously failed artifacts cannot be republished through the release gate.",
+      "persona_ref": "callweave-system-administrator"
     }
   ],
   "version": "1.0.0"
