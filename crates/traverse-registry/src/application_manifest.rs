@@ -12,7 +12,7 @@ use traverse_contracts::{
 };
 
 use crate::{
-    ArtifactDigests, BinaryFormat, BinaryReference, CapabilityArtifactRecord,
+    ArtifactDigests, ArtifactPin, BinaryFormat, BinaryReference, CapabilityArtifactRecord,
     CapabilityRegistration, CapabilityRegistry, ComposabilityMetadata, CompositionKind,
     CompositionPattern, EventRegistry, ImplementationKind, LookupScope, ModelResolutionEvidence,
     RegistryProvenance, RegistryScope, SourceKind, SourceReference, WorkflowDefinition,
@@ -454,6 +454,14 @@ pub struct WasmComponentManifest {
     pub dependencies: Vec<WasmComponentDependency>,
     pub connector_requirements: Vec<ConnectorRequirement>,
     pub validation_evidence: Vec<Value>,
+    /// Optional exact executable-package pin (Spec 106 FR-003). When
+    /// present, activation-time resolution via
+    /// [`crate::resolve_executable_artifact`] MUST select exactly this
+    /// package id/version or fail closed with
+    /// `ExecutableArtifactIncompatible`/`ExecutableArtifactUnavailable` --
+    /// it never falls back to another candidate, even one that would
+    /// otherwise win by version ordering.
+    pub executable_pin: Option<ArtifactPin>,
 }
 
 /// A public capability dependency resolved from synced registry state.
@@ -554,6 +562,7 @@ pub enum ApplicationManifestErrorCode {
     ConnectorBindingDuplicate,
     ConnectorBindingMissing,
     ConnectorBindingIncompatible,
+    ExecutablePinMalformed,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -662,6 +671,8 @@ struct WasmComponentManifestSerde {
     dependencies: Vec<WasmComponentDependency>,
     connector_requirements: Vec<ConnectorRequirement>,
     validation_evidence: Vec<Value>,
+    #[serde(default)]
+    executable_pin: Option<ArtifactPin>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -1922,6 +1933,7 @@ fn load_component(
     validate_component_source(&component, &manifest_path)?;
     validate_component_execution_mode(&component, execution_mode, &manifest_path)?;
     ensure_concrete_component_dependencies(&component.dependencies, &manifest_path)?;
+    validate_executable_pin(&component, &manifest_path)?;
 
     if let Some(registry_ref) = component.registry_ref.as_ref() {
         let resolver = resolver.ok_or_else(|| {
@@ -2261,6 +2273,26 @@ fn ensure_concrete_component_dependencies(
     Ok(())
 }
 
+fn validate_executable_pin(
+    component: &WasmComponentManifestSerde,
+    manifest_path: &Path,
+) -> Result<(), ApplicationManifestFailure> {
+    let Some(pin) = component.executable_pin.as_ref() else {
+        return Ok(());
+    };
+    if !has_text(&pin.package_id) || !has_text(&pin.package_version) {
+        return Err(single_error(
+            ApplicationManifestErrorCode::ExecutablePinMalformed,
+            manifest_path.display().to_string(),
+            format!(
+                "component {}@{} declares executable_pin with a non-empty package_id and package_version",
+                component.component_id, component.version
+            ),
+        ));
+    }
+    Ok(())
+}
+
 fn load_component_contract(
     contract_path: &Path,
     component: &WasmComponentManifestSerde,
@@ -2380,6 +2412,7 @@ fn to_component_manifest(
         dependencies: component.dependencies,
         connector_requirements: component.connector_requirements,
         validation_evidence: component.validation_evidence,
+        executable_pin: component.executable_pin,
     }
 }
 

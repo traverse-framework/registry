@@ -188,17 +188,6 @@ fn skip_ws(s: &[u8]) -> &[u8] {
     rest
 }
 
-fn skip_ws_comma(s: &[u8]) -> usize {
-    let mut i = 0usize;
-    while i < s.len() {
-        match s[i] {
-            b' ' | b'\n' | b'\t' | b'\r' | b',' => i += 1,
-            _ => break,
-        }
-    }
-    i
-}
-
 fn balanced_end(s: &[u8], open: u8, close: u8) -> Option<usize> {
     let mut depth = 0i32;
     let mut in_str = false;
@@ -269,6 +258,7 @@ fn find_key_at_depth(hay: &[u8], key: &[u8], target_depth: i32) -> Option<usize>
     None
 }
 
+<<<<<<< HEAD
 fn string_value_after<'a>(after_key: &'a [u8]) -> &'a [u8] {
     let Some(colon) = after_key.iter().position(|b| *b == b':') else {
         return b"";
@@ -298,6 +288,8 @@ fn extract_string_at_depth<'a>(hay: &'a [u8], key: &[u8], depth: i32) -> &'a [u8
     string_value_after(&hay[pos + key.len()..])
 }
 
+=======
+>>>>>>> origin/main
 fn object_after_key_at_depth<'a>(hay: &'a [u8], key: &[u8], depth: i32) -> Option<&'a [u8]> {
     let pos = find_key_at_depth(hay, key, depth)?;
     let after = &hay[pos + key.len()..];
@@ -418,6 +410,7 @@ fn copy(out: &mut [u8], at: usize, bytes: &[u8]) -> usize {
     end
 }
 
+<<<<<<< HEAD
 fn copy_json_escaped(out: &mut [u8], mut i: usize, s: &[u8]) -> usize {
     for &b in s {
         match b {
@@ -434,6 +427,8 @@ fn copy_json_escaped(out: &mut [u8], mut i: usize, s: &[u8]) -> usize {
     i
 }
 
+=======
+>>>>>>> origin/main
 fn write_u32(out: &mut [u8], mut i: usize, mut n: u32) -> usize {
     if n == 0 {
         if i < out.len() {
@@ -459,6 +454,7 @@ fn write_u32(out: &mut [u8], mut i: usize, mut n: u32) -> usize {
     i
 }
 
+<<<<<<< HEAD
 fn write_i32(out: &mut [u8], mut i: usize, n: i32) -> usize {
     if n < 0 {
         i = copy(out, i, b"-");
@@ -565,6 +561,8 @@ fn format_score_millis(out: &mut [u8], millis: u32) -> usize {
     i
 }
 
+=======
+>>>>>>> origin/main
 #[cfg(not(test))]
 #[panic_handler]
 fn panic(_: &core::panic::PanicInfo<'_>) -> ! {
@@ -599,4 +597,180 @@ mod catalog_coverage_tests {
         assert!(out.contains("\"reason_code\":\"invalid_input\""), "expected invalid_input in {out}");
     }
 
+<<<<<<< HEAD
+=======
+    #[test]
+    fn use_case_04_sad_missing_health_key() {
+        let out = run("{\"escalation_config\":{\"min_overdue_for_escalate\":2,\"min_overloaded_owners\":1,\"require_multiple_signals\":true}}");
+        assert!(out.contains("\"reason_code\":\"invalid_input\""), "expected invalid_input in {out}");
+    }
+
+    #[test]
+    fn use_case_05_sad_missing_escalation_config_key() {
+        let out = run("{\"health\":{\"overdue_count\":1,\"overloaded_owners\":[],\"top_pressure_items\":[]}}");
+        assert!(out.contains("\"reason_code\":\"invalid_input\""), "expected invalid_input in {out}");
+    }
+
+    #[test]
+    fn use_case_06_sad_escalation_config_not_an_object() {
+        let out = run("{\"health\":{\"overdue_count\":1,\"overloaded_owners\":[],\"top_pressure_items\":[]},\"escalation_config\":\"oops\"}");
+        assert!(out.contains("\"reason_code\":\"invalid_input\""), "expected invalid_input in {out}");
+    }
+
+    #[test]
+    fn use_case_07_happy_missing_on_track_pct_key() {
+        let out = run("{\"health\":{\"overdue_count\":1,\"overloaded_owners\":[],\"top_pressure_items\":[]},\"escalation_config\":{\"min_overdue_for_escalate\":2,\"min_overloaded_owners\":1,\"require_multiple_signals\":true}}");
+        assert!(out.contains("\"reason_code\":\"ok\""), "expected ok in {out}");
+    }
+
+    #[test]
+    fn use_case_08_happy_single_signal_escalates_without_require_multiple() {
+        let out = run("{\"health\":{\"overdue_count\":5,\"overloaded_owners\":[],\"top_pressure_items\":[\"ai-1\"]},\"escalation_config\":{\"min_overdue_for_escalate\":2,\"min_overloaded_owners\":1,\"require_multiple_signals\":false}}");
+        assert!(out.contains("\"decision\":\"escalate\""), "expected escalate in {out}");
+        assert!(out.contains("\"require_multiple=false\""), "expected require_multiple=false in {out}");
+    }
+
+    #[test]
+    fn use_case_09_happy_malformed_require_multiple_signals_falls_back_to_default() {
+        let out = run("{\"health\":{\"overdue_count\":1,\"overloaded_owners\":[],\"top_pressure_items\":[]},\"escalation_config\":{\"min_overdue_for_escalate\":2,\"min_overloaded_owners\":1,\"require_multiple_signals\":123}}");
+        assert!(out.contains("\"reason_code\":\"ok\""), "expected ok in {out}");
+    }
+
+    #[test]
+    fn use_case_10_happy_tolerates_extra_whitespace_and_backslash_before_target_keys() {
+        let out = run("{\"health\":{\"overdue_count\":1,\"note\":\"a\\\\b\",\"overloaded_owners\":[{\"owner_id\":\"user\\\\x\",\"open_count\":1}],\"top_pressure_items\":[]},\"escalation_config\":  {\"min_overdue_for_escalate\":2,\"min_overloaded_owners\":1,\"require_multiple_signals\":true}}");
+        assert!(out.contains("\"reason_code\":\"ok\""), "expected ok in {out}");
+    }
+
+    #[test]
+    fn use_case_11_sad_unbalanced_escalation_config_object() {
+        let out = run("{\"health\":{\"overdue_count\":1,\"overloaded_owners\":[],\"top_pressure_items\":[]},\"escalation_config\":{\"min_overdue_for_escalate\":2");
+        assert!(out.contains("\"reason_code\":\"invalid_input\""), "expected invalid_input in {out}");
+    }
+
+    #[test]
+    fn use_case_12_happy_overloaded_owners_not_an_array_falls_back_to_empty() {
+        let out = run("{\"health\":{\"overdue_count\":1,\"overloaded_owners\":\"oops\",\"top_pressure_items\":[]},\"escalation_config\":{\"min_overdue_for_escalate\":2,\"min_overloaded_owners\":1,\"require_multiple_signals\":true}}");
+        assert!(out.contains("\"reason_code\":\"ok\""), "expected ok in {out}");
+    }
+
+    #[test]
+    fn use_case_13_happy_non_numeric_min_overdue_falls_back_to_default() {
+        let out = run("{\"health\":{\"overdue_count\":1,\"overloaded_owners\":[],\"top_pressure_items\":[]},\"escalation_config\":{\"min_overdue_for_escalate\":\"bad\",\"min_overloaded_owners\":1,\"require_multiple_signals\":true}}");
+        assert!(out.contains("\"reason_code\":\"ok\""), "expected ok in {out}");
+    }
+
+    #[test]
+    fn use_case_14_happy_on_track_pct_stops_at_trailing_garbage() {
+        let out = run("{\"health\":{\"overdue_count\":1,\"on_track_pct\":66x,\"overloaded_owners\":[],\"top_pressure_items\":[]},\"escalation_config\":{\"min_overdue_for_escalate\":2,\"min_overloaded_owners\":1,\"require_multiple_signals\":true}}");
+        assert!(out.contains("\"reason_code\":\"ok\""), "expected ok in {out}");
+    }
+
+    #[test]
+    fn parse_i32_rejects_empty_input() {
+        assert_eq!(parse_i32(b""), None);
+    }
+
+    #[test]
+    fn parse_number_millis_rejects_a_key_with_nothing_after_its_colon() {
+        assert_eq!(parse_number_millis(b"\"x\":", b"\"x\""), None);
+    }
+
+    #[test]
+    fn use_case_15_happy_nested_object_inside_array_item() {
+        let out = run("{\"health\":{\"overdue_count\":1,\"overloaded_owners\":[{\"owner_id\":\"x\",\"meta\":{\"note\":\"y\"}}],\"top_pressure_items\":[]},\"escalation_config\":{\"min_overdue_for_escalate\":2,\"min_overloaded_owners\":1,\"require_multiple_signals\":true}}");
+        assert!(out.contains("\"reason_code\":\"ok\""), "expected ok in {out}");
+    }
+
+    #[test]
+    fn use_case_16_sad_escalation_config_key_without_colon() {
+        let out = run("{\"health\":{\"overdue_count\":1,\"overloaded_owners\":[],\"top_pressure_items\":[]},\"escalation_config\"}");
+        assert!(out.contains("\"reason_code\":\"invalid_input\""), "expected invalid_input in {out}");
+    }
+
+    #[test]
+    fn use_case_17_happy_missing_overloaded_owners_key() {
+        let out = run("{\"health\":{\"overdue_count\":1,\"top_pressure_items\":[]},\"escalation_config\":{\"min_overdue_for_escalate\":2,\"min_overloaded_owners\":1,\"require_multiple_signals\":true}}");
+        assert!(out.contains("\"reason_code\":\"ok\""), "expected ok in {out}");
+    }
+
+    #[test]
+    fn use_case_18_happy_overloaded_owners_key_without_colon() {
+        // overloaded_owners must be the last key in the whole document with
+        // no colon anywhere after it -- the scanner searches the rest of
+        // the input for the next colon, so an earlier key would otherwise
+        // pick up a later, unrelated key's colon instead of finding none.
+        let out = run("{\"escalation_config\":{\"min_overdue_for_escalate\":2,\"min_overloaded_owners\":1,\"require_multiple_signals\":true},\"health\":{\"overdue_count\":1,\"top_pressure_items\":[],\"overloaded_owners\"}}");
+        assert!(out.contains("\"reason_code\":\"ok\""), "expected ok in {out}");
+    }
+
+    #[test]
+    fn array_after_key_at_depth_rejects_an_unclosed_array() {
+        assert_eq!(
+            array_after_key_at_depth(b"{\"a\":[1,2}", b"\"a\"", 1),
+            None
+        );
+    }
+
+    #[test]
+    fn use_case_20_happy_missing_require_multiple_signals_key() {
+        let out = run("{\"health\":{\"overdue_count\":1,\"overloaded_owners\":[],\"top_pressure_items\":[]},\"escalation_config\":{\"min_overdue_for_escalate\":2,\"min_overloaded_owners\":1}}");
+        assert!(out.contains("\"reason_code\":\"ok\""), "expected ok in {out}");
+    }
+
+    #[test]
+    fn use_case_21_happy_require_multiple_signals_key_without_colon() {
+        let out = run("{\"health\":{\"overdue_count\":1,\"overloaded_owners\":[],\"top_pressure_items\":[]},\"escalation_config\":{\"min_overdue_for_escalate\":2,\"min_overloaded_owners\":1,\"require_multiple_signals\"}}");
+        assert!(out.contains("\"reason_code\":\"ok\""), "expected ok in {out}");
+    }
+
+    #[test]
+    fn use_case_22_happy_missing_min_overdue_key() {
+        let out = run("{\"health\":{\"overdue_count\":1,\"overloaded_owners\":[],\"top_pressure_items\":[]},\"escalation_config\":{\"min_overloaded_owners\":1,\"require_multiple_signals\":true}}");
+        assert!(out.contains("\"reason_code\":\"ok\""), "expected ok in {out}");
+    }
+
+    #[test]
+    fn use_case_23_happy_min_overdue_key_without_colon() {
+        // min_overdue_for_escalate must be the last key in the document
+        // with no colon anywhere after it, for the same reason as
+        // use_case_18 above.
+        let out = run("{\"health\":{\"overdue_count\":1,\"overloaded_owners\":[],\"top_pressure_items\":[]},\"escalation_config\":{\"min_overdue_for_escalate\"}}");
+        assert!(out.contains("\"reason_code\":\"ok\""), "expected ok in {out}");
+    }
+
+    #[test]
+    fn use_case_24_happy_on_track_pct_key_without_colon() {
+        // on_track_pct must be the last key in the document with no colon
+        // anywhere after it, for the same reason as use_case_18 above.
+        let out = run("{\"escalation_config\":{\"min_overdue_for_escalate\":2,\"min_overloaded_owners\":1,\"require_multiple_signals\":true},\"health\":{\"overdue_count\":1,\"overloaded_owners\":[],\"top_pressure_items\":[],\"on_track_pct\"}}");
+        assert!(out.contains("\"reason_code\":\"ok\""), "expected ok in {out}");
+    }
+
+    #[test]
+    fn use_case_25_happy_on_track_pct_with_more_than_three_fractional_digits() {
+        let out = run("{\"health\":{\"overdue_count\":1,\"on_track_pct\":66.123456,\"overloaded_owners\":[],\"top_pressure_items\":[]},\"escalation_config\":{\"min_overdue_for_escalate\":2,\"min_overloaded_owners\":1,\"require_multiple_signals\":true}}");
+        assert!(out.contains("\"reason_code\":\"ok\""), "expected ok in {out}");
+    }
+
+    #[test]
+    fn write_u32_drops_digits_that_do_not_fit_a_nonzero_value() {
+        let mut out: [u8; 0] = [];
+        assert_eq!(write_u32(&mut out, 0, 5), 0);
+    }
+
+    #[test]
+    fn copy_truncates_instead_of_overflowing_the_output_buffer() {
+        let mut out = [0u8; 2];
+        let end = copy(&mut out, 1, b"abc");
+        assert_eq!(end, 1, "copy must return the unchanged offset when it would overflow");
+    }
+
+    #[test]
+    fn write_u32_writes_nothing_when_zero_does_not_fit_the_buffer() {
+        let mut out: [u8; 0] = [];
+        assert_eq!(write_u32(&mut out, 0, 0), 0);
+    }
+
+>>>>>>> origin/main
 }
