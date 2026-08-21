@@ -35,9 +35,13 @@ Publishing more than one capability in the same session? Branch each
 `publish/<capability>-<version>` branch from `origin/main` — never from another in-flight
 `publish/*` branch. This repo squash-merges PRs, which severs shared history between a
 merged branch and anything built on top of it; a branch stacked on another `publish/*`
-branch becomes unmergeable (or silently redundant) the moment the earlier one merges, with
-no warning until then. See `docs/decision-log.md` entry 62 for what this looked like in
-practice (`#280`/`#281`).
+branch becomes unmergeable (or silently redundant) the moment the earlier one merges. See
+`docs/decision-log.md` entry 62 for what this looked like in practice (`#280`/`#281`), and
+entry 63 for a second recurrence (`#283`/`#287`/`#288`/`#289`/`#291`/`#294`) that stayed
+green and mergeable for hours after going stale. Main's branch protection now requires
+`required_status_checks.strict` (branches must be up to date before merging), so a stale or
+stacked branch will surface as a merge/CI conflict at update time instead of silently
+sitting green — but branching correctly in the first place still avoids the rebuild.
 
 ## Core Rules
 
