@@ -195,10 +195,7 @@ fn write_error(out: &mut [u8], reason: &[u8]) -> usize {
 }
 
 fn is_open_status(s: &[u8]) -> bool {
-    matches!(
-        s,
-        b"open" | b"in_progress" | b"blocked" | b"snoozed"
-    )
+    matches!(s, b"open" | b"in_progress" | b"blocked" | b"snoozed")
 }
 
 fn bump_owner(owners: &mut [OwnerSlot], owner_count: &mut usize, owner: &[u8]) {
@@ -552,13 +549,148 @@ mod catalog_coverage_tests {
     #[test]
     fn use_case_01_happy() {
         let out = run("{\"items\":[{\"id\":\"ai-1\",\"owner_id\":\"user-ada\",\"status\":\"open\",\"due_date\":\"2026-08-08\",\"pressure_score\":0.9},{\"id\":\"ai-2\",\"owner_id\":\"user-ada\",\"status\":\"in_progress\",\"due_date\":\"2026-08-15\",\"pressure_score\":0.3},{\"id\":\"ai-3\",\"owner_id\":\"user-bob\",\"status\":\"open\",\"due_date\":\"2026-08-01\",\"pressure_score\":0.95}],\"reference_date\":\"2026-08-07\",\"aggregation_config\":{\"version\":\"1.0\",\"overdue_threshold_days\":0}}");
-        assert!(out.contains("\"reason_code\":\"ok\""), "expected ok in {out}");
+        assert!(
+            out.contains("\"reason_code\":\"ok\""),
+            "expected ok in {out}"
+        );
     }
 
     #[test]
     fn use_case_02_sad() {
         let out = run("{\"items\":[],\"reference_date\":\"\",\"aggregation_config\":{\"version\":\"1.0\",\"overdue_threshold_days\":0}}");
-        assert!(out.contains("\"reason_code\":\"invalid_input\""), "expected invalid_input in {out}");
+        assert!(
+            out.contains("\"reason_code\":\"invalid_input\""),
+            "expected invalid_input in {out}"
+        );
     }
 
+    #[test]
+    fn missing_config_yields_invalid_input() {
+        let out = run("{\"items\":[],\"reference_date\":\"2026-08-07\"}");
+        assert!(
+            out.contains("\"reason_code\":\"invalid_input\""),
+            "expected invalid_input in {out}"
+        );
+    }
+
+    #[test]
+    fn empty_items_array_yields_zero_percent_and_totals() {
+        let out = run("{\"items\":[],\"reference_date\":\"2026-08-07\",\"aggregation_config\":{}}");
+        assert!(out.contains("\"total_open\":0"));
+        assert!(out.contains("\"on_track_pct\":0"));
+    }
+
+    #[test]
+    fn closed_status_items_are_skipped() {
+        let out = run("{\"items\":[{\"id\":\"ai-1\",\"owner_id\":\"user-ada\",\"status\":\"done\",\"due_date\":\"2026-08-01\"}],\"reference_date\":\"2026-08-07\",\"aggregation_config\":{}}");
+        assert!(out.contains("\"total_open\":0"));
+    }
+
+    #[test]
+    fn owner_with_two_or_more_open_items_is_overloaded() {
+        let out = run("{\"items\":[{\"id\":\"ai-1\",\"owner_id\":\"user-ada\",\"status\":\"open\",\"due_date\":\"2026-08-08\"},{\"id\":\"ai-2\",\"owner_id\":\"user-ada\",\"status\":\"open\",\"due_date\":\"2026-08-09\"}],\"reference_date\":\"2026-08-07\",\"aggregation_config\":{}}");
+        assert!(out.contains("\"owner_id\":\"user-ada\",\"open_count\":2"));
+    }
+
+    #[test]
+    fn three_items_keep_only_top_two_by_pressure() {
+        let out = run("{\"items\":[{\"id\":\"low\",\"status\":\"open\",\"pressure_score\":0.1},{\"id\":\"high\",\"status\":\"open\",\"pressure_score\":0.9},{\"id\":\"mid\",\"status\":\"open\",\"pressure_score\":0.5}],\"reference_date\":\"2026-08-07\",\"aggregation_config\":{}}");
+        assert!(out.contains("\"high\""));
+        assert!(out.contains("\"mid\""));
+        assert!(!out.contains("\"low\""));
+    }
+
+    #[test]
+    fn tied_pressure_scores_break_by_lexical_id() {
+        let out = run("{\"items\":[{\"id\":\"bbb\",\"status\":\"open\",\"pressure_score\":0.5},{\"id\":\"aaa\",\"status\":\"open\",\"pressure_score\":0.5}],\"reference_date\":\"2026-08-07\",\"aggregation_config\":{}}");
+        assert!(out.contains("\"aaa\""));
+        assert!(out.contains("\"bbb\""));
+    }
+
+    #[test]
+    fn non_object_item_element_stops_scanning() {
+        let out = run("{\"items\":[{\"id\":\"ai-1\",\"status\":\"open\"},42],\"reference_date\":\"2026-08-07\",\"aggregation_config\":{}}");
+        assert!(out.contains("\"total_open\":1"));
+    }
+
+    #[test]
+    fn unterminated_item_object_stops_scanning() {
+        let out = run("{\"reference_date\":\"2026-08-07\",\"aggregation_config\":{},\"items\":[{\"id\":\"ai-1\",\"status\":\"open\"},{\"id\":\"ai-2\"]}");
+        assert!(out.contains("\"total_open\":1"));
+    }
+
+    #[test]
+    fn owner_slot_and_pressure_slot_clone_are_bitwise_copies() {
+        let owner = OwnerSlot {
+            id: [1u8; ID_MAX],
+            len: 1,
+            count: 5,
+        };
+        let cloned = owner.clone();
+        assert_eq!(cloned.count, 5);
+
+        let pressure = PressureSlot {
+            id: [2u8; ID_MAX],
+            len: 1,
+            score_millis: 900,
+        };
+        let cloned_p = pressure.clone();
+        assert_eq!(cloned_p.score_millis, 900);
+    }
+
+    #[test]
+    fn bump_owner_ignores_ids_longer_than_id_max() {
+        let mut owners = [OwnerSlot {
+            id: [0; ID_MAX],
+            len: 0,
+            count: 0,
+        }; MAX_OWNERS];
+        let mut count = 0usize;
+        let long_id = vec![b'x'; ID_MAX + 1];
+        bump_owner(&mut owners, &mut count, &long_id);
+        assert_eq!(count, 0);
+    }
+
+    #[test]
+    fn insert_top_pressure_ignores_ids_longer_than_id_max() {
+        let mut top = [
+            PressureSlot {
+                id: [0; ID_MAX],
+                len: 0,
+                score_millis: 0,
+            },
+            PressureSlot {
+                id: [0; ID_MAX],
+                len: 0,
+                score_millis: 0,
+            },
+        ];
+        let long_id = vec![b'x'; ID_MAX + 1];
+        insert_top_pressure(&mut top, &long_id, 500);
+        assert_eq!(top[0].len, 0);
+    }
+
+    #[test]
+    fn array_after_key_at_depth_and_object_after_key_at_depth_handle_wrong_type() {
+        assert_eq!(array_after_key_at_depth(b"\"k\":5", b"\"k\"", 0), None);
+        assert_eq!(object_after_key_at_depth(b"\"k\":5", b"\"k\""), None);
+    }
+
+    #[test]
+    fn balanced_end_returns_none_when_unterminated() {
+        assert_eq!(balanced_end(b"{\"a\":\"b\"", b'{', b'}'), None);
+    }
+
+    #[test]
+    fn string_value_after_handles_missing_colon_quote_and_terminator() {
+        assert_eq!(string_value_after(b"no colon"), b"");
+        assert_eq!(string_value_after(b":not-a-quote"), b"");
+        assert_eq!(string_value_after(b":\"unterminated"), b"");
+    }
+
+    #[test]
+    fn parse_pressure_score_handles_missing_key_and_no_colon() {
+        assert_eq!(parse_pressure_score(b"{}"), 0);
+        assert_eq!(parse_pressure_score(b"\"pressure_score\"no-colon"), 0);
+    }
 }
