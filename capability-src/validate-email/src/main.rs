@@ -14,7 +14,11 @@ use wasi_capability_runtime::{object, Value};
 
 const DEFAULT_MAX_LENGTH: usize = 254;
 
-fn validate_email(email: &str, allow_plus_addressing: bool, max_length: usize) -> Option<&'static str> {
+fn validate_email(
+    email: &str,
+    allow_plus_addressing: bool,
+    max_length: usize,
+) -> Option<&'static str> {
     if email.is_empty() {
         return Some("empty");
     }
@@ -61,7 +65,9 @@ fn validate_email(email: &str, allow_plus_addressing: bool, max_length: usize) -
     if !local_ok {
         return Some("invalid_character");
     }
-    let domain_ok = domain.chars().all(|c| c.is_alphanumeric() || c == '.' || c == '-');
+    let domain_ok = domain
+        .chars()
+        .all(|c| c.is_alphanumeric() || c == '.' || c == '-');
     if !domain_ok {
         return Some("invalid_character");
     }
@@ -122,9 +128,25 @@ mod tests {
         assert_eq!(check("@example.com"), Some("empty_local_part"));
         assert_eq!(check("alice@"), Some("empty_domain"));
         assert_eq!(check("alice@localhost"), Some("domain_missing_dot"));
-        assert_eq!(check("alice@example..com"), Some("consecutive_dots_in_domain"));
-        assert_eq!(check(".alice@example.com"), Some("leading_dot_in_local_part"));
+        assert_eq!(
+            check("alice@example..com"),
+            Some("consecutive_dots_in_domain")
+        );
+        assert_eq!(
+            check(".alice@example.com"),
+            Some("leading_dot_in_local_part")
+        );
         assert_eq!(check("alice @example.com"), Some("invalid_character"));
+    }
+
+    #[test]
+    fn invalid_character_in_local_part_is_rejected() {
+        assert_eq!(check("ali!ce@example.com"), Some("invalid_character"));
+    }
+
+    #[test]
+    fn invalid_character_in_domain_is_rejected() {
+        assert_eq!(check("alice@exa!mple.com"), Some("invalid_character"));
     }
 
     #[test]
@@ -152,9 +174,28 @@ mod tests {
     }
 
     #[test]
+    fn handle_reads_max_length_from_input() {
+        let out = handle(object(alloc::vec![
+            ("email", Value::String(String::from("alice@example.com"))),
+            ("max_length", Value::Number(5.0)),
+        ]));
+        assert_eq!(out.get("valid").unwrap().as_bool(), Some(false));
+        assert_eq!(
+            out.get("reason").unwrap().as_str(),
+            Some("exceeds_max_length")
+        );
+    }
+
+    #[test]
     fn output_genuinely_differs_across_distinct_inputs() {
-        let out_a = handle(object(alloc::vec![("email", Value::String(String::from("alice@example.com")))]));
-        let out_b = handle(object(alloc::vec![("email", Value::String(String::from("not-an-email")))]));
+        let out_a = handle(object(alloc::vec![(
+            "email",
+            Value::String(String::from("alice@example.com"))
+        )]));
+        let out_b = handle(object(alloc::vec![(
+            "email",
+            Value::String(String::from("not-an-email"))
+        )]));
         assert_ne!(
             out_a.get("valid").unwrap().as_bool(),
             out_b.get("valid").unwrap().as_bool(),

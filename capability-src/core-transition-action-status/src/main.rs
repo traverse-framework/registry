@@ -32,7 +32,9 @@ unsafe extern "C" {
 }
 
 #[cfg(test)]
-unsafe fn emit_event(_ptr: i32, _len: i32) -> i32 { 0 }
+unsafe fn emit_event(_ptr: i32, _len: i32) -> i32 {
+    0
+}
 
 static mut INPUT_BUF: [u8; 8192] = [0; 8192];
 static mut OUTPUT_BUF: [u8; 4096] = [0; 4096];
@@ -84,11 +86,7 @@ pub unsafe fn evaluate(input: &[u8], out: &mut [u8]) -> usize {
         return write_result(
             out,
             false,
-            if current.is_empty() {
-                b""
-            } else {
-                current
-            },
+            if current.is_empty() { b"" } else { current },
             b"invalid_status",
             br#"["precondition failed: required fields missing"]"#,
         );
@@ -109,7 +107,11 @@ pub unsafe fn evaluate(input: &[u8], out: &mut [u8]) -> usize {
         if owner.is_empty() || actor != owner {
             let mut trace = [0u8; 96];
             let mut t = 0usize;
-            t = copy(&mut trace, t, br#"["owner_only=true and actor is not owner"]"#);
+            t = copy(
+                &mut trace,
+                t,
+                br#"["owner_only=true and actor is not owner"]"#,
+            );
             return write_result(out, false, current, b"not_owner", &trace[..t]);
         }
     }
@@ -349,7 +351,9 @@ fn string_value_after<'a>(after_key: &'a [u8]) -> &'a [u8] {
         return b"";
     };
     let mut rest = &after_key[colon + 1..];
-    while rest.first() == Some(&b' ') || rest.first() == Some(&b'\n') || rest.first() == Some(&b'\t')
+    while rest.first() == Some(&b' ')
+        || rest.first() == Some(&b'\n')
+        || rest.first() == Some(&b'\t')
     {
         rest = &rest[1..];
     }
@@ -416,67 +420,184 @@ mod catalog_coverage_tests {
     #[test]
     fn use_case_01_happy() {
         let out = run("{\"action_item_id\":\"item-001\",\"current_status\":\"open\",\"requested_status\":\"in_progress\",\"actor_id\":\"user-ada\",\"owner_id\":\"user-ada\",\"transition_config\":{\"version\":\"1.0\",\"allowed_transitions\":{\"open\":[\"in_progress\",\"cancelled\",\"snoozed\"],\"in_progress\":[\"blocked\",\"done\",\"cancelled\",\"snoozed\"],\"blocked\":[\"in_progress\",\"cancelled\"],\"snoozed\":[\"open\",\"in_progress\",\"cancelled\"],\"done\":[],\"cancelled\":[]},\"owner_only\":true}}");
-        assert!(out.contains("\"reason_code\":\"ok\""), "expected ok in {out}");
+        assert!(
+            out.contains("\"reason_code\":\"ok\""),
+            "expected ok in {out}"
+        );
     }
 
     #[test]
     fn use_case_02_sad() {
         let out = run("{\"action_item_id\":\"item-002\",\"current_status\":\"done\",\"requested_status\":\"open\",\"actor_id\":\"user-ada\",\"owner_id\":\"user-ada\",\"transition_config\":{\"version\":\"1.0\",\"allowed_transitions\":{\"open\":[\"in_progress\",\"cancelled\",\"snoozed\"],\"in_progress\":[\"blocked\",\"done\",\"cancelled\",\"snoozed\"],\"blocked\":[\"in_progress\",\"cancelled\"],\"snoozed\":[\"open\",\"in_progress\",\"cancelled\"],\"done\":[],\"cancelled\":[]},\"owner_only\":true}}");
-        assert!(out.contains("\"reason_code\":\"illegal_transition\""), "expected illegal_transition in {out}");
+        assert!(
+            out.contains("\"reason_code\":\"illegal_transition\""),
+            "expected illegal_transition in {out}"
+        );
     }
 
     #[test]
     fn use_case_03_happy() {
         let out = run("{\"action_item_id\":\"item-003\",\"current_status\":\"open\",\"requested_status\":\"snoozed\",\"actor_id\":\"user-ada\",\"owner_id\":\"user-ada\",\"transition_config\":{\"version\":\"1.0\",\"allowed_transitions\":{\"open\":[\"in_progress\",\"cancelled\",\"snoozed\"],\"in_progress\":[\"blocked\",\"done\",\"cancelled\",\"snoozed\"],\"blocked\":[\"in_progress\",\"cancelled\"],\"snoozed\":[\"open\",\"in_progress\",\"cancelled\"],\"done\":[],\"cancelled\":[]},\"owner_only\":true}}");
-        assert!(out.contains("\"reason_code\":\"ok\""), "expected ok in {out}");
+        assert!(
+            out.contains("\"reason_code\":\"ok\""),
+            "expected ok in {out}"
+        );
     }
 
     #[test]
     fn use_case_04_sad() {
         let out = run("{\"action_item_id\":\"item-004\",\"current_status\":\"open\",\"requested_status\":\"in_progress\",\"actor_id\":\"user-bob\",\"owner_id\":\"user-ada\",\"transition_config\":{\"version\":\"1.0\",\"allowed_transitions\":{\"open\":[\"in_progress\",\"cancelled\",\"snoozed\"],\"in_progress\":[\"blocked\",\"done\",\"cancelled\",\"snoozed\"],\"blocked\":[\"in_progress\",\"cancelled\"],\"snoozed\":[\"open\",\"in_progress\",\"cancelled\"],\"done\":[],\"cancelled\":[]},\"owner_only\":true}}");
-        assert!(out.contains("\"reason_code\":\"not_owner\""), "expected not_owner in {out}");
+        assert!(
+            out.contains("\"reason_code\":\"not_owner\""),
+            "expected not_owner in {out}"
+        );
     }
 
     #[test]
     fn use_case_05_happy() {
         let out = run("{\"action_item_id\":\"item-005\",\"current_status\":\"in_progress\",\"requested_status\":\"blocked\",\"actor_id\":\"user-ada\",\"owner_id\":\"user-ada\",\"transition_config\":{\"version\":\"1.0\",\"allowed_transitions\":{\"open\":[\"in_progress\",\"cancelled\",\"snoozed\"],\"in_progress\":[\"blocked\",\"done\",\"cancelled\",\"snoozed\"],\"blocked\":[\"in_progress\",\"cancelled\"],\"snoozed\":[\"open\",\"in_progress\",\"cancelled\"],\"done\":[],\"cancelled\":[]},\"owner_only\":true}}");
-        assert!(out.contains("\"reason_code\":\"ok\""), "expected ok in {out}");
+        assert!(
+            out.contains("\"reason_code\":\"ok\""),
+            "expected ok in {out}"
+        );
     }
 
     #[test]
     fn use_case_06_happy() {
         let out = run("{\"action_item_id\":\"item-006\",\"current_status\":\"in_progress\",\"requested_status\":\"done\",\"actor_id\":\"user-ada\",\"owner_id\":\"user-ada\",\"transition_config\":{\"version\":\"1.0\",\"allowed_transitions\":{\"open\":[\"in_progress\",\"cancelled\",\"snoozed\"],\"in_progress\":[\"blocked\",\"done\",\"cancelled\",\"snoozed\"],\"blocked\":[\"in_progress\",\"cancelled\"],\"snoozed\":[\"open\",\"in_progress\",\"cancelled\"],\"done\":[],\"cancelled\":[]},\"owner_only\":true}}");
-        assert!(out.contains("\"reason_code\":\"ok\""), "expected ok in {out}");
+        assert!(
+            out.contains("\"reason_code\":\"ok\""),
+            "expected ok in {out}"
+        );
     }
 
     #[test]
     fn use_case_07_happy() {
         let out = run("{\"action_item_id\":\"item-007\",\"current_status\":\"blocked\",\"requested_status\":\"in_progress\",\"actor_id\":\"user-ada\",\"owner_id\":\"user-ada\",\"transition_config\":{\"version\":\"1.0\",\"allowed_transitions\":{\"open\":[\"in_progress\",\"cancelled\",\"snoozed\"],\"in_progress\":[\"blocked\",\"done\",\"cancelled\",\"snoozed\"],\"blocked\":[\"in_progress\",\"cancelled\"],\"snoozed\":[\"open\",\"in_progress\",\"cancelled\"],\"done\":[],\"cancelled\":[]},\"owner_only\":true}}");
-        assert!(out.contains("\"reason_code\":\"ok\""), "expected ok in {out}");
+        assert!(
+            out.contains("\"reason_code\":\"ok\""),
+            "expected ok in {out}"
+        );
     }
 
     #[test]
     fn use_case_08_happy() {
         let out = run("{\"action_item_id\":\"item-008\",\"current_status\":\"snoozed\",\"requested_status\":\"open\",\"actor_id\":\"user-ada\",\"owner_id\":\"user-ada\",\"transition_config\":{\"version\":\"1.0\",\"allowed_transitions\":{\"open\":[\"in_progress\",\"cancelled\",\"snoozed\"],\"in_progress\":[\"blocked\",\"done\",\"cancelled\",\"snoozed\"],\"blocked\":[\"in_progress\",\"cancelled\"],\"snoozed\":[\"open\",\"in_progress\",\"cancelled\"],\"done\":[],\"cancelled\":[]},\"owner_only\":true}}");
-        assert!(out.contains("\"reason_code\":\"ok\""), "expected ok in {out}");
+        assert!(
+            out.contains("\"reason_code\":\"ok\""),
+            "expected ok in {out}"
+        );
     }
 
     #[test]
     fn use_case_09_happy() {
         let out = run("{\"action_item_id\":\"item-009\",\"current_status\":\"open\",\"requested_status\":\"cancelled\",\"actor_id\":\"user-ada\",\"owner_id\":\"user-ada\",\"transition_config\":{\"version\":\"1.0\",\"allowed_transitions\":{\"open\":[\"in_progress\",\"cancelled\",\"snoozed\"],\"in_progress\":[\"blocked\",\"done\",\"cancelled\",\"snoozed\"],\"blocked\":[\"in_progress\",\"cancelled\"],\"snoozed\":[\"open\",\"in_progress\",\"cancelled\"],\"done\":[],\"cancelled\":[]},\"owner_only\":true}}");
-        assert!(out.contains("\"reason_code\":\"ok\""), "expected ok in {out}");
+        assert!(
+            out.contains("\"reason_code\":\"ok\""),
+            "expected ok in {out}"
+        );
     }
 
     #[test]
     fn use_case_10_sad() {
         let out = run("{\"action_item_id\":\"item-010\",\"current_status\":\"cancelled\",\"requested_status\":\"open\",\"actor_id\":\"user-ada\",\"owner_id\":\"user-ada\",\"transition_config\":{\"version\":\"1.0\",\"allowed_transitions\":{\"open\":[\"in_progress\",\"cancelled\",\"snoozed\"],\"in_progress\":[\"blocked\",\"done\",\"cancelled\",\"snoozed\"],\"blocked\":[\"in_progress\",\"cancelled\"],\"snoozed\":[\"open\",\"in_progress\",\"cancelled\"],\"done\":[],\"cancelled\":[]},\"owner_only\":true}}");
-        assert!(out.contains("\"reason_code\":\"illegal_transition\""), "expected illegal_transition in {out}");
+        assert!(
+            out.contains("\"reason_code\":\"illegal_transition\""),
+            "expected illegal_transition in {out}"
+        );
     }
 
     #[test]
     fn use_case_11_sad() {
         let out = run("{\"action_item_id\":\"item-011\",\"current_status\":\"\",\"requested_status\":\"open\",\"actor_id\":\"user-ada\",\"owner_id\":\"user-ada\",\"transition_config\":{\"version\":\"1.0\",\"allowed_transitions\":{\"open\":[\"in_progress\",\"cancelled\",\"snoozed\"],\"in_progress\":[\"blocked\",\"done\",\"cancelled\",\"snoozed\"],\"blocked\":[\"in_progress\",\"cancelled\"],\"snoozed\":[\"open\",\"in_progress\",\"cancelled\"],\"done\":[],\"cancelled\":[]},\"owner_only\":true}}");
-        assert!(out.contains("\"reason_code\":\"invalid_status\""), "expected invalid_status in {out}");
+        assert!(
+            out.contains("\"reason_code\":\"invalid_status\""),
+            "expected invalid_status in {out}"
+        );
     }
 
+    #[test]
+    fn missing_required_fields_yields_invalid_status() {
+        let out = run("{}");
+        assert!(
+            out.contains("\"reason_code\":\"invalid_status\""),
+            "expected invalid_status in {out}"
+        );
+        assert!(out.contains("\"new_status\":\"\""));
+    }
+
+    #[test]
+    fn unknown_requested_status_is_invalid() {
+        let out = run("{\"action_item_id\":\"item-1\",\"current_status\":\"open\",\"requested_status\":\"vanished\",\"actor_id\":\"user-ada\",\"owner_id\":\"user-ada\",\"transition_config\":{\"allowed_transitions\":{\"open\":[\"vanished\"]},\"owner_only\":true}}");
+        assert!(
+            out.contains("\"reason_code\":\"invalid_status\""),
+            "expected invalid_status in {out}"
+        );
+    }
+
+    #[test]
+    fn owner_only_false_allows_non_owner_actor() {
+        let out = run("{\"action_item_id\":\"item-1\",\"current_status\":\"open\",\"requested_status\":\"in_progress\",\"actor_id\":\"user-bob\",\"owner_id\":\"user-ada\",\"transition_config\":{\"allowed_transitions\":{\"open\":[\"in_progress\"]},\"owner_only\":false}}");
+        assert!(
+            out.contains("\"reason_code\":\"ok\""),
+            "expected ok in {out}"
+        );
+        assert!(!out.contains("actor is owner"));
+    }
+
+    #[test]
+    fn missing_allowed_transitions_is_illegal_transition() {
+        let out = run("{\"action_item_id\":\"item-1\",\"current_status\":\"open\",\"requested_status\":\"in_progress\",\"actor_id\":\"user-ada\",\"owner_id\":\"user-ada\",\"transition_config\":{\"owner_only\":true}}");
+        assert!(
+            out.contains("\"reason_code\":\"illegal_transition\""),
+            "expected illegal_transition in {out}"
+        );
+        assert!(out.contains("allowed_transitions missing"));
+    }
+
+    #[test]
+    fn status_with_no_transition_list_entry_is_illegal_transition() {
+        let out = run("{\"action_item_id\":\"item-1\",\"current_status\":\"blocked\",\"requested_status\":\"open\",\"actor_id\":\"user-ada\",\"owner_id\":\"user-ada\",\"transition_config\":{\"allowed_transitions\":{\"open\":[\"in_progress\"]},\"owner_only\":true}}");
+        assert!(
+            out.contains("\"reason_code\":\"illegal_transition\""),
+            "expected illegal_transition in {out}"
+        );
+        assert!(out.contains("has no transition list"));
+    }
+
+    #[test]
+    fn object_after_key_handles_missing_and_non_object() {
+        assert_eq!(object_after_key(b"{}", b"\"missing\""), None);
+        assert_eq!(object_after_key(b"\"k\":5", b"\"k\""), None);
+    }
+
+    #[test]
+    fn array_after_key_handles_missing_and_non_array() {
+        assert_eq!(array_after_key(b"{}", b"\"missing\""), None);
+        assert_eq!(array_after_key(b"\"k\":5", b"\"k\""), None);
+    }
+
+    #[test]
+    fn extract_bool_handles_false_and_neither() {
+        assert_eq!(extract_bool(b"\"k\":false", b"\"k\""), Some(false));
+        assert_eq!(extract_bool(b"\"k\":maybe", b"\"k\""), None);
+    }
+
+    #[test]
+    fn balanced_end_returns_none_when_unterminated() {
+        assert_eq!(balanced_end(b"{\"a\":\"b\"", b'{', b'}'), None);
+    }
+
+    #[test]
+    fn string_value_after_handles_missing_colon_quote_and_terminator() {
+        assert_eq!(string_value_after(b"no colon"), b"");
+        assert_eq!(string_value_after(b":not-a-quote"), b"");
+        assert_eq!(string_value_after(b":\"unterminated"), b"");
+    }
+
+    #[test]
+    fn array_contains_string_matches_exact_element() {
+        assert!(array_contains_string(br#"["a","b"]"#, b"b"));
+        assert!(!array_contains_string(br#"["a","b"]"#, b"c"));
+    }
 }

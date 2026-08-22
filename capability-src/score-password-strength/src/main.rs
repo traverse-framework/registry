@@ -36,9 +36,14 @@ fn has_sequential_run(chars: &[char]) -> bool {
         return false;
     }
     for window in chars.windows(4) {
-        let codes: Vec<i32> = window.iter().map(|c| c.to_ascii_lowercase() as i32).collect();
-        let ascending = codes[1] == codes[0] + 1 && codes[2] == codes[1] + 1 && codes[3] == codes[2] + 1;
-        let descending = codes[1] == codes[0] - 1 && codes[2] == codes[1] - 1 && codes[3] == codes[2] - 1;
+        let codes: Vec<i32> = window
+            .iter()
+            .map(|c| c.to_ascii_lowercase() as i32)
+            .collect();
+        let ascending =
+            codes[1] == codes[0] + 1 && codes[2] == codes[1] + 1 && codes[3] == codes[2] + 1;
+        let descending =
+            codes[1] == codes[0] - 1 && codes[2] == codes[1] - 1 && codes[3] == codes[2] - 1;
         if ascending || descending {
             return true;
         }
@@ -50,7 +55,9 @@ fn has_repeated_run(chars: &[char]) -> bool {
     if chars.len() < 4 {
         return false;
     }
-    chars.windows(4).any(|w| w[0] == w[1] && w[1] == w[2] && w[2] == w[3])
+    chars
+        .windows(4)
+        .any(|w| w[0] == w[1] && w[1] == w[2] && w[2] == w[3])
 }
 
 fn score_password(password: &str, min_length: usize, require_symbol: bool) -> ScoreResult {
@@ -63,7 +70,8 @@ fn score_password(password: &str, min_length: usize, require_symbol: bool) -> Sc
     let has_digit = chars.iter().any(|c| c.is_ascii_digit());
     let has_symbol = chars.iter().any(|&c| is_symbol(c));
 
-    let structural = i32::from(has_lower) + i32::from(has_upper) + i32::from(has_digit) + i32::from(has_symbol);
+    let structural =
+        i32::from(has_lower) + i32::from(has_upper) + i32::from(has_digit) + i32::from(has_symbol);
     let length_bonus = i32::from(char_count >= min_length.saturating_mul(2));
     let sequential = has_sequential_run(&chars);
     let repeated = has_repeated_run(&chars);
@@ -107,7 +115,11 @@ fn score_password(password: &str, min_length: usize, require_symbol: bool) -> Sc
         issues.push("repeated_characters");
     }
 
-    ScoreResult { score, strength, issues }
+    ScoreResult {
+        score,
+        strength,
+        issues,
+    }
 }
 
 fn handle(input: Value) -> Value {
@@ -191,7 +203,11 @@ mod tests {
     fn too_short_caps_score_even_with_diverse_characters() {
         let r = score_password("Short1!", 12, false);
         assert!(r.issues.contains(&"too_short"));
-        assert!(r.score <= 1, "a too-short password should be capped low regardless of character diversity, got {}", r.score);
+        assert!(
+            r.score <= 1,
+            "a too-short password should be capped low regardless of character diversity, got {}",
+            r.score
+        );
     }
 
     #[test]
@@ -218,6 +234,16 @@ mod tests {
         )]));
         let written = wasi_capability_runtime::write_json(&out);
         assert!(!written.contains("SuperSecretValue123"));
+    }
+
+    #[test]
+    fn handle_reads_min_length_from_input() {
+        let out = handle(object(alloc::vec![
+            ("password", Value::String(String::from("Short1!"))),
+            ("min_length", Value::Number(12.0)),
+        ]));
+        let issues = wasi_capability_runtime::write_json(&out);
+        assert!(issues.contains("too_short"));
     }
 
     #[test]

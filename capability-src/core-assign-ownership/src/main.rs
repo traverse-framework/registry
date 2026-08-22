@@ -98,7 +98,15 @@ pub unsafe fn evaluate(input: &[u8], out: &mut [u8]) -> usize {
     if suggested_null || suggested.is_empty() {
         traces[trace_n] = b"suggested_owner null";
         trace_n += 1;
-        return apply_fallback(out, fallback, creator, members, require_active, &mut traces, trace_n);
+        return apply_fallback(
+            out,
+            fallback,
+            creator,
+            members,
+            require_active,
+            &mut traces,
+            trace_n,
+        );
     }
 
     if let Some((id, method, note)) = resolve_member(members, suggested, require_active) {
@@ -112,7 +120,15 @@ pub unsafe fn evaluate(input: &[u8], out: &mut [u8]) -> usize {
 
     traces[0] = b"no member match for suggestion";
     trace_n = 1;
-    apply_fallback(out, fallback, creator, members, require_active, &mut traces, trace_n)
+    apply_fallback(
+        out,
+        fallback,
+        creator,
+        members,
+        require_active,
+        &mut traces,
+        trace_n,
+    )
 }
 
 fn apply_fallback<'a>(
@@ -168,13 +184,7 @@ fn apply_fallback<'a>(
                 traces[trace_n] = b"fallback=unassigned";
                 trace_n += 1;
             }
-            write_result(
-                out,
-                None,
-                b"fallback_unassigned",
-                b"ok",
-                &traces[..trace_n],
-            )
+            write_result(out, None, b"fallback_unassigned", b"ok", &traces[..trace_n])
         }
         _ => {
             if trace_n < MAX_TRACE {
@@ -469,43 +479,137 @@ mod catalog_coverage_tests {
     #[test]
     fn use_case_01_happy() {
         let out = run("{\"suggested_owner\":\"Ada Lovelace\",\"creator_id\":\"user-carol\",\"workspace_members\":[{\"id\":\"user-ada\",\"name\":\"Ada Lovelace\",\"email\":\"ada@loop.dev\"},{\"id\":\"user-bob\",\"name\":\"Bob Smith\",\"email\":\"bob@loop.dev\"}],\"ownership_config\":{\"version\":\"1.0\",\"fallback\":\"creator\",\"require_active_member\":true}}");
-        assert!(out.contains("\"reason_code\":\"ok\""), "expected ok in {out}");
+        assert!(
+            out.contains("\"reason_code\":\"ok\""),
+            "expected ok in {out}"
+        );
     }
 
     #[test]
     fn use_case_02_happy() {
         let out = run("{\"suggested_owner\":\"bob@loop.dev\",\"creator_id\":\"user-carol\",\"workspace_members\":[{\"id\":\"user-ada\",\"name\":\"Ada Lovelace\",\"email\":\"ada@loop.dev\"},{\"id\":\"user-bob\",\"name\":\"Bob Smith\",\"email\":\"bob@loop.dev\"}],\"ownership_config\":{\"version\":\"1.0\",\"fallback\":\"creator\",\"require_active_member\":true}}");
-        assert!(out.contains("\"reason_code\":\"ok\""), "expected ok in {out}");
+        assert!(
+            out.contains("\"reason_code\":\"ok\""),
+            "expected ok in {out}"
+        );
     }
 
     #[test]
     fn use_case_03_happy() {
         let out = run("{\"suggested_owner\":null,\"creator_id\":\"user-carol\",\"workspace_members\":[{\"id\":\"user-carol\",\"name\":\"Carol Jones\",\"email\":\"carol@loop.dev\"}],\"ownership_config\":{\"version\":\"1.0\",\"fallback\":\"creator\",\"require_active_member\":true}}");
-        assert!(out.contains("\"reason_code\":\"ok\""), "expected ok in {out}");
+        assert!(
+            out.contains("\"reason_code\":\"ok\""),
+            "expected ok in {out}"
+        );
     }
 
     #[test]
     fn use_case_04_sad() {
         let out = run("{\"suggested_owner\":\"Unknown Person\",\"creator_id\":\"user-carol\",\"workspace_members\":[{\"id\":\"user-ada\",\"name\":\"Ada Lovelace\",\"email\":\"ada@loop.dev\"}],\"ownership_config\":{\"version\":\"1.0\",\"fallback\":\"fail\",\"require_active_member\":true}}");
-        assert!(out.contains("\"reason_code\":\"unresolved\""), "expected unresolved in {out}");
+        assert!(
+            out.contains("\"reason_code\":\"unresolved\""),
+            "expected unresolved in {out}"
+        );
     }
 
     #[test]
     fn use_case_05_sad() {
         let out = run("{\"suggested_owner\":\"user-ada\",\"creator_id\":\"user-carol\",\"workspace_members\":[{\"id\":\"user-ada\",\"name\":\"Ada Lovelace\",\"email\":\"ada@loop.dev\",\"active\":false}],\"ownership_config\":{\"version\":\"1.0\",\"fallback\":\"fail\",\"require_active_member\":true}}");
-        assert!(out.contains("\"reason_code\":\"inactive_member\""), "expected inactive_member in {out}");
+        assert!(
+            out.contains("\"reason_code\":\"inactive_member\""),
+            "expected inactive_member in {out}"
+        );
     }
 
     #[test]
     fn use_case_06_sad() {
         let out = run("{\"suggested_owner\":\"Ada Lovelace\",\"creator_id\":\"user-carol\",\"workspace_members\":[{\"id\":\"user-ada\",\"name\":\"Ada Lovelace\",\"email\":\"ada@loop.dev\"},{\"id\":\"user-bob\",\"name\":\"Bob Smith\",\"email\":\"bob@loop.dev\"}],\"ownership_config\":{\"version\":\"1.0\",\"fallback\":\"bogus\",\"require_active_member\":true}}");
-        assert!(out.contains("\"reason_code\":\"config_error\""), "expected config_error in {out}");
+        assert!(
+            out.contains("\"reason_code\":\"config_error\""),
+            "expected config_error in {out}"
+        );
     }
 
     #[test]
     fn use_case_07_happy() {
         let out = run("{\"suggested_owner\":\"Unknown Person\",\"creator_id\":\"user-carol\",\"workspace_members\":[{\"id\":\"user-ada\",\"name\":\"Ada Lovelace\",\"email\":\"ada@loop.dev\"}],\"ownership_config\":{\"version\":\"1.0\",\"fallback\":\"unassigned\",\"require_active_member\":true}}");
-        assert!(out.contains("\"reason_code\":\"ok\""), "expected ok in {out}");
+        assert!(
+            out.contains("\"reason_code\":\"ok\""),
+            "expected ok in {out}"
+        );
     }
 
+    #[test]
+    fn missing_config_yields_config_error() {
+        let out = run(
+            "{\"suggested_owner\":null,\"creator_id\":\"user-carol\",\"workspace_members\":[]}",
+        );
+        assert!(
+            out.contains("\"reason_code\":\"config_error\""),
+            "expected config_error in {out}"
+        );
+    }
+
+    #[test]
+    fn missing_fallback_key_defaults_to_creator() {
+        let out = run("{\"suggested_owner\":null,\"creator_id\":\"user-carol\",\"workspace_members\":[{\"id\":\"user-carol\",\"name\":\"Carol Jones\",\"active\":true}],\"ownership_config\":{\"require_active_member\":true}}");
+        assert!(out.contains("\"resolution_method\":\"fallback_creator\""));
+    }
+
+    #[test]
+    fn fallback_creator_with_missing_creator_id_is_unresolved() {
+        let out = run("{\"suggested_owner\":null,\"workspace_members\":[],\"ownership_config\":{\"fallback\":\"creator\"}}");
+        assert!(
+            out.contains("\"reason_code\":\"unresolved\""),
+            "expected unresolved in {out}"
+        );
+        assert!(out.contains("creator_id missing"));
+    }
+
+    #[test]
+    fn fallback_creator_require_active_matches_creator_as_active_member() {
+        let out = run("{\"suggested_owner\":null,\"creator_id\":\"user-carol\",\"workspace_members\":[{\"id\":\"user-carol\",\"name\":\"Carol Jones\",\"active\":true}],\"ownership_config\":{\"fallback\":\"creator\",\"require_active_member\":true}}");
+        assert!(out.contains("\"owner_id\":\"user-carol\""));
+        assert!(out.contains("\"resolution_method\":\"fallback_creator\""));
+    }
+
+    #[test]
+    fn fallback_creator_without_require_active_accepts_creator_id_directly() {
+        let out = run("{\"suggested_owner\":null,\"creator_id\":\"user-zed\",\"workspace_members\":[],\"ownership_config\":{\"fallback\":\"creator\",\"require_active_member\":false}}");
+        assert!(out.contains("\"owner_id\":\"user-zed\""));
+        assert!(out.contains("\"resolution_method\":\"fallback_creator\""));
+    }
+
+    #[test]
+    fn is_null_at_depth_handles_missing_key_and_non_null_value() {
+        assert!(!is_null_at_depth(b"{}", b"\"missing\"", 1));
+        assert!(!is_null_at_depth(br#"{"k":5}"#, b"\"k\"", 0));
+        assert!(!is_null_at_depth(br#"{"k""#, b"\"k\"", 0));
+    }
+
+    #[test]
+    fn object_after_key_and_array_after_key_handle_missing_and_wrong_type() {
+        assert_eq!(object_after_key(b"{}", b"\"missing\""), None);
+        assert_eq!(object_after_key(br#"{"k":5}"#, b"\"k\""), None);
+        assert_eq!(array_after_key(b"{}", b"\"missing\""), None);
+        assert_eq!(array_after_key(br#"{"k":5}"#, b"\"k\""), None);
+    }
+
+    #[test]
+    fn balanced_end_returns_none_when_unterminated() {
+        assert_eq!(balanced_end(b"{\"a\":\"b\"", b'{', b'}'), None);
+    }
+
+    #[test]
+    fn string_value_after_handles_missing_colon_quote_and_terminator() {
+        assert_eq!(string_value_after(b"no colon"), b"");
+        assert_eq!(string_value_after(b":not-a-quote"), b"");
+        assert_eq!(string_value_after(b":\"unterminated"), b"");
+    }
+
+    #[test]
+    fn extract_bool_handles_false_and_neither() {
+        assert_eq!(extract_bool(b"\"k\":false", b"\"k\""), Some(false));
+        assert_eq!(extract_bool(b"\"k\":maybe", b"\"k\""), None);
+    }
 }

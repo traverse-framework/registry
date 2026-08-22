@@ -148,7 +148,11 @@ pub unsafe fn evaluate(input: &[u8], out: &mut [u8]) -> usize {
             continue;
         }
         let channel = extract_string(obj, b"\"channel\"");
-        let chan: &[u8] = if channel.is_empty() { b"in_app" } else { channel };
+        let chan: &[u8] = if channel.is_empty() {
+            b"in_app"
+        } else {
+            channel
+        };
 
         if wrote > 0 {
             i = copy(out, i, b",");
@@ -177,7 +181,11 @@ pub unsafe fn evaluate(input: &[u8], out: &mut [u8]) -> usize {
     }
     i = copy(out, i, b"],\"intent_count\":");
     i = write_u32(out, i, wrote);
-    i = copy(out, i, b",\"reason_code\":\"ok\",\"evaluation_trace\":[\"event_type=");
+    i = copy(
+        out,
+        i,
+        b",\"reason_code\":\"ok\",\"evaluation_trace\":[\"event_type=",
+    );
     i = copy(out, i, event_type);
     i = copy(out, i, b"\",\"prepared ");
     i = write_u32(out, i, wrote);
@@ -187,7 +195,11 @@ pub unsafe fn evaluate(input: &[u8], out: &mut [u8]) -> usize {
 
 fn fail(out: &mut [u8], code: &[u8]) -> usize {
     let mut i = 0usize;
-    i = copy(out, i, b"{\"intents\":[],\"intent_count\":0,\"reason_code\":\"");
+    i = copy(
+        out,
+        i,
+        b"{\"intents\":[],\"intent_count\":0,\"reason_code\":\"",
+    );
     i = copy(out, i, code);
     i = copy(out, i, b"\",\"evaluation_trace\":[]}");
     i
@@ -352,79 +364,6 @@ fn extract_bool(hay: &[u8], key: &[u8]) -> Option<bool> {
     }
 }
 
-fn extract_i32(hay: &[u8], key: &[u8]) -> Option<i32> {
-    let pos = find(hay, key)?;
-    let after = &hay[pos + key.len()..];
-    let colon = after.iter().position(|b| *b == b':')?;
-    let rest = skip_ws(&after[colon + 1..]);
-    parse_i32(rest)
-}
-
-fn parse_i32(rest: &[u8]) -> Option<i32> {
-    if rest.is_empty() {
-        return None;
-    }
-    let mut neg = false;
-    let mut j = 0usize;
-    if rest[0] == b'-' {
-        neg = true;
-        j = 1;
-    }
-    if j >= rest.len() || rest[j] < b'0' || rest[j] > b'9' {
-        return None;
-    }
-    let mut n: i32 = 0;
-    while j < rest.len() && rest[j] >= b'0' && rest[j] <= b'9' {
-        n = n * 10 + (rest[j] - b'0') as i32;
-        j += 1;
-    }
-    Some(if neg { -n } else { n })
-}
-
-fn parse_number_millis(hay: &[u8], key: &[u8]) -> Option<u32> {
-    let pos = find(hay, key)?;
-    let after = &hay[pos + key.len()..];
-    let colon = after.iter().position(|b| *b == b':')?;
-    let rest = skip_ws(&after[colon + 1..]);
-    if rest.is_empty() {
-        return None;
-    }
-    let mut whole: u32 = 0;
-    let mut frac: u32 = 0;
-    let mut frac_digits = 0u32;
-    let mut seen_dot = false;
-    let mut j = 0usize;
-    while j < rest.len() {
-        let b = rest[j];
-        if b == b',' || b == b'}' || b == b']' || b == b' ' || b == b'\n' {
-            break;
-        }
-        if b == b'.' {
-            seen_dot = true;
-            j += 1;
-            continue;
-        }
-        if b < b'0' || b > b'9' {
-            break;
-        }
-        let digit = (b - b'0') as u32;
-        if seen_dot {
-            if frac_digits < 3 {
-                frac = frac * 10 + digit;
-                frac_digits += 1;
-            }
-        } else {
-            whole = whole * 10 + digit;
-        }
-        j += 1;
-    }
-    while frac_digits < 3 {
-        frac *= 10;
-        frac_digits += 1;
-    }
-    Some(whole * 1000 + frac)
-}
-
 fn copy(out: &mut [u8], at: usize, bytes: &[u8]) -> usize {
     let end = at + bytes.len();
     if end > out.len() {
@@ -475,112 +414,6 @@ fn write_u32(out: &mut [u8], mut i: usize, mut n: u32) -> usize {
     i
 }
 
-fn write_i32(out: &mut [u8], mut i: usize, n: i32) -> usize {
-    if n < 0 {
-        i = copy(out, i, b"-");
-        write_u32(out, i, (-n) as u32)
-    } else {
-        write_u32(out, i, n as u32)
-    }
-}
-
-fn ascii_lower(b: u8) -> u8 {
-    if b >= b'A' && b <= b'Z' {
-        b + 32
-    } else {
-        b
-    }
-}
-
-fn eq_ignore_case(a: &[u8], b: &[u8]) -> bool {
-    if a.len() != b.len() {
-        return false;
-    }
-    for i in 0..a.len() {
-        if ascii_lower(a[i]) != ascii_lower(b[i]) {
-            return false;
-        }
-    }
-    true
-}
-
-fn normalize_email(src: &[u8], dst: &mut [u8]) -> usize {
-    let mut i = 0usize;
-    let mut j = 0usize;
-    while i < src.len() && (src[i] == b' ' || src[i] == b'\t') {
-        i += 1;
-    }
-    let mut end = src.len();
-    while end > i && (src[end - 1] == b' ' || src[end - 1] == b'\t') {
-        end -= 1;
-    }
-    while i < end && j < dst.len() {
-        dst[j] = ascii_lower(src[i]);
-        i += 1;
-        j += 1;
-    }
-    j
-}
-
-fn trim_ascii(s: &[u8]) -> &[u8] {
-    let mut start = 0usize;
-    let mut end = s.len();
-    while start < end && matches!(s[start], b' ' | b'\t' | b'\n' | b'\r') {
-        start += 1;
-    }
-    while end > start && matches!(s[end - 1], b' ' | b'\t' | b'\n' | b'\r') {
-        end -= 1;
-    }
-    &s[start..end]
-}
-
-/// Days since 1970-01-01 for YYYY-MM-DD (Howard Hinnant civil_from_days inverse).
-fn parse_ymd_days(s: &[u8]) -> Option<i32> {
-    if s.len() < 10 || s[4] != b'-' || s[7] != b'-' {
-        return None;
-    }
-    let y = parse_i32(&s[0..4])?;
-    let m = parse_i32(&s[5..7])?;
-    let d = parse_i32(&s[8..10])?;
-    if m < 1 || m > 12 || d < 1 || d > 31 {
-        return None;
-    }
-    let y = y as i32 - if m <= 2 { 1 } else { 0 };
-    let era = if y >= 0 { y } else { y - 399 } / 400;
-    let yoe = (y - era * 400) as u32;
-    let mp = if m > 2 { (m - 3) as u32 } else { (m + 9) as u32 };
-    let doy = (153 * mp + 2) / 5 + d as u32 - 1;
-    let doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;
-    Some((era * 146097 + doe as i32) - 719468)
-}
-
-fn format_score_millis(out: &mut [u8], millis: u32) -> usize {
-    let whole = millis / 1000;
-    let frac = millis % 1000;
-    let mut i = write_u32(out, 0, whole);
-    i = copy(out, i, b".");
-    // always 3 digits for determinism in contract examples we may trim; write without trailing zeros carefully
-    // Use up to 3 digits, trim trailing zeros but keep at least one if frac!=0? Contract examples use 0.785 / 1.0
-    if frac == 0 {
-        i = copy(out, i, b"0");
-        return i;
-    }
-    let d0 = (frac / 100) as u8;
-    let d1 = ((frac / 10) % 10) as u8;
-    let d2 = (frac % 10) as u8;
-    out[i] = b'0' + d0;
-    i += 1;
-    if d1 != 0 || d2 != 0 {
-        out[i] = b'0' + d1;
-        i += 1;
-        if d2 != 0 {
-            out[i] = b'0' + d2;
-            i += 1;
-        }
-    }
-    i
-}
-
 #[cfg(not(test))]
 #[panic_handler]
 fn panic(_: &core::panic::PanicInfo<'_>) -> ! {
@@ -600,25 +433,160 @@ mod catalog_coverage_tests {
     #[test]
     fn use_case_01_happy() {
         let out = run("{\"item\":{\"id\":\"ai-1\",\"title\":\"Send the revised proposal\",\"owner_id\":\"user-ada\",\"owner_name\":\"Ada\",\"status\":\"done\"},\"stakeholders\":[{\"user_id\":\"user-carol\",\"role\":\"requester\",\"channel\":\"in_app\"},{\"user_id\":\"user-mgr\",\"role\":\"manager\",\"channel\":\"email\"}],\"event_type\":\"completed\",\"notify_config\":{\"version\":\"1.0\",\"include_manager_on_complete\":true}}");
-        assert!(out.contains("\"reason_code\":\"ok\""), "expected ok in {out}");
+        assert!(
+            out.contains("\"reason_code\":\"ok\""),
+            "expected ok in {out}"
+        );
     }
 
     #[test]
     fn use_case_02_sad() {
         let out = run("{\"item\":{\"id\":\"ai-3\",\"title\":\"Draft agenda\",\"owner_id\":\"user-bob\",\"owner_name\":\"Bob\",\"status\":\"done\"},\"stakeholders\":[],\"event_type\":\"completed\",\"notify_config\":{\"version\":\"1.0\",\"include_manager_on_complete\":true}}");
-        assert!(out.contains("\"reason_code\":\"nothing_to_notify\""), "expected nothing_to_notify in {out}");
+        assert!(
+            out.contains("\"reason_code\":\"nothing_to_notify\""),
+            "expected nothing_to_notify in {out}"
+        );
     }
 
     #[test]
     fn use_case_03_happy() {
         let out = run("{\"item\":{\"id\":\"ai-1\",\"title\":\"Send the revised proposal\",\"owner_id\":\"user-ada\",\"owner_name\":\"Ada\",\"status\":\"in_progress\"},\"stakeholders\":[{\"user_id\":\"user-carol\",\"role\":\"requester\",\"channel\":\"in_app\"}],\"event_type\":\"status_changed\",\"notify_config\":{\"version\":\"1.0\",\"include_manager_on_complete\":true}}");
-        assert!(out.contains("\"reason_code\":\"ok\""), "expected ok in {out}");
+        assert!(
+            out.contains("\"reason_code\":\"ok\""),
+            "expected ok in {out}"
+        );
     }
 
     #[test]
     fn use_case_04_happy() {
         let out = run("{\"item\":{\"id\":\"ai-1\",\"title\":\"Send the revised proposal\",\"owner_id\":\"user-ada\",\"owner_name\":\"Ada\",\"status\":\"blocked\"},\"stakeholders\":[{\"user_id\":\"user-carol\",\"role\":\"requester\",\"channel\":\"in_app\"}],\"event_type\":\"blocked\",\"notify_config\":{\"version\":\"1.0\",\"include_manager_on_complete\":true}}");
-        assert!(out.contains("\"reason_code\":\"ok\""), "expected ok in {out}");
+        assert!(
+            out.contains("\"reason_code\":\"ok\""),
+            "expected ok in {out}"
+        );
     }
 
+    #[test]
+    fn missing_required_fields_yields_invalid_input() {
+        let out = run("{}");
+        assert!(
+            out.contains("\"reason_code\":\"invalid_input\""),
+            "expected invalid_input in {out}"
+        );
+    }
+
+    #[test]
+    fn unknown_event_type_is_rejected() {
+        let out = run("{\"item\":{\"id\":\"ai-1\",\"title\":\"T\",\"owner_id\":\"u\",\"owner_name\":\"Ann\",\"status\":\"done\"},\"stakeholders\":[{\"user_id\":\"u1\",\"role\":\"requester\",\"channel\":\"in_app\"}],\"event_type\":\"archived\",\"notify_config\":{\"version\":\"1.0\",\"include_manager_on_complete\":true}}");
+        assert!(
+            out.contains("\"reason_code\":\"invalid_event_type\""),
+            "expected invalid_event_type in {out}"
+        );
+    }
+
+    #[test]
+    fn missing_owner_name_defaults_to_someone() {
+        let out = run("{\"item\":{\"id\":\"ai-1\",\"title\":\"T\",\"owner_id\":\"u\",\"owner_name\":\"\",\"status\":\"done\"},\"stakeholders\":[{\"user_id\":\"u1\",\"role\":\"requester\",\"channel\":\"in_app\"}],\"event_type\":\"completed\",\"notify_config\":{\"version\":\"1.0\",\"include_manager_on_complete\":true}}");
+        assert!(out.contains("Someone"), "expected default owner in {out}");
+    }
+
+    #[test]
+    fn manager_excluded_when_include_manager_false_with_whitespace_and_backslash() {
+        let out = run("{\"item\": {\"id\":\"ai-1\",\"title\":\"Report\\\\Q1\",\"owner_id\":\"u\",\"owner_name\":\"Ann\",\"status\":\"done\"}, \"stakeholders\": [ {\"user_id\":\"u1\",\"role\":\"manager\",\"channel\":\"email\"},{\"user_id\":\"u2\",\"role\":\"requester\",\"channel\":\"in_app\"} ], \"event_type\":\"completed\", \"notify_config\": { \"version\":\"1.0\",\"include_manager_on_complete\": false } }");
+        assert!(
+            out.contains("\"intent_count\":1"),
+            "expected only the non-manager intent in {out}"
+        );
+        assert!(
+            !out.contains("\"recipient_id\":\"u1\""),
+            "manager should be excluded from {out}"
+        );
+    }
+
+    #[test]
+    fn stakeholder_missing_user_id_is_skipped() {
+        let out = run("{\"item\":{\"id\":\"ai-1\",\"title\":\"T\",\"owner_id\":\"u\",\"owner_name\":\"Ann\",\"status\":\"done\"},\"stakeholders\":[{\"user_id\":\"\",\"role\":\"requester\",\"channel\":\"in_app\"},{\"user_id\":\"u2\",\"role\":\"requester\",\"channel\":\"in_app\"}],\"event_type\":\"completed\",\"notify_config\":{\"version\":\"1.0\",\"include_manager_on_complete\":true}}");
+        assert!(
+            out.contains("\"intent_count\":1"),
+            "expected the empty user_id entry to be skipped in {out}"
+        );
+    }
+
+    #[test]
+    fn non_object_stakeholder_element_stops_scanning() {
+        let out = run("{\"item\":{\"id\":\"ai-1\",\"title\":\"T\",\"owner_id\":\"u\",\"owner_name\":\"Ann\",\"status\":\"done\"},\"stakeholders\":[{\"user_id\":\"u1\",\"role\":\"requester\",\"channel\":\"in_app\"},42],\"event_type\":\"completed\",\"notify_config\":{\"version\":\"1.0\",\"include_manager_on_complete\":true}}");
+        assert!(
+            out.contains("\"intent_count\":1"),
+            "expected scanning to stop at the non-object element in {out}"
+        );
+    }
+
+    #[test]
+    fn unterminated_stakeholder_object_stops_scanning() {
+        let out = run("{\"item\":{\"id\":\"ai-1\",\"title\":\"T\",\"owner_id\":\"u\",\"owner_name\":\"Ann\",\"status\":\"done\"},\"event_type\":\"completed\",\"notify_config\":{\"version\":\"1.0\",\"include_manager_on_complete\":true},\"stakeholders\":[{\"user_id\":\"u1\",\"role\":\"requester\",\"channel\":\"in_app\"},{\"user_id\":\"u2\"]}");
+        assert!(
+            out.contains("\"intent_count\":1"),
+            "expected scanning to stop at the unterminated object in {out}"
+        );
+    }
+
+    #[test]
+    fn missing_channel_defaults_to_in_app() {
+        let out = run("{\"item\":{\"id\":\"ai-1\",\"title\":\"T\",\"owner_id\":\"u\",\"owner_name\":\"Ann\",\"status\":\"done\"},\"stakeholders\":[{\"user_id\":\"u1\",\"role\":\"requester\"}],\"event_type\":\"completed\",\"notify_config\":{\"version\":\"1.0\",\"include_manager_on_complete\":true}}");
+        assert!(
+            out.contains("\"channel\":\"in_app\""),
+            "expected default channel in {out}"
+        );
+    }
+
+    #[test]
+    fn string_value_after_handles_missing_colon_quote_and_terminator() {
+        assert_eq!(string_value_after(b"no colon here"), b"");
+        assert_eq!(string_value_after(b":not-a-quote"), b"");
+        assert_eq!(string_value_after(b":\"unterminated"), b"");
+        assert_eq!(string_value_after(b":\"ok\""), b"ok");
+    }
+
+    #[test]
+    fn extract_string_returns_empty_when_key_missing() {
+        assert_eq!(extract_string(b"{\"other\":\"x\"}", b"\"missing\""), b"");
+    }
+
+    #[test]
+    fn extract_string_at_depth_returns_empty_when_key_missing() {
+        assert_eq!(extract_string_at_depth(b"{}", b"\"missing\"", 1), b"");
+    }
+
+    #[test]
+    fn object_after_key_at_depth_returns_none_for_non_object_value() {
+        assert_eq!(
+            object_after_key_at_depth(b"\"item\":5", b"\"item\"", 0),
+            None
+        );
+    }
+
+    #[test]
+    fn array_after_key_at_depth_returns_none_for_non_array_value() {
+        assert_eq!(
+            array_after_key_at_depth(b"\"item\":5", b"\"item\"", 0),
+            None
+        );
+    }
+
+    #[test]
+    fn extract_bool_handles_false_and_neither() {
+        assert_eq!(extract_bool(b"\"k\":false", b"\"k\""), Some(false));
+        assert_eq!(extract_bool(b"\"k\":maybe", b"\"k\""), None);
+    }
+
+    #[test]
+    fn skip_ws_trims_leading_whitespace() {
+        assert_eq!(skip_ws(b"   abc"), b"abc");
+        assert_eq!(skip_ws(b"abc"), b"abc");
+    }
+
+    #[test]
+    fn balanced_end_returns_none_when_unterminated() {
+        assert_eq!(balanced_end(b"{\"a\":\"b\"", b'{', b'}'), None);
+    }
 }

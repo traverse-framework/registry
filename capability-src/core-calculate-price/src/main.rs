@@ -120,8 +120,16 @@ pub unsafe fn evaluate(input: &[u8], out: &mut [u8]) -> usize {
     if starts_with_minus(qty_raw) || parse_int(qty_raw).unwrap_or(0) <= 0 {
         let mut trace = [0u8; 128];
         let mut t = 0usize;
-        t = copy(&mut trace, t, br#"["precondition failed: quantity must be > 0 for "#);
-        t = copy(&mut trace, t, if line_id.is_empty() { b"line" } else { line_id });
+        t = copy(
+            &mut trace,
+            t,
+            br#"["precondition failed: quantity must be > 0 for "#,
+        );
+        t = copy(
+            &mut trace,
+            t,
+            if line_id.is_empty() { b"line" } else { line_id },
+        );
         t = copy(&mut trace, t, br#""]"#);
         return fail(out, currency, b"invalid_quantity", &trace[..t]);
     }
@@ -133,7 +141,11 @@ pub unsafe fn evaluate(input: &[u8], out: &mut [u8]) -> usize {
             t,
             br#"["precondition failed: unit_price must be >= 0 for "#,
         );
-        t = copy(&mut trace, t, if line_id.is_empty() { b"line" } else { line_id });
+        t = copy(
+            &mut trace,
+            t,
+            if line_id.is_empty() { b"line" } else { line_id },
+        );
         t = copy(&mut trace, t, br#""]"#);
         return fail(out, currency, b"invalid_unit_price", &trace[..t]);
     }
@@ -154,8 +166,7 @@ pub unsafe fn evaluate(input: &[u8], out: &mut [u8]) -> usize {
     let gross = quantity.saturating_mul(unit_cents);
 
     // Discount: first percentage/fixed rule that applies to this SKU (or has no applies_to).
-    let discount_rules =
-        array_after_key(config, b"\"discount_rules\"").unwrap_or(b"[]");
+    let discount_rules = array_after_key(config, b"\"discount_rules\"").unwrap_or(b"[]");
     let (disc_id, disc_type, disc_value, discount_amount) =
         select_discount(discount_rules, sku, gross);
 
@@ -286,16 +297,16 @@ pub unsafe fn evaluate(input: &[u8], out: &mut [u8]) -> usize {
     i = write_cents_into_json_str(out, i, net);
     i = copy(out, i, b"\"],\"config_hash\":\"");
     i = copy(out, i, &hash_buf[..hash_len]);
-    i = copy(out, i, b"\",\"reason_code\":\"ok\",\"confidence\":\"high\"}");
+    i = copy(
+        out,
+        i,
+        b"\",\"reason_code\":\"ok\",\"confidence\":\"high\"}",
+    );
     let _ = inclusive;
     i
 }
 
-fn select_discount<'a>(
-    rules: &'a [u8],
-    sku: &[u8],
-    gross: i64,
-) -> (&'a [u8], &'a [u8], i64, i64) {
+fn select_discount<'a>(rules: &'a [u8], sku: &[u8], gross: i64) -> (&'a [u8], &'a [u8], i64, i64) {
     if rules.first() != Some(&b'[') {
         return (b"", b"", 0, 0);
     }
@@ -366,7 +377,15 @@ fn extract_inclusive_tax(inclusive_base: i64, _exclusive_style: i64) -> i64 {
 fn fail(out: &mut [u8], currency: &[u8], code: &[u8], trace: &[u8]) -> usize {
     let mut i = 0usize;
     i = copy(out, i, b"{\"currency\":\"");
-    i = copy(out, i, if currency.is_empty() { b"USD" } else { currency });
+    i = copy(
+        out,
+        i,
+        if currency.is_empty() {
+            b"USD"
+        } else {
+            currency
+        },
+    );
     i = copy(
         out,
         i,
@@ -835,49 +854,172 @@ mod catalog_coverage_tests {
     #[test]
     fn use_case_01_happy() {
         let out = run("{\"currency\":\"USD\",\"lines\":[{\"id\":\"line-1\",\"sku\":\"SKU-100\",\"quantity\":2,\"unit_price\":50.0,\"tax_code\":\"STANDARD\"}],\"customer\":{\"id\":\"cust-42\",\"attributes\":{\"segment\":\"retail\"}},\"context\":{},\"pricing_config\":{\"version\":\"1.0\",\"currency\":\"USD\",\"rounding\":\"half_up\",\"decimal_places\":2,\"discount_rules\":[{\"id\":\"summer-10\",\"priority\":100,\"type\":\"percentage\",\"value\":10,\"stackable\":false,\"applies_to\":[\"SKU-100\"]}],\"tax_rules\":[{\"id\":\"us-standard\",\"tax_code\":\"STANDARD\",\"rate\":0.08,\"inclusive\":false}]}}");
-        assert!(out.contains("\"reason_code\":\"ok\""), "expected ok in {out}");
+        assert!(
+            out.contains("\"reason_code\":\"ok\""),
+            "expected ok in {out}"
+        );
     }
 
     #[test]
     fn use_case_02_happy() {
         let out = run("{\"currency\":\"USD\",\"lines\":[{\"id\":\"sub-1\",\"sku\":\"PLAN-PRO\",\"quantity\":1,\"unit_price\":99.0}],\"customer\":{\"id\":\"cust-99\"},\"context\":{},\"pricing_config\":{\"version\":\"1.0\",\"currency\":\"USD\",\"rounding\":\"half_up\",\"decimal_places\":2,\"discount_rules\":[{\"id\":\"loyalty-5\",\"priority\":50,\"type\":\"fixed\",\"value\":5.0,\"stackable\":true}],\"tax_rules\":[]}}");
-        assert!(out.contains("\"reason_code\":\"ok\""), "expected ok in {out}");
+        assert!(
+            out.contains("\"reason_code\":\"ok\""),
+            "expected ok in {out}"
+        );
     }
 
     #[test]
     fn use_case_03_happy() {
         let out = run("{\"currency\":\"USD\",\"lines\":[{\"id\":\"line-1\",\"sku\":\"SKU-100\",\"quantity\":1,\"unit_price\":50.0}],\"customer\":{\"id\":\"cust-1\"},\"context\":{},\"pricing_config\":{\"version\":\"1.0\",\"currency\":\"USD\",\"rounding\":\"half_up\",\"decimal_places\":2,\"discount_rules\":[],\"tax_rules\":[]}}");
-        assert!(out.contains("\"reason_code\":\"ok\""), "expected ok in {out}");
+        assert!(
+            out.contains("\"reason_code\":\"ok\""),
+            "expected ok in {out}"
+        );
     }
 
     #[test]
     fn use_case_04_sad() {
         let out = run("{\"currency\":\"USD\",\"lines\":[{\"id\":\"line-1\",\"sku\":\"SKU-100\",\"quantity\":0,\"unit_price\":50.0}],\"customer\":{\"id\":\"cust-1\"},\"context\":{},\"pricing_config\":{\"version\":\"1.0\",\"currency\":\"USD\",\"rounding\":\"half_up\",\"decimal_places\":2,\"discount_rules\":[],\"tax_rules\":[]}}");
-        assert!(out.contains("\"reason_code\":\"invalid_quantity\""), "expected invalid_quantity in {out}");
+        assert!(
+            out.contains("\"reason_code\":\"invalid_quantity\""),
+            "expected invalid_quantity in {out}"
+        );
     }
 
     #[test]
     fn use_case_05_sad() {
         let out = run("{\"currency\":\"USD\",\"lines\":[{\"id\":\"line-1\",\"sku\":\"SKU-X\",\"quantity\":1,\"unit_price\":-10.0}],\"customer\":{\"id\":\"cust-1\"},\"context\":{},\"pricing_config\":{\"version\":\"1.0\",\"currency\":\"USD\",\"rounding\":\"half_up\",\"decimal_places\":2,\"discount_rules\":[],\"tax_rules\":[]}}");
-        assert!(out.contains("\"reason_code\":\"invalid_unit_price\""), "expected invalid_unit_price in {out}");
+        assert!(
+            out.contains("\"reason_code\":\"invalid_unit_price\""),
+            "expected invalid_unit_price in {out}"
+        );
     }
 
     #[test]
     fn use_case_06_sad() {
         let out = run("{\"currency\":\"\",\"lines\":[{\"id\":\"line-1\",\"sku\":\"SKU-100\",\"quantity\":1,\"unit_price\":50.0}],\"customer\":{\"id\":\"cust-1\"},\"context\":{},\"pricing_config\":{\"version\":\"1.0\",\"currency\":\"USD\",\"rounding\":\"half_up\",\"decimal_places\":2,\"discount_rules\":[],\"tax_rules\":[]}}");
-        assert!(out.contains("\"reason_code\":\"invalid_config\""), "expected invalid_config in {out}");
+        assert!(
+            out.contains("\"reason_code\":\"invalid_config\""),
+            "expected invalid_config in {out}"
+        );
     }
 
     #[test]
     fn use_case_07_sad() {
         let out = run("{\"currency\":\"EUR\",\"lines\":[{\"id\":\"line-1\",\"sku\":\"SKU-100\",\"quantity\":1,\"unit_price\":50.0}],\"customer\":{\"id\":\"cust-1\"},\"context\":{},\"pricing_config\":{\"version\":\"1.0\",\"currency\":\"USD\",\"rounding\":\"half_up\",\"decimal_places\":2,\"discount_rules\":[],\"tax_rules\":[]}}");
-        assert!(out.contains("\"reason_code\":\"currency_mismatch\""), "expected currency_mismatch in {out}");
+        assert!(
+            out.contains("\"reason_code\":\"currency_mismatch\""),
+            "expected currency_mismatch in {out}"
+        );
     }
 
     #[test]
     fn use_case_08_sad() {
         let out = run("{\"currency\":\"USD\",\"lines\":[],\"customer\":{\"id\":\"cust-1\"},\"context\":{},\"pricing_config\":{\"version\":\"1.0\",\"currency\":\"USD\",\"rounding\":\"half_up\",\"decimal_places\":2,\"discount_rules\":[],\"tax_rules\":[]}}");
-        assert!(out.contains("\"reason_code\":\"empty_cart\""), "expected empty_cart in {out}");
+        assert!(
+            out.contains("\"reason_code\":\"empty_cart\""),
+            "expected empty_cart in {out}"
+        );
     }
 
+    #[test]
+    fn missing_pricing_config_yields_invalid_config() {
+        let out = run("{\"currency\":\"USD\",\"lines\":[{\"id\":\"line-1\",\"sku\":\"SKU-100\",\"quantity\":1,\"unit_price\":50.0}]}");
+        assert!(
+            out.contains("\"reason_code\":\"invalid_config\""),
+            "expected invalid_config in {out}"
+        );
+    }
+
+    #[test]
+    fn missing_quantity_field_yields_invalid_quantity() {
+        let out = run("{\"currency\":\"USD\",\"lines\":[{\"id\":\"line-1\",\"sku\":\"SKU-100\",\"unit_price\":50.0}],\"pricing_config\":{\"currency\":\"USD\",\"discount_rules\":[],\"tax_rules\":[]}}");
+        assert!(
+            out.contains("\"reason_code\":\"invalid_quantity\""),
+            "expected invalid_quantity in {out}"
+        );
+        assert!(out.contains("quantity missing"));
+    }
+
+    #[test]
+    fn discount_not_matching_sku_is_skipped() {
+        let out = run("{\"currency\":\"USD\",\"lines\":[{\"id\":\"line-1\",\"sku\":\"SKU-200\",\"quantity\":1,\"unit_price\":50.0}],\"pricing_config\":{\"currency\":\"USD\",\"discount_rules\":[{\"id\":\"summer-10\",\"type\":\"percentage\",\"value\":10,\"applies_to\":[\"SKU-100\"]}],\"tax_rules\":[]}}");
+        assert!(out.contains("\"applied_discounts\":[]"));
+    }
+
+    #[test]
+    fn fixed_discount_is_capped_at_gross() {
+        let out = run("{\"currency\":\"USD\",\"lines\":[{\"id\":\"line-1\",\"sku\":\"SKU-1\",\"quantity\":1,\"unit_price\":5.0}],\"pricing_config\":{\"currency\":\"USD\",\"discount_rules\":[{\"id\":\"big-fixed\",\"type\":\"fixed\",\"value\":9999.0}],\"tax_rules\":[]}}");
+        assert!(out.contains("\"discount_amount\":5.00"));
+    }
+
+    #[test]
+    fn tax_code_mismatch_skips_rule_then_falls_through() {
+        let out = run("{\"currency\":\"USD\",\"lines\":[{\"id\":\"line-1\",\"sku\":\"SKU-1\",\"quantity\":1,\"unit_price\":100.0,\"tax_code\":\"OTHER\"}],\"pricing_config\":{\"currency\":\"USD\",\"discount_rules\":[],\"tax_rules\":[{\"id\":\"standard\",\"tax_code\":\"STANDARD\",\"rate\":0.08}]}}");
+        assert!(out.contains("\"applied_taxes\":[]"));
+    }
+
+    #[test]
+    fn tax_rule_with_unparseable_rate_is_skipped() {
+        let out = run("{\"currency\":\"USD\",\"lines\":[{\"id\":\"line-1\",\"sku\":\"SKU-1\",\"quantity\":1,\"unit_price\":100.0}],\"pricing_config\":{\"currency\":\"USD\",\"discount_rules\":[],\"tax_rules\":[{\"id\":\"bad\",\"rate\":\"oops\"},{\"id\":\"good\",\"rate\":0.05}]}}");
+        assert!(out.contains("\"rule_id\":\"good\""));
+    }
+
+    #[test]
+    fn inclusive_tax_rule_takes_the_inclusive_branch() {
+        let out = run("{\"currency\":\"USD\",\"lines\":[{\"id\":\"line-1\",\"sku\":\"SKU-1\",\"quantity\":1,\"unit_price\":100.0}],\"pricing_config\":{\"currency\":\"USD\",\"discount_rules\":[],\"tax_rules\":[{\"id\":\"vat\",\"rate\":0.2,\"inclusive\":true}]}}");
+        assert!(out.contains("\"reason_code\":\"ok\""));
+    }
+
+    #[test]
+    fn half_up_div_returns_zero_for_non_positive_denominator() {
+        assert_eq!(half_up_div(100, 0), 0);
+        assert_eq!(half_up_div(100, -5), 0);
+    }
+
+    #[test]
+    fn parse_scaled_stops_at_second_dot() {
+        assert_eq!(parse_money_cents(b"1.2.3"), Some(120));
+    }
+
+    #[test]
+    fn parse_int_and_starts_with_minus_handle_negative() {
+        assert_eq!(parse_int(b"-42"), Some(-42));
+        assert!(starts_with_minus(b"-1"));
+        assert!(!starts_with_minus(b"1"));
+    }
+
+    #[test]
+    fn array_contains_string_handles_non_array_and_non_quote_element() {
+        assert!(!array_contains_string(b"not-array", b"x"));
+        assert!(!array_contains_string(b"[1,2]", b"x"));
+        assert!(array_contains_string(br#"["a","b"]"#, b"b"));
+    }
+
+    #[test]
+    fn array_after_key_and_depth_variants_handle_missing_and_wrong_type() {
+        assert_eq!(array_after_key(b"{}", b"\"missing\""), None);
+        assert_eq!(array_after_key(br#""k":5"#, b"\"k\""), None);
+        assert_eq!(array_after_key_at_depth(b"{}", b"\"missing\"", 1), None);
+        assert_eq!(object_after_key_at_depth(b"{}", b"\"missing\""), None);
+    }
+
+    #[test]
+    fn balanced_end_returns_none_when_unterminated() {
+        assert_eq!(balanced_end(b"{\"a\":\"b\"", b'{', b'}'), None);
+    }
+
+    #[test]
+    fn string_value_after_handles_missing_colon_quote_and_terminator() {
+        assert_eq!(string_value_after(b"no colon"), b"");
+        assert_eq!(string_value_after(b":not-a-quote"), b"");
+        assert_eq!(string_value_after(b":\"unterminated"), b"");
+    }
+
+    #[test]
+    fn extract_bool_handles_false_and_neither() {
+        assert_eq!(extract_bool(b"\"k\":false", b"\"k\""), Some(false));
+        assert_eq!(extract_bool(b"\"k\":maybe", b"\"k\""), None);
+    }
 }
