@@ -92,7 +92,6 @@ pub unsafe fn evaluate(input: &[u8], out: &mut [u8]) -> usize {
     let respect_quiet = extract_bool(config, b"\"respect_quiet_hours\"").unwrap_or(true);
     let escalate_after = extract_i32(config, b"\"escalate_after_nudges\"").unwrap_or(3);
     let min_pressure = extract_number_scaled(config, b"\"min_pressure_for_soft\"").unwrap_or(400);
-    let soft_days = extract_i32(config, b"\"soft_days_before_due\"").unwrap_or(2);
 
     let ref_date = &ref_dt[..ref_dt.len().min(10)];
 
@@ -132,7 +131,6 @@ pub unsafe fn evaluate(input: &[u8], out: &mut [u8]) -> usize {
         let snoozed = extract_optional_string(item, b"\"snoozed_until\"");
         let nudge_count = extract_i32(item, b"\"nudge_count\"").unwrap_or(0);
         let pressure = extract_number_scaled(item, b"\"pressure_score\"").unwrap_or(0);
-        let last_activity = extract_string(item, b"\"last_activity_at\"");
 
         if !snoozed.is_empty() && snoozed > ref_dt {
             push_skipped(
@@ -172,8 +170,7 @@ pub unsafe fn evaluate(input: &[u8], out: &mut [u8]) -> usize {
         }
 
         let max_nudges = user_pref_i32(prefs, owner, b"\"max_nudges_per_day\"").unwrap_or(2);
-        let sent_today =
-            user_pref_i32(prefs, owner, b"\"nudges_sent_today\"").unwrap_or(0);
+        let sent_today = user_pref_i32(prefs, owner, b"\"nudges_sent_today\"").unwrap_or(0);
         if sent_today >= max_nudges {
             push_skipped(
                 &mut skipped,
@@ -223,38 +220,17 @@ pub unsafe fn evaluate(input: &[u8], out: &mut [u8]) -> usize {
             return;
         }
 
-        if approaching_due(due, ref_date, soft_days) || pressure >= min_pressure {
-            push_selected(
-                &mut selected,
-                &mut sel_count,
-                item_id,
-                b"soft",
-                b"approaching due date or sufficient pressure",
-                b"",
-            );
-            return;
-        }
-
-        if !last_activity.is_empty() {
-            let act_date = &last_activity[..last_activity.len().min(10)];
-            if act_date >= ref_date {
-                push_skipped(
-                    &mut skipped,
-                    &mut skip_count,
-                    item_id,
-                    b"recently_active",
-                    b"owner recently active on item",
-                );
-                return;
-            }
-        }
-
-        push_skipped(
-            &mut skipped,
-            &mut skip_count,
+        // `pressure < min_pressure` already returned above, so the
+        // `pressure >= min_pressure` disjunct always holds here: every
+        // remaining item is a "soft" selection, never a
+        // last_activity/no-signal skip.
+        push_selected(
+            &mut selected,
+            &mut sel_count,
             item_id,
-            b"low_pressure",
-            b"no follow-up signal",
+            b"soft",
+            b"approaching due date or sufficient pressure",
+            b"",
         );
     });
 
@@ -275,15 +251,15 @@ pub unsafe fn evaluate(input: &[u8], out: &mut [u8]) -> usize {
     }
     t = copy(&mut trace, t, b"]");
 
-    write_output(out, &selected[..sel_count], &skipped[..skip_count], &trace[..t])
+    write_output(
+        out,
+        &selected[..sel_count],
+        &skipped[..skip_count],
+        &trace[..t],
+    )
 }
 
-fn write_output(
-    out: &mut [u8],
-    selected: &[Selected],
-    skipped: &[Skipped],
-    trace: &[u8],
-) -> usize {
+fn write_output(out: &mut [u8], selected: &[Selected], skipped: &[Skipped], trace: &[u8]) -> usize {
     let mut i = 0usize;
     i = copy(out, i, b"{\"selected\":[");
     for (idx, s) in selected.iter().enumerate() {
@@ -323,7 +299,11 @@ fn write_output(
 
 fn fail(out: &mut [u8], code: &[u8], trace: &[u8]) -> usize {
     let mut i = 0usize;
-    i = copy(out, i, b"{\"selected\":[],\"skipped\":[],\"reason_code\":\"");
+    i = copy(
+        out,
+        i,
+        b"{\"selected\":[],\"skipped\":[],\"reason_code\":\"",
+    );
     i = copy(out, i, code);
     i = copy(out, i, b"\",\"evaluation_trace\":");
     i = copy(out, i, trace);
@@ -480,63 +460,6 @@ fn parse_two_digit_hour(s: &[u8]) -> i32 {
     i32::from(h0 - b'0') * 10 + i32::from(h1 - b'0')
 }
 
-fn approaching_due(due: &[u8], ref_date: &[u8], soft_days: i32) -> bool {
-    if due.is_empty() || ref_date.is_empty() {
-        return false;
-    }
-    if due == ref_date {
-        return true;
-    }
-    if due > ref_date {
-        return days_between(ref_date, due) <= soft_days;
-    }
-    false
-}
-
-fn days_between(from: &[u8], to: &[u8]) -> i32 {
-    if from.len() < 10 || to.len() < 10 {
-        return 999;
-    }
-    let fy = parse_year(from);
-    let fm = parse_month(from);
-    let fd = parse_day(from);
-    let ty = parse_year(to);
-    let tm = parse_month(to);
-    let td = parse_day(to);
-    let from_days = fy * 372 + fm * 31 + fd;
-    let to_days = ty * 372 + tm * 31 + td;
-    to_days - from_days
-}
-
-fn parse_year(d: &[u8]) -> i32 {
-    parse_digits(&d[..4.min(d.len())])
-}
-
-fn parse_month(d: &[u8]) -> i32 {
-    if d.len() < 7 {
-        return 0;
-    }
-    parse_digits(&d[5..7])
-}
-
-fn parse_day(d: &[u8]) -> i32 {
-    if d.len() < 10 {
-        return 0;
-    }
-    parse_digits(&d[8..10])
-}
-
-fn parse_digits(s: &[u8]) -> i32 {
-    let mut val = 0i32;
-    for &b in s {
-        if b < b'0' || b > b'9' {
-            break;
-        }
-        val = val.saturating_mul(10).saturating_add(i32::from(b - b'0'));
-    }
-    val
-}
-
 fn write_usize(out: &mut [u8], at: usize, n: usize) -> usize {
     if n == 0 {
         return copy(out, at, b"0");
@@ -612,9 +535,7 @@ fn extract_number_scaled(hay: &[u8], key: &[u8]) -> Option<i32> {
                 frac_digits += 1;
             }
         } else {
-            whole = whole
-                .saturating_mul(10)
-                .saturating_add(i32::from(b - b'0'));
+            whole = whole.saturating_mul(10).saturating_add(i32::from(b - b'0'));
         }
     }
     if !any {
@@ -845,19 +766,245 @@ mod catalog_coverage_tests {
     #[test]
     fn use_case_01_happy() {
         let out = run("{\"open_items\":[{\"id\":\"ai-1\",\"owner_id\":\"user-ada\",\"due_date\":\"2026-08-08\",\"status\":\"open\",\"last_activity_at\":\"2026-08-05T10:00:00Z\",\"nudge_count\":0,\"pressure_score\":0.85,\"snoozed_until\":null}],\"user_preferences\":{\"user-ada\":{\"quiet_hours\":{\"start\":\"20:00\",\"end\":\"08:00\",\"timezone\":\"America/Los_Angeles\"},\"max_nudges_per_day\":2,\"nudges_sent_today\":0}},\"reference_datetime\":\"2026-08-07T22:30:00Z\",\"followup_config\":{\"version\":\"1.1\",\"soft_days_before_due\":2,\"direct_days_overdue\":1,\"escalate_after_nudges\":3,\"min_pressure_for_soft\":0.4,\"respect_quiet_hours\":true}}");
-        assert!(out.contains("\"reason_code\":\"ok\""), "expected ok in {out}");
+        assert!(
+            out.contains("\"reason_code\":\"ok\""),
+            "expected ok in {out}"
+        );
     }
 
     #[test]
     fn use_case_02_happy() {
         let out = run("{\"open_items\":[{\"id\":\"ai-9\",\"owner_id\":\"user-bob\",\"due_date\":\"2026-08-01\",\"status\":\"open\",\"last_activity_at\":\"2026-07-28T09:00:00Z\",\"nudge_count\":3,\"pressure_score\":0.95,\"snoozed_until\":null}],\"user_preferences\":{\"user-bob\":{\"quiet_hours\":null,\"max_nudges_per_day\":3,\"nudges_sent_today\":0}},\"reference_datetime\":\"2026-08-07T10:00:00Z\",\"followup_config\":{\"version\":\"1.1\",\"soft_days_before_due\":2,\"direct_days_overdue\":1,\"escalate_after_nudges\":3,\"min_pressure_for_soft\":0.4,\"respect_quiet_hours\":true}}");
-        assert!(out.contains("\"reason_code\":\"ok\""), "expected ok in {out}");
+        assert!(
+            out.contains("\"reason_code\":\"ok\""),
+            "expected ok in {out}"
+        );
     }
 
     #[test]
     fn use_case_03_sad() {
         let out = run("{\"open_items\":[],\"user_preferences\":{},\"reference_datetime\":\"\",\"followup_config\":{\"version\":\"1.1\",\"soft_days_before_due\":2,\"direct_days_overdue\":1,\"escalate_after_nudges\":3,\"min_pressure_for_soft\":0.4,\"respect_quiet_hours\":true}}");
-        assert!(out.contains("\"reason_code\":\"config_error\""), "expected config_error in {out}");
+        assert!(
+            out.contains("\"reason_code\":\"config_error\""),
+            "expected config_error in {out}"
+        );
     }
 
+    #[test]
+    fn missing_open_items_yields_config_error() {
+        let out = run("{\"user_preferences\":{},\"reference_datetime\":\"2026-08-07T10:00:00Z\",\"followup_config\":{\"version\":\"1.1\"}}");
+        assert!(
+            out.contains("\"reason_code\":\"config_error\""),
+            "expected config_error in {out}"
+        );
+        assert!(
+            out.contains("open_items missing"),
+            "expected reason detail in {out}"
+        );
+    }
+
+    #[test]
+    fn snoozed_item_is_skipped() {
+        let out = run("{\"open_items\":[{\"id\":\"ai-1\",\"owner_id\":\"user-ada\",\"due_date\":\"2026-08-01\",\"nudge_count\":0,\"pressure_score\":0.9,\"snoozed_until\":\"2099-01-01T00:00:00Z\"}],\"user_preferences\":{},\"reference_datetime\":\"2026-08-07T10:00:00Z\",\"followup_config\":{\"respect_quiet_hours\":false,\"min_pressure_for_soft\":0.4}}");
+        assert!(
+            out.contains("\"reason\":\"snoozed\""),
+            "expected snoozed skip in {out}"
+        );
+    }
+
+    #[test]
+    fn quiet_hours_wrap_around_midnight_skips_item() {
+        let out = run("{\"open_items\":[{\"id\":\"ai-1\",\"owner_id\":\"user-ada\",\"due_date\":\"2026-08-01\",\"nudge_count\":0,\"pressure_score\":0.9,\"snoozed_until\":null}],\"user_preferences\":{\"user-ada\":{\"quiet_hours\":{\"start\":\"22:00\",\"end\":\"06:00\"},\"max_nudges_per_day\":2,\"nudges_sent_today\":0}},\"reference_datetime\":\"2026-08-07T23:00:00Z\",\"followup_config\":{\"respect_quiet_hours\":true,\"min_pressure_for_soft\":0.4}}");
+        assert!(
+            out.contains("\"reason\":\"quiet_hours\""),
+            "expected quiet_hours skip in {out}"
+        );
+    }
+
+    #[test]
+    fn quiet_hours_same_day_but_outside_window_proceeds() {
+        let out = run("{\"open_items\":[{\"id\":\"ai-1\",\"owner_id\":\"user-ada\",\"due_date\":\"2026-08-01\",\"nudge_count\":0,\"pressure_score\":0.9,\"snoozed_until\":null}],\"user_preferences\":{\"user-ada\":{\"quiet_hours\":{\"start\":\"20:00\",\"end\":\"22:00\"},\"max_nudges_per_day\":2,\"nudges_sent_today\":0}},\"reference_datetime\":\"2026-08-07T10:00:00Z\",\"followup_config\":{\"respect_quiet_hours\":true,\"min_pressure_for_soft\":0.4}}");
+        assert!(
+            !out.contains("\"reason\":\"quiet_hours\""),
+            "expected item not skipped for quiet hours in {out}"
+        );
+    }
+
+    #[test]
+    fn owner_without_preferences_skips_quiet_hours_check() {
+        let out = run("{\"open_items\":[{\"id\":\"ai-1\",\"owner_id\":\"user-nobody\",\"due_date\":\"2026-08-01\",\"nudge_count\":0,\"pressure_score\":0.9,\"snoozed_until\":null}],\"user_preferences\":{},\"reference_datetime\":\"2026-08-07T10:00:00Z\",\"followup_config\":{\"respect_quiet_hours\":true,\"min_pressure_for_soft\":0.4}}");
+        assert!(
+            out.contains("\"reason_code\":\"ok\""),
+            "expected evaluation to proceed in {out}"
+        );
+    }
+
+    #[test]
+    fn budget_exceeded_is_skipped() {
+        let out = run("{\"open_items\":[{\"id\":\"ai-1\",\"owner_id\":\"user-ada\",\"due_date\":\"2026-08-01\",\"nudge_count\":0,\"pressure_score\":0.9,\"snoozed_until\":null}],\"user_preferences\":{\"user-ada\":{\"max_nudges_per_day\":1,\"nudges_sent_today\":2}},\"reference_datetime\":\"2026-08-07T10:00:00Z\",\"followup_config\":{\"respect_quiet_hours\":false,\"min_pressure_for_soft\":0.4}}");
+        assert!(
+            out.contains("\"reason\":\"budget_exceeded\""),
+            "expected budget_exceeded skip in {out}"
+        );
+    }
+
+    #[test]
+    fn low_pressure_is_skipped() {
+        let out = run("{\"open_items\":[{\"id\":\"ai-1\",\"owner_id\":\"user-ada\",\"due_date\":\"2026-08-01\",\"nudge_count\":0,\"pressure_score\":0.1,\"snoozed_until\":null}],\"user_preferences\":{},\"reference_datetime\":\"2026-08-07T10:00:00Z\",\"followup_config\":{\"respect_quiet_hours\":false,\"min_pressure_for_soft\":0.4}}");
+        assert!(
+            out.contains("\"reason\":\"low_pressure\""),
+            "expected low_pressure skip in {out}"
+        );
+    }
+
+    #[test]
+    fn overdue_with_enough_nudges_escalates() {
+        let out = run("{\"open_items\":[{\"id\":\"ai-1\",\"owner_id\":\"user-ada\",\"due_date\":\"2026-08-01\",\"nudge_count\":5,\"pressure_score\":0.9,\"snoozed_until\":null}],\"user_preferences\":{},\"reference_datetime\":\"2026-08-07T10:00:00Z\",\"followup_config\":{\"respect_quiet_hours\":false,\"min_pressure_for_soft\":0.4,\"escalate_after_nudges\":3}}");
+        assert!(
+            out.contains("\"intensity\":\"escalate\""),
+            "expected escalate selection in {out}"
+        );
+        assert!(out.contains("\"recommended_channel\":\"manager\""));
+    }
+
+    #[test]
+    fn overdue_without_enough_nudges_is_direct() {
+        let out = run("{\"open_items\":[{\"id\":\"ai-1\",\"owner_id\":\"user-ada\",\"due_date\":\"2026-08-01\",\"nudge_count\":0,\"pressure_score\":0.9,\"snoozed_until\":null}],\"user_preferences\":{},\"reference_datetime\":\"2026-08-07T10:00:00Z\",\"followup_config\":{\"respect_quiet_hours\":false,\"min_pressure_for_soft\":0.4,\"escalate_after_nudges\":3}}");
+        assert!(
+            out.contains("\"intensity\":\"direct\""),
+            "expected direct selection in {out}"
+        );
+    }
+
+    #[test]
+    fn due_today_is_soft_selection() {
+        let out = run("{\"open_items\":[{\"id\":\"ai-1\",\"owner_id\":\"user-ada\",\"due_date\":\"2026-08-07\",\"nudge_count\":0,\"pressure_score\":0.9,\"snoozed_until\":null}],\"user_preferences\":{},\"reference_datetime\":\"2026-08-07T10:00:00Z\",\"followup_config\":{\"respect_quiet_hours\":false,\"min_pressure_for_soft\":0.4}}");
+        assert!(
+            out.contains("\"intensity\":\"soft\""),
+            "expected soft selection in {out}"
+        );
+    }
+
+    #[test]
+    fn max_items_cutoff_stops_after_limit() {
+        let mut items = String::new();
+        for n in 0..20 {
+            if n > 0 {
+                items.push(',');
+            }
+            items.push_str(&format!(
+                "{{\"id\":\"ai-{n}\",\"owner_id\":\"user-ada\",\"due_date\":\"2026-08-01\",\"nudge_count\":0,\"pressure_score\":0.9,\"snoozed_until\":null}}"
+            ));
+        }
+        let input = format!(
+            "{{\"open_items\":[{items}],\"user_preferences\":{{}},\"reference_datetime\":\"2026-08-07T10:00:00Z\",\"followup_config\":{{\"respect_quiet_hours\":false,\"min_pressure_for_soft\":0.4}}}}"
+        );
+        let out = run(&input);
+        assert!(
+            out.contains("16 item evaluateds"),
+            "expected the 16-item cap in {out}"
+        );
+    }
+
+    #[test]
+    fn non_object_item_element_stops_scanning() {
+        let out = run("{\"open_items\":[{\"id\":\"ai-1\",\"owner_id\":\"user-ada\",\"due_date\":\"2026-08-01\",\"nudge_count\":0,\"pressure_score\":0.9,\"snoozed_until\":null},42],\"user_preferences\":{},\"reference_datetime\":\"2026-08-07T10:00:00Z\",\"followup_config\":{\"respect_quiet_hours\":false,\"min_pressure_for_soft\":0.4}}");
+        assert!(
+            out.contains("1 item evaluated"),
+            "expected scanning to stop at the non-object element in {out}"
+        );
+    }
+
+    #[test]
+    fn empty_open_items_array_evaluates_to_zero_items() {
+        let out = run("{\"open_items\":[],\"user_preferences\":{},\"reference_datetime\":\"2026-08-07T10:00:00Z\",\"followup_config\":{\"respect_quiet_hours\":false}}");
+        assert!(
+            out.contains("0 item evaluateds"),
+            "expected zero items in {out}"
+        );
+    }
+
+    #[test]
+    fn parse_two_digit_hour_rejects_non_digits() {
+        assert_eq!(parse_two_digit_hour(b"ab"), 0);
+        assert_eq!(parse_two_digit_hour(b"9"), 0);
+        assert_eq!(parse_two_digit_hour(b"23"), 23);
+    }
+
+    #[test]
+    fn parse_ref_hour_defaults_when_no_t_separator() {
+        assert_eq!(parse_ref_hour(b"2026-08-07"), 0);
+    }
+
+    #[test]
+    fn extract_number_scaled_handles_negative_and_missing() {
+        assert_eq!(extract_number_scaled(b"\"k\":-1.5", b"\"k\""), Some(-1500));
+        assert_eq!(extract_number_scaled(b"\"k\":oops", b"\"k\""), None);
+        assert_eq!(extract_number_scaled(b"{}", b"\"missing\""), None);
+    }
+
+    #[test]
+    fn extract_i32_handles_negative_and_missing() {
+        assert_eq!(extract_i32(b"\"k\":-7", b"\"k\""), Some(-7));
+        assert_eq!(extract_i32(b"\"k\":oops", b"\"k\""), None);
+        assert_eq!(extract_i32(b"{}", b"\"missing\""), None);
+    }
+
+    #[test]
+    fn extract_bool_handles_false_and_neither() {
+        assert_eq!(extract_bool(b"\"k\":false", b"\"k\""), Some(false));
+        assert_eq!(extract_bool(b"\"k\":maybe", b"\"k\""), None);
+    }
+
+    #[test]
+    fn extract_optional_string_handles_missing_null_and_malformed() {
+        assert_eq!(extract_optional_string(b"{}", b"\"k\""), b"");
+        assert_eq!(extract_optional_string(b"\"k\"no-colon", b"\"k\""), b"");
+        assert_eq!(extract_optional_string(b"\"k\":null", b"\"k\""), b"");
+        assert_eq!(extract_optional_string(b"\"k\":5", b"\"k\""), b"");
+        assert_eq!(
+            extract_optional_string(b"\"k\":\"unterminated", b"\"k\""),
+            b""
+        );
+        assert_eq!(extract_optional_string(b"\"k\":\"ok\"", b"\"k\""), b"ok");
+    }
+
+    #[test]
+    fn object_after_key_handles_missing_and_non_object() {
+        assert_eq!(object_after_key(b"{}", b"\"missing\""), None);
+        assert_eq!(object_after_key(b"\"k\":5", b"\"k\""), None);
+    }
+
+    #[test]
+    fn array_after_key_at_depth_handles_non_array() {
+        assert_eq!(array_after_key_at_depth(b"\"k\":5", b"\"k\"", 0), None);
+    }
+
+    #[test]
+    fn user_pref_object_handles_empty_prefs_and_owner() {
+        assert_eq!(user_pref_object(b"", b"user-a"), None);
+        assert_eq!(user_pref_object(b"{}", b""), None);
+    }
+
+    #[test]
+    fn string_value_after_handles_missing_colon_quote_and_terminator() {
+        assert_eq!(string_value_after(b"no colon here"), b"");
+        assert_eq!(string_value_after(b":not-a-quote"), b"");
+        assert_eq!(string_value_after(b":\"unterminated"), b"");
+    }
+
+    #[test]
+    fn balanced_end_returns_none_when_unterminated() {
+        assert_eq!(balanced_end(b"{\"a\":\"b\"", b'{', b'}'), None);
+    }
+
+    #[test]
+    fn write_usize_handles_zero_and_multiple_digits() {
+        let mut buf = [0u8; 8];
+        let n = write_usize(&mut buf, 0, 0);
+        assert_eq!(&buf[..n], b"0");
+        let mut buf2 = [0u8; 8];
+        let n2 = write_usize(&mut buf2, 0, 123);
+        assert_eq!(&buf2[..n2], b"123");
+    }
 }
