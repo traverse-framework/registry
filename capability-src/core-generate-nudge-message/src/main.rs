@@ -60,7 +60,11 @@ pub unsafe fn evaluate(input: &[u8], out: &mut [u8]) -> usize {
         return fail(out, b"config_error", br#"["missing required fields"]"#);
     }
     if !matches!(intensity, b"soft" | b"direct" | b"escalate") {
-        return fail(out, b"invalid_intensity", br#"["intensity must be soft|direct|escalate"]"#);
+        return fail(
+            out,
+            b"invalid_intensity",
+            br#"["intensity must be soft|direct|escalate"]"#,
+        );
     }
     let tone = extract_string(config, b"\"tone\"");
     let tone = if tone.is_empty() { b"friendly" } else { tone };
@@ -130,7 +134,11 @@ pub unsafe fn evaluate(input: &[u8], out: &mut [u8]) -> usize {
     i = copy_json_escaped(out, i, &msg[..m]);
     i = copy(out, i, b"\",\"preview\":\"");
     i = copy_json_escaped(out, i, &prev[..p]);
-    i = copy(out, i, b"\",\"reason_code\":\"ok\",\"evaluation_trace\":[\"intensity=");
+    i = copy(
+        out,
+        i,
+        b"\",\"reason_code\":\"ok\",\"evaluation_trace\":[\"intensity=",
+    );
     i = copy(out, i, intensity);
     i = copy(out, i, b"\",\"tone=");
     i = copy(out, i, tone);
@@ -140,7 +148,11 @@ pub unsafe fn evaluate(input: &[u8], out: &mut [u8]) -> usize {
 
 fn fail(out: &mut [u8], code: &[u8], trace: &[u8]) -> usize {
     let mut i = 0usize;
-    i = copy(out, i, b"{\"message\":\"\",\"preview\":\"\",\"reason_code\":\"");
+    i = copy(
+        out,
+        i,
+        b"{\"message\":\"\",\"preview\":\"\",\"reason_code\":\"",
+    );
     i = copy(out, i, code);
     i = copy(out, i, b"\",\"evaluation_trace\":");
     i = copy(out, i, trace);
@@ -332,25 +344,107 @@ mod catalog_coverage_tests {
     #[test]
     fn use_case_01_happy() {
         let out = run("{\"item\":{\"id\":\"ai-1\",\"title\":\"Send the revised proposal\",\"owner_name\":\"Ada\",\"due_date\":\"2026-08-09\",\"status\":\"open\",\"nudge_count\":0},\"intensity\":\"soft\",\"message_config\":{\"version\":\"1.0\",\"tone\":\"friendly\",\"include_due_date\":true,\"language\":\"en\"}}");
-        assert!(out.contains("\"reason_code\":\"ok\""), "expected ok in {out}");
+        assert!(
+            out.contains("\"reason_code\":\"ok\""),
+            "expected ok in {out}"
+        );
     }
 
     #[test]
     fn use_case_02_happy() {
         let out = run("{\"item\":{\"id\":\"ai-9\",\"title\":\"Close security review\",\"owner_name\":\"Bob\",\"due_date\":\"2026-08-01\",\"status\":\"open\",\"nudge_count\":3},\"intensity\":\"escalate\",\"message_config\":{\"version\":\"1.0\",\"tone\":\"direct\",\"include_due_date\":true,\"language\":\"en\"}}");
-        assert!(out.contains("\"reason_code\":\"ok\""), "expected ok in {out}");
+        assert!(
+            out.contains("\"reason_code\":\"ok\""),
+            "expected ok in {out}"
+        );
     }
 
     #[test]
     fn use_case_03_happy() {
         let out = run("{\"item\":{\"id\":\"ai-2\",\"title\":\"Ship docs\",\"owner_name\":\"Ada\",\"due_date\":\"2026-08-12\",\"status\":\"open\",\"nudge_count\":1},\"intensity\":\"direct\",\"message_config\":{\"version\":\"1.0\",\"tone\":\"neutral\",\"include_due_date\":true,\"language\":\"en\"}}");
-        assert!(out.contains("\"reason_code\":\"ok\""), "expected ok in {out}");
+        assert!(
+            out.contains("\"reason_code\":\"ok\""),
+            "expected ok in {out}"
+        );
     }
 
     #[test]
     fn use_case_04_sad() {
         let out = run("{\"item\":{\"id\":\"ai-x\",\"title\":\"\",\"owner_name\":\"Ada\",\"due_date\":\"2026-08-09\",\"status\":\"open\",\"nudge_count\":0},\"intensity\":\"soft\",\"message_config\":{\"version\":\"1.0\",\"tone\":\"friendly\",\"include_due_date\":true,\"language\":\"en\"}}");
-        assert!(out.contains("\"reason_code\":\"config_error\""), "expected config_error in {out}");
+        assert!(
+            out.contains("\"reason_code\":\"config_error\""),
+            "expected config_error in {out}"
+        );
     }
 
+    #[test]
+    fn missing_top_level_fields_yields_config_error() {
+        let out = run("{}");
+        assert!(
+            out.contains("\"reason_code\":\"config_error\""),
+            "expected config_error in {out}"
+        );
+    }
+
+    #[test]
+    fn invalid_intensity_is_rejected() {
+        let out =
+            run("{\"item\":{\"title\":\"T\"},\"intensity\":\"urgent\",\"message_config\":{}}");
+        assert!(
+            out.contains("\"reason_code\":\"invalid_intensity\""),
+            "expected invalid_intensity in {out}"
+        );
+    }
+
+    #[test]
+    fn soft_message_without_owner_or_due_date_uses_defaults() {
+        let out = run("{\"item\":{\"title\":\"Ship docs\"},\"intensity\":\"soft\",\"message_config\":{\"include_due_date\":false}}");
+        assert!(out.contains("Hey there"));
+        assert!(!out.contains(" is due "));
+    }
+
+    #[test]
+    fn direct_message_without_owner_or_due_date_omits_prefix_and_date() {
+        let out = run("{\"item\":{\"title\":\"Ship docs\"},\"intensity\":\"direct\",\"message_config\":{\"include_due_date\":false}}");
+        assert!(out.contains("Please complete"));
+        assert!(!out.contains(" by "));
+    }
+
+    #[test]
+    fn escalate_message_without_owner_or_due_date_omits_both() {
+        let out = run("{\"item\":{\"title\":\"Ship docs\"},\"intensity\":\"escalate\",\"message_config\":{\"include_due_date\":false}}");
+        assert!(out.contains("Escalation"));
+        assert!(!out.contains(" from "));
+        assert!(!out.contains(" (due "));
+    }
+
+    #[test]
+    fn tone_defaults_to_friendly_when_missing() {
+        let out = run("{\"item\":{\"title\":\"T\"},\"intensity\":\"soft\",\"message_config\":{}}");
+        assert!(out.contains("\"tone=friendly\""));
+    }
+
+    #[test]
+    fn object_after_key_handles_missing_and_non_object() {
+        assert_eq!(object_after_key(b"{}", b"\"missing\""), None);
+        assert_eq!(object_after_key(br#"{"k":5}"#, b"\"k\""), None);
+    }
+
+    #[test]
+    fn balanced_end_returns_none_when_unterminated() {
+        assert_eq!(balanced_end(b"{\"a\":\"b\"", b'{', b'}'), None);
+    }
+
+    #[test]
+    fn string_value_after_handles_missing_colon_quote_and_terminator() {
+        assert_eq!(string_value_after(b"no colon"), b"");
+        assert_eq!(string_value_after(b":not-a-quote"), b"");
+        assert_eq!(string_value_after(b":\"unterminated"), b"");
+    }
+
+    #[test]
+    fn extract_bool_handles_false_and_neither() {
+        assert_eq!(extract_bool(b"\"k\":false", b"\"k\""), Some(false));
+        assert_eq!(extract_bool(b"\"k\":maybe", b"\"k\""), None);
+    }
 }
