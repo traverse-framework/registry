@@ -116,7 +116,8 @@ pub unsafe fn extract(input: &[u8], out: &mut [u8]) -> usize {
             continue;
         }
 
-        if let Some(pidx) = match_action_participant(sent.body, &participants[..participant_count]) {
+        if let Some(pidx) = match_action_participant(sent.body, &participants[..participant_count])
+        {
             let p = &participants[pidx];
             let will = contains(sent.body, b" will ");
             let to_pat = contains(sent.body, b" to ");
@@ -727,13 +728,153 @@ mod catalog_coverage_tests {
     #[test]
     fn use_case_01_happy() {
         let out = run("{\"text\":\"Ada will send the revised proposal by Friday. We should probably look at the API at some point. Bob to review security notes next week.\",\"participants\":[\"Ada Lovelace\",\"Bob Smith\"],\"meeting_date\":\"2026-08-07\",\"extraction_config\":{\"version\":\"1.1\",\"min_confidence\":0.75,\"review_threshold\":0.55,\"date_parsing\":\"relative_and_absolute\",\"owner_strategy\":\"name_match_first\",\"reject_vague\":true}}");
-        assert!(out.contains("\"reason_code\":\"ok\""), "expected ok in {out}");
+        assert!(
+            out.contains("\"reason_code\":\"ok\""),
+            "expected ok in {out}"
+        );
     }
 
     #[test]
     fn use_case_02_sad() {
         let out = run("{\"text\":\"We had a good discussion and aligned on the direction. No specific next steps today.\",\"participants\":[],\"meeting_date\":\"2026-08-07\",\"extraction_config\":{\"version\":\"1.1\",\"min_confidence\":0.75,\"review_threshold\":0.55,\"date_parsing\":\"relative_and_absolute\",\"owner_strategy\":\"name_match_first\",\"reject_vague\":true}}");
-        assert!(out.contains("\"reason_code\":\"no_action_items_found\""), "expected no_action_items_found in {out}");
+        assert!(
+            out.contains("\"reason_code\":\"no_action_items_found\""),
+            "expected no_action_items_found in {out}"
+        );
     }
 
+    #[test]
+    fn missing_text_yields_no_action_items_found() {
+        let out =
+            run("{\"participants\":[],\"meeting_date\":\"2026-08-07\",\"extraction_config\":{}}");
+        assert!(
+            out.contains("\"reason_code\":\"no_action_items_found\""),
+            "expected no_action_items_found in {out}"
+        );
+        assert!(out.contains("text missing"));
+    }
+
+    #[test]
+    fn empty_sentence_between_periods_is_skipped() {
+        let out = run("{\"text\":\"Ada will send the report.. Just some extra context.\",\"participants\":[\"Ada Lovelace\"],\"meeting_date\":\"2026-08-07\",\"extraction_config\":{}}");
+        assert!(out.contains("\"reason_code\":\"ok\""));
+    }
+
+    #[test]
+    fn capitalized_name_match_without_will_or_to_is_ignored() {
+        let out = run("{\"text\":\"Someone mentioned Ada during the call.\",\"participants\":[],\"meeting_date\":\"2026-08-07\",\"extraction_config\":{}}");
+        assert!(out.contains("\"reason_code\":\"no_action_items_found\""));
+    }
+
+    #[test]
+    fn below_review_threshold_confidence_is_dropped_entirely() {
+        let out = run("{\"text\":\"Ada to help sometime.\",\"participants\":[\"Ada Lovelace\"],\"meeting_date\":\"2026-08-07\",\"extraction_config\":{\"min_confidence\":0.99,\"review_threshold\":0.9}}");
+        assert!(
+            out.contains("\"reason_code\":\"no_action_items_found\""),
+            "expected everything dropped below review_threshold in {out}"
+        );
+    }
+
+    #[test]
+    fn below_min_confidence_but_above_review_threshold_moves_to_review() {
+        let out = run("{\"text\":\"Ada to help with review.\",\"participants\":[\"Ada Lovelace\"],\"meeting_date\":\"2026-08-07\",\"extraction_config\":{\"min_confidence\":0.99,\"review_threshold\":0.5}}");
+        assert!(
+            out.contains("\"reason_code\":\"ok\""),
+            "expected review candidate to still count as ok in {out}"
+        );
+        assert!(out.contains("below_min_confidence"));
+    }
+
+    #[test]
+    fn capitalized_name_start_with_will_matches_as_participant_zero() {
+        let out = run("{\"text\":\"Zoe will file the report.\",\"participants\":[],\"meeting_date\":\"2026-08-07\",\"extraction_config\":{}}");
+        assert!(out.contains("\"reason_code\":\"ok\""));
+    }
+
+    #[test]
+    fn multiple_action_items_and_multiple_review_items_are_comma_joined() {
+        let out = run("{\"text\":\"Ada will send the report. Bob will file the notes. We should probably revisit scope at some point. We should probably ping design at some point.\",\"participants\":[\"Ada Lovelace\",\"Bob Smith\"],\"meeting_date\":\"2026-08-07\",\"extraction_config\":{}}");
+        assert!(out.contains("\"reason_code\":\"ok\""));
+        assert!(out.matches("\"suggested_owner\"").count() >= 2);
+        assert!(out.matches("\"reason\":\"vague_language\"").count() >= 2);
+    }
+
+    #[test]
+    fn resolve_due_date_handles_next_week_and_non_matching_meeting_date() {
+        let out = run("{\"text\":\"Ada will follow up next week.\",\"participants\":[\"Ada Lovelace\"],\"meeting_date\":\"2026-08-07\",\"extraction_config\":{}}");
+        assert!(out.contains("2026-08-14"));
+
+        let out2 = run("{\"text\":\"Ada will follow up by Friday.\",\"participants\":[\"Ada Lovelace\"],\"meeting_date\":\"2099-01-01\",\"extraction_config\":{}}");
+        assert!(!out2.contains("suggested_due_date"));
+    }
+
+    #[test]
+    fn simplify_action_title_strips_first_name_will_and_suffix() {
+        let mut out = [0u8; 64];
+        let n = simplify_action_title(
+            b"Ada will send the report by Friday",
+            b"Ada",
+            true,
+            &mut out,
+        );
+        assert_eq!(&out[..n], b"Send the report");
+    }
+
+    #[test]
+    fn strip_prefix_and_suffix_phrase_no_match_returns_input() {
+        assert_eq!(strip_prefix_phrase(b"hello world", b"We "), b"hello world");
+        assert_eq!(
+            strip_suffix_phrase(b"hello world", b" next week"),
+            b"hello world"
+        );
+    }
+
+    #[test]
+    fn capitalize_first_handles_empty_and_already_uppercase() {
+        let mut out = [0u8; 8];
+        assert_eq!(capitalize_first(b"", &mut out), 0);
+        let n = capitalize_first(b"Already", &mut out);
+        assert_eq!(&out[..n], b"Already");
+    }
+
+    #[test]
+    fn parse_participants_handles_missing_array() {
+        let mut out: [Participant; MAX_PARTICIPANTS] = [Participant {
+            full: b"",
+            first: b"",
+        }; MAX_PARTICIPANTS];
+        assert_eq!(parse_participants(b"{}", &mut out), 0);
+    }
+
+    #[test]
+    fn object_after_key_and_array_after_key_handle_missing_and_wrong_type() {
+        assert_eq!(object_after_key(b"{}", b"\"missing\""), None);
+        assert_eq!(object_after_key(br#"{"k":5}"#, b"\"k\""), None);
+        assert_eq!(json_array_after_key(b"{}", b"\"missing\""), None);
+        assert_eq!(json_array_after_key(br#"{"k":5}"#, b"\"k\""), None);
+    }
+
+    #[test]
+    fn balanced_end_returns_none_when_unterminated() {
+        assert_eq!(balanced_end(b"{\"a\":\"b\"", b'{', b'}'), None);
+    }
+
+    #[test]
+    fn string_value_after_handles_missing_colon_quote_and_terminator() {
+        assert_eq!(string_value_after(b"no colon"), b"");
+        assert_eq!(string_value_after(b":not-a-quote"), b"");
+        assert_eq!(string_value_after(b":\"unterminated"), b"");
+    }
+
+    #[test]
+    fn extract_bool_handles_false_and_neither() {
+        assert_eq!(extract_bool(b"\"k\":false", b"\"k\""), Some(false));
+        assert_eq!(extract_bool(b"\"k\":maybe", b"\"k\""), None);
+    }
+
+    #[test]
+    fn parse_decimal_handles_no_digits() {
+        assert_eq!(parse_decimal(b"oops"), None);
+        assert_eq!(parse_decimal(b"3"), Some(3.0));
+    }
 }
