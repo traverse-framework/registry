@@ -127,17 +127,15 @@ pub unsafe fn process(input: &[u8], out: &mut [u8]) -> usize {
     }
 
     match action {
-        b"create" | b"edit" | b"reply" => {
-            process_body_action(
-                out,
-                action,
-                actor_id,
-                comment,
-                policy,
-                visibility_attr,
-                visibility_model,
-            )
-        }
+        b"create" | b"edit" | b"reply" => process_body_action(
+            out,
+            action,
+            actor_id,
+            comment,
+            policy,
+            visibility_attr,
+            visibility_model,
+        ),
         b"react" => process_react(out, actor_id, comment, policy),
         b"delete" => process_delete(out, actor_id, comment, policy),
         _ => deny(
@@ -309,7 +307,11 @@ fn process_react(out: &mut [u8], actor_id: &[u8], comment: &[u8], policy: &[u8])
     let mut i = 0usize;
     i = copy(out, i, br#"{"decision":"allow","reason":"Reaction "#);
     i = copy(out, i, if op == b"remove" { b"remove" } else { b"add" });
-    i = copy(out, i, br#" allowed","reason_code":"ok","normalized_comment":{"id":"#);
+    i = copy(
+        out,
+        i,
+        br#" allowed","reason_code":"ok","normalized_comment":{"id":"#,
+    );
     i = json_str(out, i, comment_id);
     i = copy(out, i, br#","action":"react","reactions":[{"emoji":"#);
     i = json_str(out, i, emoji);
@@ -334,7 +336,8 @@ fn process_delete(out: &mut [u8], actor_id: &[u8], comment: &[u8], policy: &[u8]
             policy,
         );
     }
-    let soft = contains(policy, b"\"soft_delete\":true") || contains(policy, b"\"soft_delete\": true");
+    let soft =
+        contains(policy, b"\"soft_delete\":true") || contains(policy, b"\"soft_delete\": true");
     if !soft {
         return deny(
             out,
@@ -357,7 +360,15 @@ fn process_delete(out: &mut [u8], actor_id: &[u8], comment: &[u8], policy: &[u8]
     i = copy(out, i, br#","deleted":true,"deleted_by":"#);
     i = json_str(out, i, actor_id);
     i = copy(out, i, br#","deleted_at":null,"created_by":"#);
-    i = json_str(out, i, if created_by.is_empty() { actor_id } else { created_by });
+    i = json_str(
+        out,
+        i,
+        if created_by.is_empty() {
+            actor_id
+        } else {
+            created_by
+        },
+    );
     i = copy(out, i, br#"},"obligations":[{"type":"audit_log","severity":"required","metadata":{"soft_delete":true}},{"type":"retain_for_ediscovery","severity":"required"}],"evaluation_trace":["action=delete","soft_delete=true in policy","actor is creator -> allow","body retained for audit"],"policy_hash":"#);
     i = write_policy_hash(out, i, policy);
     i = copy(out, i, br#","confidence":"high"}"#);
@@ -417,7 +428,11 @@ fn write_allow_normalized(
     }
     i = copy(out, i, br#"],"reactions":[],"visibility":"#);
     i = json_str(out, i, visibility);
-    i = copy(out, i, br#","resolved":false,"pinned":false,"deleted":false,"created_by":"#);
+    i = copy(
+        out,
+        i,
+        br#","resolved":false,"pinned":false,"deleted":false,"created_by":"#,
+    );
     i = json_str(out, i, actor_id);
     if quarantine {
         i = copy(out, i, br#","metadata":{"quarantine":true}}"#);
@@ -433,12 +448,20 @@ fn write_allow_normalized(
             i,
             br#"{"type":"quarantine","severity":"required","reason":"blocklist_match"}"#,
         );
-        i = copy(out, i, br#",{"type":"notify","severity":"required","targets":["role:moderator"]}"#);
+        i = copy(
+            out,
+            i,
+            br#",{"type":"notify","severity":"required","targets":["role:moderator"]}"#,
+        );
         i = copy(out, i, br#",{"type":"audit_log","severity":"required"}"#);
     } else {
         let mut need_comma = false;
         if !mentions.is_empty() {
-            i = copy(out, i, br#"{"type":"notify","severity":"required","targets":["#);
+            i = copy(
+                out,
+                i,
+                br#"{"type":"notify","severity":"required","targets":["#,
+            );
             for (idx, m) in mentions.iter().enumerate() {
                 if idx > 0 {
                     i = copy(out, i, br#","#);
@@ -463,7 +486,11 @@ fn write_allow_normalized(
     i = copy(out, i, br#"],"evaluation_trace":["action="#);
     i = copy(out, i, action);
     if quarantine {
-        i = copy(out, i, br#"","body matched blocklist","decision=allow with quarantine"]"#);
+        i = copy(
+            out,
+            i,
+            br#"","body matched blocklist","decision=allow with quarantine"]"#,
+        );
     } else {
         i = copy(out, i, br#"","validations passed"]"#);
     }
@@ -931,67 +958,285 @@ mod catalog_coverage_tests {
     #[test]
     fn use_case_01_happy() {
         let out = run("{\"action\":\"create\",\"actor\":{\"id\":\"user-42\",\"roles\":[\"member\"],\"attributes\":{\"tenant_id\":\"t-100\",\"display_name\":\"Ada Lovelace\"}},\"resource\":{\"type\":\"document\",\"id\":\"doc-99\",\"attributes\":{\"tenant_id\":\"t-100\",\"visibility\":\"team\"}},\"comment\":{\"body\":\"Hey @user-7 and @user-11, please review the latest draft. See https://example.com/spec\",\"parent_id\":null,\"metadata\":{}},\"context\":{\"request_id\":\"req-abc\",\"client\":\"web\"},\"comment_policy\":{\"version\":\"2026.08.1\",\"max_body_length\":10000,\"max_thread_depth\":8,\"allowed_markups\":[\"bold\",\"italic\",\"code\",\"link\"],\"mention_resolution\":\"strict\",\"visibility_model\":\"resource-acl\",\"soft_delete\":true,\"actions\":{\"create\":{\"roles\":[\"member\",\"admin\"]},\"edit\":{\"roles\":[\"member\",\"admin\"],\"own_only\":true},\"delete\":{\"roles\":[\"member\",\"admin\"],\"own_only\":true},\"react\":{\"roles\":[\"member\",\"admin\"]},\"resolve\":{\"roles\":[\"admin\",\"owner\"]},\"pin\":{\"roles\":[\"admin\"]}},\"moderation\":{\"blocklist\":[],\"require_approval_roles\":[]}}}");
-        assert!(out.contains("\"reason_code\":\"ok\""), "expected ok in {out}");
+        assert!(
+            out.contains("\"reason_code\":\"ok\""),
+            "expected ok in {out}"
+        );
     }
 
     #[test]
     fn use_case_02_sad() {
         let out = run("{\"action\":\"edit\",\"actor\":{\"id\":\"user-99\",\"roles\":[\"member\"],\"attributes\":{\"tenant_id\":\"t-100\"}},\"resource\":{\"type\":\"document\",\"id\":\"doc-99\",\"attributes\":{\"tenant_id\":\"t-100\"}},\"comment\":{\"id\":\"cmt-55\",\"body\":\"Updated text\",\"parent_id\":null,\"created_by\":\"user-42\"},\"context\":{},\"comment_policy\":{\"version\":\"2026.08.1\",\"max_body_length\":10000,\"max_thread_depth\":8,\"allowed_markups\":[\"bold\",\"italic\",\"code\",\"link\"],\"mention_resolution\":\"strict\",\"visibility_model\":\"resource-acl\",\"soft_delete\":true,\"actions\":{\"edit\":{\"roles\":[\"member\",\"admin\"],\"own_only\":true}},\"moderation\":{\"blocklist\":[],\"require_approval_roles\":[]}}}");
-        assert!(out.contains("\"reason_code\":\"not_owner\""), "expected not_owner in {out}");
+        assert!(
+            out.contains("\"reason_code\":\"not_owner\""),
+            "expected not_owner in {out}"
+        );
     }
 
     #[test]
     fn use_case_03_sad() {
         let out = run("{\"action\":\"reply\",\"actor\":{\"id\":\"user-42\",\"roles\":[\"member\"],\"attributes\":{\"tenant_id\":\"t-100\"}},\"resource\":{\"type\":\"document\",\"id\":\"doc-99\",\"attributes\":{\"tenant_id\":\"t-100\"}},\"comment\":{\"body\":\"One more level\",\"parent_id\":\"cmt-depth-7\",\"parent_depth\":7},\"context\":{},\"comment_policy\":{\"version\":\"2026.08.1\",\"max_body_length\":10000,\"max_thread_depth\":8,\"allowed_markups\":[\"bold\",\"italic\"],\"mention_resolution\":\"strict\",\"visibility_model\":\"resource-acl\",\"soft_delete\":true,\"actions\":{\"reply\":{\"roles\":[\"member\",\"admin\"]}},\"moderation\":{\"blocklist\":[],\"require_approval_roles\":[]}}}");
-        assert!(out.contains("\"reason_code\":\"max_thread_depth_exceeded\""), "expected max_thread_depth_exceeded in {out}");
+        assert!(
+            out.contains("\"reason_code\":\"max_thread_depth_exceeded\""),
+            "expected max_thread_depth_exceeded in {out}"
+        );
     }
 
     #[test]
     fn use_case_04_happy() {
         let out = run("{\"action\":\"create\",\"actor\":{\"id\":\"user-77\",\"roles\":[\"member\"],\"attributes\":{\"tenant_id\":\"t-100\"}},\"resource\":{\"type\":\"channel\",\"id\":\"ch-general\",\"attributes\":{\"tenant_id\":\"t-100\"}},\"comment\":{\"body\":\"This contains a blocked-term that should be flagged\",\"parent_id\":null},\"context\":{},\"comment_policy\":{\"version\":\"2026.08.1\",\"max_body_length\":10000,\"max_thread_depth\":8,\"allowed_markups\":[\"bold\",\"italic\"],\"mention_resolution\":\"strict\",\"visibility_model\":\"channel\",\"soft_delete\":true,\"actions\":{\"create\":{\"roles\":[\"member\",\"admin\"]}},\"moderation\":{\"blocklist\":[\"blocked-term\"],\"require_approval_roles\":[\"moderator\"]}}}");
-        assert!(out.contains("\"reason_code\":\"moderation_quarantine\""), "expected moderation_quarantine in {out}");
+        assert!(
+            out.contains("\"reason_code\":\"moderation_quarantine\""),
+            "expected moderation_quarantine in {out}"
+        );
     }
 
     #[test]
     fn use_case_05_happy() {
         let out = run("{\"action\":\"react\",\"actor\":{\"id\":\"user-42\",\"roles\":[\"member\"],\"attributes\":{\"tenant_id\":\"t-100\"}},\"resource\":{\"type\":\"document\",\"id\":\"doc-99\",\"attributes\":{\"tenant_id\":\"t-100\"}},\"comment\":{\"id\":\"cmt-55\",\"reaction\":{\"emoji\":\"thumbsup\",\"op\":\"add\"}},\"context\":{},\"comment_policy\":{\"version\":\"2026.08.1\",\"max_body_length\":10000,\"max_thread_depth\":8,\"allowed_markups\":[],\"mention_resolution\":\"strict\",\"visibility_model\":\"resource-acl\",\"soft_delete\":true,\"actions\":{\"react\":{\"roles\":[\"member\",\"admin\"]}},\"moderation\":{\"blocklist\":[],\"require_approval_roles\":[]}}}");
-        assert!(out.contains("\"reason_code\":\"ok\""), "expected ok in {out}");
+        assert!(
+            out.contains("\"reason_code\":\"ok\""),
+            "expected ok in {out}"
+        );
     }
 
     #[test]
     fn use_case_06_happy() {
         let out = run("{\"action\":\"delete\",\"actor\":{\"id\":\"user-42\",\"roles\":[\"member\"],\"attributes\":{\"tenant_id\":\"t-100\"}},\"resource\":{\"type\":\"document\",\"id\":\"doc-99\",\"attributes\":{\"tenant_id\":\"t-100\"}},\"comment\":{\"id\":\"cmt-55\",\"body\":\"Original text that must be retained\",\"created_by\":\"user-42\"},\"context\":{},\"comment_policy\":{\"version\":\"2026.08.1\",\"max_body_length\":10000,\"max_thread_depth\":8,\"allowed_markups\":[],\"mention_resolution\":\"strict\",\"visibility_model\":\"resource-acl\",\"soft_delete\":true,\"actions\":{\"delete\":{\"roles\":[\"member\",\"admin\"],\"own_only\":true}},\"moderation\":{\"blocklist\":[],\"require_approval_roles\":[]}}}");
-        assert!(out.contains("\"reason_code\":\"ok\""), "expected ok in {out}");
+        assert!(
+            out.contains("\"reason_code\":\"ok\""),
+            "expected ok in {out}"
+        );
     }
 
     #[test]
     fn use_case_07_sad() {
         let out = run("{\"action\":\"create\",\"actor\":{\"id\":\"user-42\",\"roles\":[\"admin\"],\"attributes\":{\"tenant_id\":\"t-100\"}},\"resource\":{\"type\":\"document\",\"id\":\"doc-99\",\"attributes\":{\"tenant_id\":\"t-200\"}},\"comment\":{\"body\":\"Trying to comment across tenants\",\"parent_id\":null},\"context\":{},\"comment_policy\":{\"version\":\"2026.08.1\",\"max_body_length\":10000,\"max_thread_depth\":8,\"allowed_markups\":[],\"mention_resolution\":\"strict\",\"visibility_model\":\"resource-acl\",\"soft_delete\":true,\"actions\":{\"create\":{\"roles\":[\"member\",\"admin\"]}},\"moderation\":{\"blocklist\":[],\"require_approval_roles\":[]},\"enforce_tenant_isolation\":true}}");
-        assert!(out.contains("\"reason_code\":\"tenant_isolation_violation\""), "expected tenant_isolation_violation in {out}");
+        assert!(
+            out.contains("\"reason_code\":\"tenant_isolation_violation\""),
+            "expected tenant_isolation_violation in {out}"
+        );
     }
 
     #[test]
     fn use_case_08_sad() {
         let out = run("{\"action\":\"create\",\"actor\":{\"id\":\"user-42\",\"roles\":[\"member\"],\"attributes\":{\"tenant_id\":\"t-100\"}},\"resource\":{\"type\":\"document\",\"id\":\"doc-99\",\"attributes\":{\"tenant_id\":\"t-100\"}},\"comment\":{\"body\":\"   \",\"parent_id\":null},\"context\":{},\"comment_policy\":{\"version\":\"2026.08.1\",\"max_body_length\":10000,\"max_thread_depth\":8,\"allowed_markups\":[],\"mention_resolution\":\"strict\",\"visibility_model\":\"resource-acl\",\"soft_delete\":true,\"actions\":{\"create\":{\"roles\":[\"member\"]}},\"moderation\":{\"blocklist\":[],\"require_approval_roles\":[]}}}");
-        assert!(out.contains("\"reason_code\":\"empty_body\""), "expected empty_body in {out}");
+        assert!(
+            out.contains("\"reason_code\":\"empty_body\""),
+            "expected empty_body in {out}"
+        );
     }
 
     #[test]
     fn use_case_09_sad() {
         let out = run("{\"action\":\"create\",\"actor\":{\"id\":\"user-42\",\"roles\":[\"member\"],\"attributes\":{\"tenant_id\":\"t-100\"}},\"resource\":{\"type\":\"document\",\"id\":\"doc-99\",\"attributes\":{\"tenant_id\":\"t-100\"}},\"comment\":{\"body\":\"xxxxxxxxxxxxxxxxxxxxx\",\"parent_id\":null},\"context\":{},\"comment_policy\":{\"version\":\"2026.08.1\",\"max_body_length\":20,\"max_thread_depth\":8,\"allowed_markups\":[],\"mention_resolution\":\"strict\",\"visibility_model\":\"resource-acl\",\"soft_delete\":true,\"actions\":{\"create\":{\"roles\":[\"member\"]}},\"moderation\":{\"blocklist\":[],\"require_approval_roles\":[]}}}");
-        assert!(out.contains("\"reason_code\":\"body_too_long\""), "expected body_too_long in {out}");
+        assert!(
+            out.contains("\"reason_code\":\"body_too_long\""),
+            "expected body_too_long in {out}"
+        );
     }
 
     #[test]
     fn use_case_10_sad() {
         let out = run("{\"action\":\"react\",\"actor\":{\"id\":\"user-42\",\"roles\":[\"member\"],\"attributes\":{\"tenant_id\":\"t-100\"}},\"resource\":{\"type\":\"document\",\"id\":\"doc-99\",\"attributes\":{\"tenant_id\":\"t-100\"}},\"comment\":{\"id\":\"cmt-55\",\"reaction\":{\"op\":\"add\"}},\"context\":{},\"comment_policy\":{\"version\":\"2026.08.1\",\"max_body_length\":10000,\"max_thread_depth\":8,\"allowed_markups\":[],\"mention_resolution\":\"strict\",\"visibility_model\":\"resource-acl\",\"soft_delete\":true,\"actions\":{\"react\":{\"roles\":[\"member\"]}},\"moderation\":{\"blocklist\":[],\"require_approval_roles\":[]}}}");
-        assert!(out.contains("\"reason_code\":\"invalid_reaction\""), "expected invalid_reaction in {out}");
+        assert!(
+            out.contains("\"reason_code\":\"invalid_reaction\""),
+            "expected invalid_reaction in {out}"
+        );
     }
 
     #[test]
     fn use_case_11_sad() {
         let out = run("{\"action\":\"create\",\"actor\":{\"id\":\"user-42\",\"roles\":[\"guest\"],\"attributes\":{\"tenant_id\":\"t-100\"}},\"resource\":{\"type\":\"document\",\"id\":\"doc-99\",\"attributes\":{\"tenant_id\":\"t-100\"}},\"comment\":{\"body\":\"Hello\",\"parent_id\":null},\"context\":{},\"comment_policy\":{\"version\":\"2026.08.1\",\"max_body_length\":10000,\"max_thread_depth\":8,\"allowed_markups\":[],\"mention_resolution\":\"strict\",\"visibility_model\":\"resource-acl\",\"soft_delete\":true,\"actions\":{\"create\":{\"roles\":[\"member\",\"admin\"]}},\"moderation\":{\"blocklist\":[],\"require_approval_roles\":[]}}}");
-        assert!(out.contains("\"reason_code\":\"insufficient_role\""), "expected insufficient_role in {out}");
+        assert!(
+            out.contains("\"reason_code\":\"insufficient_role\""),
+            "expected insufficient_role in {out}"
+        );
     }
 
+    #[test]
+    fn missing_required_top_level_fields_denies_invalid_input() {
+        let out = run("{}");
+        assert!(
+            out.contains("\"reason_code\":\"invalid_input\""),
+            "expected invalid_input in {out}"
+        );
+    }
+
+    #[test]
+    fn missing_actor_id_denies_invalid_actor() {
+        let out = run("{\"action\":\"create\",\"actor\":{\"roles\":[\"member\"]},\"resource\":{\"id\":\"doc-1\"},\"comment\":{\"body\":\"hi\"},\"comment_policy\":{\"actions\":{\"create\":{\"roles\":[\"member\"]}}}}");
+        assert!(
+            out.contains("\"reason_code\":\"invalid_actor\""),
+            "expected invalid_actor in {out}"
+        );
+    }
+
+    #[test]
+    fn unknown_action_is_denied() {
+        let out = run("{\"action\":\"resolve\",\"actor\":{\"id\":\"user-1\",\"roles\":[\"admin\"]},\"resource\":{\"id\":\"doc-1\"},\"comment\":{\"body\":\"hi\"},\"comment_policy\":{\"actions\":{\"resolve\":{\"roles\":[\"admin\"]}}}}");
+        assert!(
+            out.contains("\"reason_code\":\"invalid_action\""),
+            "expected invalid_action in {out}"
+        );
+    }
+
+    #[test]
+    fn successful_edit_by_owner_defaults_visibility_to_team() {
+        let out = run("{\"action\":\"edit\",\"actor\":{\"id\":\"user-42\",\"roles\":[\"member\"],\"attributes\":{\"tenant_id\":\"t-100\"}},\"resource\":{\"id\":\"doc-99\",\"attributes\":{\"tenant_id\":\"t-100\"}},\"comment\":{\"id\":\"cmt-1\",\"body\":\"Updated text\",\"created_by\":\"user-42\"},\"comment_policy\":{\"visibility_model\":\"resource-acl\",\"actions\":{\"edit\":{\"roles\":[\"member\"],\"own_only\":true}},\"moderation\":{\"blocklist\":[]}}}");
+        assert!(
+            out.contains("\"reason\":\"Edit allowed\""),
+            "expected Edit allowed reason in {out}"
+        );
+        assert!(out.contains("\"visibility\":\"team\""));
+    }
+
+    #[test]
+    fn successful_reply_under_depth_limit() {
+        let out = run("{\"action\":\"reply\",\"actor\":{\"id\":\"user-42\",\"roles\":[\"member\"]},\"resource\":{\"id\":\"doc-99\"},\"comment\":{\"body\":\"A short reply\",\"parent_id\":\"cmt-1\",\"parent_depth\":1},\"comment_policy\":{\"visibility_model\":\"channel\",\"max_thread_depth\":8,\"actions\":{\"reply\":{\"roles\":[\"member\"]}},\"moderation\":{\"blocklist\":[]}}}");
+        assert!(
+            out.contains("\"reason\":\"Reply allowed\""),
+            "expected Reply allowed reason in {out}"
+        );
+        assert!(out.contains("\"depth\":2"));
+        assert!(out.contains("\"visibility\":\"channel\""));
+    }
+
+    #[test]
+    fn multiple_mentions_and_links_are_all_emitted() {
+        let out = run("{\"action\":\"create\",\"actor\":{\"id\":\"user-42\",\"roles\":[\"member\"]},\"resource\":{\"id\":\"doc-99\"},\"comment\":{\"body\":\"cc @alice @bob see https://a.example and https://b.example\"},\"comment_policy\":{\"actions\":{\"create\":{\"roles\":[\"member\"]}},\"moderation\":{\"blocklist\":[]}}}");
+        assert!(out.contains("\"id\":\"alice\""));
+        assert!(out.contains("\"id\":\"bob\""));
+        assert!(out.contains("https://a.example"));
+        assert!(out.contains("https://b.example"));
+    }
+
+    #[test]
+    fn parent_id_literal_string_null_is_emitted_as_json_string() {
+        let out = run("{\"action\":\"create\",\"actor\":{\"id\":\"user-42\",\"roles\":[\"member\"]},\"resource\":{\"id\":\"doc-99\"},\"comment\":{\"body\":\"hi\",\"parent_id\":\"null\"},\"comment_policy\":{\"actions\":{\"create\":{\"roles\":[\"member\"]}},\"moderation\":{\"blocklist\":[]}}}");
+        assert!(
+            out.contains("\"parent_id\":null"),
+            "expected literal \"null\" string value to render as JSON null in {out}"
+        );
+    }
+
+    #[test]
+    fn delete_own_only_mismatch_is_denied() {
+        let out = run("{\"action\":\"delete\",\"actor\":{\"id\":\"user-99\",\"roles\":[\"member\"]},\"resource\":{\"id\":\"doc-99\"},\"comment\":{\"id\":\"cmt-1\",\"body\":\"x\",\"created_by\":\"user-42\"},\"comment_policy\":{\"soft_delete\":true,\"actions\":{\"delete\":{\"roles\":[\"member\"],\"own_only\":true}},\"moderation\":{\"blocklist\":[]}}}");
+        assert!(
+            out.contains("\"reason_code\":\"not_owner\""),
+            "expected not_owner in {out}"
+        );
+    }
+
+    #[test]
+    fn delete_without_soft_delete_policy_is_denied() {
+        let out = run("{\"action\":\"delete\",\"actor\":{\"id\":\"user-42\",\"roles\":[\"member\"]},\"resource\":{\"id\":\"doc-99\"},\"comment\":{\"id\":\"cmt-1\",\"body\":\"x\",\"created_by\":\"user-42\"},\"comment_policy\":{\"soft_delete\":false,\"actions\":{\"delete\":{\"roles\":[\"member\"],\"own_only\":true}},\"moderation\":{\"blocklist\":[]}}}");
+        assert!(
+            out.contains("\"reason_code\":\"hard_delete_unsupported\""),
+            "expected hard_delete_unsupported in {out}"
+        );
+    }
+
+    #[test]
+    fn policy_without_version_falls_back_to_fnv_hash() {
+        let out = run("{\"action\":\"create\",\"actor\":{\"id\":\"user-42\",\"roles\":[\"member\"]},\"resource\":{\"id\":\"doc-99\"},\"comment\":{\"body\":\"hi\"},\"comment_policy\":{\"actions\":{\"create\":{\"roles\":[\"member\"]}},\"moderation\":{\"blocklist\":[]}}}");
+        assert!(
+            out.contains("\"policy_hash\":\"sha256:policy:"),
+            "expected fnv-derived policy hash in {out}"
+        );
+    }
+
+    #[test]
+    fn action_role_allowed_handles_missing_actions_and_unknown_action() {
+        assert!(!action_role_allowed(b"{}", b"create", &[b"member"]));
+        assert!(!action_role_allowed(
+            br#"{"actions":{"create":{"roles":[]}}}"#,
+            b"create",
+            &[b"member"]
+        ));
+        assert!(!action_role_allowed(
+            br#"{"actions":{"create":{"roles":["admin"]}}}"#,
+            b"create",
+            &[b"member"]
+        ));
+    }
+
+    #[test]
+    fn action_own_only_handles_missing_actions_and_missing_action() {
+        assert!(!action_own_only(b"{}", b"delete"));
+        assert!(!action_own_only(br#"{"actions":{}}"#, b"delete"));
+    }
+
+    #[test]
+    fn parse_moderation_blocklist_handles_missing_moderation() {
+        let mut out: [&[u8]; MAX_BLOCK] = [&b""[..]; MAX_BLOCK];
+        assert_eq!(parse_moderation_blocklist(b"{}", &mut out), 0);
+    }
+
+    #[test]
+    fn is_blank_and_contains_ascii_ci_edge_cases() {
+        assert!(is_blank(b""));
+        assert!(is_blank(b"  \t\n"));
+        assert!(!is_blank(b"a"));
+        assert!(!contains_ascii_ci(b"short", b"longer than short"));
+        assert!(!contains_ascii_ci(b"hello", b""));
+        assert!(contains_ascii_ci(b"Hello World", b"WORLD"));
+    }
+
+    #[test]
+    fn attr_string_handles_missing_attributes() {
+        assert_eq!(attr_string(b"{}", b"tenant_id"), b"");
+    }
+
+    #[test]
+    fn object_after_key_and_array_after_key_handle_missing_and_wrong_type() {
+        assert_eq!(object_after_key(b"{}", b"\"missing\""), None);
+        assert_eq!(object_after_key(br#"{"k":5}"#, b"\"k\""), None);
+        assert_eq!(json_array_after_key(b"{}", b"\"missing\""), None);
+        assert_eq!(json_array_after_key(br#"{"k":5}"#, b"\"k\""), None);
+    }
+
+    #[test]
+    fn balanced_end_returns_none_when_unterminated() {
+        assert_eq!(balanced_end(b"{\"a\":\"b\"", b'{', b'}'), None);
+    }
+
+    #[test]
+    fn string_value_after_handles_missing_colon_quote_and_terminator() {
+        assert_eq!(string_value_after(b"no colon"), b"");
+        assert_eq!(string_value_after(b":not-a-quote"), b"");
+        assert_eq!(string_value_after(b":\"unterminated"), b"");
+    }
+
+    #[test]
+    fn extract_string_at_depth_returns_empty_when_missing() {
+        assert_eq!(extract_string_at_depth(b"{}", b"\"missing\"", 1), b"");
+    }
+
+    #[test]
+    fn extract_i32_handles_negative_and_none() {
+        assert_eq!(extract_i32(b"\"k\":-3", b"\"k\""), Some(-3));
+        assert_eq!(extract_i32(b"{}", b"\"missing\""), None);
+        assert_eq!(extract_i32(b"\"k\":oops", b"\"k\""), None);
+    }
+
+    #[test]
+    fn copy_i32_handles_negative() {
+        let mut buf = [0u8; 8];
+        let n = copy_i32(&mut buf, 0, -42);
+        assert_eq!(&buf[..n], b"-42");
+    }
+
+    #[test]
+    fn extract_mentions_ignores_bare_at_sign() {
+        let mut out: [&[u8]; MAX_MENTIONS] = [&b""[..]; MAX_MENTIONS];
+        assert_eq!(extract_mentions(b"just an @ sign", &mut out), 0);
+    }
+
+    #[test]
+    fn extract_links_ignores_non_https_text() {
+        let mut out: [&[u8]; MAX_LINKS] = [&b""[..]; MAX_LINKS];
+        assert_eq!(extract_links(b"no links here", &mut out), 0);
+    }
 }
