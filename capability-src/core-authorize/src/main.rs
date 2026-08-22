@@ -221,10 +221,7 @@ pub unsafe fn authorize(input: &[u8], out: &mut [u8]) -> usize {
                     &b"break_glass_override"[..],
                 )
             } else {
-                (
-                    &b"Matched allow rule"[..],
-                    &b"matched_allow_rule"[..],
-                )
+                (&b"Matched allow rule"[..], &b"matched_allow_rule"[..])
             };
             return write_result(
                 out,
@@ -713,7 +710,9 @@ fn string_value_after<'a>(after_key: &'a [u8]) -> &'a [u8] {
         return b"";
     };
     let mut rest = &after_key[colon + 1..];
-    while rest.first() == Some(&b' ') || rest.first() == Some(&b'\n') || rest.first() == Some(&b'\t')
+    while rest.first() == Some(&b' ')
+        || rest.first() == Some(&b'\n')
+        || rest.first() == Some(&b'\t')
     {
         rest = &rest[1..];
     }
@@ -835,67 +834,192 @@ mod catalog_coverage_tests {
     #[test]
     fn use_case_01_happy() {
         let out = run("{\"principal\":{\"id\":\"user-42\",\"roles\":[\"admin\"],\"attributes\":{\"tenant_id\":\"t-100\"},\"groups\":[]},\"action\":\"delete\",\"resource\":{\"type\":\"document\",\"id\":\"doc-99\",\"attributes\":{\"tenant_id\":\"t-100\"},\"owner_id\":\"user-7\"},\"context\":{\"request_time\":\"2026-08-07T22:00:00Z\"},\"policy\":{\"version\":\"1.0\",\"mode\":\"hybrid\",\"default_effect\":\"deny\",\"rules\":[{\"id\":\"admin-delete\",\"effect\":\"allow\",\"priority\":100,\"principal\":{\"roles\":[\"admin\"]},\"action\":[\"delete\"],\"resource\":{\"type\":\"document\"}}]}}");
-        assert!(out.contains("\"reason_code\":\"matched_allow_rule\""), "expected matched_allow_rule in {out}");
+        assert!(
+            out.contains("\"reason_code\":\"matched_allow_rule\""),
+            "expected matched_allow_rule in {out}"
+        );
     }
 
     #[test]
     fn use_case_02_sad() {
         let out = run("{\"principal\":{\"id\":\"user-42\",\"roles\":[\"admin\"],\"attributes\":{\"tenant_id\":\"t-100\"}},\"action\":\"read\",\"resource\":{\"type\":\"document\",\"id\":\"doc-77\",\"attributes\":{\"tenant_id\":\"t-200\"}},\"context\":{},\"policy\":{\"version\":\"1.0\",\"mode\":\"hybrid\",\"default_effect\":\"deny\",\"rules\":[{\"id\":\"tenant-isolation\",\"effect\":\"deny\",\"priority\":200,\"condition\":{\"op\":\"neq\",\"left\":\"principal.attributes.tenant_id\",\"right\":\"resource.attributes.tenant_id\"}},{\"id\":\"admin-read\",\"effect\":\"allow\",\"priority\":100,\"principal\":{\"roles\":[\"admin\"]},\"action\":[\"read\"],\"resource\":{\"type\":\"document\"}}]}}");
-        assert!(out.contains("\"reason_code\":\"matched_deny_rule\""), "expected matched_deny_rule in {out}");
+        assert!(
+            out.contains("\"reason_code\":\"matched_deny_rule\""),
+            "expected matched_deny_rule in {out}"
+        );
     }
 
     #[test]
     fn use_case_03_happy() {
         let out = run("{\"principal\":{\"id\":\"user-7\",\"roles\":[\"member\"]},\"action\":\"update\",\"resource\":{\"type\":\"document\",\"id\":\"doc-99\",\"owner_id\":\"user-7\"},\"context\":{},\"policy\":{\"version\":\"1.0\",\"mode\":\"hybrid\",\"default_effect\":\"deny\",\"rules\":[{\"id\":\"owner-update\",\"effect\":\"allow\",\"priority\":150,\"condition\":{\"op\":\"eq\",\"left\":\"principal.id\",\"right\":\"resource.owner_id\"},\"action\":[\"update\"]}]}}");
-        assert!(out.contains("\"reason_code\":\"matched_allow_rule\""), "expected matched_allow_rule in {out}");
+        assert!(
+            out.contains("\"reason_code\":\"matched_allow_rule\""),
+            "expected matched_allow_rule in {out}"
+        );
     }
 
     #[test]
     fn use_case_04_sad() {
         let out = run("{\"principal\":{\"id\":\"user-99\",\"roles\":[\"admin\"],\"attributes\":{\"status\":\"suspended\"}},\"action\":\"delete\",\"resource\":{\"type\":\"document\",\"id\":\"doc-1\"},\"context\":{},\"policy\":{\"version\":\"1.0\",\"mode\":\"hybrid\",\"default_effect\":\"deny\",\"rules\":[{\"id\":\"suspended-deny\",\"effect\":\"deny\",\"priority\":300,\"principal\":{\"attributes\":{\"status\":\"suspended\"}}},{\"id\":\"admin-delete\",\"effect\":\"allow\",\"priority\":100,\"principal\":{\"roles\":[\"admin\"]},\"action\":[\"delete\"]}]}}");
-        assert!(out.contains("\"reason_code\":\"matched_deny_rule\""), "expected matched_deny_rule in {out}");
+        assert!(
+            out.contains("\"reason_code\":\"matched_deny_rule\""),
+            "expected matched_deny_rule in {out}"
+        );
     }
 
     #[test]
     fn use_case_05_happy() {
         let out = run("{\"principal\":{\"id\":\"user-42\",\"roles\":[\"finance\"]},\"action\":\"transfer\",\"resource\":{\"type\":\"payment\",\"id\":\"pay-55\",\"attributes\":{\"amount\":50000}},\"context\":{\"amount\":50000},\"policy\":{\"version\":\"1.0\",\"mode\":\"hybrid\",\"default_effect\":\"deny\",\"rules\":[{\"id\":\"high-value-transfer\",\"effect\":\"allow\",\"priority\":100,\"principal\":{\"roles\":[\"finance\"]},\"action\":[\"transfer\"],\"resource\":{\"type\":\"payment\"},\"obligations\":[{\"type\":\"require_mfa\",\"severity\":\"required\"},{\"type\":\"audit_log\",\"severity\":\"required\",\"metadata\":{\"category\":\"high_value\"}}]}]}}");
-        assert!(out.contains("\"reason_code\":\"matched_allow_rule\""), "expected matched_allow_rule in {out}");
+        assert!(
+            out.contains("\"reason_code\":\"matched_allow_rule\""),
+            "expected matched_allow_rule in {out}"
+        );
     }
 
     #[test]
     fn use_case_06_sad() {
         let out = run("{\"principal\":{\"id\":\"user-1\",\"roles\":[\"guest\"]},\"action\":\"delete\",\"resource\":{\"type\":\"document\",\"id\":\"doc-1\"},\"context\":{},\"policy\":{\"version\":\"1.0\",\"mode\":\"rbac\",\"default_effect\":\"deny\",\"rules\":[{\"id\":\"member-read\",\"effect\":\"allow\",\"priority\":50,\"principal\":{\"roles\":[\"member\"]},\"action\":[\"read\"]}]}}");
-        assert!(out.contains("\"reason_code\":\"no_matching_rule\""), "expected no_matching_rule in {out}");
+        assert!(
+            out.contains("\"reason_code\":\"no_matching_rule\""),
+            "expected no_matching_rule in {out}"
+        );
     }
 
     #[test]
     fn use_case_07_sad() {
         let out = run("{\"principal\":{\"id\":\"user-1\"},\"action\":\"read\",\"resource\":{\"type\":\"document\"},\"context\":{},\"policy\":{\"version\":\"1.0\",\"mode\":\"rbac\",\"default_effect\":\"deny\",\"rules\":[]}}");
-        assert!(out.contains("\"reason_code\":\"empty_or_invalid_policy\""), "expected empty_or_invalid_policy in {out}");
+        assert!(
+            out.contains("\"reason_code\":\"empty_or_invalid_policy\""),
+            "expected empty_or_invalid_policy in {out}"
+        );
     }
 
     #[test]
     fn use_case_08_happy() {
         let out = run("{\"principal\":{\"id\":\"user-ops\",\"roles\":[\"sre\"],\"attributes\":{\"break_glass\":true}},\"action\":\"read\",\"resource\":{\"type\":\"secret\",\"id\":\"sec-1\"},\"context\":{\"incident_id\":\"INC-2048\"},\"policy\":{\"version\":\"1.0\",\"mode\":\"hybrid\",\"default_effect\":\"deny\",\"break_glass\":{\"enabled\":true,\"required_attribute\":\"break_glass\",\"max_priority\":999},\"rules\":[{\"id\":\"break-glass-allow\",\"effect\":\"allow\",\"priority\":999,\"principal\":{\"attributes\":{\"break_glass\":true}},\"obligations\":[{\"type\":\"audit_log\",\"severity\":\"required\",\"metadata\":{\"break_glass\":true}},{\"type\":\"notify_security\",\"severity\":\"required\"}]}]}}");
-        assert!(out.contains("\"reason_code\":\"break_glass_override\""), "expected break_glass_override in {out}");
+        assert!(
+            out.contains("\"reason_code\":\"break_glass_override\""),
+            "expected break_glass_override in {out}"
+        );
     }
 
     #[test]
     fn use_case_09_sad() {
         let out = run("{\"principal\":{\"roles\":[\"admin\"]},\"action\":\"read\",\"resource\":{\"type\":\"document\"},\"context\":{},\"policy\":{\"version\":\"1.0\",\"mode\":\"rbac\",\"default_effect\":\"deny\",\"rules\":[]}}");
-        assert!(out.contains("\"reason_code\":\"invalid_principal\""), "expected invalid_principal in {out}");
+        assert!(
+            out.contains("\"reason_code\":\"invalid_principal\""),
+            "expected invalid_principal in {out}"
+        );
     }
 
     #[test]
     fn use_case_10_sad() {
         let out = run("{\"principal\":{\"id\":\"user-1\",\"roles\":[\"admin\"]},\"action\":\"\",\"resource\":{\"type\":\"document\",\"id\":\"doc-1\"},\"context\":{},\"policy\":{\"version\":\"1.0\",\"mode\":\"rbac\",\"default_effect\":\"deny\",\"rules\":[{\"id\":\"r1\",\"effect\":\"allow\",\"priority\":1,\"principal\":{\"roles\":[\"admin\"]},\"action\":[\"read\"]}]}}");
-        assert!(out.contains("\"reason_code\":\"invalid_action\""), "expected invalid_action in {out}");
+        assert!(
+            out.contains("\"reason_code\":\"invalid_action\""),
+            "expected invalid_action in {out}"
+        );
     }
 
     #[test]
     fn use_case_11_sad() {
         let out = run("{\"principal\":{\"id\":\"user-1\",\"roles\":[\"admin\"]},\"action\":\"read\",\"resource\":{\"type\":\"\",\"id\":\"doc-1\"},\"context\":{},\"policy\":{\"version\":\"1.0\",\"mode\":\"rbac\",\"default_effect\":\"deny\",\"rules\":[{\"id\":\"r1\",\"effect\":\"allow\",\"priority\":1,\"principal\":{\"roles\":[\"admin\"]},\"action\":[\"read\"]}]}}");
-        assert!(out.contains("\"reason_code\":\"invalid_resource\""), "expected invalid_resource in {out}");
+        assert!(
+            out.contains("\"reason_code\":\"invalid_resource\""),
+            "expected invalid_resource in {out}"
+        );
     }
 
+    #[test]
+    fn policy_missing_rules_key_entirely_is_invalid() {
+        let out = run("{\"principal\":{\"id\":\"user-1\",\"roles\":[\"admin\"]},\"action\":\"read\",\"resource\":{\"type\":\"document\"},\"context\":{},\"policy\":{\"version\":\"1.0\"}}");
+        assert!(
+            out.contains("\"reason_code\":\"empty_or_invalid_policy\""),
+            "expected empty_or_invalid_policy in {out}"
+        );
+    }
+
+    #[test]
+    fn default_effect_allow_with_no_matching_rule_allows() {
+        let out = run("{\"principal\":{\"id\":\"user-1\",\"roles\":[\"guest\"]},\"action\":\"delete\",\"resource\":{\"type\":\"document\"},\"context\":{},\"policy\":{\"version\":\"1.0\",\"default_effect\":\"allow\",\"rules\":[{\"id\":\"member-read\",\"effect\":\"allow\",\"priority\":50,\"principal\":{\"roles\":[\"member\"]},\"action\":[\"read\"]}]}}");
+        assert!(
+            out.contains("\"decision\":\"allow\""),
+            "expected allow in {out}"
+        );
+        assert!(out.contains("\"reason_code\":\"no_matching_rule\""));
+    }
+
+    #[test]
+    fn rule_with_role_principal_lacks_does_not_match() {
+        let out = run("{\"principal\":{\"id\":\"user-1\",\"roles\":[\"guest\"]},\"action\":\"read\",\"resource\":{\"type\":\"document\"},\"context\":{},\"policy\":{\"version\":\"1.0\",\"default_effect\":\"deny\",\"rules\":[{\"id\":\"admin-only\",\"effect\":\"allow\",\"priority\":1,\"principal\":{\"roles\":[\"admin\"]},\"action\":[\"read\"]}]}}");
+        assert!(out.contains("\"reason_code\":\"no_matching_rule\""));
+    }
+
+    #[test]
+    fn rule_with_status_attribute_mismatch_does_not_match() {
+        let out = run("{\"principal\":{\"id\":\"user-1\",\"roles\":[\"admin\"],\"attributes\":{\"status\":\"active\"}},\"action\":\"read\",\"resource\":{\"type\":\"document\"},\"context\":{},\"policy\":{\"version\":\"1.0\",\"default_effect\":\"deny\",\"rules\":[{\"id\":\"suspended-only\",\"effect\":\"deny\",\"priority\":1,\"principal\":{\"attributes\":{\"status\":\"suspended\"}}}]}}");
+        assert!(out.contains("\"reason_code\":\"no_matching_rule\""));
+    }
+
+    #[test]
+    fn rule_with_tenant_attribute_mismatch_does_not_match() {
+        let out = run("{\"principal\":{\"id\":\"user-1\",\"roles\":[\"admin\"],\"attributes\":{\"tenant_id\":\"t-1\"}},\"action\":\"read\",\"resource\":{\"type\":\"document\"},\"context\":{},\"policy\":{\"version\":\"1.0\",\"default_effect\":\"deny\",\"rules\":[{\"id\":\"tenant2-only\",\"effect\":\"allow\",\"priority\":1,\"principal\":{\"attributes\":{\"tenant_id\":\"t-2\"}},\"action\":[\"read\"]}]}}");
+        assert!(out.contains("\"reason_code\":\"no_matching_rule\""));
+    }
+
+    #[test]
+    fn condition_eq_false_does_not_match() {
+        let out = run("{\"principal\":{\"id\":\"user-1\",\"roles\":[\"admin\"]},\"action\":\"update\",\"resource\":{\"type\":\"document\",\"owner_id\":\"user-other\"},\"context\":{},\"policy\":{\"version\":\"1.0\",\"default_effect\":\"deny\",\"rules\":[{\"id\":\"owner-only\",\"effect\":\"allow\",\"priority\":1,\"condition\":{\"op\":\"eq\",\"left\":\"principal.id\",\"right\":\"resource.owner_id\"},\"action\":[\"update\"]}]}}");
+        assert!(out.contains("\"reason_code\":\"no_matching_rule\""));
+    }
+
+    #[test]
+    fn condition_neq_true_when_equal_does_not_match() {
+        let out = run("{\"principal\":{\"id\":\"user-1\",\"roles\":[\"admin\"],\"attributes\":{\"tenant_id\":\"t-1\"}},\"action\":\"read\",\"resource\":{\"type\":\"document\",\"attributes\":{\"tenant_id\":\"t-1\"}},\"context\":{},\"policy\":{\"version\":\"1.0\",\"default_effect\":\"deny\",\"rules\":[{\"id\":\"cross-tenant-deny\",\"effect\":\"deny\",\"priority\":1,\"condition\":{\"op\":\"neq\",\"left\":\"principal.attributes.tenant_id\",\"right\":\"resource.attributes.tenant_id\"}}]}}");
+        assert!(out.contains("\"reason_code\":\"no_matching_rule\""));
+    }
+
+    #[test]
+    fn attr_bool_true_matches_the_spaced_colon_form() {
+        assert!(attr_bool_true(
+            br#"{"attributes":{"break_glass": true}}"#,
+            b"break_glass"
+        ));
+        assert!(!attr_bool_true(b"{}", b"break_glass"));
+    }
+
+    #[test]
+    fn value_object_after_and_value_array_after_handle_missing_and_wrong_type() {
+        assert_eq!(value_object_after(b"no colon"), None);
+        assert_eq!(value_object_after(b":5"), None);
+        assert_eq!(value_array_after(b"no colon"), None);
+        assert_eq!(value_array_after(b":5"), None);
+    }
+
+    #[test]
+    fn balanced_end_returns_none_when_unterminated() {
+        assert_eq!(balanced_end(b"{\"a\":\"b\"", b'{', b'}'), None);
+    }
+
+    #[test]
+    fn string_value_after_handles_missing_colon_quote_and_terminator() {
+        assert_eq!(string_value_after(b"no colon"), b"");
+        assert_eq!(string_value_after(b":not-a-quote"), b"");
+        assert_eq!(string_value_after(b":\"unterminated"), b"");
+    }
+
+    #[test]
+    fn extract_i32_handles_negative_and_none() {
+        assert_eq!(extract_i32(b"\"k\":-3", b"\"k\""), Some(-3));
+        assert_eq!(extract_i32(b"{}", b"\"missing\""), None);
+        assert_eq!(extract_i32(b"\"k\":oops", b"\"k\""), None);
+    }
+
+    #[test]
+    fn resolve_path_defaults_to_empty_for_unknown_path() {
+        assert_eq!(
+            resolve_path(b"unknown.path", b"p", b"t", b"s", b"o", b"rt"),
+            b""
+        );
+    }
 }
