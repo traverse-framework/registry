@@ -259,15 +259,13 @@ fn write_invalid_config(out: &mut [u8], trace: &[u8]) -> usize {
     i
 }
 
-fn write_ok(
-    out: &mut [u8],
-    title: &[u8],
-    owner: &[u8],
-    due: &[u8],
-    traces: &[&[u8]],
-) -> usize {
+fn write_ok(out: &mut [u8], title: &[u8], owner: &[u8], due: &[u8], traces: &[&[u8]]) -> usize {
     let mut i = 0usize;
-    i = copy(out, i, b"{\"valid\":true,\"errors\":[],\"normalized\":{\"title\":\"");
+    i = copy(
+        out,
+        i,
+        b"{\"valid\":true,\"errors\":[],\"normalized\":{\"title\":\"",
+    );
     i = copy(out, i, title);
     i = copy(out, i, b"\"");
     if !owner.is_empty() {
@@ -286,12 +284,7 @@ fn write_ok(
     i
 }
 
-fn write_fail(
-    out: &mut [u8],
-    reason: &[u8],
-    errors: &[ErrPart],
-    traces: &[&[u8]],
-) -> usize {
+fn write_fail(out: &mut [u8], reason: &[u8], errors: &[ErrPart], traces: &[&[u8]]) -> usize {
     let mut i = 0usize;
     i = copy(out, i, b"{\"valid\":false,\"errors\":[");
     for (idx, err) in errors.iter().enumerate() {
@@ -510,37 +503,121 @@ mod catalog_coverage_tests {
     #[test]
     fn use_case_01_happy() {
         let out = run("{\"action_item\":{\"title\":\"Send proposal\",\"owner_id\":\"user-ada\",\"due_date\":\"2026-08-09\",\"source\":\"meeting\"},\"existing_open_items\":[],\"validation_config\":{\"version\":\"1.0\",\"require_owner\":true,\"require_due_date\":false,\"allow_past_due\":false,\"duplicate_check\":\"title_and_owner\"},\"reference_date\":\"2026-08-07\"}");
-        assert!(out.contains("\"reason_code\":\"ok\""), "expected ok in {out}");
+        assert!(
+            out.contains("\"reason_code\":\"ok\""),
+            "expected ok in {out}"
+        );
     }
 
     #[test]
     fn use_case_02_sad() {
         let out = run("{\"action_item\":{\"title\":\"Old task\",\"owner_id\":\"user-ada\",\"due_date\":\"2026-08-01\"},\"existing_open_items\":[],\"validation_config\":{\"version\":\"1.0\",\"require_owner\":true,\"require_due_date\":true,\"allow_past_due\":false,\"duplicate_check\":\"title_and_owner\"},\"reference_date\":\"2026-08-07\"}");
-        assert!(out.contains("\"reason_code\":\"validation_failed\""), "expected validation_failed in {out}");
+        assert!(
+            out.contains("\"reason_code\":\"validation_failed\""),
+            "expected validation_failed in {out}"
+        );
     }
 
     #[test]
     fn use_case_03_sad() {
         let out = run("{\"action_item\":{\"title\":\"Draft agenda\",\"due_date\":\"2026-08-10\"},\"existing_open_items\":[],\"validation_config\":{\"version\":\"1.0\",\"require_owner\":true,\"require_due_date\":false,\"allow_past_due\":false,\"duplicate_check\":\"none\"},\"reference_date\":\"2026-08-07\"}");
-        assert!(out.contains("\"reason_code\":\"validation_failed\""), "expected validation_failed in {out}");
+        assert!(
+            out.contains("\"reason_code\":\"validation_failed\""),
+            "expected validation_failed in {out}"
+        );
     }
 
     #[test]
     fn use_case_04_sad() {
         let out = run("{\"action_item\":{\"title\":\"Send proposal\",\"owner_id\":\"user-ada\",\"due_date\":\"2026-08-12\"},\"existing_open_items\":[{\"title\":\"Send proposal\",\"owner_id\":\"user-ada\",\"due_date\":\"2026-08-09\"}],\"validation_config\":{\"version\":\"1.0\",\"require_owner\":true,\"require_due_date\":false,\"allow_past_due\":false,\"duplicate_check\":\"title_and_owner\"},\"reference_date\":\"2026-08-07\"}");
-        assert!(out.contains("\"reason_code\":\"duplicate\""), "expected duplicate in {out}");
+        assert!(
+            out.contains("\"reason_code\":\"duplicate\""),
+            "expected duplicate in {out}"
+        );
     }
 
     #[test]
     fn use_case_05_sad() {
         let out = run("{\"action_item\":{\"title\":\"Send proposal\",\"owner_id\":\"user-bob\",\"due_date\":\"2026-08-12\"},\"existing_open_items\":[{\"title\":\"Send proposal\",\"owner_id\":\"user-ada\",\"due_date\":\"2026-08-09\"}],\"validation_config\":{\"version\":\"1.0\",\"require_owner\":true,\"require_due_date\":false,\"allow_past_due\":false,\"duplicate_check\":\"title\"},\"reference_date\":\"2026-08-07\"}");
-        assert!(out.contains("\"reason_code\":\"duplicate\""), "expected duplicate in {out}");
+        assert!(
+            out.contains("\"reason_code\":\"duplicate\""),
+            "expected duplicate in {out}"
+        );
     }
 
     #[test]
     fn use_case_06_sad() {
         let out = run("{\"action_item\":{\"title\":\"Send proposal\",\"owner_id\":\"user-ada\",\"due_date\":\"2026-08-12\"},\"existing_open_items\":[],\"validation_config\":{\"version\":\"1.0\",\"require_owner\":true,\"require_due_date\":false,\"allow_past_due\":false,\"duplicate_check\":\"bogus\"},\"reference_date\":\"2026-08-07\"}");
-        assert!(out.contains("\"reason_code\":\"invalid_config\""), "expected invalid_config in {out}");
+        assert!(
+            out.contains("\"reason_code\":\"invalid_config\""),
+            "expected invalid_config in {out}"
+        );
     }
 
+    #[test]
+    fn missing_required_fields_yields_invalid_config() {
+        let out = run("{}");
+        assert!(
+            out.contains("\"reason_code\":\"invalid_config\""),
+            "expected invalid_config in {out}"
+        );
+    }
+
+    #[test]
+    fn empty_title_is_an_error() {
+        let out = run("{\"action_item\":{\"title\":\"\",\"owner_id\":\"user-ada\"},\"existing_open_items\":[],\"validation_config\":{\"require_owner\":true,\"duplicate_check\":\"none\"},\"reference_date\":\"2026-08-07\"}");
+        assert!(out.contains("\"code\":\"empty_title\""));
+    }
+
+    #[test]
+    fn missing_due_date_is_an_error_when_required() {
+        let out = run("{\"action_item\":{\"title\":\"Task\",\"owner_id\":\"user-ada\"},\"existing_open_items\":[],\"validation_config\":{\"require_owner\":true,\"require_due_date\":true,\"duplicate_check\":\"none\"},\"reference_date\":\"2026-08-07\"}");
+        assert!(out.contains("\"code\":\"missing_due_date\""));
+    }
+
+    #[test]
+    fn ok_result_omits_absent_owner_and_due_date() {
+        let out = run("{\"action_item\":{\"title\":\"Task\"},\"existing_open_items\":[],\"validation_config\":{\"require_owner\":false,\"duplicate_check\":\"none\"},\"reference_date\":\"2026-08-07\"}");
+        assert!(out.contains("\"reason_code\":\"ok\""));
+        assert!(!out.contains("\"owner_id\""));
+        assert!(!out.contains("\"due_date\""));
+    }
+
+    #[test]
+    fn find_duplicate_ignores_non_object_and_unterminated_elements() {
+        assert!(!find_duplicate(br#"[42]"#, b"Task", b"", false));
+        assert!(!find_duplicate(br#"[{"title":"Task""#, b"Task", b"", false));
+        assert!(!find_duplicate(b"[]", b"Task", b"", false));
+    }
+
+    #[test]
+    fn object_after_key_and_array_after_key_handle_missing_and_wrong_type() {
+        assert_eq!(object_after_key(b"{}", b"\"missing\""), None);
+        assert_eq!(object_after_key(br#"{"k":5}"#, b"\"k\""), None);
+        assert_eq!(array_after_key(b"{}", b"\"missing\""), None);
+        assert_eq!(array_after_key(br#"{"k":5}"#, b"\"k\""), None);
+    }
+
+    #[test]
+    fn balanced_end_returns_none_when_unterminated() {
+        assert_eq!(balanced_end(b"{\"a\":\"b\"", b'{', b'}'), None);
+    }
+
+    #[test]
+    fn string_value_after_handles_missing_colon_quote_and_terminator() {
+        assert_eq!(string_value_after(b"no colon"), b"");
+        assert_eq!(string_value_after(b":not-a-quote"), b"");
+        assert_eq!(string_value_after(b":\"unterminated"), b"");
+    }
+
+    #[test]
+    fn extract_string_at_depth_returns_empty_when_missing() {
+        assert_eq!(extract_string_at_depth(b"{}", b"\"missing\"", 1), b"");
+    }
+
+    #[test]
+    fn extract_bool_handles_false_and_neither() {
+        assert_eq!(extract_bool(b"\"k\":false", b"\"k\""), Some(false));
+        assert_eq!(extract_bool(b"\"k\":maybe", b"\"k\""), None);
+    }
 }
