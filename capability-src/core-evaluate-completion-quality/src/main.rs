@@ -75,7 +75,8 @@ pub unsafe fn evaluate(input: &[u8], out: &mut [u8]) -> usize {
     let pressure_millis = parse_number_millis(item, b"\"pressure_score\"").unwrap_or(0);
 
     let high_thresh = parse_number_millis(config, b"\"high_pressure_threshold\"").unwrap_or(700);
-    let require_ev = extract_bool(config, b"\"require_evidence_when_high_pressure\"").unwrap_or(true);
+    let require_ev =
+        extract_bool(config, b"\"require_evidence_when_high_pressure\"").unwrap_or(true);
     let min_note = extract_i32(config, b"\"min_note_length\"").unwrap_or(8) as u32;
 
     let high_pressure = pressure_millis >= high_thresh;
@@ -143,7 +144,11 @@ pub unsafe fn evaluate(input: &[u8], out: &mut [u8]) -> usize {
         i = copy(out, i, gaps[g]);
         i = copy(out, i, b"\"");
     }
-    i = copy(out, i, b"],\"reason_code\":\"ok\",\"evaluation_trace\":[\"high_pressure=");
+    i = copy(
+        out,
+        i,
+        b"],\"reason_code\":\"ok\",\"evaluation_trace\":[\"high_pressure=",
+    );
     i = copy(out, i, if high_pressure { b"true" } else { b"false" });
     i = copy(out, i, b"\",\"evidence=");
     i = write_u32(out, i, evidence_count);
@@ -183,7 +188,11 @@ fn fail(out: &mut [u8], code: &[u8], item_id: &[u8]) -> usize {
     let mut i = 0usize;
     i = copy(out, i, b"{\"item_id\":\"");
     i = copy_json_escaped(out, i, item_id);
-    i = copy(out, i, b"\",\"quality_score\":0,\"verdict\":\"fail\",\"gaps\":[],\"reason_code\":\"");
+    i = copy(
+        out,
+        i,
+        b"\",\"quality_score\":0,\"verdict\":\"fail\",\"gaps\":[],\"reason_code\":\"",
+    );
     i = copy(out, i, code);
     i = copy(out, i, b"\",\"evaluation_trace\":[]}");
     i
@@ -198,17 +207,6 @@ fn skip_ws(s: &[u8]) -> &[u8] {
         rest = &rest[1..];
     }
     rest
-}
-
-fn skip_ws_comma(s: &[u8]) -> usize {
-    let mut i = 0usize;
-    while i < s.len() {
-        match s[i] {
-            b' ' | b'\n' | b'\t' | b'\r' | b',' => i += 1,
-            _ => break,
-        }
-    }
-    i
 }
 
 fn balanced_end(s: &[u8], open: u8, close: u8) -> Option<usize> {
@@ -298,13 +296,6 @@ fn string_value_after<'a>(after_key: &'a [u8]) -> &'a [u8] {
 
 fn extract_string<'a>(hay: &'a [u8], key: &[u8]) -> &'a [u8] {
     let Some(pos) = find(hay, key) else {
-        return b"";
-    };
-    string_value_after(&hay[pos + key.len()..])
-}
-
-fn extract_string_at_depth<'a>(hay: &'a [u8], key: &[u8], depth: i32) -> &'a [u8] {
-    let Some(pos) = find_key_at_depth(hay, key, depth) else {
         return b"";
     };
     string_value_after(&hay[pos + key.len()..])
@@ -471,85 +462,6 @@ fn write_u32(out: &mut [u8], mut i: usize, mut n: u32) -> usize {
     i
 }
 
-fn write_i32(out: &mut [u8], mut i: usize, n: i32) -> usize {
-    if n < 0 {
-        i = copy(out, i, b"-");
-        write_u32(out, i, (-n) as u32)
-    } else {
-        write_u32(out, i, n as u32)
-    }
-}
-
-fn ascii_lower(b: u8) -> u8 {
-    if b >= b'A' && b <= b'Z' {
-        b + 32
-    } else {
-        b
-    }
-}
-
-fn eq_ignore_case(a: &[u8], b: &[u8]) -> bool {
-    if a.len() != b.len() {
-        return false;
-    }
-    for i in 0..a.len() {
-        if ascii_lower(a[i]) != ascii_lower(b[i]) {
-            return false;
-        }
-    }
-    true
-}
-
-fn normalize_email(src: &[u8], dst: &mut [u8]) -> usize {
-    let mut i = 0usize;
-    let mut j = 0usize;
-    while i < src.len() && (src[i] == b' ' || src[i] == b'\t') {
-        i += 1;
-    }
-    let mut end = src.len();
-    while end > i && (src[end - 1] == b' ' || src[end - 1] == b'\t') {
-        end -= 1;
-    }
-    while i < end && j < dst.len() {
-        dst[j] = ascii_lower(src[i]);
-        i += 1;
-        j += 1;
-    }
-    j
-}
-
-fn trim_ascii(s: &[u8]) -> &[u8] {
-    let mut start = 0usize;
-    let mut end = s.len();
-    while start < end && matches!(s[start], b' ' | b'\t' | b'\n' | b'\r') {
-        start += 1;
-    }
-    while end > start && matches!(s[end - 1], b' ' | b'\t' | b'\n' | b'\r') {
-        end -= 1;
-    }
-    &s[start..end]
-}
-
-/// Days since 1970-01-01 for YYYY-MM-DD (Howard Hinnant civil_from_days inverse).
-fn parse_ymd_days(s: &[u8]) -> Option<i32> {
-    if s.len() < 10 || s[4] != b'-' || s[7] != b'-' {
-        return None;
-    }
-    let y = parse_i32(&s[0..4])?;
-    let m = parse_i32(&s[5..7])?;
-    let d = parse_i32(&s[8..10])?;
-    if m < 1 || m > 12 || d < 1 || d > 31 {
-        return None;
-    }
-    let y = y as i32 - if m <= 2 { 1 } else { 0 };
-    let era = if y >= 0 { y } else { y - 399 } / 400;
-    let yoe = (y - era * 400) as u32;
-    let mp = if m > 2 { (m - 3) as u32 } else { (m + 9) as u32 };
-    let doy = (153 * mp + 2) / 5 + d as u32 - 1;
-    let doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;
-    Some((era * 146097 + doe as i32) - 719468)
-}
-
 fn format_score_millis(out: &mut [u8], millis: u32) -> usize {
     let whole = millis / 1000;
     let frac = millis % 1000;
@@ -596,25 +508,129 @@ mod catalog_coverage_tests {
     #[test]
     fn use_case_01_happy() {
         let out = run("{\"item\":{\"id\":\"ai-1\",\"title\":\"Send the revised proposal\",\"status\":\"done\",\"pressure_score\":0.9,\"completion_note\":\"Sent revised proposal to stakeholders\",\"evidence_refs\":[\"doc-123\"]},\"quality_config\":{\"version\":\"1.0\",\"high_pressure_threshold\":0.7,\"require_evidence_when_high_pressure\":true,\"min_note_length\":8}}");
-        assert!(out.contains("\"reason_code\":\"ok\""), "expected ok in {out}");
+        assert!(
+            out.contains("\"reason_code\":\"ok\""),
+            "expected ok in {out}"
+        );
     }
 
     #[test]
     fn use_case_02_happy() {
         let out = run("{\"item\":{\"id\":\"ai-2\",\"title\":\"Fix production bug\",\"status\":\"done\",\"pressure_score\":0.95,\"completion_note\":\"done\",\"evidence_refs\":[]},\"quality_config\":{\"version\":\"1.0\",\"high_pressure_threshold\":0.7,\"require_evidence_when_high_pressure\":true,\"min_note_length\":8}}");
-        assert!(out.contains("\"reason_code\":\"ok\""), "expected ok in {out}");
+        assert!(
+            out.contains("\"reason_code\":\"ok\""),
+            "expected ok in {out}"
+        );
     }
 
     #[test]
     fn use_case_03_sad() {
         let out = run("{\"item\":{\"id\":\"ai-1\",\"title\":\"X\",\"status\":\"open\",\"pressure_score\":0.5,\"completion_note\":\"still working\",\"evidence_refs\":[]},\"quality_config\":{\"version\":\"1.0\",\"high_pressure_threshold\":0.7,\"require_evidence_when_high_pressure\":true,\"min_note_length\":8}}");
-        assert!(out.contains("\"reason_code\":\"invalid_status\""), "expected invalid_status in {out}");
+        assert!(
+            out.contains("\"reason_code\":\"invalid_status\""),
+            "expected invalid_status in {out}"
+        );
     }
 
     #[test]
     fn use_case_04_sad() {
         let out = run("{\"item\":{\"id\":\"\",\"title\":\"X\",\"status\":\"done\",\"pressure_score\":0.5,\"completion_note\":\"done enough\",\"evidence_refs\":[]},\"quality_config\":{\"version\":\"1.0\",\"high_pressure_threshold\":0.7,\"require_evidence_when_high_pressure\":true,\"min_note_length\":8}}");
-        assert!(out.contains("\"reason_code\":\"invalid_input\""), "expected invalid_input in {out}");
+        assert!(
+            out.contains("\"reason_code\":\"invalid_input\""),
+            "expected invalid_input in {out}"
+        );
     }
 
+    #[test]
+    fn missing_item_or_config_yields_invalid_input() {
+        let out = run("{}");
+        assert!(
+            out.contains("\"reason_code\":\"invalid_input\""),
+            "expected invalid_input in {out}"
+        );
+    }
+
+    #[test]
+    fn short_note_and_missing_evidence_under_low_pressure_fails() {
+        let out = run("{\"item\":{\"id\":\"ai-1\",\"status\":\"done\",\"pressure_score\":0.1,\"completion_note\":\"hi\",\"evidence_refs\":[]},\"quality_config\":{\"high_pressure_threshold\":0.7,\"require_evidence_when_high_pressure\":true,\"min_note_length\":8}}");
+        assert!(
+            out.contains("\"verdict\":\"fail\""),
+            "expected fail verdict in {out}"
+        );
+        assert!(out.contains("\"gaps\":[\"short_note\"]"));
+    }
+
+    #[test]
+    fn short_note_and_missing_evidence_under_high_pressure_needs_evidence_with_both_gaps() {
+        let out = run("{\"item\":{\"id\":\"ai-1\",\"status\":\"done\",\"pressure_score\":0.9,\"completion_note\":\"hi\",\"evidence_refs\":[]},\"quality_config\":{\"high_pressure_threshold\":0.7,\"require_evidence_when_high_pressure\":true,\"min_note_length\":8}}");
+        assert!(
+            out.contains("\"verdict\":\"needs_evidence\""),
+            "expected needs_evidence verdict in {out}"
+        );
+        assert!(out.contains("\"gaps\":[\"short_note\",\"missing_evidence\"]"));
+    }
+
+    #[test]
+    fn short_note_with_evidence_present_needs_evidence() {
+        let out = run("{\"item\":{\"id\":\"ai-1\",\"status\":\"done\",\"pressure_score\":0.1,\"completion_note\":\"hi\",\"evidence_refs\":[\"doc-1\"]},\"quality_config\":{\"high_pressure_threshold\":0.7,\"require_evidence_when_high_pressure\":true,\"min_note_length\":8}}");
+        assert!(
+            out.contains("\"verdict\":\"needs_evidence\""),
+            "expected needs_evidence verdict in {out}"
+        );
+        assert!(out.contains("\"gaps\":[\"short_note\"]"));
+    }
+
+    #[test]
+    fn extract_bool_handles_false_and_neither() {
+        assert_eq!(extract_bool(b"\"k\":false", b"\"k\""), Some(false));
+        assert_eq!(extract_bool(b"\"k\":maybe", b"\"k\""), None);
+    }
+
+    #[test]
+    fn extract_i32_handles_none() {
+        assert_eq!(extract_i32(b"{}", b"\"missing\""), None);
+        assert_eq!(extract_i32(b"\"k\":oops", b"\"k\""), None);
+    }
+
+    #[test]
+    fn parse_number_millis_handles_missing_and_non_digit() {
+        assert_eq!(parse_number_millis(b"{}", b"\"missing\""), None);
+        assert_eq!(parse_number_millis(b"\"k\":oops", b"\"k\""), Some(0));
+    }
+
+    #[test]
+    fn object_after_key_at_depth_handles_missing_and_non_object() {
+        assert_eq!(object_after_key_at_depth(b"{}", b"\"missing\"", 1), None);
+        assert_eq!(object_after_key_at_depth(b"\"k\":5", b"\"k\"", 0), None);
+    }
+
+    #[test]
+    fn array_after_key_at_depth_handles_non_array() {
+        assert_eq!(array_after_key_at_depth(b"\"k\":5", b"\"k\"", 0), None);
+    }
+
+    #[test]
+    fn string_value_after_handles_missing_colon_quote_and_terminator() {
+        assert_eq!(string_value_after(b"no colon here"), b"");
+        assert_eq!(string_value_after(b":not-a-quote"), b"");
+        assert_eq!(string_value_after(b":\"unterminated"), b"");
+    }
+
+    #[test]
+    fn balanced_end_returns_none_when_unterminated() {
+        assert_eq!(balanced_end(b"{\"a\":\"b\"", b'{', b'}'), None);
+    }
+
+    #[test]
+    fn find_key_at_depth_skips_escaped_characters_in_strings() {
+        assert_eq!(
+            find_key_at_depth(b"\"a\":\"x\\\"y\",\"b\":1", b"\"b\"", 0),
+            Some(11)
+        );
+    }
+
+    #[test]
+    fn count_array_strings_skips_escaped_quotes() {
+        assert_eq!(count_array_strings(b"[\"a\\\"b\",\"c\"]"), 2);
+    }
 }
