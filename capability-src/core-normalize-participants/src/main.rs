@@ -209,7 +209,15 @@ pub unsafe fn evaluate(input: &[u8], out: &mut [u8]) -> usize {
             matched += 1;
             i = copy(out, i, match_id);
             i = copy(out, i, b"\",\"display_name\":\"");
-            i = copy_json_escaped(out, i, if match_name.is_empty() { name } else { match_name });
+            i = copy_json_escaped(
+                out,
+                i,
+                if match_name.is_empty() {
+                    name
+                } else {
+                    match_name
+                },
+            );
             i = copy(out, i, b"\",\"email\":");
             if match_email.is_empty() {
                 i = copy(out, i, b"null");
@@ -228,7 +236,11 @@ pub unsafe fn evaluate(input: &[u8], out: &mut [u8]) -> usize {
     i = write_u32(out, i, matched);
     i = copy(out, i, b",\"unmatched_count\":");
     i = write_u32(out, i, unmatched);
-    i = copy(out, i, b",\"reason_code\":\"ok\",\"evaluation_trace\":[\"normalized ");
+    i = copy(
+        out,
+        i,
+        b",\"reason_code\":\"ok\",\"evaluation_trace\":[\"normalized ",
+    );
     i = write_u32(out, i, total);
     i = copy(out, i, b" participants\",\"matched ");
     i = write_u32(out, i, matched);
@@ -238,7 +250,11 @@ pub unsafe fn evaluate(input: &[u8], out: &mut [u8]) -> usize {
 
 fn fail(out: &mut [u8], code: &[u8]) -> usize {
     let mut i = 0usize;
-    i = copy(out, i, b"{\"participants\":[],\"matched_count\":0,\"unmatched_count\":0,\"reason_code\":\"");
+    i = copy(
+        out,
+        i,
+        b"{\"participants\":[],\"matched_count\":0,\"unmatched_count\":0,\"reason_code\":\"",
+    );
     i = copy(out, i, code);
     i = copy(out, i, b"\",\"evaluation_trace\":[]}");
     i
@@ -358,13 +374,6 @@ fn extract_string<'a>(hay: &'a [u8], key: &[u8]) -> &'a [u8] {
     string_value_after(&hay[pos + key.len()..])
 }
 
-fn extract_string_at_depth<'a>(hay: &'a [u8], key: &[u8], depth: i32) -> &'a [u8] {
-    let Some(pos) = find_key_at_depth(hay, key, depth) else {
-        return b"";
-    };
-    string_value_after(&hay[pos + key.len()..])
-}
-
 fn object_after_key_at_depth<'a>(hay: &'a [u8], key: &[u8], depth: i32) -> Option<&'a [u8]> {
     let pos = find_key_at_depth(hay, key, depth)?;
     let after = &hay[pos + key.len()..];
@@ -387,93 +396,6 @@ fn array_after_key_at_depth<'a>(hay: &'a [u8], key: &[u8], depth: i32) -> Option
     }
     let end = balanced_end(rest, b'[', b']')?;
     Some(&rest[..=end])
-}
-
-fn extract_bool(hay: &[u8], key: &[u8]) -> Option<bool> {
-    let pos = find(hay, key)?;
-    let after = &hay[pos + key.len()..];
-    let colon = after.iter().position(|b| *b == b':')?;
-    let rest = skip_ws(&after[colon + 1..]);
-    if rest.starts_with(b"true") {
-        Some(true)
-    } else if rest.starts_with(b"false") {
-        Some(false)
-    } else {
-        None
-    }
-}
-
-fn extract_i32(hay: &[u8], key: &[u8]) -> Option<i32> {
-    let pos = find(hay, key)?;
-    let after = &hay[pos + key.len()..];
-    let colon = after.iter().position(|b| *b == b':')?;
-    let rest = skip_ws(&after[colon + 1..]);
-    parse_i32(rest)
-}
-
-fn parse_i32(rest: &[u8]) -> Option<i32> {
-    if rest.is_empty() {
-        return None;
-    }
-    let mut neg = false;
-    let mut j = 0usize;
-    if rest[0] == b'-' {
-        neg = true;
-        j = 1;
-    }
-    if j >= rest.len() || rest[j] < b'0' || rest[j] > b'9' {
-        return None;
-    }
-    let mut n: i32 = 0;
-    while j < rest.len() && rest[j] >= b'0' && rest[j] <= b'9' {
-        n = n * 10 + (rest[j] - b'0') as i32;
-        j += 1;
-    }
-    Some(if neg { -n } else { n })
-}
-
-fn parse_number_millis(hay: &[u8], key: &[u8]) -> Option<u32> {
-    let pos = find(hay, key)?;
-    let after = &hay[pos + key.len()..];
-    let colon = after.iter().position(|b| *b == b':')?;
-    let rest = skip_ws(&after[colon + 1..]);
-    if rest.is_empty() {
-        return None;
-    }
-    let mut whole: u32 = 0;
-    let mut frac: u32 = 0;
-    let mut frac_digits = 0u32;
-    let mut seen_dot = false;
-    let mut j = 0usize;
-    while j < rest.len() {
-        let b = rest[j];
-        if b == b',' || b == b'}' || b == b']' || b == b' ' || b == b'\n' {
-            break;
-        }
-        if b == b'.' {
-            seen_dot = true;
-            j += 1;
-            continue;
-        }
-        if b < b'0' || b > b'9' {
-            break;
-        }
-        let digit = (b - b'0') as u32;
-        if seen_dot {
-            if frac_digits < 3 {
-                frac = frac * 10 + digit;
-                frac_digits += 1;
-            }
-        } else {
-            whole = whole * 10 + digit;
-        }
-        j += 1;
-    }
-    while frac_digits < 3 {
-        frac *= 10;
-        frac_digits += 1;
-    }
-    Some(whole * 1000 + frac)
 }
 
 fn copy(out: &mut [u8], at: usize, bytes: &[u8]) -> usize {
@@ -526,15 +448,6 @@ fn write_u32(out: &mut [u8], mut i: usize, mut n: u32) -> usize {
     i
 }
 
-fn write_i32(out: &mut [u8], mut i: usize, n: i32) -> usize {
-    if n < 0 {
-        i = copy(out, i, b"-");
-        write_u32(out, i, (-n) as u32)
-    } else {
-        write_u32(out, i, n as u32)
-    }
-}
-
 fn ascii_lower(b: u8) -> u8 {
     if b >= b'A' && b <= b'Z' {
         b + 32
@@ -585,53 +498,6 @@ fn trim_ascii(s: &[u8]) -> &[u8] {
     &s[start..end]
 }
 
-/// Days since 1970-01-01 for YYYY-MM-DD (Howard Hinnant civil_from_days inverse).
-fn parse_ymd_days(s: &[u8]) -> Option<i32> {
-    if s.len() < 10 || s[4] != b'-' || s[7] != b'-' {
-        return None;
-    }
-    let y = parse_i32(&s[0..4])?;
-    let m = parse_i32(&s[5..7])?;
-    let d = parse_i32(&s[8..10])?;
-    if m < 1 || m > 12 || d < 1 || d > 31 {
-        return None;
-    }
-    let y = y as i32 - if m <= 2 { 1 } else { 0 };
-    let era = if y >= 0 { y } else { y - 399 } / 400;
-    let yoe = (y - era * 400) as u32;
-    let mp = if m > 2 { (m - 3) as u32 } else { (m + 9) as u32 };
-    let doy = (153 * mp + 2) / 5 + d as u32 - 1;
-    let doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;
-    Some((era * 146097 + doe as i32) - 719468)
-}
-
-fn format_score_millis(out: &mut [u8], millis: u32) -> usize {
-    let whole = millis / 1000;
-    let frac = millis % 1000;
-    let mut i = write_u32(out, 0, whole);
-    i = copy(out, i, b".");
-    // always 3 digits for determinism in contract examples we may trim; write without trailing zeros carefully
-    // Use up to 3 digits, trim trailing zeros but keep at least one if frac!=0? Contract examples use 0.785 / 1.0
-    if frac == 0 {
-        i = copy(out, i, b"0");
-        return i;
-    }
-    let d0 = (frac / 100) as u8;
-    let d1 = ((frac / 10) % 10) as u8;
-    let d2 = (frac % 10) as u8;
-    out[i] = b'0' + d0;
-    i += 1;
-    if d1 != 0 || d2 != 0 {
-        out[i] = b'0' + d1;
-        i += 1;
-        if d2 != 0 {
-            out[i] = b'0' + d2;
-            i += 1;
-        }
-    }
-    i
-}
-
 #[cfg(not(test))]
 #[panic_handler]
 fn panic(_: &core::panic::PanicInfo<'_>) -> ! {
@@ -651,13 +517,144 @@ mod catalog_coverage_tests {
     #[test]
     fn use_case_01_happy() {
         let out = run("{\"raw_participants\":[{\"name\":\"Ada Lovelace\",\"email\":\"Ada@Loop.Dev\"},{\"name\":\"bob smith\",\"email\":\"bob@loop.dev\"},{\"name\":\"Unknown Person\",\"email\":\"stranger@example.com\"}],\"workspace_members\":[{\"id\":\"user-ada\",\"name\":\"Ada Lovelace\",\"email\":\"ada@loop.dev\"},{\"id\":\"user-bob\",\"name\":\"Bob Smith\",\"email\":\"bob@loop.dev\"}],\"normalize_config\":{\"version\":\"1.0\"}}");
-        assert!(out.contains("\"reason_code\":\"ok\""), "expected ok in {out}");
+        assert!(
+            out.contains("\"reason_code\":\"ok\""),
+            "expected ok in {out}"
+        );
     }
 
     #[test]
     fn use_case_02_happy() {
         let out = run("{\"raw_participants\":[{\"name\":\"Ada Lovelace\",\"email\":null}],\"workspace_members\":[{\"id\":\"user-ada\",\"name\":\"Ada Lovelace\",\"email\":\"ada@loop.dev\"}],\"normalize_config\":{\"version\":\"1.0\"}}");
-        assert!(out.contains("\"reason_code\":\"ok\""), "expected ok in {out}");
+        assert!(
+            out.contains("\"reason_code\":\"ok\""),
+            "expected ok in {out}"
+        );
     }
 
+    #[test]
+    fn missing_required_fields_yields_invalid_input() {
+        let out = run("{\"workspace_members\":[],\"normalize_config\":{}}");
+        assert!(
+            out.contains("\"reason_code\":\"invalid_input\""),
+            "expected invalid_input in {out}"
+        );
+    }
+
+    #[test]
+    fn member_with_missing_name_or_email_falls_back_on_match() {
+        let out = run("{\"raw_participants\": [ {\"name\":\"Dave X\",\"email\":\"dave@x.com\"},{\"name\":\"Carol\",\"email\":null} ],\"workspace_members\": [ {\"id\":\"user-dave\",\"name\":\"\",\"email\":\"dave@x.com\"},{\"id\":\"user-carol\",\"name\":\"Carol\",\"email\":\"\"} ],\"normalize_config\": {\"version\":\"1.0\"}}");
+        assert!(
+            out.contains("\"display_name\":\"Dave X\""),
+            "expected name fallback to raw participant's own name in {out}"
+        );
+        assert!(
+            out.contains("\"email\":null"),
+            "expected null email for member matched with no email on file in {out}"
+        );
+    }
+
+    #[test]
+    fn member_with_empty_or_too_long_id_is_skipped() {
+        let long_id = "x".repeat(200);
+        let input = format!(
+            "{{\"raw_participants\":[{{\"name\":\"Solo\",\"email\":\"solo@x.com\"}}],\"workspace_members\":[{{\"id\":\"\",\"name\":\"NoId\",\"email\":\"noid@x.com\"}},{{\"id\":\"{long_id}\",\"name\":\"TooLong\",\"email\":\"solo@x.com\"}}],\"normalize_config\":{{\"version\":\"1.0\"}}}}"
+        );
+        let out = run(&input);
+        assert!(
+            out.contains("\"match_method\":\"none\""),
+            "expected no match since both members were skipped in {out}"
+        );
+    }
+
+    #[test]
+    fn non_object_member_element_stops_scanning() {
+        let out = run("{\"raw_participants\":[{\"name\":\"A\",\"email\":\"a@x.com\"}],\"workspace_members\":[{\"id\":\"user-a\",\"name\":\"A\",\"email\":\"a@x.com\"},42],\"normalize_config\":{\"version\":\"1.0\"}}");
+        assert!(
+            out.contains("\"match_method\":\"email\""),
+            "expected the first member to still be usable in {out}"
+        );
+    }
+
+    #[test]
+    fn non_object_participant_element_stops_scanning() {
+        let out = run("{\"raw_participants\":[{\"name\":\"A\",\"email\":\"a@x.com\"},42],\"workspace_members\":[{\"id\":\"user-a\",\"name\":\"A\",\"email\":\"a@x.com\"}],\"normalize_config\":{\"version\":\"1.0\"}}");
+        assert!(
+            out.contains("\"matched_count\":1"),
+            "expected scanning to stop at the non-object element in {out}"
+        );
+    }
+
+    #[test]
+    fn unterminated_member_object_stops_scanning() {
+        let out = run("{\"raw_participants\":[{\"name\":\"A\",\"email\":\"a@x.com\"}],\"normalize_config\":{\"version\":\"1.0\"},\"workspace_members\":[{\"id\":\"user-a\",\"name\":\"A\",\"email\":\"a@x.com\"},{\"id\":\"user-b\"]}");
+        assert!(
+            out.contains("\"match_method\":\"email\""),
+            "expected the first member to still be usable in {out}"
+        );
+    }
+
+    #[test]
+    fn unterminated_participant_object_stops_scanning() {
+        let out = run("{\"workspace_members\":[{\"id\":\"user-a\",\"name\":\"A\",\"email\":\"a@x.com\"}],\"normalize_config\":{\"version\":\"1.0\"},\"raw_participants\":[{\"name\":\"A\",\"email\":\"a@x.com\"},{\"name\":\"B\"]}");
+        assert!(
+            out.contains("\"matched_count\":1"),
+            "expected scanning to stop at the unterminated element in {out}"
+        );
+    }
+
+    #[test]
+    fn member_clone_is_a_bitwise_copy() {
+        let m = Member {
+            id: [1u8; STR_MAX],
+            id_len: 1,
+            name: [2u8; STR_MAX],
+            name_len: 1,
+            email: [3u8; STR_MAX],
+            email_len: 1,
+        };
+        let cloned = m.clone();
+        assert_eq!(cloned.id_len, m.id_len);
+        assert_eq!(cloned.email[0], 3u8);
+    }
+
+    #[test]
+    fn string_value_after_handles_missing_colon_quote_and_terminator() {
+        assert_eq!(string_value_after(b"no colon here"), b"");
+        assert_eq!(string_value_after(b":not-a-quote"), b"");
+        assert_eq!(string_value_after(b":\"unterminated"), b"");
+        assert_eq!(string_value_after(b":\"ok\""), b"ok");
+    }
+
+    #[test]
+    fn extract_string_returns_empty_when_key_missing() {
+        assert_eq!(extract_string(b"{\"other\":\"x\"}", b"\"missing\""), b"");
+    }
+
+    #[test]
+    fn object_after_key_at_depth_returns_none_for_non_object_value() {
+        assert_eq!(
+            object_after_key_at_depth(b"\"item\":5", b"\"item\"", 0),
+            None
+        );
+    }
+
+    #[test]
+    fn array_after_key_at_depth_returns_none_for_non_array_value() {
+        assert_eq!(
+            array_after_key_at_depth(b"\"item\":5", b"\"item\"", 0),
+            None
+        );
+    }
+
+    #[test]
+    fn skip_ws_trims_leading_whitespace() {
+        assert_eq!(skip_ws(b"   abc"), b"abc");
+        assert_eq!(skip_ws(b"abc"), b"abc");
+    }
+
+    #[test]
+    fn balanced_end_returns_none_when_unterminated() {
+        assert_eq!(balanced_end(b"{\"a\":\"b\"", b'{', b'}'), None);
+    }
 }
