@@ -48,6 +48,7 @@ Usage: generate_catalog_pages.py <catalog.json> <base_url> <output_dir>
 
 import html
 import json
+import re
 import sys
 from pathlib import Path
 from typing import Optional
@@ -56,6 +57,21 @@ from urllib.parse import quote
 
 def esc(value) -> str:
     return html.escape(str(value), quote=True)
+
+
+# Same spec 007-artifact-hosting tag-scheme prefix mirror_artifacts.py
+# matches against -- kept in lockstep with that script's ARTIFACT_URL_RE.
+# mirror_artifacts.py copies every artifact to this exact relative path
+# under the catalog output dir, so the CORS-enabled mirror URL is always
+# this fixed prefix swap, never new state to keep in sync (registry#304).
+ARTIFACT_URL_PREFIX_RE = re.compile(
+    r"^https://github\.com/traverse-framework/registry/releases/download/(artifacts/[^/]+/[^/]+)$"
+)
+
+
+def artifact_mirror_url(base_url: str, artifact_url: str) -> Optional[str]:
+    match = ARTIFACT_URL_PREFIX_RE.match(artifact_url)
+    return f"{base_url}/{match.group(1)}" if match else None
 
 
 def field_row(label: str, value) -> str:
@@ -384,6 +400,9 @@ def render_capability_page(
         field_rows += f'<div class="field-row"><span class="field-label">Artifact digest</span><span class="field-value t-mono">{esc(artifact["digest"])}</span></div>'
     if artifact.get("url"):
         field_rows += f'<div class="field-row"><span class="field-label">Artifact</span><span class="field-value"><a href="{esc(artifact["url"])}">{esc(artifact["url"])}</a></span></div>'
+        mirror_url = artifact_mirror_url(base_url, artifact["url"])
+        if mirror_url:
+            field_rows += f'<div class="field-row"><span class="field-label">Artifact (CORS mirror)</span><span class="field-value"><a href="{esc(mirror_url)}">{esc(mirror_url)}</a></span></div>'
 
     use_cases = contract.get("use_cases") or []
     use_cases_html = (
