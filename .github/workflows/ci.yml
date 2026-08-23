@@ -260,6 +260,9 @@ jobs:
       - name: Generate static capability pages + sitemap.xml (registry#131)
         run: python3 scripts/ci/generate_catalog_pages.py catalog/catalog.json https://registry.traverse-framework.com catalog
 
+      - name: Mirror artifact WASM binaries for CORS-enabled fetch (registry#304)
+        run: python3 scripts/ci/mirror_artifacts.py catalog
+
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v5
         with:
