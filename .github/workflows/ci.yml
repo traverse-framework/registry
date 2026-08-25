@@ -204,6 +204,24 @@ jobs:
         with:
           workspaces: |
             capability-src/catalog-builder
+            capability-src/approval-decision-apply
+            capability-src/artifact-revision-create
+            capability-src/classification-outcome-resolve
+            capability-src/classifier-release-gate-evaluate
+            capability-src/cluster-curate
+            capability-src/coverage-completeness-assess
+            capability-src/embedding-cluster-organize
+            capability-src/location-initialize
+            capability-src/model-improve
+            capability-src/operations-recover
+            capability-src/period-finalize
+            capability-src/retention-eligibility-classify
+            capability-src/review-prepare
+            capability-src/review-state-transition-decide
+            capability-src/revision-successor-assign
+            capability-src/summary-aggregate
+            capability-src/uncertainty-score
+            capability-src/visual-parameter-map
             capability-src/validate-luhn
             capability-src/validate-email
             capability-src/normalize-phone-number

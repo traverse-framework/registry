@@ -46,11 +46,31 @@ from pathlib import Path
 from typing import Optional
 
 # Maps a capability id to the capability-src/ crate whose current source
-# backs it. Only the 11 real, tested capabilities published today have an
-# entry -- a future capability must be added here explicitly, the same
-# deliberate-no-magic policy verify_use_cases.py (registry#107) used for its
-# own binary-path mapping.
+# backs it. A future capability must be added here explicitly, following the
+# same deliberate-no-magic policy verify_use_cases.py (registry#107) uses for
+# its own binary-path mapping.
 CURRENT_CRATE_FOR_ID = {
+    # Callweave-owned source mirrors.  These are explicit (rather than
+    # discovered heuristically) so the catalog only reports independently
+    # measured coverage for the source that backs each current capability.
+    "approval.decision-apply": "approval-decision-apply",
+    "artifact.revision-create": "artifact-revision-create",
+    "classification.outcome-resolve": "classification-outcome-resolve",
+    "classifier.release-gate-evaluate": "classifier-release-gate-evaluate",
+    "cluster.curate": "cluster-curate",
+    "coverage.completeness-assess": "coverage-completeness-assess",
+    "embedding.cluster-organize": "embedding-cluster-organize",
+    "location.initialize": "location-initialize",
+    "model.improve": "model-improve",
+    "operations.recover": "operations-recover",
+    "period.finalize": "period-finalize",
+    "retention.eligibility-classify": "retention-eligibility-classify",
+    "review.prepare": "review-prepare",
+    "review.state-transition-decide": "review-state-transition-decide",
+    "revision.successor-assign": "revision-successor-assign",
+    "summary.aggregate": "summary-aggregate",
+    "uncertainty.score": "uncertainty-score",
+    "visual.parameter-map": "visual-parameter-map",
     "validation.validate-luhn": "validate-luhn",
     "validation.validate-email": "validate-email",
     "validation.normalize-phone-number": "normalize-phone-number",

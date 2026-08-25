@@ -1,0 +1,14 @@
+{
+  "cluster": {
+    "id": "cluster-8"
+  },
+  "privacy": {
+    "state": "unknown",
+    "sanitized_assets": [
+      "cluster-8-summary.md"
+    ]
+  },
+  "policy": {
+    "version": "review-policy-1"
+  }
+}

@@ -1,0 +1,5 @@
+{
+  "location": { "id": "quiet-site" },
+  "policy": { "version": "location-policy-1" },
+  "sources": []
+}

@@ -1,0 +1,29 @@
+{
+  "kind": "runtime_request",
+  "schema_version": "1.0.0",
+  "request_id": "release-gate-02",
+  "intent": {
+    "capability_id": "classifier.release-gate-evaluate",
+    "capability_version": "1.0.0"
+  },
+  "input": {
+    "cases": [
+      { "contains_positive": true, "positive_detected": false },
+      { "contains_positive": true, "positive_detected": true }
+    ],
+    "policy": {
+      "version": "release-gate-1",
+      "minimum_positive_cases": 2,
+      "maximum_false_negative_millis": 0
+    }
+  },
+  "lookup": {
+    "scope": "prefer_private",
+    "allow_ambiguity": false
+  },
+  "context": {
+    "requested_target": "local",
+    "caller": "callweave-smoke"
+  },
+  "governing_spec": "006-runtime-request-execution"
+}
