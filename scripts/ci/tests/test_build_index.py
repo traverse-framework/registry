@@ -101,6 +101,44 @@ class BuildIndexContractMetadataTests(unittest.TestCase):
             index = self._run_in(tmp, 5, "deadbeef")
             self.assertEqual(index["index_version"], 6)
 
+    def test_entry_carries_sanitized_display_metadata(self):
+        # specs/019-public-metadata-sync-extension FR-001/FR-002
+        # (registry#312): summary/description pass through verbatim,
+        # use_cases keeps only scenario text.
+        with tempfile.TemporaryDirectory() as tmp:
+            contract = valid_contract()
+            contract["summary"] = "Does a thing."
+            contract["description"] = "Does the thing in detail."
+            contract["use_cases"] = [
+                {
+                    "scenario": "As a user, I want X, so that Y.",
+                    "input_example": {"secret": "should not leak"},
+                    "output_example": {"also_secret": "should not leak"},
+                    "happy": True,
+                    "persona_ref": "some-persona@1.0.0",
+                }
+            ]
+            write_contract(tmp, contract)
+
+            index = self._run_in(tmp, 0, "deadbeef")
+
+            entry = index["capabilities"][0]
+            self.assertEqual(entry["summary"], "Does a thing.")
+            self.assertEqual(entry["description"], "Does the thing in detail.")
+            self.assertEqual(entry["use_cases"], [{"scenario": "As a user, I want X, so that Y."}])
+
+    def test_missing_display_metadata_does_not_fail_build(self):
+        # FR-003: absence is valid, not a build failure -- matches this
+        # script's existing non-retroactive stance on older content.
+        with tempfile.TemporaryDirectory() as tmp:
+            write_contract(tmp, valid_contract())
+            index = self._run_in(tmp, 0, "deadbeef")
+
+            entry = index["capabilities"][0]
+            self.assertEqual(entry["summary"], "")
+            self.assertEqual(entry["description"], "")
+            self.assertEqual(entry["use_cases"], [])
+
     def test_active_contract_missing_artifact_aborts_build(self):
         # Regression test for a real incident (registry#89/#90): an active
         # contract with no artifact.digest/.url must never reach the
