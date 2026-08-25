@@ -1,0 +1,29 @@
+{
+  "kind": "runtime_request",
+  "schema_version": "1.0.0",
+  "request_id": "visual-parameter-map-02",
+  "intent": {
+    "capability_id": "visual.parameter-map",
+    "capability_version": "1.0.0"
+  },
+  "input": {
+    "summary": {
+      "evidence_count": 3,
+      "coverage_millis": 420,
+      "uncertainty_millis": 800
+    },
+    "style_policy": {
+      "version": "style-policy-1",
+      "seed": 10
+    }
+  },
+  "lookup": {
+    "scope": "prefer_private",
+    "allow_ambiguity": false
+  },
+  "context": {
+    "requested_target": "local",
+    "caller": "callweave-smoke"
+  },
+  "governing_spec": "006-runtime-request-execution"
+}

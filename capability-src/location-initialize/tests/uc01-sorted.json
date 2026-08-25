@@ -1,0 +1,19 @@
+{
+  "location": { "id": "golden-bc" },
+  "policy": { "version": "location-policy-1" },
+  "sources": [
+    {
+      "id": "source-b",
+      "license": "CC-BY-4.0",
+      "taxon": "Taxon beta",
+      "status": "rare",
+      "season": "summer"
+    },
+    {
+      "id": "source-a",
+      "license": "CC-BY-4.0",
+      "taxon": "Taxon alpha",
+      "status": "expected"
+    }
+  ]
+}

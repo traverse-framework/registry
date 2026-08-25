@@ -1,0 +1,11 @@
+{
+  "location": { "id": "golden-bc" },
+  "policy": { "version": "location-policy-1" },
+  "sources": [
+    {
+      "id": "source-a",
+      "taxon": "Taxon alpha",
+      "status": "expected"
+    }
+  ]
+}

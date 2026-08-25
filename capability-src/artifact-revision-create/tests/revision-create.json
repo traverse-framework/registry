@@ -1,0 +1,22 @@
+{
+  "context": {
+    "caller": "capability-scaffold",
+    "requested_target": "local"
+  },
+  "governing_spec": "006-runtime-request-execution",
+  "input": {
+    "artifact": { "id": "canvas-2026-08-17", "previous_revision": 1, "correction_reason": "verified-evidence" },
+    "revision_policy": { "version": "1.0.0" }
+  },
+  "intent": {
+    "capability_id": "artifact.revision-create",
+    "capability_version": "1.0.0"
+  },
+  "kind": "runtime_request",
+  "lookup": {
+    "allow_ambiguity": false,
+    "scope": "prefer_private"
+  },
+  "request_id": "revision-create-scaffold-001",
+  "schema_version": "1.0.0"
+}

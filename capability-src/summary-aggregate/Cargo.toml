@@ -1,0 +1,17 @@
+[workspace]
+
+[package]
+name = "summary-aggregate-agent"
+version = "1.0.0"
+edition = "2015"
+publish = false
+description = "Callweave-owned source mirror of summary.aggregate for independently measured registry coverage."
+
+[[bin]]
+name = "summary-aggregate-agent"
+path = "src/main.rs"
+
+[profile.release]
+opt-level = "s"
+lto = true
+panic = "abort"

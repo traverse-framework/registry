@@ -1,0 +1,22 @@
+{
+  "context": {
+    "caller": "capability-scaffold",
+    "requested_target": "local"
+  },
+  "governing_spec": "006-runtime-request-execution",
+  "input": {
+    "cluster": { "id": "c-1", "member_count": 4, "representative_ref": "e-1" },
+    "curation_policy": { "version": "1.0.0" }
+  },
+  "intent": {
+    "capability_id": "cluster.curate",
+    "capability_version": "1.0.0"
+  },
+  "kind": "runtime_request",
+  "lookup": {
+    "allow_ambiguity": false,
+    "scope": "prefer_private"
+  },
+  "request_id": "cluster-curate-scaffold-001",
+  "schema_version": "1.0.0"
+}

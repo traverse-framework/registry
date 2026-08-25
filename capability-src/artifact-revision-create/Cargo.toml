@@ -1,0 +1,17 @@
+[workspace]
+
+[package]
+name = "artifact-revision-create-agent"
+version = "1.0.0"
+edition = "2015"
+publish = false
+description = "Callweave-owned source mirror of artifact.revision-create for independently measured registry coverage."
+
+[[bin]]
+name = "artifact-revision-create-agent"
+path = "src/main.rs"
+
+[profile.release]
+opt-level = "s"
+lto = true
+panic = "abort"
