@@ -28,6 +28,25 @@ pub struct PublicRegistryCapabilityRecord {
     pub contract_digest: String,
     pub contract_url: String,
     pub deprecated: bool,
+    /// specs/019-public-metadata-sync-extension (Draft, registry#312):
+    /// sanitized display metadata for a spec-116-style offline metadata
+    /// cache to consume directly, without an extra fetch per capability.
+    /// `#[serde(default)]` so a pre-spec-019 `index.json` (missing these
+    /// fields) still deserializes.
+    #[serde(default)]
+    pub summary: String,
+    #[serde(default)]
+    pub description: String,
+    #[serde(default)]
+    pub use_cases: Vec<PublicUseCaseSummary>,
+}
+
+/// Sanitized use-case projection: `scenario` text only. Never carries
+/// `input_example`/`output_example`/`persona_ref` -- those stay in the full
+/// contract, fetched separately via `contract_url` when actually needed.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
+pub struct PublicUseCaseSummary {
+    pub scenario: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
@@ -432,7 +451,10 @@ fn capability_json_value(record: &PublicRegistryCapabilityRecord) -> Value {
         "artifact_url": record.artifact_url,
         "contract_digest": record.contract_digest,
         "contract_url": record.contract_url,
-        "deprecated": record.deprecated
+        "deprecated": record.deprecated,
+        "summary": record.summary,
+        "description": record.description,
+        "use_cases": record.use_cases
     })
 }
 
@@ -603,6 +625,43 @@ mod tests {
 
         assert!(codes.contains(&PublicRegistryStateErrorCode::EmptyField));
         assert!(codes.contains(&PublicRegistryStateErrorCode::DuplicateRecord));
+    }
+
+    #[test]
+    fn missing_display_metadata_passes_validation() {
+        // specs/019-public-metadata-sync-extension FR-005: absence of
+        // summary/description/use_cases is valid, not a validation failure.
+        let mut index = valid_index();
+        index.capabilities[0].summary = String::new();
+        index.capabilities[0].description = String::new();
+        index.capabilities[0].use_cases = Vec::new();
+
+        assert!(validate_public_registry_index(&index).is_ok());
+    }
+
+    #[test]
+    fn capability_record_deserializes_pre_spec_019_index_json() {
+        // specs/019-public-metadata-sync-extension FR-004: a generation
+        // built before this spec landed (no summary/description/use_cases
+        // keys at all) must still deserialize, with the new fields
+        // defaulting to empty.
+        let raw = serde_json::json!({
+            "namespace": "traverse-starter",
+            "id": "traverse-starter.process",
+            "version": "1.0.0",
+            "digest": "sha256:5647",
+            "artifact_url": "https://example.invalid/artifact.wasm",
+            "contract_digest": "sha256:5647",
+            "contract_url": "https://example.invalid/contract.json",
+            "deprecated": false
+        });
+
+        let record: PublicRegistryCapabilityRecord =
+            serde_json::from_value(raw).expect("pre-spec-019 record should deserialize");
+
+        assert_eq!(record.summary, "");
+        assert_eq!(record.description, "");
+        assert!(record.use_cases.is_empty());
     }
 
     #[test]
@@ -906,6 +965,11 @@ mod tests {
                 contract_digest: "sha256:5647".to_string(),
                 contract_url: "https://github.com/traverse-framework/registry/releases/download/artifacts/traverse-starter.process-1.0.0/contract.json".to_string(),
                 deprecated: false,
+                summary: "Processes a note.".to_string(),
+                description: "Processes a note into structured form.".to_string(),
+                use_cases: vec![PublicUseCaseSummary {
+                    scenario: "As a user, I want my note processed, so that it's structured.".to_string(),
+                }],
             }],
         }
     }

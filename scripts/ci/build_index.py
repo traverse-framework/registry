@@ -44,6 +44,12 @@ file is the whole published record, so each entry carries `product_digest`/
 `product_url` provenance fields (plus optional `deprecated` from a sibling
 `deprecated.json`).
 
+Also implements specs/019-public-metadata-sync-extension/spec.md (Draft,
+registry#312): each capability entry gains `summary`, `description`, and a
+sanitized `use_cases` projection (scenario text only) so a spec 116-style
+offline metadata cache can build from one `index.json` fetch instead of
+fetching every capability's full contract individually.
+
 Usage: build_index.py <previous_index_version_or_0> <source_commit_sha> <output_path> [repo_slug]
 """
 
@@ -62,6 +68,19 @@ class IndexBuildError(Exception):
         self.code = code
         self.path = path
         self.message = message
+
+
+def sanitized_use_cases(use_cases) -> list:
+    """specs/019-public-metadata-sync-extension FR-002: keep only `scenario`
+    text -- drop input_example/output_example/happy/persona_ref, matching
+    traverse spec 116 FR-003's exclusion of use-case inputs/outputs."""
+    if not isinstance(use_cases, list):
+        return []
+    return [
+        {"scenario": entry.get("scenario", "")}
+        for entry in use_cases
+        if isinstance(entry, dict)
+    ]
 
 
 def build_index(previous_index_version: int, source_commit: str, repo_slug: str = DEFAULT_REPO_SLUG) -> dict:
@@ -113,6 +132,9 @@ def build_index(previous_index_version: int, source_commit: str, repo_slug: str 
                     "contract_digest": contract_digest,
                     "contract_url": contract_url,
                     "deprecated": deprecated,
+                    "summary": contract.get("summary") or "",
+                    "description": contract.get("description") or "",
+                    "use_cases": sanitized_use_cases(contract.get("use_cases")),
                 }
             )
 

@@ -298,5 +298,17 @@
       ]
     }
   ],
-  "draft_specs": []
+  "draft_specs": [
+    {
+      "id": "019-public-metadata-sync-extension",
+      "version": "0.1.0",
+      "status": "draft",
+      "immutable": false,
+      "path": "specs/019-public-metadata-sync-extension/spec.md",
+      "will_govern": [
+        "scripts/ci/build_index.py",
+        "crates/traverse-registry/"
+      ]
+    }
+  ]
 }
