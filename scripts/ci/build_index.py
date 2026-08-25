@@ -50,6 +50,13 @@ sanitized `use_cases` projection (scenario text only) so a spec 116-style
 offline metadata cache can build from one `index.json` fetch instead of
 fetching every capability's full contract individually.
 
+Also implements specs/019-public-metadata-sync-extension/spec.md's
+amendment (Draft, registry#318, FR-006 through FR-009): each capability
+entry additionally gains `service_type`, `permitted_targets`, `lifecycle`,
+and an unfiltered `provenance` object, matching what traverse spec
+114-mcp-capability-search FR-005 requires its search-result projection to
+carry.
+
 Usage: build_index.py <previous_index_version_or_0> <source_commit_sha> <output_path> [repo_slug]
 """
 
@@ -135,6 +142,10 @@ def build_index(previous_index_version: int, source_commit: str, repo_slug: str 
                     "summary": contract.get("summary") or "",
                     "description": contract.get("description") or "",
                     "use_cases": sanitized_use_cases(contract.get("use_cases")),
+                    "service_type": contract.get("service_type") or "",
+                    "permitted_targets": contract.get("permitted_targets") or [],
+                    "lifecycle": contract.get("lifecycle") or "",
+                    "provenance": contract.get("provenance"),
                 }
             )
 
