@@ -181,7 +181,7 @@ dependencies = [
 
 [[package]]
 name = "traverse-registry"
-version = "0.15.0"
+version = "0.15.1"
 dependencies = [
  "semver",
  "serde",
