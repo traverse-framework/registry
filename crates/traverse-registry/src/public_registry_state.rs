@@ -39,6 +39,21 @@ pub struct PublicRegistryCapabilityRecord {
     pub description: String,
     #[serde(default)]
     pub use_cases: Vec<PublicUseCaseSummary>,
+    /// specs/019-public-metadata-sync-extension amendment (Draft,
+    /// registry#318): search-projection fields required by traverse spec
+    /// 114-mcp-capability-search FR-005. `#[serde(default)]` so an
+    /// `index.json` generation that predates the amendment still
+    /// deserializes.
+    #[serde(default)]
+    pub service_type: String,
+    #[serde(default)]
+    pub permitted_targets: Vec<String>,
+    #[serde(default)]
+    pub lifecycle: String,
+    /// Unfiltered pass-through of the contract's own `provenance` object --
+    /// see spec 019's amendment for why no sub-field redaction is needed.
+    #[serde(default)]
+    pub provenance: Option<Value>,
 }
 
 /// Sanitized use-case projection: `scenario` text only. Never carries
@@ -454,7 +469,11 @@ fn capability_json_value(record: &PublicRegistryCapabilityRecord) -> Value {
         "deprecated": record.deprecated,
         "summary": record.summary,
         "description": record.description,
-        "use_cases": record.use_cases
+        "use_cases": record.use_cases,
+        "service_type": record.service_type,
+        "permitted_targets": record.permitted_targets,
+        "lifecycle": record.lifecycle,
+        "provenance": record.provenance
     })
 }
 
@@ -662,6 +681,83 @@ mod tests {
         assert_eq!(record.summary, "");
         assert_eq!(record.description, "");
         assert!(record.use_cases.is_empty());
+    }
+
+    #[test]
+    fn capability_record_deserializes_pre_amendment_318_index_json() {
+        // specs/019-public-metadata-sync-extension amendment FR-009
+        // (registry#318): a generation built before this amendment landed
+        // (no service_type/permitted_targets/lifecycle/provenance keys at
+        // all) must still deserialize, with the new fields defaulting to
+        // empty/None.
+        let raw = serde_json::json!({
+            "namespace": "traverse-starter",
+            "id": "traverse-starter.process",
+            "version": "1.0.0",
+            "digest": "sha256:5647",
+            "artifact_url": "https://example.invalid/artifact.wasm",
+            "contract_digest": "sha256:5647",
+            "contract_url": "https://example.invalid/contract.json",
+            "deprecated": false,
+            "summary": "Processes a note.",
+            "description": "Processes a note into structured form.",
+            "use_cases": []
+        });
+
+        let record: PublicRegistryCapabilityRecord =
+            serde_json::from_value(raw).expect("pre-amendment-318 record should deserialize");
+
+        assert_eq!(record.service_type, "");
+        assert!(record.permitted_targets.is_empty());
+        assert_eq!(record.lifecycle, "");
+        assert!(record.provenance.is_none());
+    }
+
+    #[test]
+    fn search_projection_fields_round_trip_unfiltered() {
+        // specs/019-public-metadata-sync-extension amendment FR-006/FR-007
+        // (registry#318): service_type/permitted_targets/lifecycle/provenance
+        // survive a write/load round trip, and provenance is passed through
+        // with every sub-field intact (no redaction, unlike use_cases).
+        let workspace_root = unique_temp_dir();
+
+        write_synced_public_registry_state(
+            &workspace_root,
+            "local",
+            "traverse-framework/registry",
+            "index-v7",
+            "2026-07-06T00:00:00Z",
+            valid_index(),
+        )
+        .expect("public registry state should write");
+
+        let record = resolve_synced_public_registry_record(
+            &workspace_root,
+            "local",
+            "traverse-starter",
+            "traverse-starter.process",
+            "1.0.0",
+        )
+        .expect("public record lookup should read local state")
+        .expect("public record should resolve");
+
+        assert_eq!(record.service_type, "stateless");
+        assert_eq!(
+            record.permitted_targets,
+            vec!["local".to_string(), "cloud".to_string()]
+        );
+        assert_eq!(record.lifecycle, "active");
+        assert_eq!(
+            record.provenance,
+            Some(serde_json::json!({
+                "source": "greenfield",
+                "author": "enricopiovesan",
+                "created_at": "2026-07-08T00:00:00Z",
+                "spec_ref": "058-workflow-pipeline-execution@1.0.0",
+                "adr_refs": ["0001-rust-wasm-foundation"],
+                "exception_refs": []
+            }))
+        );
     }
 
     #[test]
@@ -970,6 +1066,17 @@ mod tests {
                 use_cases: vec![PublicUseCaseSummary {
                     scenario: "As a user, I want my note processed, so that it's structured.".to_string(),
                 }],
+                service_type: "stateless".to_string(),
+                permitted_targets: vec!["local".to_string(), "cloud".to_string()],
+                lifecycle: "active".to_string(),
+                provenance: Some(serde_json::json!({
+                    "source": "greenfield",
+                    "author": "enricopiovesan",
+                    "created_at": "2026-07-08T00:00:00Z",
+                    "spec_ref": "058-workflow-pipeline-execution@1.0.0",
+                    "adr_refs": ["0001-rust-wasm-foundation"],
+                    "exception_refs": []
+                })),
             }],
         }
     }

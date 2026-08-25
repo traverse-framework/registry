@@ -139,6 +139,46 @@ class BuildIndexContractMetadataTests(unittest.TestCase):
             self.assertEqual(entry["description"], "")
             self.assertEqual(entry["use_cases"], [])
 
+    def test_entry_carries_search_projection_fields(self):
+        # specs/019-public-metadata-sync-extension amendment FR-006/FR-007
+        # (registry#318): service_type/permitted_targets/lifecycle copied
+        # verbatim, provenance passed through unfiltered (no redaction --
+        # unlike use_cases, none of its fields are secret or PII).
+        with tempfile.TemporaryDirectory() as tmp:
+            contract = valid_contract()
+            contract["service_type"] = "stateless"
+            contract["permitted_targets"] = ["local", "cloud"]
+            contract["lifecycle"] = "active"
+            contract["provenance"] = {
+                "source": "greenfield",
+                "author": "enricopiovesan",
+                "created_at": "2026-07-08T00:00:00Z",
+                "spec_ref": "058-workflow-pipeline-execution@1.0.0",
+                "adr_refs": ["0001-rust-wasm-foundation"],
+                "exception_refs": [],
+            }
+            write_contract(tmp, contract)
+
+            index = self._run_in(tmp, 0, "deadbeef")
+
+            entry = index["capabilities"][0]
+            self.assertEqual(entry["service_type"], "stateless")
+            self.assertEqual(entry["permitted_targets"], ["local", "cloud"])
+            self.assertEqual(entry["lifecycle"], "active")
+            self.assertEqual(entry["provenance"], contract["provenance"])
+
+    def test_missing_search_projection_fields_does_not_fail_build(self):
+        # FR-008: absence is valid, not a build failure.
+        with tempfile.TemporaryDirectory() as tmp:
+            write_contract(tmp, valid_contract())
+            index = self._run_in(tmp, 0, "deadbeef")
+
+            entry = index["capabilities"][0]
+            self.assertEqual(entry["service_type"], "")
+            self.assertEqual(entry["permitted_targets"], [])
+            self.assertEqual(entry["lifecycle"], "")
+            self.assertIsNone(entry["provenance"])
+
     def test_active_contract_missing_artifact_aborts_build(self):
         # Regression test for a real incident (registry#89/#90): an active
         # contract with no artifact.digest/.url must never reach the
