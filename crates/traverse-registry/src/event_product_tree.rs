@@ -87,7 +87,18 @@ pub fn validate_event_product_tree(root: &Path) -> EventProductTreeReport {
             descriptor.contract.version.clone(),
         );
         let existing = seen.get(&key);
-        if let Err(failure) = validate_event_product_descriptor(&descriptor, existing) {
+        // registry#324: a deprecated product.json is immutable and can never
+        // be edited to satisfy a rule added after it was published (the same
+        // reasoning build_index.py already applies to a deprecated contract
+        // missing artifact.digest/.url) -- re-running full descriptor
+        // validation against it forever would permanently break CI the
+        // moment any new rule is added, with no way to ever fix the file.
+        // Structural checks above (path identity) and below (publisher/
+        // subscriber resolution) still run -- those describe facts that
+        // don't change over time, unlike content-correctness rules.
+        if !is_deprecated(&path)
+            && let Err(failure) = validate_event_product_descriptor(&descriptor, existing)
+        {
             push_descriptor_failures(&relative, &failure, &mut report.errors);
         }
 
@@ -139,10 +150,7 @@ fn push_path_mismatches(
     errors: &mut Vec<EventProductTreeError>,
 ) {
     let relative = PathBuf::from(display_path(root, path));
-    let parts: Vec<_> = relative
-        .iter()
-        .filter_map(|part| part.to_str())
-        .collect();
+    let parts: Vec<_> = relative.iter().filter_map(|part| part.to_str()).collect();
 
     // events/<namespace>/<id>/<version>/product.json
     if parts.len() != 5 || parts[0] != "events" || parts[4] != "product.json" {
@@ -271,6 +279,7 @@ fn error_code_slug(code: EventProductErrorCode) -> &'static str {
         EventProductErrorCode::UnexpectedReplacement => "unexpected_replacement",
         EventProductErrorCode::InvalidReplacement => "invalid_replacement",
         EventProductErrorCode::NonPastTenseName => "non_past_tense_name",
+        EventProductErrorCode::InconsistentIdentity => "inconsistent_identity",
         EventProductErrorCode::ImmutableDescriptorConflict => "immutable_descriptor_conflict",
         EventProductErrorCode::MissingCloudEventsSource => "missing_cloud_events_source",
         EventProductErrorCode::InvalidCloudEventsSubjectField => {
@@ -280,6 +289,12 @@ fn error_code_slug(code: EventProductErrorCode) -> &'static str {
         EventProductErrorCode::MissingCorrelationIdField => "missing_correlation_id_field",
         EventProductErrorCode::MissingRetentionPolicy => "missing_retention_policy",
     }
+}
+
+fn is_deprecated(product_path: &Path) -> bool {
+    product_path
+        .parent()
+        .is_some_and(|parent| parent.join("deprecated.json").is_file())
 }
 
 fn deserialize_error(relative: &str, err: &JsonError) -> EventProductTreeError {

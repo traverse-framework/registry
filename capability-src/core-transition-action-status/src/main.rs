@@ -3,7 +3,7 @@
 //! Evaluates whether `current_status → requested_status` is allowed under a
 //! caller-supplied `transition_config`, optionally requiring the actor to be
 //! the owner. On accepted transitions, emits
-//! `core.action-item.status-transitioned@1.0.0` via `traverse_host::emit_event`.
+//! `core.status-transitioned@1.0.0` via `traverse_host::emit_event`.
 #![cfg_attr(not(test), no_std)]
 #![cfg_attr(not(test), no_main)]
 
@@ -180,7 +180,7 @@ unsafe fn emit_status_transitioned(
 ) {
     let buf = &mut EVENT_BUF;
     let mut i = 0usize;
-    i = copy(buf, i, br#"{"event_id":"core.action-item.status-transitioned","version":"1.0.0","payload":{"action_item_id":""#);
+    i = copy(buf, i, br#"{"event_id":"core.status-transitioned","version":"1.0.0","payload":{"action_item_id":""#);
     i = copy(buf, i, action_item_id);
     i = copy(buf, i, br#"","from_status":""#);
     i = copy(buf, i, from_status);
