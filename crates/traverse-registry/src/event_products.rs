@@ -95,6 +95,7 @@ pub enum EventProductErrorCode {
     UnexpectedReplacement,
     InvalidReplacement,
     NonPastTenseName,
+    InconsistentIdentity,
     ImmutableDescriptorConflict,
     MissingCloudEventsSource,
     InvalidCloudEventsSubjectField,
@@ -152,6 +153,7 @@ pub fn validate_event_product_descriptor(
     validate_field_classifications(contract, &descriptor.field_classifications, &mut errors);
     validate_replacement(contract, descriptor.replacement.as_ref(), &mut errors);
     validate_past_tense_name(contract, &mut errors);
+    validate_event_identity(contract, &mut errors);
     validate_cloud_events_mapping(
         contract,
         &descriptor.cloud_events_source,
@@ -258,9 +260,7 @@ fn validate_field_classifications(
             errors.push(event_product_error(
                 EventProductErrorCode::MissingFieldClassification,
                 "$.field_classifications",
-                &format!(
-                    "payload property '{property}' has no controlled-exposure classification"
-                ),
+                &format!("payload property '{property}' has no controlled-exposure classification"),
                 contract,
             ));
         }
@@ -272,7 +272,10 @@ fn validate_replacement(
     replacement: Option<&EventProductReplacement>,
     errors: &mut Vec<EventProductValidationError>,
 ) {
-    let requires_replacement = matches!(contract.lifecycle, Lifecycle::Deprecated | Lifecycle::Retired);
+    let requires_replacement = matches!(
+        contract.lifecycle,
+        Lifecycle::Deprecated | Lifecycle::Retired
+    );
     let forbids_replacement = matches!(contract.lifecycle, Lifecycle::Draft | Lifecycle::Active);
 
     match replacement {
@@ -320,7 +323,10 @@ fn validate_replacement(
 /// allowance. v1.0.0 of this spec used a looser, hyphen-segment-plus-allow-list
 /// check that could accept a name Traverse's own runtime would reject
 /// (NFR-006) -- corrected here.
-fn validate_past_tense_name(contract: &EventContract, errors: &mut Vec<EventProductValidationError>) {
+fn validate_past_tense_name(
+    contract: &EventContract,
+    errors: &mut Vec<EventProductValidationError>,
+) {
     if !contract.name.ends_with("ed") {
         errors.push(event_product_error(
             EventProductErrorCode::NonPastTenseName,
@@ -328,6 +334,33 @@ fn validate_past_tense_name(contract: &EventContract, errors: &mut Vec<EventProd
             &format!(
                 "'{}' does not end in '-ed'; ECCA event names MUST describe a past-tense fact",
                 contract.name
+            ),
+            contract,
+        ));
+    }
+}
+
+/// Mirrors `traverse-contracts`' own `validate_event_identity` (the
+/// `EventRegistry::register` invariant `id == "<namespace>.<name>"`).
+/// Nothing in this repo's publish path called that check before -- this
+/// descriptor's own doc comment assumed the contract arrived
+/// "already-validated", which was never actually enforced here (registry#324:
+/// `core.action-item.status-transitioned` published with a mismatched `id`
+/// slipped through because every other check here (path segments, support
+/// route, field classifications, ...) only compares fields to each other or
+/// to the payload schema, never to this base identity rule).
+fn validate_event_identity(
+    contract: &EventContract,
+    errors: &mut Vec<EventProductValidationError>,
+) {
+    let expected_id = format!("{}.{}", contract.namespace, contract.name);
+    if contract.id != expected_id {
+        errors.push(event_product_error(
+            EventProductErrorCode::InconsistentIdentity,
+            "$.id",
+            &format!(
+                "id '{}' does not equal namespace.name '{expected_id}'",
+                contract.id
             ),
             contract,
         ));
@@ -351,7 +384,10 @@ fn validate_cloud_events_mapping(
 
     if let Some(subject_field) = subject_field {
         let declared_properties = declared_payload_properties(contract);
-        if !declared_properties.iter().any(|property| property == subject_field) {
+        if !declared_properties
+            .iter()
+            .any(|property| property == subject_field)
+        {
             errors.push(event_product_error(
                 EventProductErrorCode::InvalidCloudEventsSubjectField,
                 "$.cloud_events_subject_field",
@@ -429,6 +465,9 @@ fn remediation_for(code: EventProductErrorCode) -> &'static str {
         EventProductErrorCode::NonPastTenseName => {
             "rename the event so it ends in a past-tense fact (e.g. '-created', '-issued')"
         }
+        EventProductErrorCode::InconsistentIdentity => {
+            "set id to exactly \"<namespace>.<name>\" (traverse-contracts' own EventContract identity invariant)"
+        }
         EventProductErrorCode::ImmutableDescriptorConflict => {
             "publish a new version instead of changing a published descriptor"
         }
@@ -442,7 +481,9 @@ fn remediation_for(code: EventProductErrorCode) -> &'static str {
         EventProductErrorCode::MissingCorrelationIdField => {
             "add a correlation_id_field naming what correlates this event"
         }
-        EventProductErrorCode::MissingRetentionPolicy => "add a non-empty retention_policy statement",
+        EventProductErrorCode::MissingRetentionPolicy => {
+            "add a non-empty retention_policy statement"
+        }
     }
 }
 

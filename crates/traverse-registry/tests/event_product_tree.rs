@@ -85,6 +85,61 @@ fn rejects_path_identity_mismatch() {
     );
 }
 
+/// registry#324: an on-disk product.json whose `id` doesn't equal
+/// `namespace.name` must be rejected by the tree walk, not just the
+/// in-memory descriptor validator -- this is exactly the shape of the bad
+/// publish that slipped through (`core.action-item.status-transitioned`,
+/// `namespace="core"`, `name="status-transitioned"`).
+#[test]
+fn rejects_event_identity_mismatch() {
+    let tmp = tempfile_dir("identity-mismatch");
+    let mut product: serde_json::Value =
+        serde_json::from_str(&valid_product_for_tree()).expect("parse fixture");
+    product["contract"]["id"] = serde_json::json!("content.comments.extra.comment-draft-created");
+    write_tree(
+        &tmp,
+        "events/content.comments/content.comments.extra.comment-draft-created/1.0.0/product.json",
+        &serde_json::to_string_pretty(&product).expect("serialize"),
+    );
+    materialize_publisher(&tmp);
+
+    let report = traverse_registry::validate_event_product_tree(&tmp);
+    assert!(
+        report
+            .errors
+            .iter()
+            .any(|error| error.code == "event_product.inconsistent_identity"),
+        "{:?}",
+        report.errors
+    );
+}
+
+/// registry#324: a *deprecated* product.json with a bad identity must not
+/// break the tree walk -- it's immutable, published before this check
+/// existed, and can never be edited to satisfy it. Structural path checks
+/// still run; only the full descriptor-content validation is skipped.
+#[test]
+fn deprecated_product_with_identity_mismatch_does_not_fail_tree() {
+    let tmp = tempfile_dir("deprecated-identity-mismatch");
+    let mut product: serde_json::Value =
+        serde_json::from_str(&valid_product_for_tree()).expect("parse fixture");
+    product["contract"]["id"] = serde_json::json!("content.comments.extra.comment-draft-created");
+    write_tree(
+        &tmp,
+        "events/content.comments/content.comments.extra.comment-draft-created/1.0.0/product.json",
+        &serde_json::to_string_pretty(&product).expect("serialize"),
+    );
+    write_tree(
+        &tmp,
+        "events/content.comments/content.comments.extra.comment-draft-created/1.0.0/deprecated.json",
+        r#"{"deprecated":true,"reason":"test","deprecated_at":"2026-08-25T00:00:00Z"}"#,
+    );
+    materialize_publisher(&tmp);
+
+    let report = traverse_registry::validate_event_product_tree(&tmp);
+    assert!(report.ok(), "expected pass, got {:?}", report.errors);
+}
+
 #[test]
 fn rejects_immutable_republication_conflict_for_same_id_version() {
     let original = valid_product_for_tree();

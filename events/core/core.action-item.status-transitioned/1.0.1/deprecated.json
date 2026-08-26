@@ -1,0 +1,5 @@
+{
+  "deprecated": true,
+  "reason": "Violates traverse-contracts' own EventContract identity invariant (id must equal namespace + \".\" + name): namespace=\"core\", name=\"status-transitioned\", but id=\"core.action-item.status-transitioned\" instead of the required \"core.status-transitioned\". A strict EventRegistry::register load (e.g. traverse-cli serve --registry-state) rejects this record outright. See registry#324. Replaced by core.status-transitioned@1.0.0, which carries identical payload/classification/policy content under the corrected id.",
+  "deprecated_at": "2026-08-25T00:00:00Z"
+}

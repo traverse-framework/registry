@@ -84,7 +84,8 @@ fn base_descriptor() -> EventProductDescriptor {
         exposure: EventExposureClass::Internal,
         field_classifications: base_field_classifications(),
         replacement: None,
-        cloud_events_source: "traverse://capability/content.comments.create-comment-draft".to_string(),
+        cloud_events_source: "traverse://capability/content.comments.create-comment-draft"
+            .to_string(),
         cloud_events_subject_field: Some("draft_id".to_string()),
         deduplication_id_field: "draft_id".to_string(),
         ordering_scope_field: None,
@@ -94,7 +95,9 @@ fn base_descriptor() -> EventProductDescriptor {
     }
 }
 
-fn error_codes(failure: &traverse_registry::EventProductValidationFailure) -> Vec<EventProductErrorCode> {
+fn error_codes(
+    failure: &traverse_registry::EventProductValidationFailure,
+) -> Vec<EventProductErrorCode> {
     failure.errors.iter().map(|error| error.code).collect()
 }
 
@@ -148,7 +151,9 @@ fn rejects_invalid_support_route_scheme() {
 #[test]
 fn rejects_missing_field_classification() {
     let mut descriptor = base_descriptor();
-    descriptor.field_classifications.retain(|entry| entry.field_path != "author_email");
+    descriptor
+        .field_classifications
+        .retain(|entry| entry.field_path != "author_email");
 
     let failure = validate_event_product_descriptor(&descriptor, None)
         .expect_err("missing classification for a declared property should fail");
@@ -260,6 +265,30 @@ fn rejects_self_referential_replacement() {
     assert!(error_codes(&failure).contains(&EventProductErrorCode::InvalidReplacement));
 }
 
+/// registry#324: `id` must equal `"<namespace>.<name>"` exactly -- the
+/// invariant `traverse-contracts`' own `EventRegistry::register` enforces
+/// at load time, which this repo's own publish path never checked before
+/// (a real bad publish, `core.action-item.status-transitioned`, slipped
+/// through with `namespace="core"`, `name="status-transitioned"`, but
+/// `id="core.action-item.status-transitioned"`).
+#[test]
+fn rejects_inconsistent_event_identity() {
+    let mut descriptor = base_descriptor();
+    descriptor.contract.id = "content.comments.extra-segment.comment-draft-created".to_string();
+
+    let failure = validate_event_product_descriptor(&descriptor, None)
+        .expect_err("id not equal to namespace.name should fail");
+
+    assert!(error_codes(&failure).contains(&EventProductErrorCode::InconsistentIdentity));
+    let error = failure
+        .errors
+        .iter()
+        .find(|error| error.code == EventProductErrorCode::InconsistentIdentity)
+        .expect("InconsistentIdentity error should be present");
+    assert_eq!(error.path, "$.id");
+    assert!(!error.remediation.is_empty());
+}
+
 #[test]
 fn rejects_non_past_tense_name() {
     let mut descriptor = base_descriptor();
@@ -284,8 +313,9 @@ fn rejects_irregular_past_participle_not_ending_in_ed() {
     descriptor.contract.id = "content.comments.comment-draft-sent".to_string();
     descriptor.contract.name = "comment-draft-sent".to_string();
 
-    let failure = validate_event_product_descriptor(&descriptor, None)
-        .expect_err("'sent' does not end in '-ed' and must be rejected, matching Traverse's own runtime check");
+    let failure = validate_event_product_descriptor(&descriptor, None).expect_err(
+        "'sent' does not end in '-ed' and must be rejected, matching Traverse's own runtime check",
+    );
 
     assert!(error_codes(&failure).contains(&EventProductErrorCode::NonPastTenseName));
 }
