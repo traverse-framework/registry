@@ -56,31 +56,46 @@ gh secret set ARTIFACT_SIGNING_ED25519_SECRET_KEY \
   --body '<64-hex-char secret from step 1>'
 ```
 
-### 3. Let Actions push to `main`
+### 3. (Optional) Let Actions push to `main` for the ongoing case
 
-The `sign-artifacts` job commits `signature.json` files back to `main`. Branch
-protection must allow the `github-actions[bot]` actor (or a dedicated deploy
-key / GitHub App installation token) to push. This is the same class of
-repo-settings change as enabling GitHub Pages or marking a check required —
-`docs/decision-log.md` entries 28/29 — and is deliberately not automated.
+On merge to `main`, the `sign-artifacts` job tries to commit new `signature.json`
+files back directly. That direct push needs the `github-actions[bot]` actor to be
+allowed past the branch rules on `main`. It is **not required** to activate
+signing:
+
+- If the bot is not allowed to push, the job logs a warning and still succeeds
+  (`continue-on-error`). The signed files are always uploaded as the
+  `artifact-signatures` workflow artifact for a maintainer to download and open a
+  normal PR with.
+- New-capability publishes are infrequent, so handling them by PR is low-friction.
+  Grant the bypass (or provision a bot PAT / GitHub App token) only if you want
+  the per-publish commit to be fully automatic.
+
+Weakening the `traverse-governance-*` rulesets for this is a deliberate
+governance call, not a routine toggle — treat it as one.
 
 ### 4. Backfill existing capabilities (registry#335)
 
-Once steps 1–3 are done, run the backfill once. Either dispatch the CI job
-(preferred — it uses the repo secret and commits the result itself):
+Once the secret (step 2) exists, run the backfill once via CI — it uses the
+repo secret and uploads the signed files as the `artifact-signatures` artifact:
 
 ```bash
 gh workflow run CI --repo traverse-framework/registry -f sign_mode=all
 ```
 
-or run it locally and open a PR:
+Then download that artifact and open a PR with its contents:
 
 ```bash
-ARTIFACT_SIGNING_ED25519_SECRET_KEY='<secret>' \
-  python3 scripts/ci/sign_artifacts.py --all
+run_id=$(gh run list --repo traverse-framework/registry --workflow CI \
+  --event workflow_dispatch -L1 --json databaseId --jq '.[0].databaseId')
+gh run download "$run_id" --repo traverse-framework/registry -n artifact-signatures -D .
+git checkout -b chore/backfill-signatures
 git add capabilities catalog/signing-key.pub
 git commit -m "chore(signing): backfill Ed25519 signatures for published artifacts"
 ```
+
+(Or run `scripts/ci/sign_artifacts.py --all` locally with the secret in the
+environment, if you have a copy of it.)
 
 Then, in the same PR, add the enforcement marker so completeness becomes a hard
 CI gate:

@@ -271,7 +271,27 @@ jobs:
             python3 scripts/ci/sign_artifacts.py --since-merge
           fi
 
+      # The signed files are always published as a downloadable workflow
+      # artifact, so a maintainer can pick them up and open a normal PR
+      # without any branch-protection change (the registry#335 backfill path,
+      # and the fallback whenever the direct push below is not permitted).
+      - name: Upload signed files
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: artifact-signatures
+          path: |
+            capabilities/**/signature.json
+            catalog/signing-key.pub
+          if-no-files-found: ignore
+
+      # Direct commit back to main, attempted only on merge-to-main (the
+      # ongoing per-publish case). Requires the github-actions[bot] actor to be
+      # allowed to push to main; when it is not, this step logs and the run
+      # still succeeds (continue-on-error) -- the signed files remain available
+      # as the artifact above for a maintainer to PR.
       - name: Commit signature siblings
+        if: github.event_name == 'push'
         run: |
           if [ -z "$(git status --porcelain -- capabilities catalog/signing-key.pub)" ]; then
             echo "No new signatures to commit."
@@ -281,7 +301,8 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -- capabilities catalog/signing-key.pub
           git commit -m "chore(signing): Ed25519 signature siblings for newly-merged artifacts [skip ci]"
-          git push origin HEAD:main
+          git push origin HEAD:main || \
+            echo "::warning::Direct push to main not permitted; download the 'artifact-signatures' artifact and open a PR instead."
 
   # Discovery catalog build (registry#103/#105/#106). Regenerates
   # catalog/catalog.json from whatever is currently published, same
