@@ -1,0 +1,39 @@
+# specs/020-public-execution-proxy. See proxy/README.md for the full setup
+# runbook -- this file alone is not enough to deploy; several values below
+# are placeholders an operator must fill in after creating the real
+# Cloudflare resources (rate limiter namespace, KV if ever needed, and the
+# ADMIN_JWT secret, which is never written to this file).
+
+name = "registry-execution-proxy"
+main = "build/worker/shim.mjs"
+compatibility_date = "2026-08-27"
+
+[build]
+command = "worker-build --release"
+
+# Non-secret configuration. ADMIN_JWT is deliberately NOT here -- it is set
+# with `wrangler secret put ADMIN_JWT` (see README.md), which stores it
+# encrypted and keeps it out of source control and out of `wrangler.toml`.
+[vars]
+# The traverse-cli serve instance this proxy fronts (traverse specs
+# 118/120, --registry-state/--artifact-state). Placeholder until that
+# instance is actually running -- see README.md's "Stand up serve" step.
+SERVE_URL = "https://REPLACE-WITH-SERVE-HOSTNAME"
+# Origin(s) allowed to call this proxy directly from browser JS (FR-002's
+# companion CORS restriction -- see decision-log entry 73). Placeholder
+# until the actual discover.html-hosting origin is confirmed.
+ALLOWED_ORIGIN = "https://registry.traverse-framework.com"
+# FR-004: reject request bodies above this size before ever parsing them.
+# Keep at or below whatever the paired serve instance's own
+# MAX_REQUEST_BODY is configured to.
+MAX_REQUEST_BODY_BYTES = "262144"
+
+# FR-003: Cloudflare's native Rate Limiting binding -- 5 requests per
+# 60-second window per limit() key (this Worker calls limit() with the
+# caller's CF-Connecting-IP as the key). `namespace_id` must be unique
+# across this account's rate limiters; "1" is a placeholder -- wrangler
+# will tell you if it collides with an existing one when you first deploy.
+[[ratelimits]]
+name = "EXECUTE_RATE_LIMITER"
+namespace_id = "1"
+simple = { limit = 5, period = 60 }
