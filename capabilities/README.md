@@ -30,6 +30,14 @@ Copy-paste sequence for a new capability version (manual path today; `traverse-c
 
 Never edit an already-merged `contract.json`; yank via `deprecated.json` and publish a new version instead.
 
+**Artifact signing is automatic — nothing for publishers to do.** After a
+capability PR merges, the `sign-artifacts` CI job Ed25519-signs the referenced
+artifact and commits a `signature.json` sibling next to your `contract.json`
+(`specs/007-artifact-hosting/spec.md`, Amendment). `traverse-runtime` requires
+that signature to execute the capability. You never hold or handle the signing
+key. Workflow-backed capabilities (no `artifact` field) are not signed. Setup
+and verification: [`../docs/artifact-signing.md`](../docs/artifact-signing.md).
+
 ## Current content (as of 2026-07-28)
 
 Six reference-app capabilities are published, across three namespaces. Each has gone

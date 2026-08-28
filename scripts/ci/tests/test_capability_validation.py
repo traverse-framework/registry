@@ -1091,5 +1091,129 @@ class CheckEccaCapabilityInventoryCoverageTests(unittest.TestCase):
             self.assertIn("inventory.unpublished_capability_unclassified", codes)
 
 
+def _valid_signature_record():
+    return {
+        "scheme": "ed25519",
+        "public_key_hex": "aa" * 32,
+        "signature_hex": "bb" * 64,
+        "sigstore_bundle_ref": None,
+        "signed_at": "2026-08-28T00:00:00Z",
+    }
+
+
+class SignatureFileShapeTests(unittest.TestCase):
+    """specs/007-artifact-hosting amendment FR-007/FR-008/FR-012 (registry#334)."""
+
+    def _write(self, tmp, sig, *, with_artifact=True):
+        version_dir = Path(tmp) / "capabilities" / "core" / "core.example" / "1.0.0"
+        version_dir.mkdir(parents=True, exist_ok=True)
+        contract = valid_contract()
+        contract["id"] = "core.example"
+        if with_artifact:
+            contract["artifact"] = {
+                "digest": "sha256:" + "0" * 64,
+                "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/x-1.0.0/x.wasm",
+            }
+        (version_dir / "contract.json").write_text(json.dumps(contract))
+        sig_path = version_dir / "signature.json"
+        sig_path.write_text(json.dumps(sig))
+        return sig_path
+
+    def test_valid_signature_passes(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            errors: list = []
+            capability_validation.validate_signature_file(self._write(tmp, _valid_signature_record()), errors)
+            self.assertEqual(errors, [])
+
+    def test_missing_field_is_rejected(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            sig = _valid_signature_record()
+            del sig["signed_at"]
+            errors: list = []
+            capability_validation.validate_signature_file(self._write(tmp, sig), errors)
+            self.assertIn("signature.missing_fields", [e["code"] for e in errors])
+
+    def test_non_ed25519_scheme_is_rejected(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            sig = _valid_signature_record()
+            sig["scheme"] = "sigstore"
+            errors: list = []
+            capability_validation.validate_signature_file(self._write(tmp, sig), errors)
+            self.assertIn("signature.bad_scheme", [e["code"] for e in errors])
+
+    def test_non_null_sigstore_ref_is_rejected(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            sig = _valid_signature_record()
+            sig["sigstore_bundle_ref"] = "ref://x"
+            errors: list = []
+            capability_validation.validate_signature_file(self._write(tmp, sig), errors)
+            self.assertIn("signature.bad_sigstore_ref", [e["code"] for e in errors])
+
+    def test_bad_key_length_is_rejected(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            sig = _valid_signature_record()
+            sig["public_key_hex"] = "aa" * 16
+            errors: list = []
+            capability_validation.validate_signature_file(self._write(tmp, sig), errors)
+            self.assertIn("signature.bad_public_key", [e["code"] for e in errors])
+
+    def test_signature_without_artifact_field_is_rejected(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            errors: list = []
+            capability_validation.validate_signature_file(
+                self._write(tmp, _valid_signature_record(), with_artifact=False), errors
+            )
+            self.assertIn("signature.unexpected", [e["code"] for e in errors])
+
+
+class SignatureCompletenessTests(unittest.TestCase):
+    def _tree(self, tmp, *, signed, deprecated=False, enforced=False):
+        version_dir = Path(tmp) / "capabilities" / "core" / "core.example" / "1.0.0"
+        version_dir.mkdir(parents=True, exist_ok=True)
+        contract = valid_contract()
+        contract["id"] = "core.example"
+        contract["artifact"] = {
+            "digest": "sha256:" + "0" * 64,
+            "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/x-1.0.0/x.wasm",
+        }
+        (version_dir / "contract.json").write_text(json.dumps(contract))
+        if signed:
+            (version_dir / "signature.json").write_text(json.dumps(_valid_signature_record()))
+        if deprecated:
+            (version_dir / "deprecated.json").write_text(json.dumps({"reason": "x"}))
+        if enforced:
+            (Path(tmp) / "capabilities" / ".signatures-enforced").write_text("enforced\n")
+
+    def _run(self, tmp):
+        errors: list = []
+        cwd = os.getcwd()
+        try:
+            os.chdir(tmp)
+            capability_validation.check_signature_siblings(errors)
+        finally:
+            os.chdir(cwd)
+        return errors
+
+    def test_missing_signature_is_advisory_by_default(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            self._tree(tmp, signed=False)
+            self.assertEqual(self._run(tmp), [])
+
+    def test_missing_signature_fails_when_enforced(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            self._tree(tmp, signed=False, enforced=True)
+            self.assertIn("signature.missing", [e["code"] for e in self._run(tmp)])
+
+    def test_deprecated_version_never_requires_signature(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            self._tree(tmp, signed=False, deprecated=True, enforced=True)
+            self.assertEqual(self._run(tmp), [])
+
+    def test_signed_version_passes_when_enforced(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            self._tree(tmp, signed=True, enforced=True)
+            self.assertEqual(self._run(tmp), [])
+
+
 if __name__ == "__main__":
     unittest.main()

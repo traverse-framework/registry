@@ -109,6 +109,28 @@ jobs:
       - name: Run clippy
         run: cargo clippy --all-targets --locked
 
+  # Ed25519 signature-tooling tests (specs/007-artifact-hosting amendment,
+  # registry#334). Runs on PRs so scripts/ci/sign_artifacts.py's crypto path
+  # is exercised without needing the real signing key. Not a required check
+  # (same posture as traverse-registry-tests): it guards a post-merge job.
+  sign-artifacts-tests:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install signing dependency
+        run: pip install cryptography
+
+      - name: Run sign_artifacts tests
+        run: python3 -m unittest scripts/ci/tests/test_sign_artifacts.py -v
+
   # Advisory (non-blocking) AI review (specs/004-ai-advisory-review).
   # Runs only on PRs that touch capabilities/, and only posts a comment --
   # never fails the run, and is intentionally not a required check.
@@ -180,6 +202,63 @@ jobs:
           tag="index-v${new_version}"
           gh release create "$tag" /tmp/index.json --repo ${{ github.repository }} --title "$tag" --notes "Automated index publish for $tag" || \
           gh release upload "$tag" /tmp/index.json --repo ${{ github.repository }} --clobber
+
+  # Ed25519-signs the artifacts of capabilities newly merged by this push
+  # (specs/007-artifact-hosting amendment, registry#331/#333/#334;
+  # docs/decision-log.md entries 74/75). Runs ONLY on merge to main -- signing
+  # is gated on the same human-approval-then-merge boundary this repo already
+  # trusts (FR-009), never on PR open/sync, and no individual publisher holds
+  # the key. Writes an additive capabilities/**/signature.json sibling next to
+  # each newly-merged contract.json (never touching the immutable contract) and
+  # refreshes catalog/signing-key.pub, then commits the result back to main.
+  #
+  # continue-on-error + the "commit only if changed" guard mirror
+  # deploy-catalog's precedent (decision-log entries 28/29): the job's *code*
+  # is complete and tested, but it stays inert -- sign_artifacts.py exits 0
+  # after a "key not provisioned" notice -- until the repo owner performs two
+  # owner-only settings changes this agent deliberately does not make itself:
+  #   1. add the ARTIFACT_SIGNING_ED25519_SECRET_KEY repo secret (64 hex chars,
+  #      a 32-byte Ed25519 seed), and
+  #   2. allow GitHub Actions to push to main past branch protection.
+  # Runbook: docs/artifact-signing.md.
+  sign-artifacts:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install signing dependency
+        run: pip install cryptography
+
+      - name: Sign newly-merged artifacts
+        env:
+          ARTIFACT_SIGNING_ED25519_SECRET_KEY: ${{ secrets.ARTIFACT_SIGNING_ED25519_SECRET_KEY }}
+          BEFORE_SHA: ${{ github.event.before }}
+          AFTER_SHA: ${{ github.sha }}
+        run: python3 scripts/ci/sign_artifacts.py --since-merge
+
+      - name: Commit signature siblings
+        run: |
+          if [ -z "$(git status --porcelain -- capabilities catalog/signing-key.pub)" ]; then
+            echo "No new signatures to commit."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -- capabilities catalog/signing-key.pub
+          git commit -m "chore(signing): Ed25519 signature siblings for newly-merged artifacts [skip ci]"
+          git push origin HEAD:main
 
   # Discovery catalog build (registry#103/#105/#106). Regenerates
   # catalog/catalog.json from whatever is currently published, same
