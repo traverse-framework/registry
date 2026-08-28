@@ -77,6 +77,16 @@ and regions.percent >= 95.0. Diff-based for the same immutability
 reason as every other new-contract check above -- already-published
 capabilities (including 18 with no capability-src/ at all, and 15 more
 below this bar) are tracked separately, not retroactively judged.
+
+Also enforces specs/007-artifact-hosting's amendment (registry#331/#333,
+decision-log entries 74/75): every capabilities/**/signature.json that
+exists has the right shape (ed25519 scheme, 32-byte hex public key,
+64-byte hex signature, null sigstore_bundle_ref) and is never modified
+once written (FR-012, wired into check_immutability). Signature
+*completeness* -- FR-007, every non-deprecated artifact-bearing version
+having one -- is advisory until capabilities/.signatures-enforced is
+committed by the backfill (registry#335), since the CI signing job
+(registry#334) writes these post-merge and pre-backfill history has none.
 """
 
 import json
@@ -1128,9 +1138,14 @@ def check_workflow_capability_references(errors: list) -> None:
 
 def check_immutability(base_sha: str, head_sha: str, errors: list) -> None:
     """FR: no PR may modify an existing contract.json/workflow.json/product.json
-    once published (specs/001 FR-002/FR-013/FR-016, specs/005 FR-002)."""
+    once published (specs/001 FR-002/FR-013/FR-016, specs/005 FR-002). Also
+    covers signature.json: once written (post-merge, by CI) it is immutable
+    under the same rule (specs/007-artifact-hosting Amendment FR-012) -- a bad
+    signature is corrected by key rotation + re-backfill, not an in-place edit.
+    Additions (status "A") are always allowed."""
     for governed_dir, filename, error_code in (
         ("capabilities/", "contract.json", "capabilities.contract_modified"),
+        ("capabilities/", "signature.json", "capabilities.signature_modified"),
         ("workflows/", "workflow.json", "workflows.workflow_modified"),
         ("events/", "product.json", "events.product_modified"),
     ):
@@ -1265,6 +1280,129 @@ def check_dependency_resolvability(errors: list) -> None:
                 )
 
 
+def _is_hex(value) -> bool:
+    if not isinstance(value, str) or not value:
+        return False
+    try:
+        int(value, 16)
+        return True
+    except ValueError:
+        return False
+
+
+SIGNATURE_REQUIRED_FIELDS = {"scheme", "public_key_hex", "signature_hex", "sigstore_bundle_ref", "signed_at"}
+SIGNATURES_ENFORCED_MARKER = Path("capabilities") / ".signatures-enforced"
+
+
+def validate_signature_file(path: Path, errors: list) -> None:
+    """specs/007-artifact-hosting Amendment (registry#331/#333) FR-007/FR-008/FR-012:
+    shape of a `signature.json` sibling. Whole-tree safe -- only inspects files
+    that already exist, so it is a no-op until the CI signing job (registry#334)
+    or the backfill (registry#335) has written any."""
+    version_dir = path.parent
+    try:
+        sig = json.loads(path.read_text())
+    except Exception:
+        fail(errors, "signature.invalid_json", str(path), "signature.json is not valid JSON")
+        return
+    if not isinstance(sig, dict):
+        fail(errors, "signature.invalid_json", str(path), "signature.json must be a JSON object")
+        return
+
+    contract_path = version_dir / "contract.json"
+    artifact = None
+    if contract_path.is_file():
+        try:
+            artifact = json.loads(contract_path.read_text()).get("artifact")
+        except Exception:
+            artifact = None
+    if not isinstance(artifact, dict):
+        fail(
+            errors,
+            "signature.unexpected",
+            str(path),
+            "signature.json present for a version whose contract.json has no 'artifact' "
+            "field -- workflow-backed capabilities have nothing to sign (spec 007 Amendment FR-008)",
+        )
+
+    missing = SIGNATURE_REQUIRED_FIELDS - set(sig)
+    if missing:
+        fail(
+            errors,
+            "signature.missing_fields",
+            str(path),
+            f"signature.json missing required field(s): {sorted(missing)} (spec 007 Amendment FR-007)",
+        )
+        return
+
+    if sig.get("scheme") != "ed25519":
+        fail(errors, "signature.bad_scheme", str(path), "signature.json 'scheme' must be 'ed25519' (spec 007 Amendment)")
+    if sig.get("sigstore_bundle_ref") is not None:
+        fail(
+            errors,
+            "signature.bad_sigstore_ref",
+            str(path),
+            "'sigstore_bundle_ref' must be null under the ed25519 scheme (spec 007 Amendment)",
+        )
+    pub = sig.get("public_key_hex")
+    signature_hex = sig.get("signature_hex")
+    if not _is_hex(pub) or len(pub) != 64:
+        fail(errors, "signature.bad_public_key", str(path), "'public_key_hex' must be 64 hex chars (32-byte Ed25519 key)")
+    if not _is_hex(signature_hex) or len(signature_hex) != 128:
+        fail(errors, "signature.bad_signature", str(path), "'signature_hex' must be 128 hex chars (64-byte Ed25519 signature)")
+    if not isinstance(sig.get("signed_at"), str) or not sig.get("signed_at"):
+        fail(errors, "signature.bad_signed_at", str(path), "'signed_at' must be a non-empty ISO-8601 UTC timestamp string")
+
+
+def check_signature_siblings(errors: list) -> None:
+    """specs/007-artifact-hosting Amendment: every `signature.json` that exists is
+    validated for shape/immutability-of-content. Completeness (FR-007: every
+    non-deprecated, artifact-bearing version HAS one) is only hard-enforced once
+    `capabilities/.signatures-enforced` is committed -- the backfill (registry#335)
+    adds that marker as its final step. Before then the gap is advisory-only,
+    because signatures are written post-merge and pre-backfill history has none."""
+    capabilities_dir = Path("capabilities")
+    if not capabilities_dir.is_dir():
+        return
+
+    for sig_path in sorted(capabilities_dir.rglob("signature.json")):
+        validate_signature_file(sig_path, errors)
+
+    enforced = SIGNATURES_ENFORCED_MARKER.is_file()
+    unsigned = []
+    for contract_path in sorted(capabilities_dir.rglob("contract.json")):
+        version_dir = contract_path.parent
+        if (version_dir / "deprecated.json").is_file():
+            continue
+        try:
+            artifact = json.loads(contract_path.read_text()).get("artifact")
+        except Exception:
+            continue
+        if not isinstance(artifact, dict):
+            continue
+        if not (version_dir / "signature.json").is_file():
+            unsigned.append(str(version_dir))
+
+    if not unsigned:
+        return
+    if enforced:
+        for version_dir in unsigned:
+            fail(
+                errors,
+                "signature.missing",
+                version_dir,
+                "non-deprecated capability version has an 'artifact' but no signature.json "
+                "(spec 007 Amendment FR-007)",
+            )
+    else:
+        print(json.dumps({
+            "advisory": "signature.backfill_pending",
+            "unsigned_count": len(unsigned),
+            "note": "capabilities/.signatures-enforced not committed yet (registry#335 "
+                    "backfill); signature completeness is advisory until then",
+        }, indent=2), file=sys.stderr)
+
+
 def run_event_product_validation(errors: list) -> None:
     """FR-016: delegate ECCA event-product tree validation to the Rust binary
     so descriptor rules stay single-sourced in traverse-registry (not
@@ -1327,6 +1465,7 @@ def main() -> int:
             validate_contract(contract_path, errors)
         check_semver_bump(errors)
         check_dependency_resolvability(errors)
+        check_signature_siblings(errors)
 
     if personas_dir.is_dir():
         for persona_path in sorted(personas_dir.rglob("persona.json")):
