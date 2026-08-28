@@ -66,8 +66,14 @@ repo-settings change as enabling GitHub Pages or marking a check required —
 
 ### 4. Backfill existing capabilities (registry#335)
 
-Once steps 1–3 are done, run the backfill once (locally, or as a manual
-`workflow_dispatch`):
+Once steps 1–3 are done, run the backfill once. Either dispatch the CI job
+(preferred — it uses the repo secret and commits the result itself):
+
+```bash
+gh workflow run CI --repo traverse-framework/registry -f sign_mode=all
+```
+
+or run it locally and open a PR:
 
 ```bash
 ARTIFACT_SIGNING_ED25519_SECRET_KEY='<secret>' \

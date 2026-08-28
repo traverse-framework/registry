@@ -5,6 +5,15 @@ on:
     branches:
       - main
   pull_request:
+  workflow_dispatch:
+    inputs:
+      sign_mode:
+        description: "sign-artifacts mode"
+        type: choice
+        options:
+          - since-merge
+          - all
+        default: since-merge
 
 permissions:
   contents: read
@@ -220,9 +229,13 @@ jobs:
   #   1. add the ARTIFACT_SIGNING_ED25519_SECRET_KEY repo secret (64 hex chars,
   #      a 32-byte Ed25519 seed), and
   #   2. allow GitHub Actions to push to main past branch protection.
-  # Runbook: docs/artifact-signing.md.
+  # Runbook: docs/artifact-signing.md. Also runnable on demand via
+  # `gh workflow run CI -f sign_mode=all` (the registry#335 backfill) or
+  # `-f sign_mode=since-merge`, once the key secret exists.
   sign-artifacts:
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: >-
+      (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
+      github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     continue-on-error: true
     permissions:
@@ -241,12 +254,22 @@ jobs:
       - name: Install signing dependency
         run: pip install cryptography
 
-      - name: Sign newly-merged artifacts
+      # push to main -> --since-merge (sign what this merge added).
+      # workflow_dispatch -> the chosen sign_mode: 'since-merge', or 'all' to
+      # run the registry#335 backfill (sign every unsigned non-deprecated
+      # artifact-bearing version). Both no-op cleanly when the key is unset.
+      - name: Sign artifacts
         env:
           ARTIFACT_SIGNING_ED25519_SECRET_KEY: ${{ secrets.ARTIFACT_SIGNING_ED25519_SECRET_KEY }}
           BEFORE_SHA: ${{ github.event.before }}
           AFTER_SHA: ${{ github.sha }}
-        run: python3 scripts/ci/sign_artifacts.py --since-merge
+          SIGN_MODE: ${{ github.event.inputs.sign_mode || 'since-merge' }}
+        run: |
+          if [ "$SIGN_MODE" = "all" ]; then
+            python3 scripts/ci/sign_artifacts.py --all
+          else
+            python3 scripts/ci/sign_artifacts.py --since-merge
+          fi
 
       - name: Commit signature siblings
         run: |
