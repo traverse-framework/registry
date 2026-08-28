@@ -68,7 +68,7 @@
     },
     {
       "id": "007-artifact-hosting",
-      "version": "1.0.0",
+      "version": "1.1.0",
       "status": "approved",
       "immutable": true,
       "path": "specs/007-artifact-hosting/spec.md",
