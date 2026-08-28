@@ -296,6 +296,17 @@
         "capability-src/",
         "specs/018-capability-test-coverage/"
       ]
+    },
+    {
+      "id": "020-public-execution-proxy",
+      "version": "1.0.0",
+      "status": "approved",
+      "immutable": true,
+      "path": "specs/020-public-execution-proxy/spec.md",
+      "governs": [
+        "proxy/",
+        "specs/020-public-execution-proxy/"
+      ]
     }
   ],
   "draft_specs": [

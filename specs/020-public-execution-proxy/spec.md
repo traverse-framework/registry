@@ -2,7 +2,7 @@
 
 **Feature Branch**: `claude/registry-owned-execution-proxy`
 **Created**: 2026-08-26
-**Status**: Draft
+**Status**: Approved (2026-08-27)
 **Input**: Owner-co-brainstormed session, motivated by `traverse-framework/traverse#1158` ("Browser: execute one verified published WASM capability and show trace evidence") being blocked on how a public, anonymous browser client can reach `traverse-cli serve`'s verified-entrypoint execution endpoint (traverse spec `115-browser-verified-entrypoint-execution`) given traverse spec `033-http-json-api` FR-035 deliberately gates system-workspace access behind a signature-verified admin token.
 
 ## Purpose
@@ -137,6 +137,12 @@ Drafted by an agent from a live, owner-co-brainstormed session (options and
 tradeoffs presented one decision at a time; the owner chose the
 registry-owned-proxy direction and confirmed rate limiting belongs in this
 spec's Definition of Done). Per this repository's no-self-approval-of-specs
-rule, this spec stays `Draft` pending the repo owner's own explicit,
-standalone sign-off, separate from having co-brainstormed its content —
-matching the precedent already recorded in `specs/019-public-metadata-sync-extension`'s own Approval section.
+rule, stayed `Draft` pending the repo owner's own explicit, standalone
+sign-off, separate from having co-brainstormed its content.
+
+**Approved 2026-08-27**, via a second live, owner-brainstormed session
+(registry#328) that also resolved the operational decisions this spec
+deliberately left open — see `docs/decision-log.md` entry 73 for the full
+reasoning (proxy hosting, `serve` hosting, JWT lifecycle, index freshness,
+rate-limit threshold, CORS policy, Worker implementation language). The
+FR text above is unchanged from drafting; only its status moved.
