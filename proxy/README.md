@@ -28,6 +28,19 @@ to infrastructure it has no credentials for — every step below is manual.
 
 ## Step 1 — Stand up `traverse-cli serve`
 
+> **⚠️ Blocked as written — [`traverse-framework/traverse#1211`](https://github.com/traverse-framework/traverse/issues/1211).**
+> `traverse-cli registry sync` produces a pointer-only `index.json` (ids,
+> versions, URLs, digests). `traverse-cli registry materialize` and
+> `serve --registry-state` both want a *bundle manifest* pointing at local
+> `contract.json` files (plus, since traverse#1210, an adjacent
+> `signature.json` per Spec 124). Nothing in the current `traverse-cli`
+> build fetches those files locally and emits that manifest, so the commands
+> below fail with `missing field \`path\``. This is a traverse-side gap in
+> host-artifact-preparation (Specs 118/120), independent of artifact signing
+> (which is fully in place — `registry#334`/`#335`, key at
+> `registry.traverse-framework.com/signing-key.pub`). Steps 2–4 are correct
+> and unaffected; only this bridge step is missing.
+
 On the Oracle Cloud VM:
 
 ```bash
