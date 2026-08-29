@@ -16,6 +16,8 @@ pub struct PublicRegistryIndex {
     #[serde(default)]
     pub source_commit: Option<String>,
     pub capabilities: Vec<PublicRegistryCapabilityRecord>,
+    #[serde(default)]
+    pub events: Vec<PublicRegistryEventRecord>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
@@ -64,6 +66,22 @@ pub struct PublicUseCaseSummary {
     pub scenario: String,
 }
 
+/// Public registry event-product pointer, mirroring the `events[]` entries in
+/// the published `index.json` (Traverse Spec 534 / registry FR-016). Carried
+/// through `registry sync` so a host-prepared bundle (Traverse Spec 126) can
+/// resolve a capability's `emits[]` references offline without a request-time
+/// fetch. `#[serde(default)]` on the carrying fields keeps a pre-Spec-126
+/// `index.json` / synced state deserializable.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
+pub struct PublicRegistryEventRecord {
+    pub namespace: String,
+    pub id: String,
+    pub version: String,
+    pub product_digest: String,
+    pub product_url: String,
+    pub deprecated: bool,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 pub struct SyncedPublicRegistryState {
     pub schema_version: String,
@@ -79,6 +97,8 @@ pub struct SyncedPublicRegistryState {
     pub validation_status: String,
     pub governing_spec: String,
     pub capabilities: Vec<PublicRegistryCapabilityRecord>,
+    #[serde(default)]
+    pub events: Vec<PublicRegistryEventRecord>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -172,6 +192,35 @@ pub fn validate_public_registry_index(
         }
     }
 
+    let mut seen_events = BTreeSet::new();
+    for (position, record) in index.events.iter().enumerate() {
+        for (field, value) in [
+            ("namespace", record.namespace.as_str()),
+            ("id", record.id.as_str()),
+            ("version", record.version.as_str()),
+            ("product_digest", record.product_digest.as_str()),
+            ("product_url", record.product_url.as_str()),
+        ] {
+            if value.trim().is_empty() {
+                errors.push(error(
+                    PublicRegistryStateErrorCode::EmptyField,
+                    format!("$.events[{position}].{field}"),
+                    format!("registry index event {field} must be non-empty"),
+                ));
+            }
+        }
+        if !seen_events.insert((&record.namespace, &record.id, &record.version)) {
+            errors.push(error(
+                PublicRegistryStateErrorCode::DuplicateRecord,
+                format!("$.events[{position}]"),
+                format!(
+                    "duplicate public registry event record {}:{}@{}",
+                    record.namespace, record.id, record.version
+                ),
+            ));
+        }
+    }
+
     if errors.is_empty() {
         Ok(())
     } else {
@@ -220,6 +269,7 @@ pub fn write_synced_public_registry_state(
         validation_status: "passed".to_string(),
         governing_spec: PUBLIC_REGISTRY_GOVERNING_SPEC.to_string(),
         capabilities: index.capabilities,
+        events: index.events,
     };
     write_state_atomically(
         &synced_public_registry_state_path(workspace_root, workspace_id),
@@ -378,6 +428,7 @@ fn validate_synced_public_registry_state(
         generated_at: state.generated_at.clone(),
         source_commit: state.source_commit.clone(),
         capabilities: state.capabilities.clone(),
+        events: state.events.clone(),
     })
 }
 
@@ -453,6 +504,18 @@ fn state_json_value(state: &SyncedPublicRegistryState) -> Value {
             .capabilities
             .iter()
             .map(capability_json_value)
+            .collect::<Vec<_>>(),
+        "events": state
+            .events
+            .iter()
+            .map(|event| serde_json::json!({
+                "namespace": event.namespace,
+                "id": event.id,
+                "version": event.version,
+                "product_digest": event.product_digest,
+                "product_url": event.product_url,
+                "deprecated": event.deprecated,
+            }))
             .collect::<Vec<_>>()
     })
 }
@@ -1044,6 +1107,7 @@ mod tests {
             validation_status: "passed".to_string(),
             governing_spec: PUBLIC_REGISTRY_GOVERNING_SPEC.to_string(),
             capabilities: valid_index().capabilities,
+            events: valid_index().events,
         }
     }
 
@@ -1078,7 +1142,70 @@ mod tests {
                     "exception_refs": []
                 })),
             }],
+            events: Vec::new(),
         }
+    }
+
+    fn sample_event() -> PublicRegistryEventRecord {
+        PublicRegistryEventRecord {
+            namespace: "core".to_string(),
+            id: "core.status-transitioned".to_string(),
+            version: "1.0.0".to_string(),
+            product_digest: "sha256:76625a7c".to_string(),
+            product_url: "https://raw.githubusercontent.com/traverse-framework/registry/abc123/events/core/core.status-transitioned/1.0.0/product.json".to_string(),
+            deprecated: false,
+        }
+    }
+
+    #[test]
+    fn sync_carries_index_events_into_synced_state() {
+        let workspace_root = unique_temp_dir();
+        let mut index = valid_index();
+        index.events = vec![sample_event()];
+
+        let state = write_synced_public_registry_state(
+            &workspace_root,
+            "local",
+            "traverse-framework/registry",
+            "index-v7",
+            "2026-07-06T00:00:00Z",
+            index,
+        )
+        .expect("write should succeed");
+        assert_eq!(state.events, vec![sample_event()]);
+
+        let reloaded = load_synced_public_registry_state(&workspace_root, "local")
+            .expect("reload should succeed");
+        assert_eq!(reloaded.events, vec![sample_event()]);
+    }
+
+    #[test]
+    fn synced_state_without_events_deserializes_to_empty() {
+        // A synced index.json written by a pre-Spec-126 traverse-registry has no
+        // `events` key; `#[serde(default)]` must keep it loadable.
+        let workspace_root = unique_temp_dir();
+        let path = synced_public_registry_state_path(&workspace_root, "local");
+        fs::create_dir_all(path.parent().expect("parent")).expect("dirs");
+        let mut value = serde_json::to_value(synced_state_fixture()).expect("fixture serializes");
+        value.as_object_mut().expect("object").remove("events");
+        fs::write(&path, serde_json::to_string(&value).expect("json")).expect("write");
+
+        let state = load_synced_public_registry_state(&workspace_root, "local")
+            .expect("reload should succeed");
+        assert!(state.events.is_empty());
+    }
+
+    #[test]
+    fn validate_index_rejects_empty_and_duplicate_event_records() {
+        let mut index = valid_index();
+        let mut blank = sample_event();
+        blank.product_url = "   ".to_string();
+        index.events = vec![sample_event(), sample_event(), blank];
+
+        let failure = validate_public_registry_index(&index).expect_err("should fail");
+        let codes: Vec<_> = failure.errors.iter().map(|e| e.code).collect();
+        assert!(codes.contains(&PublicRegistryStateErrorCode::DuplicateRecord));
+        assert!(codes.contains(&PublicRegistryStateErrorCode::EmptyField));
     }
 
     fn unique_temp_dir() -> PathBuf {
