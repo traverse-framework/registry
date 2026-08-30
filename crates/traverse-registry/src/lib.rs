@@ -528,16 +528,22 @@ impl CapabilityRegistry {
             return self.reconcile_existing(&key, existing, &record, &artifact, &index_entry);
         }
 
-        let compatibility =
-            if let Some(prior) = self.latest_prior_record(scope, &contract.id, &contract.version) {
-                Some(Self::validate_semver_progression(
-                    prior,
-                    &contract,
-                    &record.evidence.evidence_id,
-                )?)
-            } else {
-                None
-            };
+        // specs/021-host-load-trust-boundary-adoption FR-001/FR-003: skip
+        // load-time semver-progression / contract-diff re-derivation for signed
+        // `scope: public` content (already publish-gated by the source
+        // registry); private/workspace and unsigned content keep full checks.
+        let compatibility = if signed_public_provenance(scope, &artifact) {
+            None
+        } else if let Some(prior) = self.latest_prior_record(scope, &contract.id, &contract.version)
+        {
+            Some(Self::validate_semver_progression(
+                prior,
+                &contract,
+                &record.evidence.evidence_id,
+            )?)
+        } else {
+            None
+        };
 
         self.contracts.insert(key.clone(), contract.clone());
         self.records.insert(key.clone(), record.clone());
@@ -1319,6 +1325,20 @@ fn declared_bump(previous: &Version, candidate: &Version) -> DeclaredVersionBump
     }
 }
 
+/// `specs/021-host-load-trust-boundary-adoption` FR-001/FR-003: a `scope:
+/// public` capability carrying Ed25519 artifact-signature evidence came from a
+/// governed registry's publish pipeline, which already gated its semver
+/// progression and contract-diff class. Such content takes the reduced
+/// load-time validation path.
+fn signed_public_provenance(scope: RegistryScope, artifact: &CapabilityArtifactRecord) -> bool {
+    scope == RegistryScope::Public
+        && artifact
+            .binary
+            .as_ref()
+            .and_then(|binary| binary.signature.as_ref())
+            .is_some()
+}
+
 fn classify_contract_change(
     previous: &CapabilityContract,
     candidate: &CapabilityContract,
@@ -1856,6 +1876,123 @@ mod tests {
             .latest_prior_record(RegistryScope::Public, id, "2.0.0")
             .expect("highest prior version should resolve");
         assert_eq!(highest_prior.record.version, "1.10.0");
+    }
+
+    fn signed_executable_artifact(contract: &CapabilityContract) -> CapabilityArtifactRecord {
+        let mut artifact = executable_artifact(contract);
+        if let Some(binary) = artifact.binary.as_mut() {
+            binary.signature = Some(ArtifactSignature {
+                scheme: ArtifactSignatureScheme::Ed25519,
+                public_key_hex: Some("aa".repeat(32)),
+                signature_hex: Some("bb".repeat(64)),
+                sigstore_bundle_ref: None,
+            });
+        }
+        artifact
+    }
+
+    fn registration_with_input_change(
+        scope: RegistryScope,
+        id: &str,
+        version: &str,
+        required_field: &str,
+        signed: bool,
+    ) -> CapabilityRegistration {
+        let mut contract = base_contract(id, version);
+        contract.inputs = SchemaContainer {
+            schema: json!({"type": "object", "required": [required_field]}),
+        };
+        let artifact = if signed {
+            signed_executable_artifact(&contract)
+        } else {
+            executable_artifact(&contract)
+        };
+        CapabilityRegistration {
+            artifact,
+            ..registration(scope, contract)
+        }
+    }
+
+    #[test]
+    fn signed_public_bundle_skips_load_time_semver_progression() {
+        // specs/021-host-load-trust-boundary-adoption FR-001: an `inputs` change
+        // classifies as Unknown; a signed public registration must not re-run
+        // that check (already publish-gated by the source registry).
+        let id = "content.comments.create-comment-draft";
+        let mut registry = CapabilityRegistry::new();
+        registry
+            .register(registration_with_input_change(
+                RegistryScope::Public,
+                id,
+                "1.0.0",
+                "comment_text",
+                true,
+            ))
+            .expect("first version registers");
+        registry
+            .register(registration_with_input_change(
+                RegistryScope::Public,
+                id,
+                "1.0.1",
+                "changed_field",
+                true,
+            ))
+            .expect("signed public: load-time progression check is skipped");
+    }
+
+    #[test]
+    fn unsigned_or_private_still_enforce_semver_progression() {
+        let id = "content.comments.create-comment-draft";
+
+        // FR-002: private keeps full validation.
+        let mut private_registry = CapabilityRegistry::new();
+        private_registry
+            .register(registration_with_input_change(
+                RegistryScope::Private,
+                id,
+                "1.0.0",
+                "comment_text",
+                true,
+            ))
+            .expect("first version");
+        let private_err = private_registry
+            .register(registration_with_input_change(
+                RegistryScope::Private,
+                id,
+                "1.0.1",
+                "changed_field",
+                true,
+            ))
+            .expect_err("private: progression check still runs");
+        assert_eq!(
+            private_err.errors[0].code,
+            RegistryErrorCode::UnknownCompatibility
+        );
+
+        // FR-003: public but unsigned keeps full validation.
+        let mut unsigned_registry = CapabilityRegistry::new();
+        unsigned_registry
+            .register(registration_with_input_change(
+                RegistryScope::Public,
+                id,
+                "1.0.0",
+                "comment_text",
+                false,
+            ))
+            .expect("first version");
+        let unsigned_err = unsigned_registry
+            .register(registration_with_input_change(
+                RegistryScope::Public,
+                id,
+                "1.0.1",
+                "changed_field",
+                false,
+            ))
+            .expect_err("unsigned public: progression check still runs");
+        assert_eq!(
+            unsigned_err.errors[0].code,
+            RegistryErrorCode::UnknownCompatibility
+        );
     }
 
     #[test]

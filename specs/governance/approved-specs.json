@@ -307,6 +307,17 @@
         "proxy/",
         "specs/020-public-execution-proxy/"
       ]
+    },
+    {
+      "id": "021-host-load-trust-boundary-adoption",
+      "version": "1.0.0",
+      "status": "approved",
+      "immutable": true,
+      "path": "specs/021-host-load-trust-boundary-adoption/spec.md",
+      "governs": [
+        "crates/traverse-registry/",
+        "specs/021-host-load-trust-boundary-adoption/"
+      ]
     }
   ],
   "draft_specs": [
