@@ -28,36 +28,36 @@ to infrastructure it has no credentials for — every step below is manual.
 
 ## Step 1 — Stand up `traverse-cli serve`
 
-> **⚠️ Blocked as written — [`traverse-framework/traverse#1211`](https://github.com/traverse-framework/traverse/issues/1211).**
-> `traverse-cli registry sync` produces a pointer-only `index.json` (ids,
-> versions, URLs, digests). `traverse-cli registry materialize` and
-> `serve --registry-state` both want a *bundle manifest* pointing at local
-> `contract.json` files (plus, since traverse#1210, an adjacent
-> `signature.json` per Spec 124). Nothing in the current `traverse-cli`
-> build fetches those files locally and emits that manifest, so the commands
-> below fail with `missing field \`path\``. This is a traverse-side gap in
-> host-artifact-preparation (Specs 118/120), independent of artifact signing
-> (which is fully in place — `registry#334`/`#335`, key at
-> `registry.traverse-framework.com/signing-key.pub`). Steps 2–4 are correct
-> and unaffected; only this bridge step is missing.
+Verified working end to end against the live published registry (2026-08-30)
+after the host-artifact-preparation pipeline landed:
+`traverse#1214` (`prepare-public-bundle`), `traverse#1218` (referenced event
+contracts), `traverse#1221` / registry Spec 021 (`serve` trusts a signed
+public bundle's publish-time governance). Needs `traverse-cli` built from
+`traverse-framework/traverse` at or after `8ff0157`, i.e. `traverse-registry`
+`>= 0.17.0`.
 
 On the Oracle Cloud VM:
 
 ```bash
-# Sync this registry's published public index into a local workspace.
+# 1. Sync this registry's published public index into a local workspace.
 traverse-cli registry sync --workspace proxy --json
 
-# Materialize (download + digest-verify) the actual artifacts referenced
-# by that synced state.
+# 2. Prepare a serve-ready bundle: fetch + digest/signature-verify each
+#    non-deprecated capability's contract.json and signature.json, plus the
+#    event contracts they emit, and emit the bundle.json manifest.
+traverse-cli registry prepare-public-bundle \
+  --synced-state .traverse/workspaces/proxy/registry/public/index.json \
+  --out .traverse/workspaces/proxy/registry/prepared
+
+# 3. Materialize (download + digest-verify) the artifacts the bundle references.
 traverse-cli registry materialize \
-  --registry-state .traverse/workspaces/proxy/registry/public/index.json \
+  --registry-state .traverse/workspaces/proxy/registry/prepared/bundle.json \
   --out .traverse/workspaces/proxy/artifacts
 
-# Keep both fresh: re-run both commands on a schedule (e.g. a daily cron
-# job or systemd timer) so newly published/deprecated capabilities show up
-# without a manual restart. This is ordinary operational upkeep spec 020
-# itself leaves to whoever operates the paired serve instance -- not
-# automated here.
+# Keep fresh: re-run all three on a schedule (daily cron / systemd timer) so
+# newly published or deprecated capabilities show up without a manual
+# restart. Ordinary operational upkeep spec 020 leaves to whoever operates
+# the paired serve instance -- not automated here.
 ```
 
 Then start `serve` bound to a **non-loopback** address — `traverse-cli`
@@ -72,7 +72,7 @@ writing this, not assumed:
 TRAVERSE_JWT_VERIFICATION_KEY=<hex Ed25519 public key from Step 2> \
   traverse-cli serve \
   --bind 0.0.0.0:8787 \
-  --registry-state .traverse/workspaces/proxy/registry/public/index.json \
+  --registry-state .traverse/workspaces/proxy/registry/prepared/bundle.json \
   --artifact-state .traverse/workspaces/proxy/artifacts/artifact-state.json
 ```
 
