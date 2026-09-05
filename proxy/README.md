@@ -224,10 +224,19 @@ checking:
 
 - A request naming a deprecated or nonexistent capability gets
   `capability_not_found`, not a call to `serve` (SC-002).
-- Six rapid requests from the same IP: the sixth should get `rate_limited`
-  (FR-003, 5/minute). Observed *not* enforcing on the first six calls
-  immediately after a fresh deploy — retest after the rate-limiter binding
-  has had a few minutes to propagate before trusting a negative result.
+- Rate limiting (FR-003 — `simple = { limit = 5, period = 60 }` in
+  `wrangler.toml`) rides Cloudflare's native rate-limit binding, which is
+  **approximate, per-Cloudflare-location, and eventually consistent** — by
+  Cloudflare's own description, not "an accurate accounting system." A tight
+  sub-second burst of 6–12 identical requests can *all* return `200`; the
+  counter catches up "very quickly, but not immediately." To confirm it
+  actually enforces, send *sustained* over-limit traffic, not a sprint.
+  Measured 2026-09-05 against the deployed Worker: a 12-request instant
+  burst all returned `200`, then 40 requests at ~0.25s spacing returned
+  28 × `200` / 12 × `429 rate_limited` (first `429` at request 9). If you
+  need deterministic "the Nth request is blocked" behaviour, this binding
+  cannot give it — that needs a strongly-consistent Durable Object counter,
+  a tradeoff `docs/decision-log.md` entry 73 deliberately declined.
 - Nothing in any response — success or error — ever contains `ADMIN_JWT`'s
   value (FR-005). Skim a few real responses to confirm, don't just trust
   the code.
