@@ -5,7 +5,7 @@ members = [
 resolver = "3"
 
 [workspace.package]
-version = "0.17.0"
+version = "0.18.0"
 edition = "2024"
 license = "Apache-2.0"
 repository = "https://github.com/traverse-framework/registry"
@@ -13,8 +13,11 @@ rust-version = "1.94"
 
 [workspace.dependencies]
 # The extracted crate supports the published contract surface from the current
-# 0.8.1 baseline through the 0.9.x Traverse release line.
-traverse-contracts = { version = ">=0.8.1, <0.10.0" }
+# 0.8.1 baseline through the 0.10.x Traverse release line. The upper bound is
+# kept one minor ahead of the newest supported line so a Traverse workspace can
+# unify its local `traverse-contracts` path crate with the version this crate
+# requires (registry#352 — a `<0.10.0` bound blocked Traverse's own v0.10.0 cut).
+traverse-contracts = { version = ">=0.8.1, <0.11.0" }
 
 [workspace.lints.rust]
 unsafe_code = "forbid"
