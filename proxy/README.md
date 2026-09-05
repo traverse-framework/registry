@@ -152,12 +152,32 @@ wrangler secret put ADMIN_JWT
 wrangler deploy
 ```
 
+**`SERVE_URL` MUST be a hostname, never a raw IP address.** A Worker's
+outbound `fetch()` to a bare IP literal fails closed with Cloudflare edge
+error `1003` ("Direct IP Access Not Allowed") — confirmed directly, not
+assumed, after it broke a real deployment. If your `serve` VM has no domain
+of its own, add one A record for it (e.g. `serve.yourdomain.com → <VM IP>`,
+proxy status **DNS only** — it must resolve to the real IP, not a
+Cloudflare-proxied one) at any DNS provider, and point `SERVE_URL` at that
+hostname instead.
+
 `wrangler deploy` provisions the `[[ratelimits]]` binding declared in
 `wrangler.toml` automatically on first deploy; if `namespace_id = "1"`
 collides with an existing rate limiter in your account, wrangler's error
 will say so — pick a different number and redeploy.
 
 ## Step 4 — Verify (spec 020 SC-001)
+
+Verified working end to end 2026-08-30/31 against a real Oracle Cloud
+`serve` instance. The `request` field is **not** the raw capability input —
+it must be a full `traverse-runtime::RuntimeRequest` envelope
+(`crates/traverse-runtime/src/lib.rs`, `traverse-framework/traverse`).
+`intent.capability_id`/`intent.capability_version` must exactly match the
+outer `id`/`version`, `intent.version_range` must be absent, and
+`context.requested_target` must name a placement the paired `serve`
+instance's executor set actually supports (`local` for a plain
+`traverse-cli serve` host; `browser` fails closed with
+`placement_unsupported` there).
 
 ```bash
 curl -s -X POST https://<your-worker-subdomain>.workers.dev/execute \
@@ -167,27 +187,47 @@ curl -s -X POST https://<your-worker-subdomain>.workers.dev/execute \
     "id": "core.transition-action-status",
     "version": "1.4.0",
     "request": {
-      "action_item_id": "item-001",
-      "actor_id": "user-ada",
-      "owner_id": "user-ada",
-      "current_status": "open",
-      "requested_status": "in_progress",
-      "transition_config": {
-        "version": "1.0",
-        "allowed_transitions": {"open": ["in_progress"]},
-        "owner_only": true
-      }
+      "kind": "runtime_request",
+      "schema_version": "1.0.0",
+      "request_id": "sc001-verify-001",
+      "intent": {
+        "capability_id": "core.transition-action-status",
+        "capability_version": "1.4.0"
+      },
+      "input": {
+        "action_item_id": "item-001",
+        "actor_id": "user-ada",
+        "owner_id": "user-ada",
+        "current_status": "open",
+        "requested_status": "in_progress",
+        "transition_config": {
+          "version": "1.0",
+          "allowed_transitions": {"open": ["in_progress"]},
+          "owner_only": true
+        }
+      },
+      "lookup": {
+        "scope": "public_only",
+        "allow_ambiguity": false
+      },
+      "context": {
+        "requested_target": "local"
+      },
+      "governing_spec": "006-runtime-request-execution"
     }
   }'
 ```
 
-A genuine execution result (not an error) with no credential of any kind
-supplied by the caller is exactly SC-001. Also worth checking:
+A genuine `"status": "completed"` execution result (not an error) with no
+credential of any kind supplied by the caller is exactly SC-001. Also worth
+checking:
 
 - A request naming a deprecated or nonexistent capability gets
   `capability_not_found`, not a call to `serve` (SC-002).
-- Six rapid requests from the same IP: the sixth gets `rate_limited` (FR-003,
-  5/minute).
+- Six rapid requests from the same IP: the sixth should get `rate_limited`
+  (FR-003, 5/minute). Observed *not* enforcing on the first six calls
+  immediately after a fresh deploy — retest after the rate-limiter binding
+  has had a few minutes to propagate before trusting a negative result.
 - Nothing in any response — success or error — ever contains `ADMIN_JWT`'s
   value (FR-005). Skim a few real responses to confirm, don't just trust
   the code.
