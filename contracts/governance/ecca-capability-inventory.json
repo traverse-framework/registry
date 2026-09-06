@@ -495,6 +495,15 @@
       "path": "capabilities/visual/visual.parameter-map/1.0.0/contract.json",
       "classification": "no-event-required",
       "evidence": "side_effects=[memory_only] on published version 1.0.0; empty emits/consumes; deterministic visual parameter mapping returns directly to the caller with no asynchronous domain fact broadcast to independent consumers."
+    },
+    {
+      "capability_id": "core.validate-audio-source-profile",
+      "published_versions": [
+        "1.0.0"
+      ],
+      "path": "capabilities/core/core.validate-audio-source-profile/1.0.0/contract.json",
+      "classification": "no-event-required",
+      "evidence": "side_effects=[memory_only], empty emits/consumes, and a direct deterministic validation result; the capability does not create or broadcast an asynchronous domain fact."
     }
   ]
 }
