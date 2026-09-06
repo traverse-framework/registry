@@ -1,0 +1,17 @@
+{
+  "id": "record-operator",
+  "version": "1.0.0",
+  "name": "Record Operator",
+  "summary": "Applies idempotent, versioned record transitions using opaque references and declared state policy.",
+  "description": "Uses typed record references, expected versions, transition requests, and idempotency keys. Does not select a database, transaction engine, event store, path, provider, or credential.",
+  "distinguished_from": [
+    {
+      "persona_id": "artifact-operator",
+      "how": "Owns versioned record state transitions; does not govern immutable byte assets."
+    },
+    {
+      "persona_id": "operations-operator",
+      "how": "Applies record state transitions; does not evaluate time-based trigger policy."
+    }
+  ]
+}

@@ -1,0 +1,17 @@
+{
+  "id": "artifact-operator",
+  "version": "1.0.0",
+  "name": "Artifact Operator",
+  "summary": "Manages opaque immutable artifact finalization and integrity outcomes without owning a storage provider.",
+  "description": "Uses opaque content and artifact references, retention classes, integrity evidence, and idempotency keys to govern artifact handling. Does not choose a filesystem, object store, database, provider, or credential.",
+  "distinguished_from": [
+    {
+      "persona_id": "record-operator",
+      "how": "Owns immutable byte-asset outcomes; does not own versioned record transitions."
+    },
+    {
+      "persona_id": "audio-operator",
+      "how": "Owns artifact lifecycle boundaries; does not configure audio source or transformation policy."
+    }
+  ]
+}
