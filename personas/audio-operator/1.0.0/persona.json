@@ -1,0 +1,17 @@
+{
+  "id": "audio-operator",
+  "version": "1.0.0",
+  "name": "Audio Operator",
+  "summary": "Configures and reviews bounded audio capture, transformation, and windowing work without owning a device implementation.",
+  "description": "Uses portable audio profiles, policy, opaque artifact references, and execution receipts to prepare or review audio work. Does not select an operating-system microphone API, storage backend, codec implementation, or application workflow.",
+  "distinguished_from": [
+    {
+      "persona_id": "inference-operator",
+      "how": "Owns audio input and transformation planning; does not select or evaluate model execution."
+    },
+    {
+      "persona_id": "artifact-operator",
+      "how": "Owns audio-boundary configuration; does not own immutable artifact lifecycle policy."
+    }
+  ]
+}

@@ -1,0 +1,17 @@
+{
+  "id": "operations-operator",
+  "version": "1.0.0",
+  "name": "Operations Operator",
+  "summary": "Evaluates declared operational trigger policy and recovery outcomes without owning timer or host implementation.",
+  "description": "Uses host-provided trigger context, calendar-policy references, logical deadlines, and idempotency keys to decide whether work should be scheduled. Does not read an ambient clock, install timers, select a scheduler, or execute a workflow directly.",
+  "distinguished_from": [
+    {
+      "persona_id": "record-operator",
+      "how": "Owns trigger and scheduling-policy evaluation; does not apply versioned record transitions."
+    },
+    {
+      "persona_id": "audio-operator",
+      "how": "Owns operational timing policy; does not configure audio processing."
+    }
+  ]
+}
