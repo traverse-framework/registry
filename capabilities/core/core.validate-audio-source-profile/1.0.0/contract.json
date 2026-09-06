@@ -1,0 +1,174 @@
+{
+  "kind": "capability_contract",
+  "schema_version": "1.0.0",
+  "id": "core.validate-audio-source-profile",
+  "namespace": "core",
+  "name": "validate-audio-source-profile",
+  "version": "1.0.0",
+  "lifecycle": "active",
+  "owner": {
+    "team": "traverse-core",
+    "contact": "maintainers@traverse-framework.org"
+  },
+  "summary": "Validate a portable audio-source profile against a bounded capture policy.",
+  "description": "Performs deterministic validation of a supplied PCM source profile and requested capture duration. It does not discover a device, request permission, capture audio, open a file, invoke a connector, select a platform, or know an application workflow or content domain.",
+  "use_cases": [
+    {
+      "scenario": "As an audio operator, I want a supported PCM profile accepted, so that a host can safely receive a later capture request.",
+      "input_example": {
+        "source_profile": { "sample_rate_hz": 48000, "channel_count": 1, "bit_depth": 16, "encoding": "pcm_s16le" },
+        "capture_policy": { "policy_version": "1.0.0", "max_segment_seconds": 900, "requested_segment_seconds": 900 }
+      },
+      "output_example": { "valid": true, "reason_code": "source_profile_compatible", "policy_version": "1.0.0" },
+      "happy": true,
+      "persona_ref": "audio-operator"
+    },
+    {
+      "scenario": "As an audio operator, I want unsupported channel counts rejected, so that a host is not asked for an out-of-policy capture.",
+      "input_example": {
+        "source_profile": { "sample_rate_hz": 48000, "channel_count": 3, "bit_depth": 24, "encoding": "pcm_s24le" },
+        "capture_policy": { "policy_version": "1.0.0", "max_segment_seconds": 900, "requested_segment_seconds": 900 }
+      },
+      "output_example": { "valid": false, "reason_code": "unsupported_channel_count", "policy_version": "1.0.0" },
+      "happy": false,
+      "persona_ref": "audio-operator"
+    },
+    {
+      "scenario": "As an audio operator, I want unsupported sample rates rejected, so that capture resource limits remain explicit and portable.",
+      "input_example": {
+        "source_profile": { "sample_rate_hz": 4000, "channel_count": 1, "bit_depth": 32, "encoding": "pcm_f32le" },
+        "capture_policy": { "policy_version": "1.0.0", "max_segment_seconds": 900, "requested_segment_seconds": 900 }
+      },
+      "output_example": { "valid": false, "reason_code": "unsupported_sample_rate", "policy_version": "1.0.0" },
+      "happy": false,
+      "persona_ref": "audio-operator"
+    },
+    {
+      "scenario": "As an audio operator, I want unsupported bit depths rejected, so that a downstream transformation is never planned from an ambiguous format.",
+      "input_example": {
+        "source_profile": { "sample_rate_hz": 48000, "channel_count": 1, "bit_depth": 12, "encoding": "pcm_s16le" },
+        "capture_policy": { "policy_version": "1.0.0", "max_segment_seconds": 900, "requested_segment_seconds": 900 }
+      },
+      "output_example": { "valid": false, "reason_code": "unsupported_bit_depth", "policy_version": "1.0.0" },
+      "happy": false,
+      "persona_ref": "audio-operator"
+    },
+    {
+      "scenario": "As an audio operator, I want an incompatible PCM encoding rejected, so that source format compatibility is verified before any host work begins.",
+      "input_example": {
+        "source_profile": { "sample_rate_hz": 48000, "channel_count": 1, "bit_depth": 16, "encoding": "pcm_f32le" },
+        "capture_policy": { "policy_version": "1.0.0", "max_segment_seconds": 900, "requested_segment_seconds": 900 }
+      },
+      "output_example": { "valid": false, "reason_code": "unsupported_encoding", "policy_version": "1.0.0" },
+      "happy": false,
+      "persona_ref": "audio-operator"
+    },
+    {
+      "scenario": "As an audio operator, I want an overlong requested segment rejected, so that the capture limit is enforced before a host is asked to act.",
+      "input_example": {
+        "source_profile": { "sample_rate_hz": 48000, "channel_count": 1, "bit_depth": 16, "encoding": "pcm_s16le" },
+        "capture_policy": { "policy_version": "1.0.0", "max_segment_seconds": 900, "requested_segment_seconds": 901 }
+      },
+      "output_example": { "valid": false, "reason_code": "segment_duration_exceeds_policy", "policy_version": "1.0.0" },
+      "happy": false,
+      "persona_ref": "audio-operator"
+    },
+    {
+      "scenario": "As an audio operator, I want incomplete policy input rejected with a stable result, so that malformed requests do not reach an audio host.",
+      "input_example": {
+        "source_profile": { "sample_rate_hz": 48000, "channel_count": 1, "bit_depth": 16, "encoding": "pcm_s16le" },
+        "capture_policy": { "policy_version": "", "max_segment_seconds": 900, "requested_segment_seconds": 900 }
+      },
+      "output_example": { "valid": false, "reason_code": "invalid_request", "policy_version": "" },
+      "happy": false,
+      "persona_ref": "audio-operator"
+    }
+  ],
+  "inputs": {
+    "schema": {
+      "type": "object",
+      "required": ["source_profile", "capture_policy"],
+      "properties": {
+        "source_profile": {
+          "type": "object",
+          "required": ["sample_rate_hz", "channel_count", "bit_depth", "encoding"],
+          "properties": {
+            "sample_rate_hz": { "type": "integer", "minimum": 8000, "maximum": 192000 },
+            "channel_count": { "type": "integer", "minimum": 1, "maximum": 2 },
+            "bit_depth": { "type": "integer", "enum": [16, 24, 32] },
+            "encoding": { "type": "string", "enum": ["pcm_s16le", "pcm_s24le", "pcm_f32le"] }
+          },
+          "additionalProperties": false
+        },
+        "capture_policy": {
+          "type": "object",
+          "required": ["policy_version", "max_segment_seconds", "requested_segment_seconds"],
+          "properties": {
+            "policy_version": { "type": "string", "minLength": 1 },
+            "max_segment_seconds": { "type": "integer", "minimum": 1, "maximum": 3600 },
+            "requested_segment_seconds": { "type": "integer", "minimum": 1, "maximum": 3600 }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "outputs": {
+    "schema": {
+      "type": "object",
+      "required": ["valid", "reason_code", "policy_version"],
+      "properties": {
+        "valid": { "type": "boolean" },
+        "reason_code": {
+          "type": "string",
+          "enum": ["source_profile_compatible", "unsupported_channel_count", "unsupported_sample_rate", "unsupported_bit_depth", "unsupported_encoding", "segment_duration_exceeds_policy", "invalid_request"]
+        },
+        "policy_version": { "type": "string" }
+      },
+      "additionalProperties": false
+    }
+  },
+  "preconditions": [
+    { "id": "profile-and-policy-supplied", "description": "The caller supplies a source-profile object and a versioned capture-policy object." }
+  ],
+  "postconditions": [
+    { "id": "deterministic-result", "description": "Identical inputs produce identical validation results." },
+    { "id": "no-device-access", "description": "Validation does not inspect or access an audio device." }
+  ],
+  "side_effects": [
+    { "kind": "memory_only", "description": "Pure policy calculation with no persistence, connector, file, network, or device action." }
+  ],
+  "emits": [],
+  "consumes": [],
+  "permissions": [
+    { "id": "core.validate-audio-source-profile.execute" }
+  ],
+  "execution": {
+    "binary_format": "wasm",
+    "entrypoint": { "kind": "wasi-command", "command": "run" },
+    "preferred_targets": ["local", "edge", "device"],
+    "constraints": { "host_api_access": "none", "network_access": "forbidden", "filesystem_access": "none" }
+  },
+  "policies": [
+    { "id": "versioned-capture-policy" }
+  ],
+  "dependencies": [],
+  "provenance": {
+    "source": "greenfield",
+    "author": "traverse-core",
+    "created_at": "2026-09-06T00:00:00Z",
+    "spec_ref": "100-capability-package-authoring@1.0.0",
+    "adr_refs": ["ADR-0039"],
+    "exception_refs": []
+  },
+  "evidence": [],
+  "state_schema": null,
+  "service_type": "stateless",
+  "permitted_targets": ["local", "edge", "device"],
+  "artifact_type": "native",
+  "artifact": {
+    "digest": "sha256:ad440e4782bc9418c59d422e4a34d3524130978a4bef049212a2ad346cd8775d",
+    "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/core.validate-audio-source-profile-1.0.0/core-validate-audio-source-profile.wasm"
+  }
+}
