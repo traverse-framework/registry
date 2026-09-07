@@ -76,6 +76,15 @@ jobs:
       - name: Run capability validation unit tests
         run: python3 -m unittest scripts/ci/tests/test_capability_validation.py -v
 
+      # specs/022-publication-lifecycle-measurement (registry#354, decision-log
+      # entry 83). Rides this already-required job rather than a new required
+      # check -- making a new job required is an owner-only branch-protection
+      # change (same precedent as decision-log entries 28/39).
+      - name: Run measurement validation unit tests
+        run: |
+          python3 -m unittest scripts/ci/tests/test_measurement_validation.py -v
+          python3 -m unittest scripts/metrics/tests/test_publication_lifecycle_export.py -v
+
       - name: Run capability validation
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
@@ -86,6 +95,17 @@ jobs:
             python3 scripts/ci/capability_validation.py "$BASE_SHA" "$HEAD_SHA"
           else
             python3 scripts/ci/capability_validation.py
+          fi
+
+      - name: Run measurement validation
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            python3 scripts/ci/measurement_validation.py "$BASE_SHA" "$HEAD_SHA"
+          else
+            python3 scripts/ci/measurement_validation.py
           fi
 
   # traverse-registry crate test suite (specs/011-013, 015, 016). Was
