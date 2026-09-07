@@ -1,0 +1,206 @@
+{
+  "kind": "capability_contract",
+  "schema_version": "1.0.0",
+  "id": "core.prepare-inference-request",
+  "namespace": "core",
+  "name": "prepare-inference-request",
+  "version": "1.0.0",
+  "lifecycle": "active",
+  "owner": {
+    "team": "traverse-core",
+    "contact": "maintainers@traverse-framework.org"
+  },
+  "summary": "Create a connector-neutral local inference request from opaque artifact references.",
+  "description": "Pure portable preparation of one inference request. It does not choose, download, load, license, or execute a model; access audio bytes; or know an application, label domain, or workflow.",
+  "use_cases": [
+    {
+      "scenario": "As an inference operator, I want a complete bounded request plan so that a configured local runtime can execute it later.",
+      "input_example": {
+        "input_artifact_ref": "asset:sha256:window-17",
+        "model_artifact_ref": "model:sha256:release-4",
+        "inference_profile_ref": "profile:classifier-default",
+        "idempotency_key": "infer-window-17"
+      },
+      "output_example": {
+        "connector_id": "traverse.local-model-runtime",
+        "operation": "infer",
+        "input_artifact_ref": "asset:sha256:window-17",
+        "model_artifact_ref": "model:sha256:release-4",
+        "inference_profile_ref": "profile:classifier-default",
+        "idempotency_key": "infer-window-17",
+        "result_class": "planned"
+      },
+      "happy": true,
+      "persona_ref": "inference-operator"
+    },
+    {
+      "scenario": "As an inference operator, I want each required opaque reference checked so that incomplete requests never reach a model runtime.",
+      "input_example": {
+        "input_artifact_ref": "",
+        "model_artifact_ref": "model:sha256:release-4",
+        "inference_profile_ref": "profile:classifier-default",
+        "idempotency_key": "infer-window-17"
+      },
+      "output_example": {
+        "connector_id": "",
+        "operation": "",
+        "input_artifact_ref": "",
+        "model_artifact_ref": "",
+        "inference_profile_ref": "",
+        "idempotency_key": "",
+        "result_class": "invalid_request"
+      },
+      "happy": false,
+      "persona_ref": "inference-operator"
+    }
+  ],
+  "inputs": {
+    "schema": {
+      "type": "object",
+      "required": [
+        "input_artifact_ref",
+        "model_artifact_ref",
+        "inference_profile_ref",
+        "idempotency_key"
+      ],
+      "properties": {
+        "input_artifact_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "model_artifact_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "inference_profile_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "idempotency_key": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "outputs": {
+    "schema": {
+      "type": "object",
+      "required": [
+        "connector_id",
+        "operation",
+        "input_artifact_ref",
+        "model_artifact_ref",
+        "inference_profile_ref",
+        "idempotency_key",
+        "result_class"
+      ],
+      "properties": {
+        "connector_id": {
+          "type": "string"
+        },
+        "operation": {
+          "type": "string"
+        },
+        "input_artifact_ref": {
+          "type": "string"
+        },
+        "model_artifact_ref": {
+          "type": "string"
+        },
+        "inference_profile_ref": {
+          "type": "string"
+        },
+        "idempotency_key": {
+          "type": "string"
+        },
+        "result_class": {
+          "type": "string",
+          "enum": [
+            "planned",
+            "invalid_request"
+          ]
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "preconditions": [
+    {
+      "id": "opaque-references-present",
+      "description": "Non-empty opaque input, model, profile, and idempotency references are supplied."
+    }
+  ],
+  "postconditions": [
+    {
+      "id": "deterministic",
+      "description": "Identical requests yield identical plans."
+    },
+    {
+      "id": "no-model-access",
+      "description": "The capability does not select, load, license, or execute a model."
+    }
+  ],
+  "side_effects": [
+    {
+      "kind": "memory_only",
+      "description": "Pure request planning."
+    }
+  ],
+  "emits": [],
+  "consumes": [],
+  "permissions": [
+    {
+      "id": "core.prepare-inference-request.execute"
+    }
+  ],
+  "execution": {
+    "binary_format": "wasm",
+    "entrypoint": {
+      "kind": "wasi-command",
+      "command": "run"
+    },
+    "preferred_targets": [
+      "local",
+      "browser",
+      "edge",
+      "device"
+    ],
+    "constraints": {
+      "host_api_access": "none",
+      "network_access": "forbidden",
+      "filesystem_access": "none"
+    }
+  },
+  "policies": [
+    {
+      "id": "opaque-inference-input-policy"
+    }
+  ],
+  "dependencies": [],
+  "provenance": {
+    "source": "greenfield",
+    "author": "traverse-core",
+    "created_at": "2026-09-07T00:00:00Z",
+    "spec_ref": "100-capability-package-authoring@1.0.0",
+    "adr_refs": [
+      "ADR-0039"
+    ],
+    "exception_refs": []
+  },
+  "evidence": [],
+  "state_schema": null,
+  "service_type": "stateless",
+  "permitted_targets": [
+    "local",
+    "browser",
+    "edge",
+    "device"
+  ],
+  "artifact_type": "native",
+  "artifact": {
+    "digest": "sha256:4a02e6eaffdb02d8b926d6fbe55aa0eae2de26e8957793481bb96bdfec4f8d39",
+    "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/core.prepare-inference-request-1.0.0/core-prepare-inference-request.wasm"
+  }
+}
