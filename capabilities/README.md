@@ -31,7 +31,11 @@ Copy-paste sequence for a new capability version (manual path today; `traverse-c
    add `authoring.source_revision`, `authoring.test_evidence`, and `authoring.review`
    (FR-003), and note that a qualified Rust/security reviewer must sign off the
    implementation evidence (FR-005). `traverse-cli capability publish` does not emit this
-   field yet — add it by hand until it does.
+   field yet — add it by hand until it does. **`authoring.method` is not a substitute
+   for a CLA-covered commit author**: every commit must still be authored by the
+   operating human or a sanctioned bot (`claude` / `cursoragent`), never a tool-local
+   identity like `<tool>@local` — see
+   [`CONTRIBUTING.md`](../CONTRIBUTING.md#agent-assisted-contributions).
 5. **Ensure every `use_cases[].persona_ref` resolves** to an existing `personas/<id>/<version>/persona.json` (see `specs/017-persona-registry/spec.md` and [`personas/README.md`](../personas/README.md)). Author missing personas before opening the contract PR — prefer `bash scripts/scaffold/new-persona.sh` so `distinguished_from` and local `validate_persona` checks pass first.
 6. **Open the PR with the org body sections** required by `spec-alignment`: `## Summary`, `## Governing Spec` (bare approved-spec ids in backticks, one per bullet), `## Project Item`, `## Definition of Done`, `## Validation`. Editing the body alone does not re-run that check — push a new commit after body fixes.
 
