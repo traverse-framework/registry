@@ -1,0 +1,17 @@
+[workspace]
+
+[package]
+name = "inference-evidence-normalize-agent"
+version = "0.1.0"
+edition = "2021"
+publish = false
+description = "Catalog-source mirror of inference.evidence-normalize."
+
+[[bin]]
+name = "inference-evidence-normalize-agent"
+path = "src/main.rs"
+
+[profile.release]
+opt-level = "s"
+lto = true
+panic = "abort"
