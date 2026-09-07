@@ -128,6 +128,10 @@ REQUIRED_FIELDS = ["id", "namespace", "owner", "version"]
 # adding this check, so there is no legacy-incompatibility risk.
 KNOWN_SERVICE_TYPES = {"stateless", "subscribable", "stateful"}
 
+# spec 023-authoring-assurance FR-001/FR-003
+AUTHORING_METHODS = {"human", "llm-assisted"}
+LLM_ASSISTED_AUDIT_FIELDS = ("source_revision", "test_evidence", "review")
+
 
 def fail(errors, code, path, message):
     errors.append({"code": code, "path": path, "message": message})
@@ -787,6 +791,68 @@ def check_new_contracts_have_artifact_reference(base_sha: str, head_sha: str, er
         status, path = parts[0], parts[-1]
         if status == "A" and path.endswith("contract.json"):
             check_new_contract_artifact_reference(Path(path), errors)
+
+
+def check_new_contract_authoring_method(path: Path, errors: list) -> None:
+    """spec 023-authoring-assurance FR-001/FR-003: a newly ADDED or CHANGED
+    contract.json MUST declare authoring.method ('human' | 'llm-assisted').
+    An 'llm-assisted' contract MUST also carry audit links (source_revision,
+    test_evidence, review) under `authoring`; the artifact digest is already
+    required separately by check_new_contract_artifact_reference (#187).
+    Diff-based, never whole-tree: contracts published before spec 023 predate
+    the field and are immutable (decision-log entry 86)."""
+    try:
+        contract = json.loads(path.read_text())
+    except Exception:
+        return
+    authoring = contract.get("authoring")
+    if not isinstance(authoring, dict) or "method" not in authoring:
+        fail(
+            errors,
+            "contract.missing_authoring_method",
+            str(path),
+            "newly added/changed contract.json must declare authoring.method "
+            "('human' | 'llm-assisted') -- spec 023-authoring-assurance FR-001",
+        )
+        return
+    method = authoring.get("method")
+    if method not in AUTHORING_METHODS:
+        fail(
+            errors,
+            "contract.invalid_authoring_method",
+            str(path),
+            f"authoring.method must be one of {sorted(AUTHORING_METHODS)}, got {method!r} "
+            "(spec 023-authoring-assurance FR-001)",
+        )
+        return
+    if method == "llm-assisted":
+        missing = [f for f in LLM_ASSISTED_AUDIT_FIELDS if not authoring.get(f)]
+        if missing:
+            fail(
+                errors,
+                "contract.missing_authoring_audit",
+                str(path),
+                f"authoring.method 'llm-assisted' requires audit link(s) {missing} under "
+                "`authoring` (spec 023-authoring-assurance FR-003); the artifact digest is "
+                "covered separately by artifact.digest (#187)",
+            )
+
+
+def check_new_contracts_declare_authoring_method(base_sha: str, head_sha: str, errors: list) -> None:
+    """Only validates contract.json files ADDED or CHANGED in this PR's diff --
+    see check_new_contract_authoring_method's docstring for why this must not
+    run against the whole historical tree."""
+    diff = subprocess.check_output(
+        ["git", "diff", "--name-status", f"{base_sha}...{head_sha}", "--", "capabilities/"],
+        text=True,
+    )
+    for line in diff.splitlines():
+        if not line.strip():
+            continue
+        parts = line.split("\t")
+        status, path = parts[0], parts[-1]
+        if path.endswith("contract.json") and (status == "A" or status.startswith("M")):
+            check_new_contract_authoring_method(Path(path), errors)
 
 
 COVERAGE_MIN_FUNCTIONS_PERCENT = 100.0
@@ -1565,6 +1631,10 @@ def main() -> int:
             fail(errors, "git.diff_failed", "capabilities/", f"Unable to compute diff: {exc}")
         try:
             check_new_contracts_have_artifact_reference(base_sha, head_sha, errors)
+        except subprocess.CalledProcessError as exc:
+            fail(errors, "git.diff_failed", "capabilities/", f"Unable to compute diff: {exc}")
+        try:
+            check_new_contracts_declare_authoring_method(base_sha, head_sha, errors)
         except subprocess.CalledProcessError as exc:
             fail(errors, "git.diff_failed", "capabilities/", f"Unable to compute diff: {exc}")
         try:
