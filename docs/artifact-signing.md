@@ -56,23 +56,40 @@ gh secret set ARTIFACT_SIGNING_ED25519_SECRET_KEY \
   --body '<64-hex-char secret from step 1>'
 ```
 
-### 3. (Optional) Let Actions push to `main` for the ongoing case
+### 3. Landing new `signature.json` files after a publish — the standing manual step
 
-On merge to `main`, the `sign-artifacts` job tries to commit new `signature.json`
-files back directly. That direct push needs the `github-actions[bot]` actor to be
-allowed past the branch rules on `main`. It is **not required** to activate
-signing:
+On merge to `main`, the `sign-artifacts` job signs any newly published capability
+and tries to commit the `signature.json` back directly. That direct push needs
+`github-actions[bot]` past the `traverse-governance-*` rules on `main`, which it
+does not have — so the job logs a warning, still succeeds (`continue-on-error`),
+and uploads the signed files as the `artifact-signatures` workflow artifact.
 
-- If the bot is not allowed to push, the job logs a warning and still succeeds
-  (`continue-on-error`). The signed files are always uploaded as the
-  `artifact-signatures` workflow artifact for a maintainer to download and open a
-  normal PR with.
-- New-capability publishes are infrequent, so handling them by PR is low-friction.
-  Grant the bypass (or provision a bot PAT / GitHub App token) only if you want
-  the per-publish commit to be fully automatic.
+**The maintainer then opens a normal PR with that artifact's contents. This is the
+chosen approach, not a stopgap** — decided in `docs/decision-log.md` entry 85
+(`/brainstorm 341 355 365`, registry#341):
 
-Weakening the `traverse-governance-*` rulesets for this is a deliberate
-governance call, not a routine toggle — treat it as one.
+- A bot PAT / GitHub App token that pushes (or opens a CI-triggering PR)
+  automatically is the right answer *eventually*, but not now — it adds a secret
+  to rotate for a step that runs only on new-capability publishes, which are
+  infrequent.
+- Adding `github-actions[bot]` to the `traverse-governance-*` bypass list is
+  rejected at any stage: it weakens a governance ruleset and broadens bot write
+  access to `main` well beyond signatures.
+
+To recover the signatures after such a merge:
+
+```bash
+run_id=$(gh run list --repo traverse-framework/registry --workflow CI \
+  --branch main -L1 --json databaseId --jq '.[0].databaseId')
+gh run download "$run_id" --repo traverse-framework/registry -n artifact-signatures -D .
+git checkout -b chore/signatures-<capability>-<version>
+git add capabilities catalog/signing-key.pub
+git commit -m "chore(signing): add signature.json for <capability> <version>"
+```
+
+**Revisit trigger:** move to the bot PAT / App token (registry#341) once
+new-capability publishes sustain more than ~1 per week and the manual PR becomes a
+real drag. Until then, registry#341 stays open as the tracking vehicle.
 
 ### 4. Backfill existing capabilities (registry#335)
 
