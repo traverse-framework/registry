@@ -73,6 +73,27 @@ green and mergeable for hours after going stale. Main's branch protection now re
 stacked branch will surface as a merge/CI conflict at update time instead of silently
 sitting green — but branching correctly in the first place still avoids the rebuild.
 
+## The lightweight / private path
+
+Not every capability needs to be published here. If a capability is specific to
+one application — app-private or workspace-scoped business logic that no other
+consumer would reuse — **keep it in that application's own workspace**. It does
+not go through this registry at all, and there is no reduced-gate track here for
+it: publishing to `traverse-framework/registry` always means the full public
+path — schema and semver validation, contract immutability, mandatory
+`capability-src/` test coverage, the advisory review pass, and human-merge-only.
+
+Promoting a previously-private capability to the public registry is a **fresh
+public publication** — a new `capabilities/<namespace>/<id>/<version>/contract.json`
+that passes every gate above. It is never an in-place upgrade or a
+"mark it public" flag on an existing private record; no such mechanism exists.
+
+This boundary is governed by
+[`specs/022-publication-lifecycle-measurement`](specs/022-publication-lifecycle-measurement/spec.md)
+FR-019 (decision-log entry 83). Whether a genuinely lighter-weight shared path
+is ever worth building is an open question the publication-lifecycle report
+(`docs/publication-lifecycle-report.md`) is meant to inform with evidence.
+
 ## Core Rules
 
 - Approved specs are versioned, immutable, and merge-gating.
