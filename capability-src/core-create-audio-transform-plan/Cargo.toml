@@ -1,0 +1,15 @@
+[workspace]
+[package]
+name = "core-create-audio-transform-plan"
+version = "1.0.0"
+edition = "2021"
+publish = false
+[[bin]]
+name = "core-create-audio-transform-plan"
+path = "src/main.rs"
+[dependencies]
+wasi-capability-runtime = { path = "../wasi-capability-runtime" }
+[profile.release]
+opt-level = "s"
+lto = true
+panic = "abort"
