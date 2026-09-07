@@ -30,6 +30,15 @@ Copy-paste sequence for a new capability version (manual path today; `traverse-c
 
 Never edit an already-merged `contract.json`; yank via `deprecated.json` and publish a new version instead.
 
+**Optional — contribute a publication-lifecycle measurement record.** After your
+capability PR merges, you can run the export helper to derive an aggregate-only,
+identity-free record of how this publish went (CI passes/failures, review rounds,
+elapsed time) and open a small PR adding it. It is opt-in and off by default —
+nothing happens unless you choose to contribute. It feeds the friction report at
+[`../docs/publication-lifecycle-report.md`](../docs/publication-lifecycle-report.md);
+the first edition publishes once ≥20 records exist. How-to:
+[`../metrics/publication-lifecycle/README.md`](../metrics/publication-lifecycle/README.md).
+
 **Artifact signing is automatic — nothing for publishers to do.** After a
 capability PR merges, the `sign-artifacts` CI job Ed25519-signs the referenced
 artifact and commits a `signature.json` sibling next to your `contract.json`
