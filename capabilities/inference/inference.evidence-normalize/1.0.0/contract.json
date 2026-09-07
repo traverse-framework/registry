@@ -54,7 +54,7 @@
         ]
       },
       "happy": true,
-      "persona_ref": "evidence-consumer"
+      "persona_ref": "inference-operator"
     },
     {
       "scenario": "As an evidence consumer, I want malformed confidence or intervals rejected before persistence so that invalid model output cannot enter the evidence store.",
@@ -78,7 +78,7 @@
         "result_class": "invalid_request"
       },
       "happy": false,
-      "persona_ref": "evidence-consumer"
+      "persona_ref": "inference-operator"
     }
   ],
   "inputs": {
@@ -292,5 +292,10 @@
     "browser",
     "edge",
     "device"
-  ]
+  ],
+  "artifact_type": "native",
+  "artifact": {
+    "digest": "sha256:849318a47433948d6c7e964bbcb644a60adad63ddc193e4b6f6d3c20502466a3",
+    "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/inference.evidence-normalize-1.0.0/evidence-normalize.wasm"
+  }
 }
