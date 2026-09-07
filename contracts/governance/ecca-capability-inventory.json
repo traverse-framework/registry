@@ -497,6 +497,13 @@
       "evidence": "side_effects=[memory_only] on published version 1.0.0; empty emits/consumes; deterministic visual parameter mapping returns directly to the caller with no asynchronous domain fact broadcast to independent consumers."
     },
     {
+      "capability_id": "audio.calibration-plan-create",
+      "published_versions": ["1.0.0"],
+      "path": "capabilities/audio/audio.calibration-plan-create/1.0.0/contract.json",
+      "classification": "no-event-required",
+      "evidence": "side_effects=[memory_only], empty emits/consumes, and a direct deterministic calibration planning result; the capability does not invoke a connector or broadcast an asynchronous domain fact."
+    },
+    {
       "capability_id": "core.create-audio-window-plan",
       "published_versions": [
         "1.0.0"
