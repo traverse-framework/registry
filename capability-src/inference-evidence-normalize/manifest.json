@@ -13,7 +13,7 @@
     "format": "wasm",
     "path": "artifacts/evidence-normalize.wasm",
     "abi_version": "1.0.0",
-    "expected_digest": "sha256:849318a47433948d6c7e964bbcb644a60adad63ddc193e4b6f6d3c20502466a3"
+    "expected_digest": "sha256:564a8038d7a2dfe350904bcdb3e0796b35f4de47bdcc13e126dc1941138bb6e9"
   },
   "source": {
     "language": "rust",
