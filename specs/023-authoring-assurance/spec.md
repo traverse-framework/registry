@@ -2,8 +2,9 @@
 
 **Feature Branch**: `023-authoring-assurance`
 **Created**: 2026-09-06
-**Status**: Draft
-**Input**: Decided via `/brainstorm 341 355 365` with the repo owner. Full reasoning: `docs/decision-log.md` entry 85. Originating issue: `#355`. Deferred empirical-evaluation follow-on: a child issue of `#355`.
+**Status**: Approved
+**Approved**: 2026-09-07, by the repo owner as a standalone decision (staged Draft in `draft_specs[]` for async review, then approved directly — same process as decision-log entry 51). Recorded in `docs/decision-log.md` entry 86.
+**Input**: Decided via `/brainstorm 341 355 365` with the repo owner. Full reasoning: `docs/decision-log.md` entry 85. Originating issue: `#355`. Deferred empirical-evaluation follow-on: `#371`.
 
 ## Purpose
 

@@ -332,6 +332,17 @@
         "scripts/metrics/",
         "metrics/"
       ]
+    },
+    {
+      "id": "023-authoring-assurance",
+      "version": "1.0.0",
+      "status": "approved",
+      "immutable": true,
+      "path": "specs/023-authoring-assurance/spec.md",
+      "governs": [
+        "capabilities/",
+        "scripts/ci/capability_validation.py"
+      ]
     }
   ],
   "draft_specs": [
@@ -344,17 +355,6 @@
       "will_govern": [
         "scripts/ci/build_index.py",
         "crates/traverse-registry/"
-      ]
-    },
-    {
-      "id": "023-authoring-assurance",
-      "version": "1.0.0",
-      "status": "draft",
-      "immutable": false,
-      "path": "specs/023-authoring-assurance/spec.md",
-      "will_govern": [
-        "capabilities/",
-        "scripts/ci/capability_validation.py"
       ]
     }
   ]
