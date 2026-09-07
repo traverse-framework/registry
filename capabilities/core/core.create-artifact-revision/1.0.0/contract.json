@@ -1,0 +1,214 @@
+{
+  "kind": "capability_contract",
+  "schema_version": "1.0.0",
+  "id": "core.create-artifact-revision",
+  "namespace": "core",
+  "name": "create-artifact-revision",
+  "version": "1.0.0",
+  "lifecycle": "active",
+  "owner": {
+    "team": "traverse-core",
+    "contact": "maintainers@traverse-framework.org"
+  },
+  "summary": "Create immutable successor metadata for a corrected artifact.",
+  "description": "Pure revision calculation from supplied prior facts. It never stores, publishes, renders, or overwrites an artifact.",
+  "use_cases": [
+    {
+      "scenario": "As an artifact operator, I want a correction to create the next immutable revision so that prior revisions remain preserved.",
+      "input_example": {
+        "artifact": {
+          "id": "canvas-2026-08-17",
+          "previous_revision": 1,
+          "correction_reason": "verified-evidence"
+        },
+        "revision_policy": {
+          "version": "1.0.0"
+        }
+      },
+      "output_example": {
+        "artifact_id": "canvas-2026-08-17",
+        "revision_number": 2,
+        "supersedes_revision": 1,
+        "correction_reason": "verified-evidence",
+        "policy_version": "1.0.0"
+      },
+      "happy": true,
+      "persona_ref": "artifact-operator"
+    },
+    {
+      "scenario": "As an artifact operator, I want incomplete revision facts rejected so that no ambiguous successor is created.",
+      "input_example": {
+        "artifact": {
+          "id": "",
+          "previous_revision": 0,
+          "correction_reason": ""
+        },
+        "revision_policy": {
+          "version": ""
+        }
+      },
+      "output_example": {
+        "artifact_id": "",
+        "revision_number": 0,
+        "supersedes_revision": 0,
+        "correction_reason": "",
+        "policy_version": ""
+      },
+      "happy": false,
+      "persona_ref": "artifact-operator"
+    }
+  ],
+  "inputs": {
+    "schema": {
+      "type": "object",
+      "required": [
+        "artifact",
+        "revision_policy"
+      ],
+      "properties": {
+        "artifact": {
+          "type": "object",
+          "required": [
+            "id",
+            "previous_revision",
+            "correction_reason"
+          ],
+          "properties": {
+            "id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "previous_revision": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "correction_reason": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "additionalProperties": false
+        },
+        "revision_policy": {
+          "type": "object",
+          "required": [
+            "version"
+          ],
+          "properties": {
+            "version": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "outputs": {
+    "schema": {
+      "type": "object",
+      "required": [
+        "artifact_id",
+        "revision_number",
+        "supersedes_revision",
+        "correction_reason",
+        "policy_version"
+      ],
+      "properties": {
+        "artifact_id": {
+          "type": "string"
+        },
+        "revision_number": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "supersedes_revision": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "correction_reason": {
+          "type": "string"
+        },
+        "policy_version": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "preconditions": [
+    {
+      "id": "base-revision-supplied",
+      "description": "A non-empty artifact id, correction reason, and previous revision of at least one are supplied."
+    }
+  ],
+  "postconditions": [
+    {
+      "id": "append-only",
+      "description": "A successor is described and the prior revision is never overwritten."
+    }
+  ],
+  "side_effects": [
+    {
+      "kind": "memory_only",
+      "description": "Pure calculation."
+    }
+  ],
+  "emits": [],
+  "consumes": [],
+  "permissions": [
+    {
+      "id": "core.create-artifact-revision.execute"
+    }
+  ],
+  "execution": {
+    "binary_format": "wasm",
+    "entrypoint": {
+      "kind": "wasi-command",
+      "command": "run"
+    },
+    "preferred_targets": [
+      "local",
+      "browser",
+      "edge",
+      "device"
+    ],
+    "constraints": {
+      "host_api_access": "none",
+      "network_access": "forbidden",
+      "filesystem_access": "none"
+    }
+  },
+  "policies": [
+    {
+      "id": "append-only-revision-policy"
+    }
+  ],
+  "dependencies": [],
+  "provenance": {
+    "source": "greenfield",
+    "author": "traverse-core",
+    "created_at": "2026-09-07T00:00:00Z",
+    "spec_ref": "100-capability-package-authoring@1.0.0",
+    "adr_refs": [
+      "ADR-0039"
+    ],
+    "exception_refs": []
+  },
+  "evidence": [],
+  "state_schema": null,
+  "service_type": "stateless",
+  "permitted_targets": [
+    "local",
+    "browser",
+    "edge",
+    "device"
+  ],
+  "artifact_type": "native",
+  "artifact": {
+    "digest": "sha256:0547b544fde47ea9f93a15ac9ece07969e1689740b0f6113797f1d935cd8a190",
+    "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/core.create-artifact-revision-1.0.0/core-create-artifact-revision.wasm"
+  }
+}
