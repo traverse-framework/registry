@@ -1,0 +1,178 @@
+{
+  "artifact": {
+    "digest": "sha256:c5526446fd6bfe09287ffecf2bd3b4c5ddfb78b8f9e0bffcae2c0476e37bfb95",
+    "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/core.assign-ownership-1.0.0/core-assign-ownership.wasm"
+  },
+  "connector_requirements": [],
+  "consumes": [],
+  "dependencies": [],
+  "description": "Takes a suggested owner (name, email, or id) plus a workspace member list and returns a canonical owner_id or a structured failure. Supports fallback strategies (creator, unassigned, fail). Pure and deterministic — never mutates storage.\n\nResolution order for a non-null suggestion:\n1. exact member id match\n2. case-insensitive email match\n3. case-insensitive name match\nThen apply `ownership_config.fallback` when unresolved.",
+  "emits": [],
+  "event_trigger": null,
+  "evidence": [],
+  "execution": {
+    "binary_format": "wasm",
+    "constraints": {
+      "filesystem_access": "none",
+      "host_api_access": "none",
+      "network_access": "forbidden"
+    },
+    "entrypoint": {
+      "command": "run",
+      "kind": "wasi-command"
+    },
+    "preferred_targets": [
+      "local",
+      "edge",
+      "browser"
+    ]
+  },
+  "id": "core.assign-ownership",
+  "inputs": {
+    "schema": {
+      "additionalProperties": false,
+      "properties": {
+        "creator_id": {
+          "type": "string"
+        },
+        "ownership_config": {
+          "properties": {
+            "fallback": {
+              "enum": [
+                "creator",
+                "unassigned",
+                "fail"
+              ],
+              "type": "string"
+            },
+            "require_active_member": {
+              "type": "boolean"
+            },
+            "version": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "version"
+          ],
+          "type": "object"
+        },
+        "suggested_owner": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "workspace_members": {
+          "items": {
+            "properties": {
+              "active": {
+                "type": "boolean"
+              },
+              "email": {
+                "type": "string"
+              },
+              "id": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              }
+            },
+            "type": "object"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "suggested_owner",
+        "workspace_members",
+        "ownership_config"
+      ],
+      "type": "object"
+    }
+  },
+  "kind": "capability_contract",
+  "lifecycle": "active",
+  "name": "assign-ownership",
+  "namespace": "core",
+  "outputs": {
+    "schema": {
+      "additionalProperties": false,
+      "properties": {
+        "evaluation_trace": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "owner_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "reason_code": {
+          "enum": [
+            "ok",
+            "unresolved",
+            "inactive_member",
+            "config_error"
+          ],
+          "type": "string"
+        },
+        "resolution_method": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "reason_code"
+      ],
+      "type": "object"
+    }
+  },
+  "owner": {
+    "contact": "founders@loop.dev",
+    "team": "loop"
+  },
+  "permissions": [
+    {
+      "id": "core.assign-ownership"
+    }
+  ],
+  "permitted_targets": [
+    "local",
+    "edge",
+    "browser",
+    "cloud"
+  ],
+  "policies": [],
+  "postconditions": [
+    {
+      "description": "Identical inputs produce identical outputs",
+      "id": "deterministic"
+    }
+  ],
+  "preconditions": [],
+  "provenance": {
+    "adr_refs": [
+      "persona-council-review-2026-08-08"
+    ],
+    "author": "loop-founders + traverse-capability-author",
+    "created_at": "2026-08-08T06:00:00Z",
+    "exception_refs": [],
+    "source": "ai-assisted",
+    "spec_ref": "core.assign-ownership@1.0.0"
+  },
+  "schema_version": "1.0.0",
+  "service_type": "stateless",
+  "side_effects": [
+    {
+      "description": "Pure resolution",
+      "kind": "memory_only"
+    }
+  ],
+  "state_schema": null,
+  "summary": "Resolves and records clear ownership for an action item (single accountable person).",
+  "version": "1.0.0"
+}

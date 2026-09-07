@@ -1,0 +1,17 @@
+[workspace]
+
+[package]
+name = "period-finalize-agent"
+version = "1.0.0"
+edition = "2015"
+publish = false
+description = "Callweave-owned source mirror of period.finalize for independently measured registry coverage."
+
+[[bin]]
+name = "period-finalize-agent"
+path = "src/main.rs"
+
+[profile.release]
+opt-level = "s"
+lto = true
+panic = "abort"

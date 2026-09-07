@@ -1,0 +1,17 @@
+{
+  "id": "runtime-engineer",
+  "version": "1.0.0",
+  "name": "Runtime Engineer",
+  "summary": "Keeps the execution host fail-closed when policy configuration is empty or malformed.",
+  "description": "Owns runtime safety around capability invocation. Uses core.authorize empty_or_invalid_policy denials so a missing rules array cannot open access.",
+  "distinguished_from": [
+    {
+      "persona_id": "platform-developer",
+      "how": "Owns host/runtime precondition failure behavior, not ordinary application policy authoring."
+    },
+    {
+      "persona_id": "incident-responder",
+      "how": "Hardens steady-state invalid-config paths; does not operate emergency break-glass access."
+    }
+  ]
+}

@@ -1,0 +1,5 @@
+{
+  "deprecated": true,
+  "reason": "Genuinely input-dependent (fixed the 1.0.1 fixed-output fixture), but built with std + serde_json targeting wasm32-wasip1, which imports wasi_snapshot_preview1::environ_get/environ_sizes_get -- confirmed by inspecting the compiled binary's import table. Traverse's WasmExecutor ABI whitelist (host_abi_v1.json) rejects any import outside fd_read/fd_write/proc_exit, so this artifact cannot execute through traverse-cli agent execute/serve or any embedder SDK, even though it runs under a generic wasmtime host. Superseded by 1.2.0, built no_std on wasi-agent-runtime (agents/wasi-agent-runtime/), which is both input-dependent and ABI-compliant. See registry#79 and docs/decision-log.md.",
+  "deprecated_at": "2026-07-28T00:00:00Z"
+}

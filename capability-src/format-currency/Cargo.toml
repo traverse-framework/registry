@@ -1,0 +1,20 @@
+[workspace]
+
+[package]
+name = "format-currency-agent"
+version = "0.1.0"
+edition = "2021"
+publish = false
+description = "Real, deterministic, ABI-compliant (no_std) implementation of the formatting.format-currency capability."
+
+[[bin]]
+name = "format-currency-agent"
+path = "src/main.rs"
+
+[dependencies]
+wasi-capability-runtime = { path = "../wasi-capability-runtime" }
+
+[profile.release]
+opt-level = "s"
+lto = true
+panic = "abort"

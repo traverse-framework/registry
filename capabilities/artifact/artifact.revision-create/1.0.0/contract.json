@@ -1,0 +1,185 @@
+{
+  "artifact": {
+    "digest": "sha256:1ded54079fbe041a068463554821d9d07311d0c0dbf8577e9db943920ddaac10",
+    "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/artifact.revision-create-1.0.0/revision-create.wasm"
+  },
+  "connector_requirements": [],
+  "consumes": [],
+  "dependencies": [],
+  "description": "Pure standalone revision calculation. It derives append-only successor metadata from supplied prior revision facts and does not render, store, publish, or overwrite an artifact.",
+  "emits": [],
+  "event_trigger": null,
+  "evidence": [],
+  "execution": {
+    "binary_format": "wasm",
+    "constraints": {
+      "filesystem_access": "none",
+      "host_api_access": "none",
+      "network_access": "forbidden"
+    },
+    "entrypoint": {
+      "command": "run",
+      "kind": "wasi-command"
+    },
+    "preferred_targets": [
+      "local",
+      "browser",
+      "edge",
+      "device"
+    ]
+  },
+  "id": "artifact.revision-create",
+  "inputs": {
+    "schema": {
+      "additionalProperties": false,
+      "properties": {
+        "artifact": {
+          "additionalProperties": false,
+          "properties": {
+            "correction_reason": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "id": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "previous_revision": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "id",
+            "previous_revision",
+            "correction_reason"
+          ],
+          "type": "object"
+        },
+        "revision_policy": {
+          "additionalProperties": false,
+          "properties": {
+            "version": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "version"
+          ],
+          "type": "object"
+        }
+      },
+      "required": [
+        "artifact",
+        "revision_policy"
+      ],
+      "type": "object"
+    }
+  },
+  "kind": "capability_contract",
+  "lifecycle": "active",
+  "name": "revision-create",
+  "namespace": "artifact",
+  "outputs": {
+    "schema": {
+      "additionalProperties": false,
+      "properties": {
+        "artifact_id": {
+          "type": "string"
+        },
+        "correction_reason": {
+          "type": "string"
+        },
+        "policy_version": {
+          "type": "string"
+        },
+        "revision_number": {
+          "type": "integer"
+        },
+        "supersedes_revision": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "artifact_id",
+        "revision_number",
+        "supersedes_revision",
+        "correction_reason",
+        "policy_version"
+      ],
+      "type": "object"
+    }
+  },
+  "owner": {
+    "contact": "maintainers@callweave.local",
+    "team": "callweave"
+  },
+  "permissions": [
+    {
+      "id": "artifact.revision-create.execute"
+    }
+  ],
+  "permitted_targets": [
+    "local",
+    "browser",
+    "edge",
+    "device"
+  ],
+  "policies": [],
+  "postconditions": [
+    {
+      "description": "A successor is described; prior revision is never overwritten.",
+      "id": "append-only"
+    }
+  ],
+  "preconditions": [
+    {
+      "description": "A non-empty artifact id, correction reason, and previous revision of at least 1 are supplied.",
+      "id": "base-revision-supplied"
+    }
+  ],
+  "provenance": {
+    "adr_refs": [],
+    "author": "Callweave",
+    "created_at": "2026-08-21T00:00:00Z",
+    "exception_refs": [],
+    "source": "greenfield",
+    "spec_ref": "100-capability-package-authoring@1.0.0"
+  },
+  "schema_version": "1.0.0",
+  "service_type": "stateless",
+  "side_effects": [
+    {
+      "description": "Pure calculation.",
+      "kind": "memory_only"
+    }
+  ],
+  "state_schema": null,
+  "summary": "Create immutable successor metadata for a corrected artifact.",
+  "use_cases": [
+    {
+      "happy": true,
+      "input_example": {
+        "artifact": {
+          "correction_reason": "verified-evidence",
+          "id": "canvas-2026-08-17",
+          "previous_revision": 1
+        },
+        "revision_policy": {
+          "version": "1.0.0"
+        }
+      },
+      "output_example": {
+        "artifact_id": "canvas-2026-08-17",
+        "correction_reason": "verified-evidence",
+        "policy_version": "1.0.0",
+        "revision_number": 2,
+        "supersedes_revision": 1
+      },
+      "persona_ref": "artifact-consumer",
+      "scenario": "As an artifact consumer, I want a correction to create the next immutable revision so that prior revisions remain preserved."
+    }
+  ],
+  "version": "1.0.0"
+}

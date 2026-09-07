@@ -1,0 +1,17 @@
+{
+  "id": "signup-form-developer",
+  "version": "1.0.0",
+  "name": "Signup Form Developer",
+  "summary": "A software developer building the account-creation/registration form for a web or mobile product.",
+  "description": "Owns the signup experience: validating that an email address is structurally well-formed before creating an account (validation.validate-email), and giving a new user real-time, actionable feedback on password strength so a weak password is caught before the account is created rather than after (validation.score-password-strength). This is specifically the identity/credential-creation step of a product, before any purchase or transaction exists for the user.",
+  "distinguished_from": [
+    {
+      "persona_id": "checkout-flow-developer",
+      "how": "Works on account creation, before the user has any purchase intent -- not the payment/shipping flow, which only exists for a user who already has an account."
+    },
+    {
+      "persona_id": "note-taking-app-developer",
+      "how": "Works on a product's signup form specifically, not its core note-taking/productivity feature -- a different feature area even if the product happened to be the same app."
+    }
+  ]
+}

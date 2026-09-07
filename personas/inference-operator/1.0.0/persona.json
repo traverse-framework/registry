@@ -1,0 +1,17 @@
+{
+  "id": "inference-operator",
+  "version": "1.0.0",
+  "name": "Inference Operator",
+  "summary": "Prepares and reviews model-neutral inference requests using verified opaque artifacts.",
+  "description": "Uses input artifact references, verified model artifact references, inference profiles, and runtime receipts. Does not choose a model provider, accept a licence on behalf of a host, load a binary, or own label-domain policy.",
+  "distinguished_from": [
+    {
+      "persona_id": "audio-operator",
+      "how": "Owns model-neutral inference request preparation; does not configure capture or codec policy."
+    },
+    {
+      "persona_id": "artifact-operator",
+      "how": "Uses immutable artifacts as inputs; does not govern artifact storage lifecycle."
+    }
+  ]
+}

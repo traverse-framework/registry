@@ -1,0 +1,187 @@
+{
+  "artifact": {
+    "digest": "sha256:56daae9768293d32ac89d60b9e782e78fe1d99665c46c13025368e29372a622b",
+    "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/revision.successor-assign-1.0.0/successor-assign.wasm"
+  },
+  "connector_requirements": [],
+  "consumes": [],
+  "dependencies": [],
+  "description": "Pure standalone revision successor policy. It derives the next revision number and superseded revision from supplied subject identity and previous revision facts. It does not apply approvals, perform state transitions, persist state, or know any application workflow.",
+  "emits": [],
+  "event_trigger": null,
+  "evidence": [],
+  "execution": {
+    "binary_format": "wasm",
+    "constraints": {
+      "filesystem_access": "none",
+      "host_api_access": "none",
+      "network_access": "forbidden"
+    },
+    "entrypoint": {
+      "command": "run",
+      "kind": "wasi-command"
+    },
+    "preferred_targets": [
+      "local",
+      "browser",
+      "edge",
+      "device"
+    ]
+  },
+  "id": "revision.successor-assign",
+  "inputs": {
+    "schema": {
+      "additionalProperties": false,
+      "properties": {
+        "policy": {
+          "additionalProperties": false,
+          "properties": {
+            "version": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "version"
+          ],
+          "type": "object"
+        },
+        "previous_revision": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "subject_id": {
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "subject_id",
+        "previous_revision",
+        "policy"
+      ],
+      "type": "object"
+    }
+  },
+  "kind": "capability_contract",
+  "lifecycle": "active",
+  "name": "successor-assign",
+  "namespace": "revision",
+  "outputs": {
+    "schema": {
+      "additionalProperties": false,
+      "properties": {
+        "policy_version": {
+          "type": "string"
+        },
+        "revision": {
+          "minimum": 1,
+          "type": "integer"
+        },
+        "subject_id": {
+          "type": "string"
+        },
+        "supersedes_revision": {
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "subject_id",
+        "revision",
+        "supersedes_revision",
+        "policy_version"
+      ],
+      "type": "object"
+    }
+  },
+  "owner": {
+    "contact": "maintainers@callweave.local",
+    "team": "callweave"
+  },
+  "permissions": [
+    {
+      "id": "revision.successor-assign.execute"
+    }
+  ],
+  "permitted_targets": [
+    "local",
+    "browser",
+    "edge",
+    "device"
+  ],
+  "policies": [
+    {
+      "id": "deterministic-policy-only"
+    }
+  ],
+  "postconditions": [
+    {
+      "description": "The assigned revision is always previous_revision plus one.",
+      "id": "revision-increments-monotonically"
+    }
+  ],
+  "preconditions": [
+    {
+      "description": "A non-empty subject id, non-negative previous revision, and non-empty policy version are supplied.",
+      "id": "subject-and-policy-supplied"
+    }
+  ],
+  "provenance": {
+    "adr_refs": [],
+    "author": "Callweave",
+    "created_at": "2026-08-21T00:00:00Z",
+    "exception_refs": [],
+    "source": "greenfield",
+    "spec_ref": "100-capability-package-authoring@1.0.0"
+  },
+  "schema_version": "1.0.0",
+  "service_type": "stateless",
+  "side_effects": [
+    {
+      "description": "Pure calculation; no host, network, filesystem, model, state, or workflow access.",
+      "kind": "memory_only"
+    }
+  ],
+  "state_schema": null,
+  "summary": "Assign the next append-only revision number for a subject.",
+  "use_cases": [
+    {
+      "happy": true,
+      "input_example": {
+        "policy": {
+          "version": "revision-policy-1"
+        },
+        "previous_revision": 3,
+        "subject_id": "knowledge-record-1"
+      },
+      "output_example": {
+        "policy_version": "revision-policy-1",
+        "revision": 4,
+        "subject_id": "knowledge-record-1",
+        "supersedes_revision": 3
+      },
+      "persona_ref": "revision-consumer",
+      "scenario": "As a revision consumer, I want a subject with an existing revision to receive the next append-only successor revision so that history remains strictly ordered."
+    },
+    {
+      "happy": true,
+      "input_example": {
+        "policy": {
+          "version": "revision-policy-1"
+        },
+        "previous_revision": 0,
+        "subject_id": "knowledge-record-2"
+      },
+      "output_example": {
+        "policy_version": "revision-policy-1",
+        "revision": 1,
+        "subject_id": "knowledge-record-2",
+        "supersedes_revision": 0
+      },
+      "persona_ref": "revision-consumer",
+      "scenario": "As a revision consumer, I want a subject with no prior revision to receive revision one so that creation and supersession share the same primitive."
+    }
+  ],
+  "version": "1.0.0"
+}

@@ -1,0 +1,17 @@
+[workspace]
+
+[package]
+name = "wasi-capability-runtime"
+version = "0.1.0"
+edition = "2021"
+publish = false
+description = "Shared no_std WASI runtime shim (allocator, JSON value/parse/write, stdin/stdout glue) for Traverse capabilities. ABI-compliant: only imports wasi_snapshot_preview1::{fd_read, fd_write, proc_exit}. See registry docs/decision-log.md."
+
+[lib]
+crate-type = ["rlib"]
+path = "src/lib.rs"
+
+[profile.release]
+opt-level = "s"
+lto = true
+panic = "abort"

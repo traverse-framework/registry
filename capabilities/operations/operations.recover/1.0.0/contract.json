@@ -1,0 +1,214 @@
+{
+  "artifact": {
+    "digest": "sha256:c57a32f9c9a8707866e67f999878c2a65fc37e7749ab64ac0680dd9e459f7ec0",
+    "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/operations.recover-1.0.0/operations-recover.wasm"
+  },
+  "connector_requirements": [],
+  "consumes": [],
+  "dependencies": [],
+  "description": "Pure standalone recovery policy. It compares expected operation ids against completed ids, removes duplicates, sorts the missing ids, and reports whether replay is needed. It does not execute recovery, persist state, or know any application workflow.",
+  "emits": [],
+  "event_trigger": null,
+  "evidence": [],
+  "execution": {
+    "binary_format": "wasm",
+    "constraints": {
+      "filesystem_access": "none",
+      "host_api_access": "none",
+      "network_access": "forbidden"
+    },
+    "entrypoint": {
+      "command": "run",
+      "kind": "wasi-command"
+    },
+    "preferred_targets": [
+      "local",
+      "browser",
+      "edge",
+      "device"
+    ]
+  },
+  "id": "operations.recover",
+  "inputs": {
+    "schema": {
+      "additionalProperties": false,
+      "properties": {
+        "completedIds": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "expectedIds": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "policy": {
+          "additionalProperties": false,
+          "properties": {
+            "version": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "version"
+          ],
+          "type": "object"
+        }
+      },
+      "required": [
+        "expectedIds",
+        "policy"
+      ],
+      "type": "object"
+    }
+  },
+  "kind": "capability_contract",
+  "lifecycle": "active",
+  "name": "recover",
+  "namespace": "operations",
+  "outputs": {
+    "schema": {
+      "additionalProperties": false,
+      "properties": {
+        "action": {
+          "enum": [
+            "replay_missing_idempotently",
+            "no_action"
+          ],
+          "type": "string"
+        },
+        "policy_version": {
+          "type": "string"
+        },
+        "replay_ids": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "policy_version",
+        "replay_ids",
+        "action"
+      ],
+      "type": "object"
+    }
+  },
+  "owner": {
+    "contact": "maintainers@callweave.local",
+    "team": "callweave"
+  },
+  "permissions": [
+    {
+      "id": "operations.recover.execute"
+    }
+  ],
+  "permitted_targets": [
+    "local",
+    "browser",
+    "edge",
+    "device"
+  ],
+  "policies": [
+    {
+      "id": "deterministic-policy-only"
+    },
+    {
+      "id": "recovery-replays-only-missing-work"
+    }
+  ],
+  "postconditions": [
+    {
+      "description": "The returned replay_ids list contains no duplicates.",
+      "id": "replay-set-is-deduplicated"
+    },
+    {
+      "description": "The returned replay_ids list is sorted deterministically.",
+      "id": "replay-set-is-sorted"
+    }
+  ],
+  "preconditions": [
+    {
+      "description": "A non-empty policy version is supplied.",
+      "id": "policy-is-versioned"
+    }
+  ],
+  "provenance": {
+    "adr_refs": [
+      "DECISION_RECORD.md"
+    ],
+    "author": "Callweave",
+    "created_at": "2026-08-18T00:00:00Z",
+    "exception_refs": [],
+    "source": "greenfield",
+    "spec_ref": "100-capability-package-authoring@1.0.0"
+  },
+  "schema_version": "1.0.0",
+  "service_type": "stateless",
+  "side_effects": [
+    {
+      "description": "Pure calculation; no host, network, filesystem, model, state, or workflow access.",
+      "kind": "memory_only"
+    }
+  ],
+  "state_schema": null,
+  "summary": "Plan which idempotent operations still need replay.",
+  "use_cases": [
+    {
+      "happy": true,
+      "input_example": {
+        "completedIds": [
+          "op-1"
+        ],
+        "expectedIds": [
+          "op-3",
+          "op-1",
+          "op-2",
+          "op-2"
+        ],
+        "policy": {
+          "version": "ops-policy-1"
+        }
+      },
+      "output_example": {
+        "action": "replay_missing_idempotently",
+        "policy_version": "ops-policy-1",
+        "replay_ids": [
+          "op-2",
+          "op-3"
+        ]
+      },
+      "scenario": "As an operator, I want only missing idempotent operations replayed so that restart recovery does not duplicate successful work.",
+      "persona_ref": "callweave-system-administrator"
+    },
+    {
+      "happy": false,
+      "input_example": {
+        "completedIds": [
+          "op-1",
+          "op-2"
+        ],
+        "expectedIds": [
+          "op-1",
+          "op-2"
+        ],
+        "policy": {
+          "version": "ops-policy-1"
+        }
+      },
+      "output_example": {
+        "action": "no_action",
+        "policy_version": "ops-policy-1",
+        "replay_ids": []
+      },
+      "scenario": "As an operator, I want a no-op recovery result when all expected work has already completed so that replay stays bounded and deterministic.",
+      "persona_ref": "callweave-system-administrator"
+    }
+  ],
+  "version": "1.0.0"
+}

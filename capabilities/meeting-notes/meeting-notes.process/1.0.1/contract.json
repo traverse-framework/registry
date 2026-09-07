@@ -1,0 +1,172 @@
+{
+  "kind": "capability_contract",
+  "schema_version": "1.0.0",
+  "id": "meeting-notes.process",
+  "namespace": "meeting-notes",
+  "name": "process",
+  "version": "1.0.1",
+  "lifecycle": "active",
+  "owner": {
+    "team": "traverse-core",
+    "contact": "enrico.piovesan10@gmail.com"
+  },
+  "summary": "Fixed-output deterministic fixture: extract deterministic structured meeting notes from one transcript.",
+  "description": "Reference app capability for meeting notes that extracts action items, decisions, follow-ups, and summary fields without model inference. IMPORTANT: this artifact is a fixed-output deterministic fixture -- it does not read or process its input at all; it always returns the same hardcoded summary/action_items/decisions/follow_ups values regardless of the transcript provided. It is a genuine, real WASI binary (not a placeholder stub sharing a digest with unrelated capabilities), useful for proving the registry/artifact-hosting/execution pipeline end-to-end, but it does not perform real analysis on its input. Tracked follow-up for real per-input logic: registry#79.",
+  "inputs": {
+    "schema": {
+      "type": "object",
+      "required": [
+        "transcript"
+      ],
+      "properties": {
+        "transcript": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "outputs": {
+    "schema": {
+      "type": "object",
+      "required": [
+        "action_items",
+        "decisions",
+        "follow_ups",
+        "summary"
+      ],
+      "properties": {
+        "action_items": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "task",
+              "owner",
+              "due"
+            ],
+            "properties": {
+              "task": {
+                "type": "string"
+              },
+              "owner": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "due": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "decisions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "text",
+              "made_by"
+            ],
+            "properties": {
+              "text": {
+                "type": "string"
+              },
+              "made_by": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "follow_ups": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "summary": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "preconditions": [
+    {
+      "id": "transcript-provided",
+      "description": "The caller provides a transcript string. Empty transcripts are accepted and produce empty collections."
+    }
+  ],
+  "postconditions": [
+    {
+      "id": "structured-meeting-notes-produced",
+      "description": "The capability returns fixed summary/action_items/decisions/follow_ups values, identical for every call regardless of the transcript provided."
+    }
+  ],
+  "side_effects": [
+    {
+      "kind": "memory_only",
+      "description": "Produces deterministic meeting-note metadata from the provided input."
+    }
+  ],
+  "emits": [],
+  "consumes": [],
+  "permissions": [
+    {
+      "id": "meeting-notes.process"
+    }
+  ],
+  "execution": {
+    "binary_format": "wasm",
+    "entrypoint": {
+      "kind": "wasi-command",
+      "command": "run"
+    },
+    "preferred_targets": [
+      "local"
+    ],
+    "constraints": {
+      "host_api_access": "none",
+      "network_access": "forbidden",
+      "filesystem_access": "none"
+    }
+  },
+  "policies": [
+    {
+      "id": "manual-approval-required"
+    }
+  ],
+  "dependencies": [],
+  "provenance": {
+    "source": "greenfield",
+    "author": "enricopiovesan",
+    "created_at": "2026-07-28T00:00:00Z",
+    "spec_ref": "044-application-bundle-manifest@1.0.0",
+    "adr_refs": [
+      "0001-rust-wasm-foundation"
+    ],
+    "exception_refs": []
+  },
+  "evidence": [],
+  "service_type": "stateless",
+  "permitted_targets": [
+    "local",
+    "cloud",
+    "edge",
+    "device"
+  ],
+  "artifact_type": "native",
+  "artifact": {
+    "digest": "sha256:bddc4423a5ae611b5606886d5b0b9c87bbfb39fff2826724f6c34850d88020f6",
+    "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/meeting-notes.process-1.0.1/process-agent.wasm"
+  }
+}

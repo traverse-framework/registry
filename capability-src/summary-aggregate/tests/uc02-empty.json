@@ -1,0 +1,26 @@
+{
+  "kind": "runtime_request",
+  "schema_version": "1.0.0",
+  "request_id": "summary-aggregate-02",
+  "intent": {
+    "capability_id": "summary.aggregate",
+    "capability_version": "1.0.0"
+  },
+  "input": {
+    "scope_id": "quiet-site",
+    "period_key": "2026-08-17",
+    "included_reference_ids": [],
+    "pending_reference_ids": [],
+    "coverage_state": "complete",
+    "policy": { "version": "summary-policy-1" }
+  },
+  "lookup": {
+    "scope": "prefer_private",
+    "allow_ambiguity": false
+  },
+  "context": {
+    "requested_target": "local",
+    "caller": "callweave-smoke"
+  },
+  "governing_spec": "006-runtime-request-execution"
+}

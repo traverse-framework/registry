@@ -1,0 +1,180 @@
+{
+  "artifact": {
+    "digest": "sha256:adffdaf2b9160e5830762ed1ab158d1faecd35d87c96df7886848c54d09850ac",
+    "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/core.record-nudge-event-1.0.0/core-record-nudge-event.wasm"
+  },
+  "connector_requirements": [],
+  "consumes": [],
+  "dependencies": [],
+  "description": "Pure WF3 capability. Builds a deterministic nudge event record (event_id, ordinal, channel, intensity, preview) for downstream persistence by the host. memory_only — no I/O.",
+  "emits": [],
+  "event_trigger": null,
+  "evidence": [],
+  "execution": {
+    "binary_format": "wasm",
+    "constraints": {
+      "filesystem_access": "none",
+      "host_api_access": "none",
+      "network_access": "forbidden"
+    },
+    "entrypoint": {
+      "command": "run",
+      "kind": "wasi-command"
+    },
+    "preferred_targets": [
+      "local",
+      "edge",
+      "browser"
+    ]
+  },
+  "id": "core.record-nudge-event",
+  "inputs": {
+    "schema": {
+      "properties": {
+        "channel": {
+          "type": "string"
+        },
+        "event_at": {
+          "type": "string"
+        },
+        "intensity": {
+          "enum": [
+            "soft",
+            "direct",
+            "escalate"
+          ],
+          "type": "string"
+        },
+        "item_id": {
+          "type": "string"
+        },
+        "message_preview": {
+          "type": "string"
+        },
+        "owner_id": {
+          "type": "string"
+        },
+        "prior_nudge_count": {
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "item_id",
+        "intensity",
+        "event_at",
+        "prior_nudge_count"
+      ],
+      "type": "object"
+    }
+  },
+  "kind": "capability_contract",
+  "lifecycle": "active",
+  "name": "record-nudge-event",
+  "namespace": "core",
+  "outputs": {
+    "schema": {
+      "properties": {
+        "evaluation_trace": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "event": {
+          "properties": {
+            "channel": {
+              "type": "string"
+            },
+            "event_at": {
+              "type": "string"
+            },
+            "event_id": {
+              "type": "string"
+            },
+            "intensity": {
+              "type": "string"
+            },
+            "item_id": {
+              "type": "string"
+            },
+            "message_preview": {
+              "type": "string"
+            },
+            "nudge_ordinal": {
+              "type": "integer"
+            },
+            "owner_id": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "event_id",
+            "item_id",
+            "intensity",
+            "event_at",
+            "nudge_ordinal"
+          ],
+          "type": "object"
+        },
+        "reason_code": {
+          "enum": [
+            "ok",
+            "invalid_intensity",
+            "invalid_input"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "event",
+        "reason_code"
+      ],
+      "type": "object"
+    }
+  },
+  "owner": {
+    "contact": "founders@loop.dev",
+    "team": "loop"
+  },
+  "permissions": [
+    {
+      "id": "core.record-nudge-event"
+    }
+  ],
+  "permitted_targets": [
+    "local",
+    "edge",
+    "browser",
+    "cloud"
+  ],
+  "policies": [],
+  "postconditions": [
+    {
+      "description": "Identical inputs produce identical outputs",
+      "id": "deterministic"
+    }
+  ],
+  "preconditions": [],
+  "provenance": {
+    "adr_refs": [
+      "persona-council-review-2026-08-08"
+    ],
+    "author": "loop-founders + traverse-capability-author",
+    "created_at": "2026-08-08T06:00:00Z",
+    "exception_refs": [],
+    "source": "ai-assisted",
+    "spec_ref": "core.record-nudge-event@1.0.0"
+  },
+  "schema_version": "1.0.0",
+  "service_type": "stateless",
+  "side_effects": [
+    {
+      "description": "Pure event payload construction; no persistence I/O",
+      "kind": "memory_only"
+    }
+  ],
+  "state_schema": null,
+  "summary": "Constructs a pure audit/event payload for a nudge that was selected and messaged.",
+  "version": "1.0.0"
+}

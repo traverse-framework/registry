@@ -1,0 +1,182 @@
+{
+  "kind": "capability_contract",
+  "schema_version": "1.0.0",
+  "id": "traverse-starter.process",
+  "namespace": "traverse-starter",
+  "name": "process",
+  "version": "1.2.2",
+  "lifecycle": "active",
+  "owner": {
+    "team": "traverse-core",
+    "contact": "enrico.piovesan10@gmail.com"
+  },
+  "summary": "Process one starter note into deterministic structured metadata.",
+  "description": "Reference app capability for downstream Traverse app authors that proves a real contract, WASM package, app manifest, workflow, and runtime request without depending on model inference. Genuinely reads the `note` input: classifies its noteType by keyword (todo/idea/meeting/question/general), derives a title from its first line or sentence, tags it (noteType plus any of urgent/blocked/needs-review/follow-up detected), suggests a next action per noteType, and derives status (completed/urgent/new) by keyword -- distinct notes produce distinct output, deterministically. This replaces the 1.0.1 fixture, which always returned the same hardcoded fields regardless of input. Built no_std on the shared agents/wasi-agent-runtime/ shim: verified to import only wasi_snapshot_preview1::{fd_read, fd_write, proc_exit}, so it is genuinely executable by Traverse's runtime, not just a generic wasmtime host. Source: agents/traverse-starter-process/ in this repo.",
+  "use_cases": [
+    {
+      "scenario": "As a note-taking app developer, I want to automatically classify and tag a user's freeform note by type, so that the app can route TODOs into the right list without the user manually categorizing it.",
+      "input_example": {
+        "note": "TODO: call the vendor about the invoice."
+      },
+      "output_example": {
+        "title": "TODO: call the vendor about the invoice",
+        "tags": [
+          "todo"
+        ],
+        "noteType": "todo",
+        "suggestedNextAction": "Add to the task list and assign an owner.",
+        "status": "new"
+      },
+      "happy": true,
+      "persona_ref": "note-taking-app-developer"
+    },
+    {
+      "scenario": "As a note-taking app developer, I want the classifier to handle an empty note gracefully instead of crashing, so that a user who saves a blank note doesn't break the app's processing pipeline.",
+      "input_example": {
+        "note": ""
+      },
+      "output_example": {
+        "title": "Untitled note",
+        "tags": [
+          "general"
+        ],
+        "noteType": "general",
+        "suggestedNextAction": "Triage and categorize.",
+        "status": "new"
+      },
+      "happy": false,
+      "persona_ref": "note-taking-app-developer"
+    },
+    {
+      "scenario": "As a note-taking app developer, I want urgency keywords to drive status and tagging independently of the note's general type, so that an urgent idea or question surfaces the same way an urgent TODO would.",
+      "input_example": {
+        "note": "URGENT: fix the broken deploy ASAP."
+      },
+      "output_example": {
+        "title": "URGENT: fix the broken deploy ASAP",
+        "tags": [
+          "general",
+          "urgent"
+        ],
+        "noteType": "general",
+        "suggestedNextAction": "Triage and categorize.",
+        "status": "urgent"
+      },
+      "happy": true,
+      "persona_ref": "note-taking-app-developer"
+    }
+  ],
+  "inputs": {
+    "schema": {
+      "type": "object",
+      "required": [
+        "note"
+      ],
+      "properties": {
+        "note": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "outputs": {
+    "schema": {
+      "type": "object",
+      "required": [
+        "title",
+        "tags",
+        "noteType",
+        "suggestedNextAction",
+        "status"
+      ],
+      "properties": {
+        "title": {
+          "type": "string"
+        },
+        "tags": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "noteType": {
+          "type": "string"
+        },
+        "suggestedNextAction": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "preconditions": [
+    {
+      "id": "note-provided",
+      "description": "The caller provides a non-empty note string."
+    }
+  ],
+  "postconditions": [
+    {
+      "id": "structured-note-produced",
+      "description": "The capability returns title/tags/noteType/suggestedNextAction/status fields genuinely derived from the provided note -- distinct inputs produce distinct outputs, deterministically."
+    }
+  ],
+  "side_effects": [
+    {
+      "kind": "memory_only",
+      "description": "Produces deterministic note metadata from the provided input."
+    }
+  ],
+  "emits": [],
+  "consumes": [],
+  "permissions": [
+    {
+      "id": "traverse-starter.process"
+    }
+  ],
+  "execution": {
+    "binary_format": "wasm",
+    "entrypoint": {
+      "kind": "wasi-command",
+      "command": "run"
+    },
+    "preferred_targets": [
+      "local"
+    ],
+    "constraints": {
+      "host_api_access": "none",
+      "network_access": "forbidden",
+      "filesystem_access": "none"
+    }
+  },
+  "policies": [
+    {
+      "id": "manual-approval-required"
+    }
+  ],
+  "dependencies": [],
+  "provenance": {
+    "source": "greenfield",
+    "author": "enricopiovesan",
+    "created_at": "2026-07-28T00:00:00Z",
+    "spec_ref": "044-application-bundle-manifest@1.0.0",
+    "adr_refs": [
+      "0001-rust-wasm-foundation"
+    ],
+    "exception_refs": []
+  },
+  "evidence": [],
+  "service_type": "stateless",
+  "permitted_targets": [
+    "local"
+  ],
+  "artifact_type": "native",
+  "artifact": {
+    "digest": "sha256:3b1e45d5d49f5e52524aa8a6420444c2fc97351c283e47fcddb5f46200030f24",
+    "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/traverse-starter.process-1.1.0/starter-process-agent.wasm"
+  }
+}

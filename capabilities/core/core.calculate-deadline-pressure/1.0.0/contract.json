@@ -1,0 +1,173 @@
+{
+  "artifact": {
+    "digest": "sha256:75f4eb3620b325df2150ec5c3f19a7cd52d46e2d5d4cb35d0a83b634c4baf14c",
+    "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/core.calculate-deadline-pressure-1.0.0/core-calculate-deadline-pressure.wasm"
+  },
+  "connector_requirements": [],
+  "consumes": [],
+  "dependencies": [],
+  "description": "Pure WF2 capability used after ownership assignment. Maps days-until-due into a 0.0-1.0 pressure_score and a band (low|medium|high|overdue) using a configurable horizon.",
+  "emits": [],
+  "event_trigger": null,
+  "evidence": [],
+  "execution": {
+    "binary_format": "wasm",
+    "constraints": {
+      "filesystem_access": "none",
+      "host_api_access": "none",
+      "network_access": "forbidden"
+    },
+    "entrypoint": {
+      "command": "run",
+      "kind": "wasi-command"
+    },
+    "preferred_targets": [
+      "local",
+      "edge",
+      "browser"
+    ]
+  },
+  "id": "core.calculate-deadline-pressure",
+  "inputs": {
+    "schema": {
+      "properties": {
+        "item": {
+          "properties": {
+            "due_date": {
+              "type": "string"
+            },
+            "id": {
+              "type": "string"
+            },
+            "status": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "id",
+            "due_date"
+          ],
+          "type": "object"
+        },
+        "pressure_config": {
+          "properties": {
+            "horizon_days": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "version": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "version"
+          ],
+          "type": "object"
+        },
+        "reference_date": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "item",
+        "reference_date",
+        "pressure_config"
+      ],
+      "type": "object"
+    }
+  },
+  "kind": "capability_contract",
+  "lifecycle": "active",
+  "name": "calculate-deadline-pressure",
+  "namespace": "core",
+  "outputs": {
+    "schema": {
+      "properties": {
+        "days_until_due": {
+          "type": "integer"
+        },
+        "evaluation_trace": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "item_id": {
+          "type": "string"
+        },
+        "pressure_band": {
+          "enum": [
+            "low",
+            "medium",
+            "high",
+            "overdue",
+            "unknown"
+          ],
+          "type": "string"
+        },
+        "pressure_score": {
+          "type": "number"
+        },
+        "reason_code": {
+          "enum": [
+            "ok",
+            "missing_due_date",
+            "invalid_date",
+            "config_error"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "pressure_score",
+        "pressure_band",
+        "reason_code"
+      ],
+      "type": "object"
+    }
+  },
+  "owner": {
+    "contact": "founders@loop.dev",
+    "team": "loop"
+  },
+  "permissions": [
+    {
+      "id": "core.calculate-deadline-pressure"
+    }
+  ],
+  "permitted_targets": [
+    "local",
+    "edge",
+    "browser",
+    "cloud"
+  ],
+  "policies": [],
+  "postconditions": [
+    {
+      "description": "Identical inputs produce identical outputs",
+      "id": "deterministic"
+    }
+  ],
+  "preconditions": [],
+  "provenance": {
+    "adr_refs": [
+      "persona-council-review-2026-08-08"
+    ],
+    "author": "loop-founders + traverse-capability-author",
+    "created_at": "2026-08-08T06:00:00Z",
+    "exception_refs": [],
+    "source": "ai-assisted",
+    "spec_ref": "core.calculate-deadline-pressure@1.0.0"
+  },
+  "schema_version": "1.0.0",
+  "service_type": "stateless",
+  "side_effects": [
+    {
+      "description": "Pure pressure calculation",
+      "kind": "memory_only"
+    }
+  ],
+  "state_schema": null,
+  "summary": "Computes a deterministic deadline pressure score from due date versus a reference date.",
+  "version": "1.0.0"
+}

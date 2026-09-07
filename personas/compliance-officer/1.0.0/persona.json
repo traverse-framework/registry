@@ -1,0 +1,17 @@
+{
+  "id": "compliance-officer",
+  "version": "1.0.0",
+  "name": "Compliance Officer",
+  "summary": "Requires allow decisions to carry enforceable obligations like MFA and audit logging.",
+  "description": "Ensures high-risk allows are never bare permits. Uses core.authorize structured obligations (require_mfa, audit_log) so calling systems can enforce additional controls before completing sensitive actions.",
+  "distinguished_from": [
+    {
+      "persona_id": "platform-security-engineer",
+      "how": "Focuses on obligatory secondary controls and auditability, not the primary allow/deny rule engine design."
+    },
+    {
+      "persona_id": "accounts-payable-clerk",
+      "how": "Works on authorization obligations generally, not AP document intake workflows."
+    }
+  ]
+}

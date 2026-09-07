@@ -1,0 +1,277 @@
+{
+  "artifact": {
+    "digest": "sha256:6e0a1cc1257f527b82fb6aa9bac1eedaf756c6654d59c241caa5bd7e3302aeb6",
+    "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/review.prepare-1.0.0/review-prepare.wasm"
+  },
+  "connector_requirements": [],
+  "consumes": [],
+  "dependencies": [],
+  "description": "Pure standalone review gate. It validates the cluster and policy envelope, denies review when privacy is not already protected, and returns only the supplied sanitized asset list when the gate is open. It does not create ZIP files, call an LMM, inspect local storage, or mutate knowledge.",
+  "emits": [],
+  "event_trigger": null,
+  "evidence": [],
+  "execution": {
+    "binary_format": "wasm",
+    "constraints": {
+      "filesystem_access": "none",
+      "host_api_access": "none",
+      "network_access": "forbidden"
+    },
+    "entrypoint": {
+      "command": "run",
+      "kind": "wasi-command"
+    },
+    "preferred_targets": [
+      "local",
+      "browser",
+      "edge",
+      "device"
+    ]
+  },
+  "id": "review.prepare",
+  "inputs": {
+    "schema": {
+      "additionalProperties": false,
+      "properties": {
+        "cluster": {
+          "additionalProperties": true,
+          "properties": {
+            "id": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "id"
+          ],
+          "type": "object"
+        },
+        "policy": {
+          "additionalProperties": false,
+          "properties": {
+            "version": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "version"
+          ],
+          "type": "object"
+        },
+        "privacy": {
+          "additionalProperties": true,
+          "properties": {
+            "sanitized_assets": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "state": {
+              "enum": [
+                "protected",
+                "unknown",
+                "blocked"
+              ],
+              "type": "string"
+            }
+          },
+          "required": [
+            "state"
+          ],
+          "type": "object"
+        }
+      },
+      "required": [
+        "cluster",
+        "privacy",
+        "policy"
+      ],
+      "type": "object"
+    }
+  },
+  "kind": "capability_contract",
+  "lifecycle": "active",
+  "name": "prepare",
+  "namespace": "review",
+  "outputs": {
+    "schema": {
+      "additionalProperties": true,
+      "properties": {
+        "allowed": {
+          "type": "boolean"
+        },
+        "assets": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "cluster_id": {
+          "type": "string"
+        },
+        "policy_version": {
+          "type": "string"
+        },
+        "reason": {
+          "enum": [
+            "privacy_not_protected"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "allowed",
+        "cluster_id",
+        "policy_version",
+        "assets"
+      ],
+      "type": "object"
+    }
+  },
+  "owner": {
+    "contact": "maintainers@callweave.local",
+    "team": "callweave"
+  },
+  "permissions": [
+    {
+      "id": "review.prepare.execute"
+    }
+  ],
+  "permitted_targets": [
+    "local",
+    "browser",
+    "edge",
+    "device"
+  ],
+  "policies": [
+    {
+      "id": "deterministic-policy-only"
+    },
+    {
+      "id": "review-fails-closed-without-privacy-protection"
+    }
+  ],
+  "postconditions": [
+    {
+      "description": "Only privacy state protected may set allowed to true.",
+      "id": "review-requires-protected-privacy-state"
+    },
+    {
+      "description": "Allowed results return only the supplied sanitized asset list.",
+      "id": "sanitized-assets-only"
+    }
+  ],
+  "preconditions": [
+    {
+      "description": "A non-empty cluster id, privacy state, and policy version are supplied.",
+      "id": "cluster-privacy-and-policy-supplied"
+    }
+  ],
+  "provenance": {
+    "adr_refs": [
+      "DECISION_RECORD.md"
+    ],
+    "author": "Callweave",
+    "created_at": "2026-08-20T00:00:00Z",
+    "exception_refs": [],
+    "source": "greenfield",
+    "spec_ref": "100-capability-package-authoring@1.0.0"
+  },
+  "schema_version": "1.0.0",
+  "service_type": "stateless",
+  "side_effects": [
+    {
+      "description": "Pure calculation; no host, network, filesystem, LMM, state, or workflow access.",
+      "kind": "memory_only"
+    }
+  ],
+  "state_schema": null,
+  "summary": "Permit advisory review assets only when a supplied privacy decision is already protected.",
+  "use_cases": [
+    {
+      "happy": true,
+      "input_example": {
+        "cluster": {
+          "id": "cluster-7"
+        },
+        "policy": {
+          "version": "review-policy-1"
+        },
+        "privacy": {
+          "sanitized_assets": [
+            "cluster-7-summary.md",
+            "cluster-7-snippet.flac"
+          ],
+          "state": "protected"
+        }
+      },
+      "output_example": {
+        "allowed": true,
+        "assets": [
+          "cluster-7-snippet.flac",
+          "cluster-7-summary.md"
+        ],
+        "cluster_id": "cluster-7",
+        "policy_version": "review-policy-1"
+      },
+      "scenario": "As a reviewer, I want a privacy-protected unknown cluster to expose only sanitized assets so that optional external advisory review stays bounded.",
+      "persona_ref": "callweave-reviewer"
+    },
+    {
+      "happy": false,
+      "input_example": {
+        "cluster": {
+          "id": "cluster-8"
+        },
+        "policy": {
+          "version": "review-policy-1"
+        },
+        "privacy": {
+          "sanitized_assets": [
+            "cluster-8-summary.md"
+          ],
+          "state": "unknown"
+        }
+      },
+      "output_example": {
+        "allowed": false,
+        "assets": [],
+        "cluster_id": "cluster-8",
+        "policy_version": "review-policy-1",
+        "reason": "privacy_not_protected"
+      },
+      "scenario": "As a reviewer, I want an unprotected cluster blocked from review preparation so that uncertain privacy status fails closed.",
+      "persona_ref": "callweave-reviewer"
+    },
+    {
+      "happy": false,
+      "input_example": {
+        "cluster": {
+          "id": "cluster-9"
+        },
+        "policy": {
+          "version": "review-policy-1"
+        },
+        "privacy": {
+          "sanitized_assets": [
+            "cluster-9-summary.md"
+          ],
+          "state": "blocked"
+        }
+      },
+      "output_example": {
+        "allowed": false,
+        "assets": [],
+        "cluster_id": "cluster-9",
+        "policy_version": "review-policy-1",
+        "reason": "privacy_not_protected"
+      },
+      "scenario": "As a reviewer, I want a policy-blocked cluster prevented from review preparation so that explicitly denied privacy outcomes cannot be shared externally.",
+      "persona_ref": "callweave-reviewer"
+    }
+  ],
+  "version": "1.0.0"
+}

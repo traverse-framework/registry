@@ -1,0 +1,5 @@
+{
+  "deprecated": true,
+  "reason": "The compiled WASM's traverse_host::emit_event call declares core.action-item.status-transitioned, which violates traverse-contracts' own EventContract identity invariant (id must equal namespace + \".\" + name for that event) and is rejected outright by a strict EventRegistry::register load. State-machine transition logic itself is unaffected -- only the emitted event's declared id is wrong. See registry#324. Replaced by 1.4.0, which emits the corrected core.status-transitioned@1.0.0.",
+  "deprecated_at": "2026-08-25T00:00:00Z"
+}

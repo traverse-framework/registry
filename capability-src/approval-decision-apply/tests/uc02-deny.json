@@ -1,0 +1,26 @@
+{
+  "kind": "runtime_request",
+  "schema_version": "1.0.0",
+  "request_id": "approval-decision-02",
+  "intent": {
+    "capability_id": "approval.decision-apply",
+    "capability_version": "1.0.0"
+  },
+  "input": {
+    "proposal": { "id": "proposal-1" },
+    "approval": {
+      "reviewer_id": "reviewer-1",
+      "decision": "deny"
+    },
+    "policy": { "version": "approval-policy-1" }
+  },
+  "lookup": {
+    "scope": "prefer_private",
+    "allow_ambiguity": false
+  },
+  "context": {
+    "requested_target": "local",
+    "caller": "callweave-smoke"
+  },
+  "governing_spec": "006-runtime-request-execution"
+}

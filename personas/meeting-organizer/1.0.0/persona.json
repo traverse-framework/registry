@@ -1,0 +1,17 @@
+{
+  "id": "meeting-organizer",
+  "version": "1.0.0",
+  "name": "Meeting Organizer",
+  "summary": "A company employee who runs meetings and needs the raw transcript turned into a concrete follow-up list.",
+  "description": "Runs or is responsible for a meeting and needs its transcript turned into something actionable afterward, without manually re-reading the whole thing. Uses meeting-notes.process to extract action items (with owner and due date), decisions, and standalone follow-up threads from the transcript -- including handling a routine status-update meeting with no actionable content by returning empty results rather than erroring, since not every meeting produces action items.",
+  "distinguished_from": [
+    {
+      "persona_id": "accounts-payable-clerk",
+      "how": "Works with meeting transcripts, not vendor documents (invoices, purchase orders) -- a different internal workflow and a different capability entirely."
+    },
+    {
+      "persona_id": "approvals-manager",
+      "how": "Extracts action items and decisions from a meeting transcript; does not review or approve vendor documents -- a different internal workflow and a different capability entirely."
+    }
+  ]
+}

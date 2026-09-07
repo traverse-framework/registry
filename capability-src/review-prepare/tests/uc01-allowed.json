@@ -1,0 +1,15 @@
+{
+  "cluster": {
+    "id": "cluster-7"
+  },
+  "privacy": {
+    "state": "protected",
+    "sanitized_assets": [
+      "cluster-7-summary.md",
+      "cluster-7-snippet.flac"
+    ]
+  },
+  "policy": {
+    "version": "review-policy-1"
+  }
+}

@@ -1,0 +1,17 @@
+[workspace]
+
+[package]
+name = "platform-decide-state-transition-agent"
+version = "0.1.0"
+edition = "2021"
+publish = false
+description = "Catalog-source mirror of platform.decide-state-transition for measured llvm-cov coverage (logic from traverse examples/decide-state-transition)."
+
+[[bin]]
+name = "platform-decide-state-transition-agent"
+path = "src/main.rs"
+
+[profile.release]
+opt-level = "s"
+lto = true
+panic = "abort"

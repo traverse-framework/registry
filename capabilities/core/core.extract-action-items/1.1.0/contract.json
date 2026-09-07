@@ -1,0 +1,177 @@
+{
+  "artifact": {
+    "digest": "sha256:1f815c8debd26d9f17cc895e49154e204b05b637df6d66760c59002f1ef0a503",
+    "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/core.extract-action-items-1.1.0/core-extract-action-items.wasm"
+  },
+  "connector_requirements": [],
+  "consumes": [],
+  "dependencies": [],
+  "description": "Council-improved extraction capability. Key changes from 1.0.0:\n- Higher default confidence threshold\n- Explicit 'needs_human_review' list for borderline items\n- Better rejection of vague or decision-only sentences\n- Clearer relative date resolution anchored to meeting_date\n- Returns source sentence + confidence for every candidate so the UI can show provenance\n\nStill pure and deterministic. No external model calls.",
+  "emits": [],
+  "event_trigger": null,
+  "evidence": [],
+  "execution": {
+    "binary_format": "wasm",
+    "constraints": {
+      "filesystem_access": "none",
+      "host_api_access": "none",
+      "network_access": "forbidden"
+    },
+    "entrypoint": {
+      "command": "run",
+      "kind": "wasi-command"
+    },
+    "preferred_targets": [
+      "local",
+      "edge",
+      "browser"
+    ]
+  },
+  "id": "core.extract-action-items",
+  "inputs": {
+    "schema": {
+      "properties": {
+        "extraction_config": {
+          "properties": {
+            "date_parsing": {
+              "type": "string"
+            },
+            "min_confidence": {
+              "type": "number"
+            },
+            "owner_strategy": {
+              "type": "string"
+            },
+            "reject_vague": {
+              "type": "boolean"
+            },
+            "review_threshold": {
+              "type": "number"
+            },
+            "version": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "version",
+            "min_confidence"
+          ],
+          "type": "object"
+        },
+        "meeting_date": {
+          "type": "string"
+        },
+        "participants": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "text": {
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "text",
+        "extraction_config"
+      ],
+      "type": "object"
+    }
+  },
+  "kind": "capability_contract",
+  "lifecycle": "active",
+  "name": "extract-action-items",
+  "namespace": "core",
+  "outputs": {
+    "schema": {
+      "properties": {
+        "action_items": {
+          "type": "array"
+        },
+        "confidence": {
+          "type": "string"
+        },
+        "evaluation_trace": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "needs_human_review": {
+          "type": "array"
+        },
+        "reason_code": {
+          "type": "string"
+        },
+        "rejected_candidates": {
+          "type": "array"
+        }
+      },
+      "required": [
+        "action_items",
+        "needs_human_review",
+        "reason_code"
+      ],
+      "type": "object"
+    }
+  },
+  "owner": {
+    "contact": "founders@loop.dev",
+    "team": "loop"
+  },
+  "permissions": [
+    {
+      "id": "core.extract-action-items"
+    }
+  ],
+  "permitted_targets": [
+    "local",
+    "edge",
+    "browser",
+    "cloud"
+  ],
+  "policies": [
+    {
+      "id": "pure-computation-only"
+    }
+  ],
+  "postconditions": [
+    {
+      "description": "Identical inputs produce identical outputs",
+      "id": "deterministic"
+    },
+    {
+      "description": "action_items only contain items >= min_confidence",
+      "id": "confidence-gated"
+    }
+  ],
+  "preconditions": [
+    {
+      "description": "text must be non-empty",
+      "id": "text-present"
+    }
+  ],
+  "provenance": {
+    "adr_refs": [
+      "persona-council-review-2026-08-08"
+    ],
+    "author": "loop-founders + traverse-capability-author",
+    "created_at": "2026-08-08T06:20:00Z",
+    "exception_refs": [],
+    "source": "ai-assisted",
+    "spec_ref": "core.extract-action-items@1.1.0"
+  },
+  "schema_version": "1.0.0",
+  "service_type": "stateless",
+  "side_effects": [
+    {
+      "description": "Pure extraction",
+      "kind": "memory_only"
+    }
+  ],
+  "state_schema": null,
+  "summary": "Extracts clean action items from meeting notes with strict confidence gating, separate 'needs review' bucket, and improved relative-date handling. Council-revised.",
+  "version": "1.1.0"
+}

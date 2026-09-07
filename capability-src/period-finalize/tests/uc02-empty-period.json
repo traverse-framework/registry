@@ -1,0 +1,27 @@
+{
+  "kind": "runtime_request",
+  "schema_version": "1.0.0",
+  "request_id": "period-finalize-02",
+  "intent": {
+    "capability_id": "period.finalize",
+    "capability_version": "1.0.0"
+  },
+  "input": {
+    "scope_id": "quiet-site",
+    "period_key": "2026-08-17",
+    "coverage_state": "complete",
+    "included_reference_ids": [],
+    "pending_reference_ids": [],
+    "watermark": "capture-watermark-002",
+    "policy": { "version": "policy-1" }
+  },
+  "lookup": {
+    "scope": "prefer_private",
+    "allow_ambiguity": false
+  },
+  "context": {
+    "requested_target": "local",
+    "caller": "callweave-smoke"
+  },
+  "governing_spec": "006-runtime-request-execution"
+}

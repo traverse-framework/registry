@@ -1,0 +1,287 @@
+{
+  "artifact": {
+    "digest": "sha256:26f2c732df012844571409db6a2ac195b2d1f8a496520e82760a3c748eea8269",
+    "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/location.initialize-1.0.0/location-initialize.wasm"
+  },
+  "connector_requirements": [],
+  "consumes": [],
+  "dependencies": [],
+  "description": "Pure standalone location policy. It validates supplied location and source records, normalizes season defaults, and sorts candidate entries deterministically. It does not fetch sources, inspect a map, read storage, or know any application workflow.",
+  "emits": [],
+  "event_trigger": null,
+  "evidence": [],
+  "execution": {
+    "binary_format": "wasm",
+    "constraints": {
+      "filesystem_access": "none",
+      "host_api_access": "none",
+      "network_access": "forbidden"
+    },
+    "entrypoint": {
+      "command": "run",
+      "kind": "wasi-command"
+    },
+    "preferred_targets": [
+      "local",
+      "browser",
+      "edge",
+      "device"
+    ]
+  },
+  "id": "location.initialize",
+  "inputs": {
+    "schema": {
+      "additionalProperties": false,
+      "properties": {
+        "location": {
+          "additionalProperties": true,
+          "properties": {
+            "id": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "id"
+          ],
+          "type": "object"
+        },
+        "policy": {
+          "additionalProperties": false,
+          "properties": {
+            "version": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "version"
+          ],
+          "type": "object"
+        },
+        "sources": {
+          "items": {
+            "additionalProperties": true,
+            "properties": {
+              "id": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "license": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "season": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "status": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "taxon": {
+                "minLength": 1,
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "license",
+              "taxon",
+              "status"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "location",
+        "sources",
+        "policy"
+      ],
+      "type": "object"
+    }
+  },
+  "kind": "capability_contract",
+  "lifecycle": "active",
+  "name": "initialize",
+  "namespace": "location",
+  "outputs": {
+    "schema": {
+      "additionalProperties": false,
+      "properties": {
+        "candidates": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "season": {
+                "type": "string"
+              },
+              "source_id": {
+                "type": "string"
+              },
+              "status": {
+                "type": "string"
+              },
+              "taxon": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "taxon",
+              "status",
+              "source_id",
+              "season"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "location_id": {
+          "type": "string"
+        },
+        "policy_version": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "location_id",
+        "policy_version",
+        "candidates"
+      ],
+      "type": "object"
+    }
+  },
+  "owner": {
+    "contact": "maintainers@callweave.local",
+    "team": "callweave"
+  },
+  "permissions": [
+    {
+      "id": "location.initialize.execute"
+    }
+  ],
+  "permitted_targets": [
+    "local",
+    "browser",
+    "edge",
+    "device"
+  ],
+  "policies": [
+    {
+      "id": "deterministic-policy-only"
+    },
+    {
+      "id": "source-facts-must-be-complete"
+    }
+  ],
+  "postconditions": [
+    {
+      "description": "Identical source facts yield the same candidate ordering.",
+      "id": "deterministic-order"
+    },
+    {
+      "description": "A missing source season resolves to all.",
+      "id": "default-season-applied"
+    }
+  ],
+  "preconditions": [
+    {
+      "description": "A non-empty location id and non-empty policy version are supplied.",
+      "id": "policy-and-location-are-versioned"
+    }
+  ],
+  "provenance": {
+    "adr_refs": [
+      "DECISION_RECORD.md"
+    ],
+    "author": "Callweave",
+    "created_at": "2026-08-18T00:00:00Z",
+    "exception_refs": [],
+    "source": "greenfield",
+    "spec_ref": "100-capability-package-authoring@1.0.0"
+  },
+  "schema_version": "1.0.0",
+  "service_type": "stateless",
+  "side_effects": [
+    {
+      "description": "Pure calculation; no host, network, filesystem, model, state, or workflow access.",
+      "kind": "memory_only"
+    }
+  ],
+  "state_schema": null,
+  "summary": "Normalize supplied occurrence facts into a deterministic location candidate set.",
+  "use_cases": [
+    {
+      "happy": true,
+      "input_example": {
+        "location": {
+          "id": "golden-bc"
+        },
+        "policy": {
+          "version": "location-policy-1"
+        },
+        "sources": [
+          {
+            "id": "source-b",
+            "license": "CC-BY-4.0",
+            "season": "summer",
+            "status": "rare",
+            "taxon": "Taxon beta"
+          },
+          {
+            "id": "source-a",
+            "license": "CC-BY-4.0",
+            "status": "expected",
+            "taxon": "Taxon alpha"
+          }
+        ]
+      },
+      "output_example": {
+        "candidates": [
+          {
+            "season": "all",
+            "source_id": "source-a",
+            "status": "expected",
+            "taxon": "Taxon alpha"
+          },
+          {
+            "season": "summer",
+            "source_id": "source-b",
+            "status": "rare",
+            "taxon": "Taxon beta"
+          }
+        ],
+        "location_id": "golden-bc",
+        "policy_version": "location-policy-1"
+      },
+      "scenario": "As a location owner, I want supplied occurrence facts normalized into a stable candidate set so that downstream detection policy starts from deterministic inputs.",
+      "persona_ref": "callweave-location-owner"
+    },
+    {
+      "happy": false,
+      "input_example": {
+        "location": {
+          "id": "golden-bc"
+        },
+        "policy": {
+          "version": "location-policy-1"
+        },
+        "sources": [
+          {
+            "id": "source-a",
+            "status": "expected",
+            "taxon": "Taxon alpha"
+          }
+        ]
+      },
+      "output_example": {
+        "error": "every source needs license, taxon, and status"
+      },
+      "scenario": "As a location owner, I want malformed occurrence facts rejected so that a candidate set is never synthesized from incomplete records.",
+      "persona_ref": "callweave-location-owner"
+    }
+  ],
+  "version": "1.0.0"
+}

@@ -1,0 +1,3 @@
+Signature completeness is CI-enforced (spec 007-artifact-hosting Amendment FR-007).
+Every non-deprecated, artifact-bearing capability version must have a signature.json sibling.
+Backfilled and enforced by registry#335.

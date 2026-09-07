@@ -1,0 +1,17 @@
+{
+  "id": "accounts-payable-clerk",
+  "version": "1.0.0",
+  "name": "Accounts-Payable Clerk",
+  "summary": "A company employee who receives and processes incoming vendor documents -- invoices, purchase orders, receipts.",
+  "description": "The first human touchpoint for a document entering the company's document-approval workflow. Submits a received document to doc-approval.analyze to have its type, party, and amount automatically extracted and confidence-scored, so a well-formed, strongly-signaled document can move straight to approval routing without manual re-keying, while a low-confidence or ambiguous document is flagged for the clerk's own manual review before it goes any further. Does not make the final approve/reject decision -- that's the next role in the workflow.",
+  "distinguished_from": [
+    {
+      "persona_id": "approvals-manager",
+      "how": "Handles the initial intake and automated analysis of a document; does not make the approve/escalate decision. The approvals manager is a separate, downstream role in the same workflow that reviews what the clerk's tooling already analyzed."
+    },
+    {
+      "persona_id": "meeting-organizer",
+      "how": "Processes vendor documents (invoices, purchase orders), not meeting transcripts -- a different internal workflow and a different capability entirely."
+    }
+  ]
+}

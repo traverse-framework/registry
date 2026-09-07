@@ -1,0 +1,20 @@
+[workspace]
+
+[package]
+name = "catalog-builder"
+version = "0.1.0"
+edition = "2021"
+publish = false
+description = "Build-tool WASM binary that transforms gathered capability contract metadata (scripts/ci/gather_catalog_data.py's output) into the discovery catalog's search index. Not a published registry capability (registry#105)."
+
+[[bin]]
+name = "catalog-builder"
+path = "src/main.rs"
+
+[dependencies]
+wasi-capability-runtime = { path = "../wasi-capability-runtime" }
+
+[profile.release]
+opt-level = "s"
+lto = true
+panic = "abort"

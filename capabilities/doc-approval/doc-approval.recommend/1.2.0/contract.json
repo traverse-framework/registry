@@ -1,0 +1,177 @@
+{
+  "kind": "capability_contract",
+  "schema_version": "1.0.0",
+  "id": "doc-approval.recommend",
+  "namespace": "doc-approval",
+  "name": "recommend",
+  "version": "1.2.0",
+  "lifecycle": "active",
+  "owner": {
+    "team": "traverse-core",
+    "contact": "enrico.piovesan10@gmail.com"
+  },
+  "summary": "Turn one deterministic document analysis into the final approval recommendation.",
+  "description": "Final step of the canonical doc-approval pipeline (spec 069): consumes the doc-approval.analyze output and produces a genuine, independent second-pass recommendation, rationale, and confidence -- not an echo of the input. It recomputes a confidence rank from the actual signal counts (docType/parties/amounts found) and takes the more conservative of that and the input's own stated confidence, downgrading the recommendation with a rationale explaining why whenever the input's stated confidence doesn't match what the signals actually support. This replaces the 1.0.1 fixture, which always returned \"approve\" / \"high\" regardless of input. Built no_std on the shared agents/wasi-agent-runtime/ shim: verified to import only wasi_snapshot_preview1::{fd_read, fd_write, proc_exit}, so it is genuinely executable by Traverse's runtime, not just a generic wasmtime host. Source: agents/doc-approval-recommend/ in this repo.",
+  "use_cases": [
+    {
+      "scenario": "A high-confidence claim backed by real signals (a party and an amount) is confirmed, not downgraded.",
+      "input_example": {
+        "docType": "invoice",
+        "parties": [
+          "Acme Corp"
+        ],
+        "amounts": [
+          "$500.00"
+        ],
+        "confidence": "high",
+        "recommendation": "approve"
+      },
+      "output_example": {
+        "recommendation": "approve",
+        "rationale": "docType=invoice; 1 party found; 1 amount found; confirmed at high confidence",
+        "confidence": "high"
+      },
+      "happy": true
+    },
+    {
+      "scenario": "A high-confidence claim with zero actual signals is independently recomputed and downgraded, with a rationale explaining why.",
+      "input_example": {
+        "docType": "general",
+        "parties": [],
+        "amounts": [],
+        "confidence": "high",
+        "recommendation": "approve"
+      },
+      "output_example": {
+        "recommendation": "insufficient_data",
+        "rationale": "docType=general; 0 parties found; 0 amounts found; downgraded from high confidence because detected signals only support low",
+        "confidence": "low"
+      },
+      "happy": false
+    }
+  ],
+  "inputs": {
+    "schema": {
+      "type": "object",
+      "required": [
+        "docType",
+        "parties",
+        "amounts",
+        "confidence",
+        "recommendation"
+      ],
+      "properties": {
+        "docType": {
+          "type": "string"
+        },
+        "parties": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "amounts": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "confidence": {
+          "type": "string"
+        },
+        "recommendation": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "outputs": {
+    "schema": {
+      "type": "object",
+      "required": [
+        "recommendation",
+        "rationale",
+        "confidence"
+      ],
+      "properties": {
+        "recommendation": {
+          "type": "string"
+        },
+        "rationale": {
+          "type": "string"
+        },
+        "confidence": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "preconditions": [
+    {
+      "id": "analysis-provided",
+      "description": "The caller provides the doc-approval.analyze output fields."
+    }
+  ],
+  "postconditions": [
+    {
+      "id": "recommendation-produced",
+      "description": "The capability returns a recommendation, rationale, and confidence genuinely derived from the provided analysis fields -- distinct inputs produce distinct outputs, deterministically, including downgrading a recommendation whose stated confidence outpaces its actual signal count."
+    }
+  ],
+  "side_effects": [
+    {
+      "kind": "memory_only",
+      "description": "Produces one deterministic recommendation payload for the provided analysis."
+    }
+  ],
+  "emits": [],
+  "consumes": [],
+  "permissions": [
+    {
+      "id": "doc-approval.recommend"
+    }
+  ],
+  "execution": {
+    "binary_format": "wasm",
+    "entrypoint": {
+      "kind": "wasi-command",
+      "command": "run"
+    },
+    "preferred_targets": [
+      "local"
+    ],
+    "constraints": {
+      "host_api_access": "none",
+      "network_access": "forbidden",
+      "filesystem_access": "none"
+    }
+  },
+  "policies": [
+    {
+      "id": "manual-approval-required"
+    }
+  ],
+  "dependencies": [],
+  "provenance": {
+    "source": "greenfield",
+    "author": "enricopiovesan",
+    "created_at": "2026-07-28T00:00:00Z",
+    "spec_ref": "069-doc-approval-pipeline-canonicalization@1.0.0",
+    "adr_refs": [
+      "0001-rust-wasm-foundation"
+    ],
+    "exception_refs": []
+  },
+  "evidence": [],
+  "service_type": "stateless",
+  "permitted_targets": [
+    "local"
+  ],
+  "artifact_type": "native",
+  "artifact": {
+    "digest": "sha256:bc2e822a9aeb1188f5f45862425cf785f9ddc0d562380031b24b5c37465ecada",
+    "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/doc-approval.recommend-1.1.0/recommend-agent.wasm"
+  }
+}

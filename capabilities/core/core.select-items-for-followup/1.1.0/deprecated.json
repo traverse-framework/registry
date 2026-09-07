@@ -1,0 +1,5 @@
+{
+  "deprecated": true,
+  "reason": "Published without use_cases (capability publish strip bug); superseded by honesty republish under Spec 102 v1.1.0 / Decision 58",
+  "deprecated_at": "2026-08-10T07:10:52Z"
+}

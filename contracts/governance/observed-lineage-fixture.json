@@ -1,0 +1,20 @@
+{
+  "schema_version": "1.0.0",
+  "description": "Fixture-backed observed lineage for catalog discovery (registry#256 / specs/016 FR-013–014). Replaced by runtime ingest when available. Demonstrates one declared match (core.transition-action-status publishing core.action-item.status-transitioned) and one drift case (undeclared subscriber).",
+  "interactions": [
+    {
+      "event_id": "core.action-item.status-transitioned",
+      "event_version": "1.0.0",
+      "capability_id": "core.transition-action-status",
+      "role": "publisher",
+      "observed_at": "2026-08-10T12:00:00Z"
+    },
+    {
+      "event_id": "core.action-item.status-transitioned",
+      "event_version": "1.0.0",
+      "capability_id": "core.unexpected-status-watcher",
+      "role": "subscriber",
+      "observed_at": "2026-08-10T12:05:00Z"
+    }
+  ]
+}

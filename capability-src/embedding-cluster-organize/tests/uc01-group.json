@@ -1,0 +1,29 @@
+{
+  "kind": "runtime_request",
+  "schema_version": "1.0.0",
+  "request_id": "cluster-organize-01",
+  "intent": {
+    "capability_id": "embedding.cluster-organize",
+    "capability_version": "1.0.0"
+  },
+  "input": {
+    "items": [
+      { "id": "ev-1", "embedding": [1, 0, 0] },
+      { "id": "ev-2", "embedding": [0.99, 0.01, 0] },
+      { "id": "ev-3", "embedding": [0, 1, 0] }
+    ],
+    "policy": {
+      "version": "cluster-1",
+      "minimum_cosine": 0.95
+    }
+  },
+  "lookup": {
+    "scope": "prefer_private",
+    "allow_ambiguity": false
+  },
+  "context": {
+    "requested_target": "local",
+    "caller": "callweave-smoke"
+  },
+  "governing_spec": "006-runtime-request-execution"
+}

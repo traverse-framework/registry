@@ -1,0 +1,465 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      sign_mode:
+        description: "sign-artifacts mode"
+        type: choice
+        options:
+          - since-merge
+          - all
+        default: since-merge
+
+permissions:
+  contents: read
+
+jobs:
+  spec-alignment:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Write PR body to file
+        if: github.event_name == 'pull_request'
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: printf '%s' "$PR_BODY" > /tmp/pr_body.txt
+
+      - name: Run spec alignment check
+        if: github.event_name == 'pull_request'
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: bash scripts/ci/spec_alignment_check.sh /tmp/pr_body.txt
+
+  # Deterministic capability validation gate (specs/002-capability-validation):
+  # schema, path-matching, semver format, semver-bump-vs-diff-class,
+  # digest-format, namespace-path-collision (via immutability check),
+  # dependency resolvability, yank-immutability (specs/005-yank-deprecation),
+  # and owner/namespace/scope field shapes (specs/006-public-scope-and-identity).
+  capability-validation:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      # FR-016 / registry#168: capability_validation.py shells out to the Rust
+      # validate_event_products binary for events/**/product.json (descriptor
+      # rules stay single-sourced in traverse-registry). llvm-tools-preview /
+      # cargo-llvm-cov added for specs/018-capability-test-coverage's new
+      # per-capability coverage gate (mirrors build-catalog's existing recipe).
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: "1.94.0"
+          components: llvm-tools-preview
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+
+      - name: Install cargo-llvm-cov
+        uses: taiki-e/install-action@cargo-llvm-cov
+
+      - name: Build event-product validator
+        run: cargo build --locked -p traverse-registry --bin validate_event_products
+
+      - name: Run capability validation unit tests
+        run: python3 -m unittest scripts/ci/tests/test_capability_validation.py -v
+
+      # specs/022-publication-lifecycle-measurement (registry#354, decision-log
+      # entry 83). Rides this already-required job rather than a new required
+      # check -- making a new job required is an owner-only branch-protection
+      # change (same precedent as decision-log entries 28/39).
+      - name: Run measurement validation unit tests
+        run: |
+          python3 -m unittest scripts/ci/tests/test_measurement_validation.py -v
+          python3 -m unittest scripts/metrics/tests/test_publication_lifecycle_export.py -v
+
+      - name: Run capability validation
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          VALIDATE_EVENT_PRODUCTS_BIN: ${{ github.workspace }}/target/debug/validate_event_products
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            python3 scripts/ci/capability_validation.py "$BASE_SHA" "$HEAD_SHA"
+          else
+            python3 scripts/ci/capability_validation.py
+          fi
+
+      - name: Run measurement validation
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            python3 scripts/ci/measurement_validation.py "$BASE_SHA" "$HEAD_SHA"
+          else
+            python3 scripts/ci/measurement_validation.py
+          fi
+
+  # traverse-registry crate test suite (specs/011-013, 015, 016). Was
+  # previously local-only -- cargo test was never run in CI, so drift like
+  # the bundled approved-specs.json mismatch (#148) went unnoticed until
+  # someone happened to run it locally. Not added to branch protection's
+  # required checks here: that's a security-settings change this agent
+  # deliberately does not make itself, same precedent as decision-log
+  # entry 28 (spec-alignment/capability-validation's own required-check
+  # status was a manual owner action, not something granted by approving
+  # the PR that added the job).
+  traverse-registry-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: "1.94.0"
+          components: clippy
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+
+      - name: Run traverse-registry test suite
+        run: cargo test --locked
+
+      - name: Run clippy
+        run: cargo clippy --all-targets --locked
+
+  # Ed25519 signature-tooling tests (specs/007-artifact-hosting amendment,
+  # registry#334). Runs on PRs so scripts/ci/sign_artifacts.py's crypto path
+  # is exercised without needing the real signing key. Not a required check
+  # (same posture as traverse-registry-tests): it guards a post-merge job.
+  sign-artifacts-tests:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - name: Install signing dependency
+        run: pip install cryptography
+
+      - name: Run sign_artifacts tests
+        run: python3 -m unittest scripts/ci/tests/test_sign_artifacts.py -v
+
+  # Advisory (non-blocking) AI review (specs/004-ai-advisory-review).
+  # Runs only on PRs that touch capabilities/, and only posts a comment --
+  # never fails the run, and is intentionally not a required check.
+  #
+  # ANTHROPIC_API_KEY is intentionally unset as of 2026-07 (repo owner
+  # deferred the budget decision -- see docs/decision-log.md item 19).
+  # This job degrades cleanly to an advisory "review didn't run" comment;
+  # that is expected, not a bug.
+  ai-advisory-review:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Find changed contract.json files
+        id: changed
+        run: |
+          git fetch origin ${{ github.event.pull_request.base.sha }} --depth=1 || true
+          changed=$(git diff --name-only ${{ github.event.pull_request.base.sha }} ${{ github.event.pull_request.head.sha }} -- 'capabilities/**/contract.json' | head -1)
+          echo "path=$changed" >> "$GITHUB_OUTPUT"
+
+      - name: Run AI-advisory review
+        if: steps.changed.outputs.path != ''
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: python3 scripts/ci/ai_advisory_review.py "${{ steps.changed.outputs.path }}" /tmp/advisory_comment.md
+
+      - name: Post advisory comment
+        if: steps.changed.outputs.path != ''
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh pr comment ${{ github.event.pull_request.number }} --body-file /tmp/advisory_comment.md
+
+  # Index/release publishing pipeline (specs/003-index-release-pipeline).
+  # Only runs on merge to main, not on PRs.
+  publish-index:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Determine previous index version
+        id: prev
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          prev=$(gh release list --repo ${{ github.repository }} 2>/dev/null | grep -oE 'index-v[0-9]+' | grep -oE '[0-9]+' | sort -n | tail -1)
+          echo "version=${prev:-0}" >> "$GITHUB_OUTPUT"
+
+      - name: Run build_index unit tests
+        run: python3 -m unittest scripts/ci/tests/test_build_index.py -v
+
+      - name: Build index
+        run: python3 scripts/ci/build_index.py "${{ steps.prev.outputs.version }}" "${{ github.sha }}" /tmp/index.json "${{ github.repository }}"
+
+      - name: Publish index as GitHub Release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          new_version=$(( ${{ steps.prev.outputs.version }} + 1 ))
+          tag="index-v${new_version}"
+          gh release create "$tag" /tmp/index.json --repo ${{ github.repository }} --title "$tag" --notes "Automated index publish for $tag" || \
+          gh release upload "$tag" /tmp/index.json --repo ${{ github.repository }} --clobber
+
+  # Ed25519-signs the artifacts of capabilities newly merged by this push
+  # (specs/007-artifact-hosting amendment, registry#331/#333/#334;
+  # docs/decision-log.md entries 74/75). Runs ONLY on merge to main -- signing
+  # is gated on the same human-approval-then-merge boundary this repo already
+  # trusts (FR-009), never on PR open/sync, and no individual publisher holds
+  # the key. Writes an additive capabilities/**/signature.json sibling next to
+  # each newly-merged contract.json (never touching the immutable contract) and
+  # refreshes catalog/signing-key.pub, then commits the result back to main.
+  #
+  # continue-on-error + the "commit only if changed" guard mirror
+  # deploy-catalog's precedent (decision-log entries 28/29): the job's *code*
+  # is complete and tested, but it stays inert -- sign_artifacts.py exits 0
+  # after a "key not provisioned" notice -- until the repo owner performs two
+  # owner-only settings changes this agent deliberately does not make itself:
+  #   1. add the ARTIFACT_SIGNING_ED25519_SECRET_KEY repo secret (64 hex chars,
+  #      a 32-byte Ed25519 seed), and
+  #   2. allow GitHub Actions to push to main past branch protection.
+  # Runbook: docs/artifact-signing.md. Also runnable on demand via
+  # `gh workflow run CI -f sign_mode=all` (the registry#335 backfill) or
+  # `-f sign_mode=since-merge`, once the key secret exists.
+  sign-artifacts:
+    if: >-
+      (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
+      github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - name: Install signing dependency
+        run: pip install cryptography
+
+      # push to main -> --since-merge (sign what this merge added).
+      # workflow_dispatch -> the chosen sign_mode: 'since-merge', or 'all' to
+      # run the registry#335 backfill (sign every unsigned non-deprecated
+      # artifact-bearing version). Both no-op cleanly when the key is unset.
+      - name: Sign artifacts
+        env:
+          ARTIFACT_SIGNING_ED25519_SECRET_KEY: ${{ secrets.ARTIFACT_SIGNING_ED25519_SECRET_KEY }}
+          BEFORE_SHA: ${{ github.event.before }}
+          AFTER_SHA: ${{ github.sha }}
+          SIGN_MODE: ${{ github.event.inputs.sign_mode || 'since-merge' }}
+        run: |
+          if [ "$SIGN_MODE" = "all" ]; then
+            python3 scripts/ci/sign_artifacts.py --all
+          else
+            python3 scripts/ci/sign_artifacts.py --since-merge
+          fi
+
+      # The signed files are always published as a downloadable workflow
+      # artifact, so a maintainer can pick them up and open a normal PR
+      # without any branch-protection change (the registry#335 backfill path,
+      # and the fallback whenever the direct push below is not permitted).
+      - name: Upload signed files
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: artifact-signatures
+          path: |
+            capabilities/**/signature.json
+            catalog/signing-key.pub
+          if-no-files-found: ignore
+
+      # Direct commit back to main, attempted only on merge-to-main (the
+      # ongoing per-publish case). Requires the github-actions[bot] actor to be
+      # allowed to push to main; when it is not, this step logs and the run
+      # still succeeds (continue-on-error) -- the signed files remain available
+      # as the artifact above for a maintainer to PR.
+      - name: Commit signature siblings
+        if: github.event_name == 'push'
+        run: |
+          if [ -z "$(git status --porcelain -- capabilities catalog/signing-key.pub)" ]; then
+            echo "No new signatures to commit."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -- capabilities catalog/signing-key.pub
+          git commit -m "chore(signing): Ed25519 signature siblings for newly-merged artifacts [skip ci]"
+          git push origin HEAD:main || \
+            echo "::warning::Direct push to main not permitted; download the 'artifact-signatures' artifact and open a PR instead."
+
+  # Discovery catalog build (registry#103/#105/#106). Regenerates
+  # catalog/catalog.json from whatever is currently published, same
+  # merge-to-main trigger as publish-index (spec 001 FR-006), so the
+  # catalog never drifts from the actual capabilities/ tree.
+  build-catalog:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: "1.94.0"
+          targets: wasm32-unknown-unknown
+          components: llvm-tools-preview
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            capability-src/catalog-builder
+            capability-src/approval-decision-apply
+            capability-src/artifact-revision-create
+            capability-src/classification-outcome-resolve
+            capability-src/classifier-release-gate-evaluate
+            capability-src/cluster-curate
+            capability-src/coverage-completeness-assess
+            capability-src/embedding-cluster-organize
+            capability-src/location-initialize
+            capability-src/model-improve
+            capability-src/operations-recover
+            capability-src/period-finalize
+            capability-src/retention-eligibility-classify
+            capability-src/review-prepare
+            capability-src/review-state-transition-decide
+            capability-src/revision-successor-assign
+            capability-src/summary-aggregate
+            capability-src/uncertainty-score
+            capability-src/visual-parameter-map
+            capability-src/validate-luhn
+            capability-src/validate-email
+            capability-src/normalize-phone-number
+            capability-src/score-password-strength
+            capability-src/format-currency
+            capability-src/traverse-starter-process
+            capability-src/traverse-starter-validate
+            capability-src/traverse-starter-summarize
+            capability-src/doc-approval-analyze
+            capability-src/doc-approval-recommend
+            capability-src/meeting-notes-process
+            capability-src/core-aggregate-team-action-health
+            capability-src/core-assign-ownership
+            capability-src/core-authorize
+            capability-src/core-calculate-deadline-pressure
+            capability-src/core-calculate-price
+            capability-src/core-decide-escalation
+            capability-src/core-evaluate-completion-quality
+            capability-src/core-extract-action-items
+            capability-src/core-generate-nudge-message
+            capability-src/core-normalize-participants
+            capability-src/core-notify-stakeholders
+            capability-src/core-process-comment
+            capability-src/core-record-nudge-event
+            capability-src/core-select-items-for-followup
+            capability-src/core-transition-action-status
+            capability-src/core-validate-action-item
+            capability-src/platform-decide-state-transition
+
+      - name: Install wasmtime
+        run: |
+          curl https://wasmtime.dev/install.sh -sSf | bash
+          echo "$HOME/.wasmtime/bin" >> "$GITHUB_PATH"
+
+      - name: Install cargo-llvm-cov
+        uses: taiki-e/install-action@cargo-llvm-cov
+
+      - name: Build catalog-builder
+        run: cargo build --release --target wasm32-unknown-unknown --manifest-path capability-src/catalog-builder/Cargo.toml
+
+      - name: Gather capability metadata
+        # Also measures real test_coverage per capability (cargo llvm-cov)
+        # for each id's current version -- see gather_catalog_data.py.
+        run: python3 scripts/ci/gather_catalog_data.py /tmp/gathered.json
+
+      - name: Run catalog-builder
+        run: wasmtime run capability-src/catalog-builder/target/wasm32-unknown-unknown/release/catalog-builder.wasm < /tmp/gathered.json > catalog/catalog.json
+
+      - name: Export AsyncAPI documents (registry#256 / specs/016 FR-015)
+        run: |
+          cargo build --locked -p traverse-registry --bin export_async_api --release
+          ./target/release/export_async_api --root . --out catalog/asyncapi
+
+      - name: Generate static capability pages + sitemap.xml (registry#131)
+        run: python3 scripts/ci/generate_catalog_pages.py catalog/catalog.json https://registry.traverse-framework.com catalog
+
+      - name: Mirror artifact WASM binaries for CORS-enabled fetch (registry#304)
+        run: python3 scripts/ci/mirror_artifacts.py catalog
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v5
+        with:
+          path: catalog
+
+  # Deploys the artifact build-catalog just produced. Split into its own
+  # job (rather than one job doing both) because actions/deploy-pages
+  # requires the `pages: write`/`id-token: write` permissions and the
+  # `github-pages` environment, which should be scoped as narrowly as
+  # possible -- not granted to the build steps that also run
+  # capability_validation.py-adjacent tooling.
+  #
+  # continue-on-error is intentional and matches ai-advisory-review's
+  # precedent elsewhere in this file: this action fails until the repo
+  # owner enables GitHub Pages (Settings -> Pages -> Build and deployment
+  # source: "GitHub Actions"), a repo-settings change this agent
+  # deliberately does not make itself (registry#106's own scope note; same
+  # precedent as decision-log entries 28/29). That is an expected,
+  # not-yet-configured state, not a build regression -- it should not show
+  # as a hard, alarming failure on every merge to main until the owner
+  # flips that toggle.
+  deploy-catalog:
+    needs: build-catalog
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    concurrency:
+      group: pages
+      cancel-in-progress: false
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v5

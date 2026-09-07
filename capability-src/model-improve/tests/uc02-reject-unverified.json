@@ -1,0 +1,18 @@
+{
+  "candidate": {
+    "id": "birdnet-adapter-2",
+    "sha256": "abc123",
+    "license": "MIT",
+    "status": "pending"
+  },
+  "evaluation": {
+    "held_out_precision_millis": 950,
+    "held_out_recall_millis": 930
+  },
+  "policy": {
+    "version": "release-gate-1",
+    "minimum_precision_millis": 900,
+    "minimum_recall_millis": 850
+  },
+  "activeModelId": "birdnet-adapter-1"
+}

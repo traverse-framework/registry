@@ -1,0 +1,293 @@
+{
+  "artifact": {
+    "digest": "sha256:72f4ebda68fec383946c388b337fed1b698a192491f2eed38aa3ade9175a09dd",
+    "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/classifier.release-gate-evaluate-1.0.0/release-gate-evaluate.wasm"
+  },
+  "connector_requirements": [],
+  "consumes": [],
+  "dependencies": [],
+  "description": "Pure standalone release-gate policy. It consumes only labeled classifier outcomes and a versioned gate policy, computes positive-case coverage and false-negative rate, and returns an approval or rejection decision. It does not inspect raw inputs, sanitize exports, access storage, or know any application workflow.",
+  "emits": [],
+  "event_trigger": null,
+  "evidence": [],
+  "execution": {
+    "binary_format": "wasm",
+    "constraints": {
+      "filesystem_access": "none",
+      "host_api_access": "none",
+      "network_access": "forbidden"
+    },
+    "entrypoint": {
+      "command": "run",
+      "kind": "wasi-command"
+    },
+    "preferred_targets": [
+      "local",
+      "browser",
+      "edge",
+      "device"
+    ]
+  },
+  "id": "classifier.release-gate-evaluate",
+  "inputs": {
+    "schema": {
+      "additionalProperties": false,
+      "properties": {
+        "cases": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "contains_positive": {
+                "type": "boolean"
+              },
+              "positive_detected": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "contains_positive",
+              "positive_detected"
+            ],
+            "type": "object"
+          },
+          "minItems": 1,
+          "type": "array"
+        },
+        "policy": {
+          "additionalProperties": false,
+          "properties": {
+            "maximum_false_negative_millis": {
+              "maximum": 1000,
+              "minimum": 0,
+              "type": "integer"
+            },
+            "minimum_positive_cases": {
+              "minimum": 0,
+              "type": "integer"
+            },
+            "version": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "version",
+            "minimum_positive_cases",
+            "maximum_false_negative_millis"
+          ],
+          "type": "object"
+        }
+      },
+      "required": [
+        "cases",
+        "policy"
+      ],
+      "type": "object"
+    }
+  },
+  "kind": "capability_contract",
+  "lifecycle": "active",
+  "name": "release-gate-evaluate",
+  "namespace": "classifier",
+  "outputs": {
+    "schema": {
+      "additionalProperties": true,
+      "properties": {
+        "decision": {
+          "enum": [
+            "approve_for_policy",
+            "reject"
+          ],
+          "type": "string"
+        },
+        "false_negative_millis": {
+          "maximum": 1000,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "false_negatives": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "policy_version": {
+          "type": "string"
+        },
+        "positive_cases": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "reason": {
+          "enum": [
+            "release_gate_passed",
+            "insufficient_positive_cases",
+            "false_negative_limit_exceeded"
+          ],
+          "type": "string"
+        },
+        "total_cases": {
+          "minimum": 1,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "policy_version",
+        "total_cases",
+        "positive_cases",
+        "false_negatives",
+        "false_negative_millis",
+        "decision",
+        "reason"
+      ],
+      "type": "object"
+    }
+  },
+  "owner": {
+    "contact": "maintainers@callweave.local",
+    "team": "callweave"
+  },
+  "permissions": [
+    {
+      "id": "classifier.release-gate-evaluate.execute"
+    }
+  ],
+  "permitted_targets": [
+    "local",
+    "browser",
+    "edge",
+    "device"
+  ],
+  "policies": [
+    {
+      "id": "deterministic-policy-only"
+    },
+    {
+      "id": "evaluation-does-not-process-raw-inputs"
+    }
+  ],
+  "postconditions": [
+    {
+      "description": "An approval is only possible when the supplied positive-case minimum is met.",
+      "id": "approval-requires-positive-coverage"
+    },
+    {
+      "description": "An approval is impossible when false_negative_millis exceeds the configured limit.",
+      "id": "approval-fails-on-excess-false-negatives"
+    }
+  ],
+  "preconditions": [
+    {
+      "description": "At least one labeled case and a non-empty policy version are supplied.",
+      "id": "labeled-cases-and-policy-supplied"
+    }
+  ],
+  "provenance": {
+    "adr_refs": [
+      "DECISION_RECORD.md"
+    ],
+    "author": "Callweave",
+    "created_at": "2026-08-21T00:00:00Z",
+    "exception_refs": [],
+    "source": "greenfield",
+    "spec_ref": "100-capability-package-authoring@1.0.0"
+  },
+  "schema_version": "1.0.0",
+  "service_type": "stateless",
+  "side_effects": [
+    {
+      "description": "Pure calculation; no host, network, filesystem, raw-input, model-provider, or workflow access.",
+      "kind": "memory_only"
+    }
+  ],
+  "state_schema": null,
+  "summary": "Evaluate a classifier release gate from labeled outcomes.",
+  "use_cases": [
+    {
+      "happy": true,
+      "input_example": {
+        "cases": [
+          {
+            "contains_positive": true,
+            "positive_detected": true
+          },
+          {
+            "contains_positive": true,
+            "positive_detected": true
+          },
+          {
+            "contains_positive": false,
+            "positive_detected": false
+          }
+        ],
+        "policy": {
+          "maximum_false_negative_millis": 0,
+          "minimum_positive_cases": 2,
+          "version": "release-gate-1"
+        }
+      },
+      "output_example": {
+        "decision": "approve_for_policy",
+        "false_negative_millis": 0,
+        "false_negatives": 0,
+        "positive_cases": 2,
+        "reason": "release_gate_passed"
+      },
+      "persona_ref": "classifier-steward",
+      "scenario": "As a classifier steward, I want a candidate with sufficient labeled positive-case coverage and zero false negatives approved so that a separate host can rely on that policy gate."
+    },
+    {
+      "happy": false,
+      "input_example": {
+        "cases": [
+          {
+            "contains_positive": true,
+            "positive_detected": false
+          },
+          {
+            "contains_positive": true,
+            "positive_detected": true
+          }
+        ],
+        "policy": {
+          "maximum_false_negative_millis": 0,
+          "minimum_positive_cases": 2,
+          "version": "release-gate-1"
+        }
+      },
+      "output_example": {
+        "decision": "reject",
+        "false_negative_millis": 500,
+        "false_negatives": 1,
+        "positive_cases": 2,
+        "reason": "false_negative_limit_exceeded"
+      },
+      "persona_ref": "classifier-steward",
+      "scenario": "As a classifier steward, I want a candidate with missed positive cases rejected so that unsafe classifier behavior cannot be promoted."
+    },
+    {
+      "happy": false,
+      "input_example": {
+        "cases": [
+          {
+            "contains_positive": false,
+            "positive_detected": false
+          }
+        ],
+        "policy": {
+          "maximum_false_negative_millis": 0,
+          "minimum_positive_cases": 1,
+          "version": "release-gate-1"
+        }
+      },
+      "output_example": {
+        "decision": "reject",
+        "false_negative_millis": 1000,
+        "false_negatives": 0,
+        "positive_cases": 0,
+        "reason": "insufficient_positive_cases"
+      },
+      "persona_ref": "classifier-steward",
+      "scenario": "As a classifier steward, I want insufficient positive-case coverage rejected so that approval cannot be claimed from weak evaluation data."
+    }
+  ],
+  "version": "1.0.0"
+}

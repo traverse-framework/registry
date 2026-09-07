@@ -1,0 +1,27 @@
+[workspace]
+
+[package]
+name = "registry-execution-proxy"
+version = "0.1.0"
+edition = "2021"
+publish = false
+description = "specs/020-public-execution-proxy: a thin Cloudflare Worker that holds the traverse-cli serve admin credential privately, validates a request against this registry's own published catalog, rate-limits, and forwards to serve's verified-entrypoint endpoint."
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+worker = "0.8"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+# `strip = true` is deliberately NOT set here: it removes the wasm
+# reference-types/externref target-features section `wasm-bindgen` 0.2.125+
+# requires, breaking `worker-build` with "externref table required for
+# catch wrappers" (cloudflare/workers-rs#1014, fixed upstream in
+# wasm-bindgen/wasm-bindgen#5205 but not yet released as of worker 0.8.5 --
+# confirmed by actually hitting this locally before writing this comment).
+[profile.release]
+opt-level = "s"
+lto = true
+codegen-units = 1

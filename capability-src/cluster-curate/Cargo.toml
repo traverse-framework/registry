@@ -1,0 +1,17 @@
+[workspace]
+
+[package]
+name = "cluster-curate-agent"
+version = "1.0.0"
+edition = "2015"
+publish = false
+description = "Callweave-owned source mirror of cluster.curate for independently measured registry coverage."
+
+[[bin]]
+name = "cluster-curate-agent"
+path = "src/main.rs"
+
+[profile.release]
+opt-level = "s"
+lto = true
+panic = "abort"

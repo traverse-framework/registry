@@ -1,0 +1,17 @@
+{
+  "id": "multi-tenant-saas-developer",
+  "version": "1.0.0",
+  "name": "Multi-tenant SaaS Developer",
+  "summary": "Builds product features that must never cross tenant boundaries even for powerful roles.",
+  "description": "Implements SaaS features where tenant isolation is non-negotiable. Uses core.authorize with high-priority tenant-mismatch deny rules so an admin in tenant A cannot read tenant B resources.",
+  "distinguished_from": [
+    {
+      "persona_id": "platform-security-engineer",
+      "how": "Consumes isolation policy in app features; does not own the platform-wide authz engine itself."
+    },
+    {
+      "persona_id": "client-developer",
+      "how": "Works on the multi-tenant product backend/policy wiring, not client SDK error-surface integration."
+    }
+  ]
+}

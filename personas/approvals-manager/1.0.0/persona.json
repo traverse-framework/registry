@@ -1,0 +1,17 @@
+{
+  "id": "approvals-manager",
+  "version": "1.0.0",
+  "name": "Approvals Manager",
+  "summary": "A company employee who reviews already-analyzed documents and makes the final approve/escalate decision.",
+  "description": "The downstream decision-maker in the document-approval workflow, one step after the accounts-payable clerk's intake. Uses doc-approval.recommend to independently recompute a document's approvability from its actual extracted signals, rather than trusting a claimed confidence score at face value -- so a document whose analysis claims high confidence but has no real supporting extracted data gets caught and downgraded instead of silently auto-approved. Never handles the raw incoming document directly; only ever works from documents doc-approval.analyze has already processed.",
+  "distinguished_from": [
+    {
+      "persona_id": "accounts-payable-clerk",
+      "how": "Reviews and decides on documents the clerk's tooling has already analyzed; does not do the initial intake, submission, or raw-document handling."
+    },
+    {
+      "persona_id": "meeting-organizer",
+      "how": "Reviews vendor documents for approval, not meeting transcripts -- a different internal workflow and a different capability entirely."
+    }
+  ]
+}

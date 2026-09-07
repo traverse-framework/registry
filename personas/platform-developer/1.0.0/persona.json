@@ -1,0 +1,17 @@
+{
+  "id": "platform-developer",
+  "version": "1.0.0",
+  "name": "Platform Developer",
+  "summary": "Integrates fail-closed authorization defaults into platform services.",
+  "description": "Wires core.authorize into platform APIs so unmatched requests deny when default_effect is deny. Relies on no_matching_rule outcomes to keep new endpoints closed until explicit policy is added.",
+  "distinguished_from": [
+    {
+      "persona_id": "runtime-engineer",
+      "how": "Integrates the capability into services; does not own host/runtime invalid-policy failure modes."
+    },
+    {
+      "persona_id": "client-developer",
+      "how": "Works server-side on platform services, not client-facing structured error mapping."
+    }
+  ]
+}

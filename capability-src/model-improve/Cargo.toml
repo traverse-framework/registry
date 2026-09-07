@@ -1,0 +1,17 @@
+[workspace]
+
+[package]
+name = "model-improve-agent"
+version = "1.0.0"
+edition = "2015"
+publish = false
+description = "Callweave-owned source mirror of model.improve for independently measured registry coverage."
+
+[[bin]]
+name = "model-improve-agent"
+path = "src/main.rs"
+
+[profile.release]
+opt-level = "s"
+lto = true
+panic = "abort"

@@ -1,0 +1,340 @@
+{
+  "artifact": {
+    "digest": "sha256:01df8aba35fd312b65d6af5dcdfa71e054f128eac07feae2a42ffae83bba1c7e",
+    "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/model.improve-1.0.0/model-improve.wasm"
+  },
+  "connector_requirements": [],
+  "consumes": [],
+  "dependencies": [],
+  "description": "Pure standalone model release policy. It rejects unverified artifacts, rejects evaluations below threshold, and approves a release only when the supplied verified artifact and held-out evaluation facts pass the governed gate. It does not train, download, cache, activate, or persist models.",
+  "emits": [],
+  "event_trigger": null,
+  "evidence": [],
+  "execution": {
+    "binary_format": "wasm",
+    "constraints": {
+      "filesystem_access": "none",
+      "host_api_access": "none",
+      "network_access": "forbidden"
+    },
+    "entrypoint": {
+      "command": "run",
+      "kind": "wasi-command"
+    },
+    "preferred_targets": [
+      "local",
+      "browser",
+      "edge",
+      "device"
+    ]
+  },
+  "id": "model.improve",
+  "inputs": {
+    "schema": {
+      "additionalProperties": false,
+      "properties": {
+        "activeModelId": {
+          "type": "string"
+        },
+        "candidate": {
+          "additionalProperties": true,
+          "properties": {
+            "id": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "license": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "sha256": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "status": {
+              "enum": [
+                "verified",
+                "pending",
+                "rejected"
+              ],
+              "type": "string"
+            }
+          },
+          "required": [
+            "id",
+            "sha256",
+            "license",
+            "status"
+          ],
+          "type": "object"
+        },
+        "evaluation": {
+          "additionalProperties": true,
+          "properties": {
+            "held_out_precision_millis": {
+              "maximum": 1000,
+              "minimum": 0,
+              "type": "integer"
+            },
+            "held_out_recall_millis": {
+              "maximum": 1000,
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "type": "object"
+        },
+        "policy": {
+          "additionalProperties": false,
+          "properties": {
+            "minimum_precision_millis": {
+              "maximum": 1000,
+              "minimum": 0,
+              "type": "integer"
+            },
+            "minimum_recall_millis": {
+              "maximum": 1000,
+              "minimum": 0,
+              "type": "integer"
+            },
+            "version": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "version",
+            "minimum_precision_millis",
+            "minimum_recall_millis"
+          ],
+          "type": "object"
+        }
+      },
+      "required": [
+        "candidate",
+        "policy"
+      ],
+      "type": "object"
+    }
+  },
+  "kind": "capability_contract",
+  "lifecycle": "active",
+  "name": "improve",
+  "namespace": "model",
+  "outputs": {
+    "schema": {
+      "additionalProperties": true,
+      "properties": {
+        "active_model_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "decision": {
+          "enum": [
+            "approve",
+            "reject"
+          ],
+          "type": "string"
+        },
+        "previous_model_id": {
+          "type": "string"
+        },
+        "reason": {
+          "enum": [
+            "release_gate_passed",
+            "artifact_not_verified",
+            "evaluation_below_threshold"
+          ],
+          "type": "string"
+        },
+        "release_id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "decision",
+        "reason",
+        "active_model_id"
+      ],
+      "type": "object"
+    }
+  },
+  "owner": {
+    "contact": "maintainers@callweave.local",
+    "team": "callweave"
+  },
+  "permissions": [
+    {
+      "id": "model.improve.execute"
+    }
+  ],
+  "permitted_targets": [
+    "local",
+    "browser",
+    "edge",
+    "device"
+  ],
+  "policies": [
+    {
+      "id": "deterministic-policy-only"
+    },
+    {
+      "id": "artifact-must-be-verified-before-release"
+    }
+  ],
+  "postconditions": [
+    {
+      "description": "Only a verified artifact may return decision approve.",
+      "id": "unverified-artifacts-cannot-pass"
+    },
+    {
+      "description": "Rejected results preserve the currently active model id.",
+      "id": "threshold-failure-keeps-active-model"
+    }
+  ],
+  "preconditions": [
+    {
+      "description": "A candidate id, checksum, license, status, and release policy are supplied.",
+      "id": "verified-artifact-and-policy-supplied"
+    }
+  ],
+  "provenance": {
+    "adr_refs": [
+      "DECISION_RECORD.md"
+    ],
+    "author": "Callweave",
+    "created_at": "2026-08-20T00:00:00Z",
+    "exception_refs": [],
+    "source": "greenfield",
+    "spec_ref": "100-capability-package-authoring@1.0.0"
+  },
+  "schema_version": "1.0.0",
+  "service_type": "stateless",
+  "side_effects": [
+    {
+      "description": "Pure calculation; no host, network, filesystem, model provider, cache, or workflow access.",
+      "kind": "memory_only"
+    }
+  ],
+  "state_schema": null,
+  "summary": "Evaluate a verified model candidate against deterministic release thresholds.",
+  "use_cases": [
+    {
+      "happy": true,
+      "input_example": {
+        "activeModelId": "birdnet-adapter-1",
+        "candidate": {
+          "id": "birdnet-adapter-2",
+          "license": "MIT",
+          "sha256": "abc123",
+          "status": "verified"
+        },
+        "evaluation": {
+          "held_out_precision_millis": 910,
+          "held_out_recall_millis": 890
+        },
+        "policy": {
+          "minimum_precision_millis": 900,
+          "minimum_recall_millis": 850,
+          "version": "release-gate-1"
+        }
+      },
+      "output_example": {
+        "active_model_id": "birdnet-adapter-2",
+        "decision": "approve",
+        "previous_model_id": "birdnet-adapter-1",
+        "reason": "release_gate_passed",
+        "release_id": "release-birdnet-adapter-2"
+      },
+      "scenario": "As a system administrator, I want a verified candidate that passes held-out precision and recall thresholds approved so that a local release can be activated separately.",
+      "persona_ref": "callweave-system-administrator"
+    },
+    {
+      "happy": false,
+      "input_example": {
+        "activeModelId": "birdnet-adapter-1",
+        "candidate": {
+          "id": "birdnet-adapter-2",
+          "license": "MIT",
+          "sha256": "abc123",
+          "status": "pending"
+        },
+        "evaluation": {
+          "held_out_precision_millis": 950,
+          "held_out_recall_millis": 930
+        },
+        "policy": {
+          "minimum_precision_millis": 900,
+          "minimum_recall_millis": 850,
+          "version": "release-gate-1"
+        }
+      },
+      "output_example": {
+        "active_model_id": "birdnet-adapter-1",
+        "decision": "reject",
+        "reason": "artifact_not_verified"
+      },
+      "scenario": "As a system administrator, I want an unverified artifact rejected before evaluation thresholds matter so that unchecked model files cannot be promoted.",
+      "persona_ref": "callweave-system-administrator"
+    },
+    {
+      "happy": false,
+      "input_example": {
+        "activeModelId": "birdnet-adapter-1",
+        "candidate": {
+          "id": "birdnet-adapter-3",
+          "license": "MIT",
+          "sha256": "def456",
+          "status": "verified"
+        },
+        "evaluation": {
+          "held_out_precision_millis": 930,
+          "held_out_recall_millis": 700
+        },
+        "policy": {
+          "minimum_precision_millis": 900,
+          "minimum_recall_millis": 850,
+          "version": "release-gate-1"
+        }
+      },
+      "output_example": {
+        "active_model_id": "birdnet-adapter-1",
+        "decision": "reject",
+        "reason": "evaluation_below_threshold"
+      },
+      "scenario": "As a system administrator, I want a verified candidate below recall threshold rejected so that weak evaluations do not silently replace a known-good model.",
+      "persona_ref": "callweave-system-administrator"
+    },
+    {
+      "happy": false,
+      "input_example": {
+        "activeModelId": "birdnet-adapter-1",
+        "candidate": {
+          "id": "birdnet-adapter-4",
+          "license": "MIT",
+          "sha256": "ghi789",
+          "status": "rejected"
+        },
+        "evaluation": {
+          "held_out_precision_millis": 980,
+          "held_out_recall_millis": 980
+        },
+        "policy": {
+          "minimum_precision_millis": 900,
+          "minimum_recall_millis": 850,
+          "version": "release-gate-1"
+        }
+      },
+      "output_example": {
+        "active_model_id": "birdnet-adapter-1",
+        "decision": "reject",
+        "reason": "artifact_not_verified"
+      },
+      "scenario": "As a system administrator, I want an explicitly rejected candidate blocked from release so that previously failed artifacts cannot be republished through the release gate.",
+      "persona_ref": "callweave-system-administrator"
+    }
+  ],
+  "version": "1.0.0"
+}

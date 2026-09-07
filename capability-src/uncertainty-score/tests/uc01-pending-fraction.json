@@ -1,0 +1,24 @@
+{
+  "kind": "runtime_request",
+  "schema_version": "1.0.0",
+  "request_id": "uncertainty-score-01",
+  "intent": {
+    "capability_id": "uncertainty.score",
+    "capability_version": "1.0.0"
+  },
+  "input": {
+    "included_count": 3,
+    "pending_count": 1,
+    "coverage_state": "partial",
+    "policy": { "version": "uncertainty-policy-1" }
+  },
+  "lookup": {
+    "scope": "prefer_private",
+    "allow_ambiguity": false
+  },
+  "context": {
+    "requested_target": "local",
+    "caller": "callweave-smoke"
+  },
+  "governing_spec": "006-runtime-request-execution"
+}

@@ -1,0 +1,156 @@
+{
+  "kind": "capability_contract",
+  "schema_version": "1.0.0",
+  "id": "validation.validate-email",
+  "namespace": "validation",
+  "name": "validate-email",
+  "version": "1.2.1",
+  "lifecycle": "active",
+  "owner": {
+    "team": "traverse-core",
+    "contact": "enrico.piovesan10@gmail.com"
+  },
+  "summary": "Validate whether a string is a syntactically well-formed email address.",
+  "description": "Checks structural validity of an email address (local-part@domain shape, character classes, length, dot placement) against a simplified, deterministic ruleset -- not full RFC 5321/5322 grammar and not a deliverability check. Does not perform DNS/MX lookups, does not verify the mailbox exists, and does not attempt SMTP verification, since none of those are possible from inside the capability sandbox (no network access) and would be non-deterministic even if they were. Whitespace is not trimmed by this capability -- callers must trim input themselves; a leading/trailing space is treated as an invalid character and reported as such. Plus-addressing (`user+tag@domain`) is treated as valid by default per the `allow_plus_addressing` input field.",
+  "use_cases": [
+    {
+      "scenario": "As a signup form developer, I want a structurally well-formed email address to be accepted, so that a user with a valid address isn't blocked from creating an account.",
+      "input_example": {
+        "email": "alice@example.com"
+      },
+      "output_example": {
+        "valid": true,
+        "reason": null
+      },
+      "happy": true
+    },
+    {
+      "scenario": "As a signup form developer, I want an address missing the '@' sign to be rejected with a specific reason, so that I can show the user exactly what's wrong instead of a generic invalid-email message.",
+      "input_example": {
+        "email": "alice.example.com"
+      },
+      "output_example": {
+        "valid": false,
+        "reason": "missing_at_sign"
+      },
+      "happy": false
+    },
+    {
+      "scenario": "As a signup form developer, I want to be able to disable plus-addressing via config, so that I can reject aliased addresses when my product specifically needs one address per real inbox.",
+      "input_example": {
+        "email": "alice+promo@example.com",
+        "allow_plus_addressing": false
+      },
+      "output_example": {
+        "valid": false,
+        "reason": "plus_addressing_disabled"
+      },
+      "happy": false
+    }
+  ],
+  "inputs": {
+    "schema": {
+      "type": "object",
+      "required": [
+        "email"
+      ],
+      "properties": {
+        "email": {
+          "type": "string"
+        },
+        "allow_plus_addressing": {
+          "type": "boolean"
+        },
+        "max_length": {
+          "type": "number"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "outputs": {
+    "schema": {
+      "type": "object",
+      "required": [
+        "valid",
+        "reason"
+      ],
+      "properties": {
+        "valid": {
+          "type": "boolean"
+        },
+        "reason": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "preconditions": [
+    {
+      "id": "email-provided",
+      "description": "The caller provides a string in the email field, possibly empty."
+    }
+  ],
+  "postconditions": [
+    {
+      "id": "valid-flag-produced",
+      "description": "Returns valid: true only if the string matches the documented simplified email-shape ruleset; otherwise valid: false with a non-null reason explaining which rule failed."
+    },
+    {
+      "id": "no-network-verification",
+      "description": "Never performs DNS/MX/SMTP verification -- valid: true means structurally well-formed, not that the mailbox exists or accepts mail."
+    }
+  ],
+  "side_effects": [
+    {
+      "kind": "memory_only",
+      "description": "Produces one validation result derived from the provided email string; does not log, persist, or transmit the input."
+    }
+  ],
+  "emits": [],
+  "consumes": [],
+  "permissions": [
+    {
+      "id": "validation.validate-email"
+    }
+  ],
+  "execution": {
+    "binary_format": "wasm",
+    "entrypoint": {
+      "kind": "wasi-command",
+      "command": "run"
+    },
+    "preferred_targets": [
+      "local"
+    ],
+    "constraints": {
+      "host_api_access": "none",
+      "network_access": "forbidden",
+      "filesystem_access": "none"
+    }
+  },
+  "policies": [],
+  "dependencies": [],
+  "provenance": {
+    "source": "greenfield",
+    "author": "enricopiovesan",
+    "created_at": "2026-07-28T00:00:00Z",
+    "spec_ref": null,
+    "adr_refs": [],
+    "exception_refs": []
+  },
+  "evidence": [],
+  "service_type": "stateless",
+  "permitted_targets": [
+    "local"
+  ],
+  "artifact_type": "native",
+  "artifact": {
+    "digest": "sha256:9f90eac5245f10d4ae63f9dfcaa91f63a05e8230eafb6495467c58f4f231b78c",
+    "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/validation.validate-email-1.0.0/validate-email-agent.wasm"
+  }
+}

@@ -1,0 +1,182 @@
+{
+  "artifact": {
+    "digest": "sha256:c15157bf5947896aa806df61636bd614483e261791f8b59e14814b80f456a0a7",
+    "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/cluster.curate-1.0.0/cluster-curate.wasm"
+  },
+  "connector_requirements": [],
+  "consumes": [],
+  "dependencies": [],
+  "description": "Pure standalone cluster curation. It preserves a supplied cluster and representative reference without recalculating embeddings, accessing models, mutating items, or knowing workflow context.",
+  "emits": [],
+  "event_trigger": null,
+  "evidence": [],
+  "execution": {
+    "binary_format": "wasm",
+    "constraints": {
+      "filesystem_access": "none",
+      "host_api_access": "none",
+      "network_access": "forbidden"
+    },
+    "entrypoint": {
+      "command": "run",
+      "kind": "wasi-command"
+    },
+    "preferred_targets": [
+      "local"
+    ]
+  },
+  "id": "cluster.curate",
+  "inputs": {
+    "schema": {
+      "additionalProperties": false,
+      "properties": {
+        "cluster": {
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "member_count": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "representative_ref": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "id",
+            "member_count",
+            "representative_ref"
+          ],
+          "type": "object"
+        },
+        "curation_policy": {
+          "additionalProperties": false,
+          "properties": {
+            "version": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "version"
+          ],
+          "type": "object"
+        }
+      },
+      "required": [
+        "cluster",
+        "curation_policy"
+      ],
+      "type": "object"
+    }
+  },
+  "kind": "capability_contract",
+  "lifecycle": "active",
+  "name": "curate",
+  "namespace": "cluster",
+  "outputs": {
+    "schema": {
+      "additionalProperties": false,
+      "properties": {
+        "cluster_id": {
+          "type": "string"
+        },
+        "curation_state": {
+          "enum": [
+            "retained"
+          ],
+          "type": "string"
+        },
+        "member_count": {
+          "type": "integer"
+        },
+        "policy_version": {
+          "type": "string"
+        },
+        "representative_ref": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "cluster_id",
+        "member_count",
+        "representative_ref",
+        "curation_state",
+        "policy_version"
+      ],
+      "type": "object"
+    }
+  },
+  "owner": {
+    "contact": "maintainers@callweave.local",
+    "team": "callweave"
+  },
+  "permissions": [
+    {
+      "id": "cluster.curate.execute"
+    }
+  ],
+  "permitted_targets": [
+    "local"
+  ],
+  "policies": [],
+  "postconditions": [
+    {
+      "description": "Identical inputs yield identical retained cluster output.",
+      "id": "curation-is-deterministic"
+    }
+  ],
+  "preconditions": [
+    {
+      "description": "A non-empty cluster id, representative reference, positive member count, and policy version are supplied.",
+      "id": "cluster-shape-supplied"
+    }
+  ],
+  "provenance": {
+    "adr_refs": [],
+    "author": "Callweave",
+    "created_at": "2026-08-21T00:00:00Z",
+    "exception_refs": [],
+    "source": "greenfield",
+    "spec_ref": "100-capability-package-authoring@1.0.0"
+  },
+  "schema_version": "1.0.0",
+  "service_type": "stateless",
+  "side_effects": [
+    {
+      "description": "Pure calculation.",
+      "kind": "memory_only"
+    }
+  ],
+  "state_schema": null,
+  "summary": "Curate a supplied cluster deterministically.",
+  "use_cases": [
+    {
+      "happy": true,
+      "input_example": {
+        "cluster": {
+          "id": "c-1",
+          "member_count": 4,
+          "representative_ref": "e-1"
+        },
+        "curation_policy": {
+          "version": "1.0.0"
+        }
+      },
+      "output_example": {
+        "cluster_id": "c-1",
+        "curation_state": "retained",
+        "member_count": 4,
+        "policy_version": "1.0.0",
+        "representative_ref": "e-1"
+      },
+      "persona_ref": "cluster-reviewer",
+      "scenario": "As a cluster reviewer, I want a proposed cluster preserved with its supplied representative so that downstream systems can consume a stable curated grouping."
+    }
+  ],
+  "version": "1.0.0"
+}

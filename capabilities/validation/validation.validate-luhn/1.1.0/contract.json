@@ -1,0 +1,155 @@
+{
+  "kind": "capability_contract",
+  "schema_version": "1.0.0",
+  "id": "validation.validate-luhn",
+  "namespace": "validation",
+  "name": "validate-luhn",
+  "version": "1.1.0",
+  "lifecycle": "active",
+  "owner": {
+    "team": "traverse-core",
+    "contact": "enrico.piovesan10@gmail.com"
+  },
+  "summary": "Check whether a numeric string passes the Luhn checksum, as used by credit card numbers and other identifiers.",
+  "description": "Applies the standard Luhn (mod 10) checksum algorithm to a digit string: doubling every second digit from the rightmost, subtracting 9 from any result over 9, summing all digits, and checking the total is a multiple of 10. This is a checksum-format check only -- it does NOT verify the number belongs to a real, active account, is not stolen, or is authorized for any transaction (none of that is possible without a live call to a card network or issuer, which is not available to any capability under the current ABI whitelist). Luhn validity is necessary but nowhere near sufficient for treating a card number as safe to charge. Formatting characters (spaces, dashes) are stripped before checking when strip_formatting is true (the default); the input is never logged, persisted, or included in the output.",
+  "use_cases": [
+    {
+      "scenario": "A well-formed card number with formatting stripped passes the checksum.",
+      "input_example": {
+        "number": "4111 1111 1111 1111"
+      },
+      "output_example": {
+        "valid": true,
+        "reason": null
+      },
+      "happy": true
+    },
+    {
+      "scenario": "A single mistyped digit fails the Luhn checksum.",
+      "input_example": {
+        "number": "4111111111111112"
+      },
+      "output_example": {
+        "valid": false,
+        "reason": "checksum_failed"
+      },
+      "happy": false
+    },
+    {
+      "scenario": "An empty string is rejected before any checksum math runs.",
+      "input_example": {
+        "number": ""
+      },
+      "output_example": {
+        "valid": false,
+        "reason": "empty"
+      },
+      "happy": false
+    }
+  ],
+  "inputs": {
+    "schema": {
+      "additionalProperties": false,
+      "properties": {
+        "number": {
+          "type": "string"
+        },
+        "strip_formatting": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "number"
+      ],
+      "type": "object"
+    }
+  },
+  "outputs": {
+    "schema": {
+      "additionalProperties": false,
+      "properties": {
+        "reason": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "valid": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "valid",
+        "reason"
+      ],
+      "type": "object"
+    }
+  },
+  "preconditions": [
+    {
+      "id": "number-provided",
+      "description": "The caller provides a string in the number field, possibly containing spaces/dashes if strip_formatting is true."
+    }
+  ],
+  "postconditions": [
+    {
+      "id": "checksum-only",
+      "description": "valid: true means the digit string passes the Luhn checksum, nothing more -- not that it is a real, active, or authorized account number."
+    },
+    {
+      "id": "input-not-echoed",
+      "description": "The output never contains the input number value, in whole or in part."
+    }
+  ],
+  "side_effects": [
+    {
+      "kind": "memory_only",
+      "description": "Produces one checksum result derived from the provided number; does not log, persist, or transmit the input."
+    }
+  ],
+  "emits": [],
+  "consumes": [],
+  "permissions": [
+    {
+      "id": "validation.validate-luhn"
+    }
+  ],
+  "execution": {
+    "binary_format": "wasm",
+    "entrypoint": {
+      "kind": "wasi-command",
+      "command": "run"
+    },
+    "preferred_targets": [
+      "local"
+    ],
+    "constraints": {
+      "host_api_access": "none",
+      "network_access": "forbidden",
+      "filesystem_access": "none"
+    }
+  },
+  "policies": [],
+  "dependencies": [],
+  "provenance": {
+    "source": "greenfield",
+    "author": "enricopiovesan",
+    "created_at": "2026-07-28T00:00:00Z",
+    "spec_ref": null,
+    "adr_refs": [],
+    "exception_refs": []
+  },
+  "evidence": [],
+  "service_type": "stateless",
+  "permitted_targets": [
+    "local"
+  ],
+  "event_trigger": null,
+  "connector_requirements": [],
+  "state_schema": null,
+  "artifact_type": "native",
+  "artifact": {
+    "digest": "sha256:b20b13054a5938a90b964855f9c8de94feb146045f85c04df7998cda81819133",
+    "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/validation.validate-luhn-1.0.0/validate-luhn-agent.wasm"
+  }
+}

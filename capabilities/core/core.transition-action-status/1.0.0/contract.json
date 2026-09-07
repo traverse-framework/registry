@@ -1,0 +1,183 @@
+{
+  "artifact": {
+    "digest": "sha256:8cd134034e97b86c9a18def9db74f3d2b676b2334b22b3d17b1d498e3a70ea48",
+    "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/core.transition-action-status-1.0.0/core-transition-action-status.wasm"
+  },
+  "connector_requirements": [],
+  "consumes": [],
+  "dependencies": [],
+  "description": "Pure state-machine capability for Loop action items. Validates that a requested status change is legal given the current status and a caller-supplied transition policy, then returns the new status plus audit metadata.\n\nConfiguration defines allowed transitions and whether only the owner may perform them. The capability never mutates external state — callers apply the returned decision.\n\nCouncil/product alignment note: workflows declare a `snoozed` status for follow-through; this contract includes `snoozed` in the status enum and default transition examples so WF3/WF4 compose without a silent schema gap.",
+  "emits": [],
+  "event_trigger": null,
+  "evidence": [],
+  "execution": {
+    "binary_format": "wasm",
+    "constraints": {
+      "filesystem_access": "none",
+      "host_api_access": "none",
+      "network_access": "forbidden"
+    },
+    "entrypoint": {
+      "command": "run",
+      "kind": "wasi-command"
+    },
+    "preferred_targets": [
+      "local",
+      "edge",
+      "browser"
+    ]
+  },
+  "id": "core.transition-action-status",
+  "inputs": {
+    "schema": {
+      "additionalProperties": false,
+      "properties": {
+        "actor_id": {
+          "type": "string"
+        },
+        "current_status": {
+          "enum": [
+            "open",
+            "in_progress",
+            "blocked",
+            "snoozed",
+            "done",
+            "cancelled"
+          ],
+          "type": "string"
+        },
+        "owner_id": {
+          "type": "string"
+        },
+        "requested_status": {
+          "enum": [
+            "open",
+            "in_progress",
+            "blocked",
+            "snoozed",
+            "done",
+            "cancelled"
+          ],
+          "type": "string"
+        },
+        "transition_config": {
+          "properties": {
+            "allowed_transitions": {
+              "type": "object"
+            },
+            "owner_only": {
+              "default": true,
+              "type": "boolean"
+            },
+            "version": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "version",
+            "allowed_transitions"
+          ],
+          "type": "object"
+        }
+      },
+      "required": [
+        "current_status",
+        "requested_status",
+        "actor_id",
+        "transition_config"
+      ],
+      "type": "object"
+    }
+  },
+  "kind": "capability_contract",
+  "lifecycle": "active",
+  "name": "transition-action-status",
+  "namespace": "core",
+  "outputs": {
+    "schema": {
+      "additionalProperties": false,
+      "properties": {
+        "allowed": {
+          "type": "boolean"
+        },
+        "evaluation_trace": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "new_status": {
+          "type": "string"
+        },
+        "reason_code": {
+          "enum": [
+            "ok",
+            "illegal_transition",
+            "not_owner",
+            "invalid_status"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "allowed",
+        "new_status",
+        "reason_code"
+      ],
+      "type": "object"
+    }
+  },
+  "owner": {
+    "contact": "founders@loop.dev",
+    "team": "loop"
+  },
+  "permissions": [
+    {
+      "id": "core.transition-action-status"
+    }
+  ],
+  "permitted_targets": [
+    "local",
+    "edge",
+    "browser",
+    "cloud"
+  ],
+  "policies": [
+    {
+      "id": "fail-closed"
+    }
+  ],
+  "postconditions": [
+    {
+      "description": "Identical inputs produce identical outputs",
+      "id": "deterministic"
+    }
+  ],
+  "preconditions": [
+    {
+      "description": "current and requested status must be known values",
+      "id": "statuses-valid"
+    }
+  ],
+  "provenance": {
+    "adr_refs": [
+      "persona-council-review-2026-08-08"
+    ],
+    "author": "loop-founders + traverse-capability-author",
+    "created_at": "2026-08-08T06:00:00Z",
+    "exception_refs": [],
+    "source": "ai-assisted",
+    "spec_ref": "core.transition-action-status@1.0.0"
+  },
+  "schema_version": "1.0.0",
+  "service_type": "stateless",
+  "side_effects": [
+    {
+      "description": "Pure state machine evaluation",
+      "kind": "memory_only"
+    }
+  ],
+  "state_schema": null,
+  "summary": "Deterministic state machine for action item status transitions (open → in_progress → blocked → snoozed → done / cancelled).",
+  "version": "1.0.0"
+}

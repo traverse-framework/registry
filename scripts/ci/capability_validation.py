@@ -1,0 +1,1527 @@
+#!/usr/bin/env python3
+"""Deterministic capability validation gate.
+
+Implements specs/002-capability-validation/spec.md FR-001 through FR-005.
+Walks capabilities/**/contract.json, validates schema/path/semver, checks
+namespace-collision-safe immutability (no PR may modify an existing
+contract.json), and checks yank records (specs/005-yank-deprecation)
+never accompany a modified contract.json. Also enforces the finalized
+owner/namespace/scope field shapes from specs/006-public-scope-and-identity
+FR-002 through FR-004.
+
+Also enforces specs/001-registry-foundation FR-011 (amended, decision-log
+entry 46, registry#140): a newly-published use_cases[].scenario must be a
+full user story, not a plain declarative sentence. Diff-based (only checks
+contract.json files newly ADDED in a PR, via git diff) rather than run
+against the whole historical tree -- older, already-published, immutable
+versions predate this requirement and can never be edited to match it, so
+checking them unconditionally would fail permanently and forever. See
+check_new_scenario_format's docstring for the concrete incident that
+confirmed this.
+
+Also enforces that a contract's service_type, if present, is one of the
+three values traverse-framework/traverse's spec 014-service-type-taxonomy
+defines (stateless/subscribable/stateful) -- a closed enum registry does
+not own, validated whole-tree since every already-published contract
+already conforms.
+
+Also enforces specs/017-persona-registry (decision-log entry 53): every
+personas/<id>/<version>/persona.json must carry the required fields
+(including a non-empty distinguished_from list, once more than one persona
+is registered), every distinguished_from reference must resolve to a real
+persona id, and every use_cases[] entry in a newly-ADDED contract.json must
+carry a persona_ref resolving to a real, registered persona. Persona shape
+and distinguished_from resolution run unconditionally (whole-tree) since
+that schema was correct from this spec's very first persona -- only the
+persona_ref-on-use_cases requirement is diff-based, for the same reason the
+scenario-format check is: older contract.json versions predate the field
+and can never be edited to add it.
+
+Also enforces traverse-framework/traverse Spec 102-contract-surface-coverage
+FR-001 (registry#192): when a newly-ADDED contract.json declares
+inputs.schema.properties.action.enum, every enum value must appear as
+use_cases[].input_example.action for at least one use case. Diff-based for
+the same immutability reason as scenario/persona_ref checks.
+
+Also enforces specs/001-registry-foundation FR-011 (amended, decision-log
+entry 55 / traverse Decision 58 / Spec 102 v1.1, registry#215): every newly
+ADDED or CHANGED contract.json MUST carry a non-empty use_cases array that
+covers the declared schema surface -- every string enum under
+inputs.schema.properties (recursive), every top-level
+inputs.schema.required property, and every outputs.schema
+reason_code/status string enum value. Diff-based so already-published
+immutable versions that predate (or were stripped of) use_cases are never
+re-judged; correcting them requires an honesty patch-bump (new version).
+
+Also enforces Spec 534 FR-020 inventory completeness (registry#170/#253):
+every published capability ID under capabilities/*/*/*/contract.json MUST have
+a classification entry in contracts/governance/ecca-capability-inventory.json.
+Whole-tree — silent skips/drift are prohibited.
+
+Also enforces specs/001-registry-foundation FR-007 and
+specs/007-artifact-hosting FR-001 (registry#187): a newly-ADDED
+contract.json MUST include artifact.digest (sha256:…) and artifact.url
+pointing at this repo's artifacts/<tag>/<asset> GitHub Release download
+URL. Diff-based so already-published immutable versions that predate (or
+were broken by) this requirement are never re-judged -- the same reason
+scenario/persona_ref checks are diff-based. The index builder already
+hard-fails active contracts missing these fields; this gate blocks the
+unusable publish at PR time instead.
+
+Also enforces specs/018-capability-test-coverage FR-001 through FR-003
+(registry#301/#302, decision-log entry 64): a newly-ADDED contract.json
+MUST have a corresponding capability-src/<id-with-dots-as-dashes>/
+crate whose test suite, measured via `cargo llvm-cov --summary-only
+--json`, achieves functions.percent == 100.0 and lines.percent >= 95.0
+and regions.percent >= 95.0. Diff-based for the same immutability
+reason as every other new-contract check above -- already-published
+capabilities (including 18 with no capability-src/ at all, and 15 more
+below this bar) are tracked separately, not retroactively judged.
+
+Also enforces specs/007-artifact-hosting's amendment (registry#331/#333,
+decision-log entries 74/75): every capabilities/**/signature.json that
+exists has the right shape (ed25519 scheme, 32-byte hex public key,
+64-byte hex signature, null sigstore_bundle_ref) and is never modified
+once written (FR-012, wired into check_immutability). Signature
+*completeness* -- FR-007, every non-deprecated artifact-bearing version
+having one -- is advisory until capabilities/.signatures-enforced is
+committed by the backfill (registry#335), since the CI signing job
+(registry#334) writes these post-merge and pre-backfill history has none.
+"""
+
+import json
+import os
+import re
+import subprocess
+import sys
+from pathlib import Path
+
+SEMVER_RE = re.compile(
+    r"^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)"
+    r"(?:-((?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)"
+    r"(?:\.(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?"
+    r"(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?$"
+)
+
+# specs/007-artifact-hosting: assets live under this repo's
+# artifacts/<id>-<version> (or artifacts/<namespace>.<id>-<version>)
+# GitHub Release tags. Allowed host is this registry only -- consumers
+# must not depend on another repo's release hygiene for immutability.
+ARTIFACT_RELEASE_URL_RE = re.compile(
+    r"^https://github\.com/traverse-framework/registry/releases/download/"
+    r"artifacts/[^/]+/[^/]+$"
+)
+
+REQUIRED_FIELDS = ["id", "namespace", "owner", "version"]
+
+# traverse-framework/traverse spec 014-service-type-taxonomy (external,
+# authoritative -- this is a closed enum registry does not own or extend).
+# Safe to validate whole-tree, unlike use_cases[].scenario/persona_ref:
+# every one of the 61 already-published contracts (current and historical)
+# already uses one of these three values, confirmed by inspection before
+# adding this check, so there is no legacy-incompatibility risk.
+KNOWN_SERVICE_TYPES = {"stateless", "subscribable", "stateful"}
+
+
+def fail(errors, code, path, message):
+    errors.append({"code": code, "path": path, "message": message})
+
+
+def is_user_story_scenario(scenario) -> bool:
+    """spec 001 FR-011 (amended, decision-log entry 46): a use_cases[]
+    scenario must be a full user story -- "As a <persona>, I want to
+    <action>, so that <benefit>." -- not a plain declarative sentence.
+    Deliberately permissive (substring presence + order, not a rigid
+    regex): real scenario prose varies in wording/punctuation around these
+    three clauses, and a strict pattern would false-positive on a
+    legitimately-phrased story."""
+    if not isinstance(scenario, str):
+        return False
+    lowered = scenario.lower()
+    as_a_index = lowered.find("as a")
+    if as_a_index == -1:
+        return False
+    i_want_index = lowered.find("i want", as_a_index)
+    if i_want_index == -1:
+        return False
+    so_that_index = lowered.find("so that", i_want_index)
+    return so_that_index != -1
+
+
+def validate_contract(path: Path, errors: list) -> None:
+    try:
+        contract = json.loads(path.read_text())
+    except Exception as exc:
+        fail(errors, "contract.invalid_json", str(path), f"Unable to parse JSON: {exc}")
+        return
+
+    for field in REQUIRED_FIELDS:
+        if field not in contract:
+            fail(
+                errors,
+                "contract.missing_required_field",
+                str(path),
+                f"Missing required field '{field}'",
+            )
+
+    # path is capabilities/<namespace>/<id>/<version>/contract.json
+    parts = path.parts
+    try:
+        idx = parts.index("capabilities")
+        namespace_seg, id_seg, version_seg = parts[idx + 1], parts[idx + 2], parts[idx + 3]
+    except (ValueError, IndexError):
+        fail(errors, "contract.bad_path", str(path), "Path does not match capabilities/<namespace>/<id>/<version>/contract.json")
+        return
+
+    namespace = contract.get("namespace")
+    if namespace is not None and (not isinstance(namespace, str) or not namespace.strip()):
+        fail(
+            errors,
+            "contract.invalid_namespace",
+            str(path),
+            "namespace must be a non-empty string (spec 006 FR-002)",
+        )
+    elif namespace and namespace != namespace_seg:
+        fail(
+            errors,
+            "contract.namespace_mismatch",
+            str(path),
+            f"contract.json namespace '{namespace}' does not match path segment '{namespace_seg}'",
+        )
+
+    owner = contract.get("owner")
+    if owner is not None and (
+        not isinstance(owner, dict) or not isinstance(owner.get("team"), str) or not owner.get("team").strip()
+    ):
+        fail(
+            errors,
+            "contract.invalid_owner",
+            str(path),
+            "owner must be an object with a non-empty 'team' string (spec 006 FR-003)",
+        )
+
+    if "scope" in contract:
+        fail(
+            errors,
+            "contract.forbidden_scope_field",
+            str(path),
+            "contract.json must not declare a top-level 'scope' field -- resolution tier is a "
+            "consumer-side concept, not part of a published record (spec 006 FR-004)",
+        )
+
+    service_type = contract.get("service_type")
+    if service_type is not None and service_type not in KNOWN_SERVICE_TYPES:
+        fail(
+            errors,
+            "contract.invalid_service_type",
+            str(path),
+            f"service_type '{service_type}' is not one of {sorted(KNOWN_SERVICE_TYPES)} "
+            "(traverse-framework/traverse spec 014-service-type-taxonomy)",
+        )
+
+    if contract.get("id") and contract.get("id") != id_seg:
+        fail(
+            errors,
+            "contract.id_mismatch",
+            str(path),
+            f"contract.json id '{contract.get('id')}' does not match path segment '{id_seg}'",
+        )
+
+    version = contract.get("version")
+    if version and version != version_seg:
+        fail(
+            errors,
+            "contract.version_mismatch",
+            str(path),
+            f"contract.json version '{version}' does not match path segment '{version_seg}'",
+        )
+
+    if version and not SEMVER_RE.match(version):
+        fail(errors, "contract.invalid_semver", str(path), f"'{version}' is not a valid semver string")
+
+    artifact = contract.get("artifact")
+    if artifact is not None:
+        if not isinstance(artifact, dict) or "digest" not in artifact or "url" not in artifact:
+            fail(
+                errors,
+                "contract.invalid_artifact_reference",
+                str(path),
+                "artifact reference must include 'digest' and 'url'",
+            )
+        elif not str(artifact["digest"]).startswith("sha256:"):
+            fail(errors, "contract.invalid_digest_format", str(path), "artifact digest must be a 'sha256:' prefixed value")
+
+
+def check_new_scenario_format(path: Path, errors: list) -> None:
+    """spec 001 FR-011 (amended, decision-log entry 46): a use_cases[]
+    scenario must be a full user story. Deliberately NOT called from
+    validate_contract, which runs unconditionally on every contract.json in
+    the tree, including every already-published, immutable older version --
+    those can never be edited to match a format introduced after they were
+    published, so checking them here would fail permanently and forever
+    (confirmed empirically: running this against the full pre-#139 tree
+    failed on 20 historical versions with no way to ever fix them). Wired
+    into main() as a diff-based check instead, the same way
+    check_immutability only looks at what a PR actually adds -- see
+    check_new_scenarios_are_user_stories below."""
+    try:
+        contract = json.loads(path.read_text())
+    except Exception:
+        return
+    use_cases = contract.get("use_cases")
+    if not isinstance(use_cases, list):
+        return
+    for index, use_case in enumerate(use_cases):
+        scenario = use_case.get("scenario") if isinstance(use_case, dict) else None
+        if not is_user_story_scenario(scenario):
+            fail(
+                errors,
+                "contract.scenario_not_user_story",
+                str(path),
+                f"use_cases[{index}].scenario must be a full user story "
+                "('As a <persona>, I want to <action>, so that <benefit>.'), "
+                f"not a plain declarative sentence (spec 001 FR-011): {scenario!r}",
+            )
+
+
+def check_new_scenarios_are_user_stories(base_sha: str, head_sha: str, errors: list) -> None:
+    """Only validates newly-ADDED contract.json files in this PR's diff --
+    see check_new_scenario_format's docstring for why this must not run
+    against the whole historical tree."""
+    diff = subprocess.check_output(
+        ["git", "diff", "--name-status", f"{base_sha}...{head_sha}", "--", "capabilities/"],
+        text=True,
+    )
+    for line in diff.splitlines():
+        if not line.strip():
+            continue
+        parts = line.split("\t")
+        status, path = parts[0], parts[-1]
+        if status == "A" and path.endswith("contract.json"):
+            check_new_scenario_format(Path(path), errors)
+
+
+PERSONA_REQUIRED_FIELDS = ["id", "version", "name", "summary", "description", "distinguished_from"]
+
+
+def validate_persona(path: Path, errors: list) -> None:
+    """spec 017-persona-registry FR-001/FR-002/FR-003: a persona.json must
+    carry the required fields, its id/version must match its path, and its
+    distinguished_from entries must be well-formed. Runs unconditionally
+    (whole-tree, unlike the diff-based use_cases[].persona_ref check) --
+    this schema is correct for every persona from the spec's first version,
+    so there is no historical-content problem to guard against here."""
+    try:
+        persona = json.loads(path.read_text())
+    except Exception as exc:
+        fail(errors, "persona.invalid_json", str(path), f"Unable to parse JSON: {exc}")
+        return
+
+    for field in PERSONA_REQUIRED_FIELDS:
+        if field not in persona:
+            fail(errors, "persona.missing_required_field", str(path), f"Missing required field '{field}'")
+
+    # path is personas/<persona-id>/<version>/persona.json
+    parts = path.parts
+    try:
+        idx = parts.index("personas")
+        id_seg, version_seg = parts[idx + 1], parts[idx + 2]
+    except (ValueError, IndexError):
+        fail(errors, "persona.bad_path", str(path), "Path does not match personas/<persona-id>/<version>/persona.json")
+        return
+
+    if persona.get("id") and persona.get("id") != id_seg:
+        fail(errors, "persona.id_mismatch", str(path), f"persona.json id '{persona.get('id')}' does not match path segment '{id_seg}'")
+
+    version = persona.get("version")
+    if version and version != version_seg:
+        fail(errors, "persona.version_mismatch", str(path), f"persona.json version '{version}' does not match path segment '{version_seg}'")
+    if version and not SEMVER_RE.match(version):
+        fail(errors, "persona.invalid_semver", str(path), f"'{version}' is not a valid semver string")
+
+    distinguished_from = persona.get("distinguished_from")
+    if distinguished_from is not None:
+        if not isinstance(distinguished_from, list):
+            fail(errors, "persona.invalid_distinguished_from", str(path), "distinguished_from must be an array")
+        else:
+            for index, entry in enumerate(distinguished_from):
+                if not isinstance(entry, dict) or not entry.get("persona_id") or not entry.get("how"):
+                    fail(
+                        errors,
+                        "persona.invalid_distinguished_from_entry",
+                        str(path),
+                        f"distinguished_from[{index}] must be an object with non-empty 'persona_id' and 'how'",
+                    )
+
+
+def collect_registered_persona_ids(personas_dir: Path) -> set:
+    ids = set()
+    for persona_path in sorted(personas_dir.rglob("persona.json")):
+        try:
+            persona = json.loads(persona_path.read_text())
+        except Exception:
+            continue
+        if persona.get("id"):
+            ids.add(persona["id"])
+    return ids
+
+
+def check_persona_distinguished_from_resolves(errors: list) -> None:
+    """spec 017-persona-registry FR-002/FR-006: distinguished_from must be
+    non-empty whenever another persona is registered, and every reference
+    in it must resolve to a real persona id."""
+    personas_dir = Path("personas")
+    if not personas_dir.is_dir():
+        return
+
+    persona_ids = collect_registered_persona_ids(personas_dir)
+
+    for persona_path in sorted(personas_dir.rglob("persona.json")):
+        try:
+            persona = json.loads(persona_path.read_text())
+        except Exception:
+            continue
+        own_id = persona.get("id")
+        distinguished_from = persona.get("distinguished_from")
+        if not isinstance(distinguished_from, list):
+            continue
+
+        if not distinguished_from and len(persona_ids) > 1:
+            fail(
+                errors,
+                "persona.empty_distinguished_from",
+                str(persona_path),
+                f"distinguished_from must be non-empty -- {len(persona_ids) - 1} other persona(s) are registered",
+            )
+
+        for entry in distinguished_from:
+            if not isinstance(entry, dict):
+                continue
+            ref = entry.get("persona_id")
+            if ref and ref not in persona_ids:
+                fail(
+                    errors,
+                    "persona.distinguished_from_unresolvable",
+                    str(persona_path),
+                    f"distinguished_from references unknown persona id '{ref}'",
+                )
+            if ref == own_id:
+                fail(
+                    errors,
+                    "persona.distinguished_from_self_reference",
+                    str(persona_path),
+                    "distinguished_from must not reference its own persona id",
+                )
+
+
+def check_new_use_case_persona_ref(path: Path, errors: list, persona_ids: set) -> None:
+    """spec 017-persona-registry FR-004/FR-005: a newly-added contract.json's
+    use_cases[] entries must each carry a persona_ref resolving to a real,
+    registered persona. Deliberately NOT called from validate_contract for
+    the same reason check_new_scenario_format isn't: already-published,
+    immutable older versions predate this field and can never be edited to
+    add it."""
+    try:
+        contract = json.loads(path.read_text())
+    except Exception:
+        return
+    use_cases = contract.get("use_cases")
+    if not isinstance(use_cases, list):
+        return
+    for index, use_case in enumerate(use_cases):
+        persona_ref = use_case.get("persona_ref") if isinstance(use_case, dict) else None
+        if not persona_ref:
+            fail(
+                errors,
+                "contract.use_case_missing_persona_ref",
+                str(path),
+                f"use_cases[{index}] is missing persona_ref (spec 017-persona-registry FR-004)",
+            )
+        elif persona_ref not in persona_ids:
+            fail(
+                errors,
+                "contract.use_case_persona_ref_unresolvable",
+                str(path),
+                f"use_cases[{index}].persona_ref '{persona_ref}' does not resolve to a registered persona (spec 017-persona-registry FR-005)",
+            )
+
+
+def check_new_use_cases_have_persona_ref(base_sha: str, head_sha: str, errors: list) -> None:
+    """Only validates newly-ADDED contract.json files in this PR's diff --
+    see check_new_use_case_persona_ref's docstring for why this must not run
+    against the whole historical tree."""
+    persona_ids = collect_registered_persona_ids(Path("personas"))
+    diff = subprocess.check_output(
+        ["git", "diff", "--name-status", f"{base_sha}...{head_sha}", "--", "capabilities/"],
+        text=True,
+    )
+    for line in diff.splitlines():
+        if not line.strip():
+            continue
+        parts = line.split("\t")
+        status, path = parts[0], parts[-1]
+        if status == "A" and path.endswith("contract.json"):
+            check_new_use_case_persona_ref(Path(path), errors, persona_ids)
+
+
+def check_new_action_enum_covered_by_use_cases(path: Path, errors: list) -> None:
+    """traverse Spec 102-contract-surface-coverage FR-001 / registry#192:
+    every inputs.schema.properties.action.enum value on a newly-added
+    contract.json must appear in some use_cases[].input_example.action.
+    Skip when action.enum is absent (capabilities without that discriminator).
+    """
+    try:
+        contract = json.loads(path.read_text())
+    except Exception:
+        return
+    action_schema = (
+        contract.get("inputs", {})
+        .get("schema", {})
+        .get("properties", {})
+        .get("action")
+    )
+    if not isinstance(action_schema, dict):
+        return
+    enum_values = action_schema.get("enum")
+    if not isinstance(enum_values, list) or not enum_values:
+        return
+    declared = []
+    for value in enum_values:
+        if not isinstance(value, str):
+            fail(
+                errors,
+                "contract.action_enum_non_string",
+                str(path),
+                "inputs.schema.properties.action.enum must contain only strings (spec 102 FR-001)",
+            )
+            return
+        declared.append(value)
+    use_cases = contract.get("use_cases")
+    covered = set()
+    if isinstance(use_cases, list):
+        for use_case in use_cases:
+            if not isinstance(use_case, dict):
+                continue
+            input_example = use_case.get("input_example")
+            if isinstance(input_example, dict):
+                action = input_example.get("action")
+                if isinstance(action, str):
+                    covered.add(action)
+    uncovered = [action for action in declared if action not in covered]
+    if uncovered:
+        fail(
+            errors,
+            "contract.action_enum_uncovered_by_use_cases",
+            str(path),
+            "inputs.schema.properties.action.enum values lack covering use_cases: "
+            + ", ".join(uncovered)
+            + " (traverse Spec 102-contract-surface-coverage FR-001)",
+        )
+
+
+def check_new_contracts_action_enum_coverage(base_sha: str, head_sha: str, errors: list) -> None:
+    """Only validates newly-ADDED contract.json files in this PR's diff --
+    older immutable publishes may predate Spec 102 coverage."""
+    diff = subprocess.check_output(
+        ["git", "diff", "--name-status", f"{base_sha}...{head_sha}", "--", "capabilities/"],
+        text=True,
+    )
+    for line in diff.splitlines():
+        if not line.strip():
+            continue
+        parts = line.split("\t")
+        status, path = parts[0], parts[-1]
+        if status == "A" and path.endswith("contract.json"):
+            check_new_action_enum_covered_by_use_cases(Path(path), errors)
+
+
+def _collect_string_enums(schema_node: dict, path_prefix: tuple) -> list:
+    """Collect (path_tuple, [string enum values]) under a JSON Schema node.
+
+    Recurses through properties and through items.properties for array
+    object schemas. Array segments are marked with the literal '[]' so
+    example lookup can expand list elements at that path.
+    """
+    found = []
+    if not isinstance(schema_node, dict):
+        return found
+    properties = schema_node.get("properties")
+    if not isinstance(properties, dict):
+        return found
+    for name, prop_schema in properties.items():
+        if not isinstance(prop_schema, dict):
+            continue
+        path = path_prefix + (name,)
+        enum_values = prop_schema.get("enum")
+        if isinstance(enum_values, list):
+            strings = [value for value in enum_values if isinstance(value, str)]
+            if strings:
+                found.append((path, strings))
+        if isinstance(prop_schema.get("properties"), dict):
+            found.extend(_collect_string_enums(prop_schema, path))
+        items = prop_schema.get("items")
+        if isinstance(items, dict) and isinstance(items.get("properties"), dict):
+            found.extend(_collect_string_enums(items, path + ("[]",)))
+    return found
+
+
+def _example_values_at_path(example, path: tuple) -> list:
+    """Return concrete values found at path in an example object, expanding arrays."""
+    current = [example]
+    for segment in path:
+        next_current = []
+        for node in current:
+            if segment == "[]":
+                if isinstance(node, list):
+                    next_current.extend(node)
+                continue
+            if isinstance(node, dict) and segment in node:
+                next_current.append(node[segment])
+        current = next_current
+    return current
+
+
+def check_new_use_cases_surface_coverage(path: Path, errors: list) -> None:
+    """spec 001 FR-011 (decision-log entry 55) / traverse Spec 102 FR-001–FR-004:
+    a newly ADDED or CHANGED contract.json must have non-empty use_cases that
+    cover input string enums (recursive), top-level required input properties,
+    and output reason_code/status string enums.
+    """
+    try:
+        contract = json.loads(path.read_text())
+    except Exception:
+        return
+
+    use_cases = contract.get("use_cases")
+    if not isinstance(use_cases, list) or not use_cases:
+        fail(
+            errors,
+            "contract.missing_use_cases",
+            str(path),
+            "newly ADDED/CHANGED contract.json must include a non-empty "
+            "use_cases array covering the declared schema surface "
+            "(spec 001 FR-011 / traverse Spec 102-contract-surface-coverage FR-004)",
+        )
+        return
+
+    input_examples = []
+    output_examples = []
+    for use_case in use_cases:
+        if not isinstance(use_case, dict):
+            continue
+        input_example = use_case.get("input_example")
+        if isinstance(input_example, dict):
+            input_examples.append(input_example)
+        output_example = use_case.get("output_example")
+        if isinstance(output_example, dict):
+            output_examples.append(output_example)
+
+    input_schema = contract.get("inputs", {}).get("schema")
+    if isinstance(input_schema, dict):
+        for enum_path, enum_values in _collect_string_enums(input_schema, ()):
+            covered = set()
+            for example in input_examples:
+                for value in _example_values_at_path(example, enum_path):
+                    if isinstance(value, str):
+                        covered.add(value)
+            uncovered = [value for value in enum_values if value not in covered]
+            if uncovered:
+                path_label = ".".join(enum_path)
+                fail(
+                    errors,
+                    "contract.input_enum_uncovered_by_use_cases",
+                    str(path),
+                    f"inputs.schema property '{path_label}' enum values lack "
+                    "covering use_cases[].input_example: "
+                    + ", ".join(uncovered)
+                    + " (traverse Spec 102-contract-surface-coverage FR-001)",
+                )
+
+        required = input_schema.get("required")
+        if isinstance(required, list):
+            missing_required = []
+            for prop_name in required:
+                if not isinstance(prop_name, str):
+                    continue
+                covered = False
+                for example in input_examples:
+                    if prop_name in example and example[prop_name] is not None:
+                        covered = True
+                        break
+                if not covered:
+                    missing_required.append(prop_name)
+            if missing_required:
+                fail(
+                    errors,
+                    "contract.required_input_uncovered_by_use_cases",
+                    str(path),
+                    "inputs.schema.required properties lack covering "
+                    "use_cases[].input_example: "
+                    + ", ".join(missing_required)
+                    + " (traverse Spec 102-contract-surface-coverage FR-002)",
+                )
+
+    output_properties = (
+        contract.get("outputs", {})
+        .get("schema", {})
+        .get("properties")
+    )
+    if isinstance(output_properties, dict):
+        for field_name in ("reason_code", "status"):
+            field_schema = output_properties.get(field_name)
+            if not isinstance(field_schema, dict):
+                continue
+            enum_values = field_schema.get("enum")
+            if not isinstance(enum_values, list):
+                continue
+            declared = [value for value in enum_values if isinstance(value, str)]
+            if not declared:
+                continue
+            covered = set()
+            for example in output_examples:
+                value = example.get(field_name)
+                if isinstance(value, str):
+                    covered.add(value)
+            uncovered = [value for value in declared if value not in covered]
+            if uncovered:
+                fail(
+                    errors,
+                    "contract.output_enum_uncovered_by_use_cases",
+                    str(path),
+                    f"outputs.schema.properties.{field_name}.enum values lack "
+                    "covering use_cases[].output_example: "
+                    + ", ".join(uncovered)
+                    + " (traverse Spec 102-contract-surface-coverage FR-003)",
+                )
+
+
+def check_new_contracts_use_cases_surface_coverage(base_sha: str, head_sha: str, errors: list) -> None:
+    """Only validates newly ADDED or CHANGED contract.json files in this PR's
+    diff -- older immutable publishes may predate Spec 102 / FR-011 surface
+    coverage (decision-log entry 55)."""
+    diff = subprocess.check_output(
+        ["git", "diff", "--name-status", f"{base_sha}...{head_sha}", "--", "capabilities/"],
+        text=True,
+    )
+    for line in diff.splitlines():
+        if not line.strip():
+            continue
+        parts = line.split("\t")
+        status, path = parts[0], parts[-1]
+        if path.endswith("contract.json") and (status == "A" or status.startswith("M")):
+            check_new_use_cases_surface_coverage(Path(path), errors)
+
+
+def check_new_contract_artifact_reference(path: Path, errors: list) -> None:
+    """spec 001 FR-007 / spec 007 FR-001 / registry#187: a newly-added
+    contract.json must carry a fetchable artifact reference. Deliberately
+    NOT called from validate_contract (whole-tree): two already-published
+    deprecated versions lack artifact after traverse-cli stripped the field
+    (traverse#859), and contracts are immutable, so checking the historical
+    tree would fail permanently. Wired into main() as a diff-based check.
+    """
+    try:
+        contract = json.loads(path.read_text())
+    except Exception:
+        return
+    artifact = contract.get("artifact")
+    if not isinstance(artifact, dict):
+        fail(
+            errors,
+            "contract.missing_artifact_reference",
+            str(path),
+            "newly-added contract.json must include artifact.digest and "
+            "artifact.url (spec 001 FR-007 / spec 007 FR-001); upload the "
+            "WASM under an artifacts/<id>-<version> release before opening "
+            "the contract PR (see traverse-framework/traverse#859 for the "
+            "CLI publish path that historically dropped these fields)",
+        )
+        return
+    digest = artifact.get("digest")
+    url = artifact.get("url")
+    if not digest or not url:
+        fail(
+            errors,
+            "contract.missing_artifact_reference",
+            str(path),
+            "newly-added contract.json artifact must include both "
+            "'digest' and 'url' (spec 001 FR-007 / spec 007 FR-001)",
+        )
+        return
+    if not str(digest).startswith("sha256:"):
+        fail(
+            errors,
+            "contract.invalid_digest_format",
+            str(path),
+            "artifact digest must be a 'sha256:' prefixed value",
+        )
+    if not ARTIFACT_RELEASE_URL_RE.match(str(url)):
+        fail(
+            errors,
+            "contract.invalid_artifact_url",
+            str(path),
+            "artifact.url must be a GitHub Release asset under "
+            "https://github.com/traverse-framework/registry/releases/download/"
+            "artifacts/<tag>/<asset> (spec 007-artifact-hosting)",
+        )
+
+
+def check_new_contracts_have_artifact_reference(base_sha: str, head_sha: str, errors: list) -> None:
+    """Only validates newly-ADDED contract.json files in this PR's diff --
+    see check_new_contract_artifact_reference's docstring for why this must
+    not run against the whole historical tree."""
+    diff = subprocess.check_output(
+        ["git", "diff", "--name-status", f"{base_sha}...{head_sha}", "--", "capabilities/"],
+        text=True,
+    )
+    for line in diff.splitlines():
+        if not line.strip():
+            continue
+        parts = line.split("\t")
+        status, path = parts[0], parts[-1]
+        if status == "A" and path.endswith("contract.json"):
+            check_new_contract_artifact_reference(Path(path), errors)
+
+
+COVERAGE_MIN_FUNCTIONS_PERCENT = 100.0
+COVERAGE_MIN_LINES_PERCENT = 95.0
+COVERAGE_MIN_REGIONS_PERCENT = 95.0
+
+
+def expected_capability_src_crate(capability_id: str) -> str:
+    """specs/018-capability-test-coverage FR-001: the canonical, deterministic
+    crate name for any capability published after this spec -- no hand-
+    maintained id-to-crate mapping needed going forward (unlike the legacy,
+    inconsistently-named crates gather_catalog_data.py's CURRENT_CRATE_FOR_ID
+    still tracks explicitly)."""
+    return capability_id.replace(".", "-")
+
+
+def check_new_contract_test_coverage(path: Path, errors: list) -> None:
+    """specs/018-capability-test-coverage FR-001 through FR-003: a newly-added
+    contract.json must have a capability-src/<crate>/ whose test suite
+    measures functions=100%, lines/regions>=95% via `cargo llvm-cov`. Not
+    called from validate_contract (whole-tree): 18 already-published
+    capabilities have no capability-src/ at all (registry#302) and 15 more
+    are below this bar (registry#301) -- diff-based, wired into main() like
+    every other new-contract check, so already-published capabilities are
+    never retroactively judged."""
+    try:
+        contract = json.loads(path.read_text())
+    except Exception:
+        return
+    capability_id = contract.get("id")
+    if not isinstance(capability_id, str) or not capability_id.strip():
+        return
+
+    crate_dir = Path("capability-src") / expected_capability_src_crate(capability_id)
+    manifest_path = crate_dir / "Cargo.toml"
+    if not manifest_path.is_file():
+        fail(
+            errors,
+            "capability.missing_test_coverage_source",
+            str(path),
+            f"newly-published capability '{capability_id}' has no "
+            f"{manifest_path} -- specs/018-capability-test-coverage requires "
+            "real Rust source with measured test coverage for every new "
+            "capability, internal or external (no attestation-only path)",
+        )
+        return
+
+    try:
+        result = subprocess.run(
+            [
+                "cargo",
+                "llvm-cov",
+                "--quiet",
+                "--json",
+                "--summary-only",
+                "--manifest-path",
+                str(manifest_path),
+            ],
+            capture_output=True,
+            text=True,
+            timeout=300,
+        )
+    except Exception as exc:
+        fail(
+            errors,
+            "capability.test_coverage_measurement_failed",
+            str(path),
+            f"unable to run cargo llvm-cov for '{capability_id}': {exc}",
+        )
+        return
+
+    if result.returncode != 0:
+        fail(
+            errors,
+            "capability.test_coverage_build_or_test_failed",
+            str(path),
+            f"cargo llvm-cov failed for '{capability_id}' "
+            f"({manifest_path}): {result.stderr.strip()[-2000:]}",
+        )
+        return
+
+    try:
+        totals = json.loads(result.stdout)["data"][0]["totals"]
+        functions_pct = totals["functions"]["percent"]
+        lines_pct = totals["lines"]["percent"]
+        regions_pct = totals["regions"]["percent"]
+    except Exception as exc:
+        fail(
+            errors,
+            "capability.test_coverage_report_unparseable",
+            str(path),
+            f"unable to parse cargo llvm-cov output for '{capability_id}': {exc}",
+        )
+        return
+
+    if (
+        functions_pct < COVERAGE_MIN_FUNCTIONS_PERCENT
+        or lines_pct < COVERAGE_MIN_LINES_PERCENT
+        or regions_pct < COVERAGE_MIN_REGIONS_PERCENT
+    ):
+        fail(
+            errors,
+            "capability.insufficient_test_coverage",
+            str(path),
+            f"'{capability_id}' ({manifest_path}) measures "
+            f"functions={functions_pct:.2f}% (need =={COVERAGE_MIN_FUNCTIONS_PERCENT}%), "
+            f"lines={lines_pct:.2f}% (need >={COVERAGE_MIN_LINES_PERCENT}%), "
+            f"regions={regions_pct:.2f}% (need >={COVERAGE_MIN_REGIONS_PERCENT}%) "
+            "-- specs/018-capability-test-coverage FR-003",
+        )
+
+
+def check_new_contracts_have_test_coverage(base_sha: str, head_sha: str, errors: list) -> None:
+    """Only validates newly-ADDED contract.json files in this PR's diff --
+    see check_new_contract_test_coverage's docstring for why this must not
+    run against the whole historical tree."""
+    diff = subprocess.check_output(
+        ["git", "diff", "--name-status", f"{base_sha}...{head_sha}", "--", "capabilities/"],
+        text=True,
+    )
+    for line in diff.splitlines():
+        if not line.strip():
+            continue
+        parts = line.split("\t")
+        status, path = parts[0], parts[-1]
+        if status == "A" and path.endswith("contract.json"):
+            check_new_contract_test_coverage(Path(path), errors)
+
+
+def real_workflow_paths(workflows_dir: Path):
+    """Real, published workflow.json files only -- excludes
+    workflows/examples/, which holds demo/fixture content
+    (workflows/examples/expedition/plan-expedition/) that predates FR-013's
+    real workflows/<namespace>/<id>/<version>/ layout and doesn't follow it,
+    the same way capability_validation.py never walks examples/applications/."""
+    return sorted(p for p in workflows_dir.rglob("workflow.json") if "examples" not in p.parts)
+
+
+def validate_workflow(path: Path, errors: list) -> None:
+    """Workflow records are governed the same way capability records are
+    (spec 001 FR-013, referencing FR-001/FR-002): immutable versioned
+    directories, path-consistent identity, valid semver. Not every
+    capability-specific check applies -- a workflow.json has no `artifact`
+    or forbidden `scope` field -- so this validates the structural subset
+    that genuinely carries over, not a full duplicate of validate_contract.
+    """
+    try:
+        workflow = json.loads(path.read_text())
+    except Exception as exc:
+        fail(errors, "workflow.invalid_json", str(path), f"Unable to parse JSON: {exc}")
+        return
+
+    for field in ["id", "namespace", "owner", "version", "nodes", "edges", "start_node", "terminal_nodes"]:
+        if field not in workflow:
+            fail(errors, "workflow.missing_required_field", str(path), f"Missing required field '{field}'")
+
+    # path is workflows/<namespace>/<id>/<version>/workflow.json
+    parts = path.parts
+    try:
+        idx = parts.index("workflows")
+        namespace_seg, id_seg, version_seg = parts[idx + 1], parts[idx + 2], parts[idx + 3]
+    except (ValueError, IndexError):
+        fail(errors, "workflow.bad_path", str(path), "Path does not match workflows/<namespace>/<id>/<version>/workflow.json")
+        return
+
+    namespace = workflow.get("namespace")
+    if namespace and namespace != namespace_seg:
+        fail(
+            errors,
+            "workflow.namespace_mismatch",
+            str(path),
+            f"workflow.json namespace '{namespace}' does not match path segment '{namespace_seg}'",
+        )
+
+    if workflow.get("id") and workflow.get("id") != id_seg:
+        fail(errors, "workflow.id_mismatch", str(path), f"workflow.json id '{workflow.get('id')}' does not match path segment '{id_seg}'")
+
+    version = workflow.get("version")
+    if version and version != version_seg:
+        fail(errors, "workflow.version_mismatch", str(path), f"workflow.json version '{version}' does not match path segment '{version_seg}'")
+    if version and not SEMVER_RE.match(version):
+        fail(errors, "workflow.invalid_semver", str(path), f"'{version}' is not a valid semver string")
+
+
+
+def published_capability_ids(capabilities_dir: Path = Path("capabilities")) -> set:
+    """Unique capability IDs that have at least one published contract.json."""
+    ids: set = set()
+    if not capabilities_dir.is_dir():
+        return ids
+    for contract_path in capabilities_dir.rglob("contract.json"):
+        parts = contract_path.parts
+        try:
+            idx = parts.index("capabilities")
+            ids.add(parts[idx + 2])
+        except (ValueError, IndexError):
+            continue
+    return ids
+
+
+def check_ecca_capability_inventory_coverage(errors: list) -> None:
+    """Spec 534 FR-020 (registry#170/#253): inventory MUST classify every published
+    capability. Skipping or patching around this file is not allowed — CI fails
+    when coverage drifts."""
+    inventory_path = Path("contracts/governance/ecca-capability-inventory.json")
+    if not inventory_path.is_file():
+        fail(
+            errors,
+            "inventory.missing",
+            str(inventory_path),
+            "FR-020 inventory file is required and must not be skipped",
+        )
+        return
+
+    try:
+        inventory = json.loads(inventory_path.read_text())
+    except Exception as exc:
+        fail(
+            errors,
+            "inventory.invalid_json",
+            str(inventory_path),
+            f"Unable to parse inventory JSON: {exc}",
+        )
+        return
+
+    entries = inventory.get("capabilities")
+    if not isinstance(entries, list):
+        fail(
+            errors,
+            "inventory.invalid_shape",
+            str(inventory_path),
+            "inventory.capabilities must be an array",
+        )
+        return
+
+    inventoried: set = set()
+    for index, entry in enumerate(entries):
+        if not isinstance(entry, dict):
+            fail(
+                errors,
+                "inventory.invalid_entry",
+                str(inventory_path),
+                f"capabilities[{index}] must be an object",
+            )
+            continue
+        capability_id = entry.get("capability_id")
+        if not isinstance(capability_id, str) or not capability_id.strip():
+            fail(
+                errors,
+                "inventory.missing_capability_id",
+                str(inventory_path),
+                f"capabilities[{index}] missing capability_id",
+            )
+            continue
+        if capability_id in inventoried:
+            fail(
+                errors,
+                "inventory.duplicate_capability_id",
+                str(inventory_path),
+                f"duplicate inventory entry for '{capability_id}'",
+            )
+        inventoried.add(capability_id)
+
+        classification = entry.get("classification")
+        if classification not in {"no-event-required", "governed-event-declared"}:
+            fail(
+                errors,
+                "inventory.invalid_classification",
+                str(inventory_path),
+                f"'{capability_id}' classification must be "
+                "no-event-required or governed-event-declared",
+            )
+        evidence = entry.get("evidence")
+        if not isinstance(evidence, str) or not evidence.strip():
+            fail(
+                errors,
+                "inventory.missing_evidence",
+                str(inventory_path),
+                f"'{capability_id}' is missing evidence",
+            )
+        entry_path = entry.get("path")
+        if isinstance(entry_path, str) and entry_path and not Path(entry_path).is_file():
+            fail(
+                errors,
+                "inventory.path_missing",
+                str(inventory_path),
+                f"'{capability_id}' path '{entry_path}' does not exist",
+            )
+        if classification == "governed-event-declared":
+            product = entry.get("event_product") or {}
+            product_path = product.get("path") if isinstance(product, dict) else None
+            if not isinstance(product_path, str) or not product_path.strip():
+                fail(
+                    errors,
+                    "inventory.missing_event_product",
+                    str(inventory_path),
+                    f"'{capability_id}' governed-event-declared requires event_product.path",
+                )
+            elif not Path(product_path).is_file():
+                fail(
+                    errors,
+                    "inventory.event_product_missing",
+                    str(inventory_path),
+                    f"'{capability_id}' event_product.path '{product_path}' does not exist",
+                )
+
+    published = published_capability_ids()
+    missing = sorted(published - inventoried)
+    for capability_id in missing:
+        fail(
+            errors,
+            "inventory.unpublished_capability_unclassified",
+            str(inventory_path),
+            f"Published capability '{capability_id}' has no FR-020 inventory entry "
+            "(inventory write must not be skipped)",
+        )
+
+def check_workflow_capability_references(errors: list) -> None:
+    """A workflow's nodes must reference capability versions that actually
+    exist in this registry -- the workflow equivalent of
+    check_dependency_resolvability, applied to `nodes[].capability_id`/
+    `capability_version` instead of a capability's own `dependencies[]`."""
+    workflows_dir = Path("workflows")
+    capabilities_dir = Path("capabilities")
+    if not workflows_dir.is_dir():
+        return
+
+    published_versions: dict = {}
+    for contract_path in sorted(capabilities_dir.rglob("contract.json")):
+        try:
+            contract = json.loads(contract_path.read_text())
+        except Exception:
+            continue
+        published_versions.setdefault(contract.get("id"), set()).add(contract.get("version"))
+
+    for workflow_path in real_workflow_paths(workflows_dir):
+        try:
+            workflow = json.loads(workflow_path.read_text())
+        except Exception:
+            continue
+        for node in workflow.get("nodes", []) or []:
+            capability_id = node.get("capability_id")
+            capability_version = node.get("capability_version")
+            if not capability_id or not capability_version:
+                continue
+            if capability_version not in published_versions.get(capability_id, set()):
+                fail(
+                    errors,
+                    "workflow.capability_reference_unresolvable",
+                    str(workflow_path),
+                    f"Node '{node.get('node_id')}' references {capability_id}@{capability_version}, "
+                    "which is not a published capability in this registry",
+                )
+
+
+def check_immutability(base_sha: str, head_sha: str, errors: list) -> None:
+    """FR: no PR may modify an existing contract.json/workflow.json/product.json
+    once published (specs/001 FR-002/FR-013/FR-016, specs/005 FR-002). Also
+    covers signature.json: once written (post-merge, by CI) it is immutable
+    under the same rule (specs/007-artifact-hosting Amendment FR-012) -- a bad
+    signature is corrected by key rotation + re-backfill, not an in-place edit.
+    Additions (status "A") are always allowed."""
+    for governed_dir, filename, error_code in (
+        ("capabilities/", "contract.json", "capabilities.contract_modified"),
+        ("capabilities/", "signature.json", "capabilities.signature_modified"),
+        ("workflows/", "workflow.json", "workflows.workflow_modified"),
+        ("events/", "product.json", "events.product_modified"),
+    ):
+        diff = subprocess.check_output(
+            ["git", "diff", "--name-status", f"{base_sha}...{head_sha}", "--", governed_dir],
+            text=True,
+        )
+        for line in diff.splitlines():
+            if not line.strip():
+                continue
+            parts = line.split("\t")
+            status = parts[0]
+            path = parts[-1]
+            if path.endswith(filename) and status != "A":
+                fail(
+                    errors,
+                    error_code,
+                    path,
+                    f"{filename} must never be modified once published (git status: {status}). "
+                    "Use a new version directory, or a deprecated.json sibling to yank.",
+                )
+
+
+def _semver_tuple(version: str):
+    match = SEMVER_RE.match(version)
+    if not match:
+        return None
+    return tuple(int(p) for p in version.split("+")[0].split("-")[0].split("."))
+
+
+def classify_change(previous: dict, current: dict) -> str:
+    """Returns 'major', 'minor', or 'patch' per specs/002-capability-validation.md."""
+    prev_fields = set(previous.keys())
+    curr_fields = set(current.keys())
+
+    removed_required = [
+        f for f in prev_fields - curr_fields if f in REQUIRED_FIELDS or f in previous.get("required", [])
+    ]
+    if removed_required:
+        return "major"
+
+    for field in prev_fields & curr_fields:
+        if field in ("description",):
+            continue
+        if previous[field] != current[field]:
+            if field in ("input_schema", "output_schema", "events", "permissions", "constraints"):
+                return "major"
+
+    if curr_fields - prev_fields:
+        return "minor"
+
+    return "patch"
+
+
+def check_semver_bump(errors: list) -> None:
+    """FR-002: declared bump must be >= detected change class vs. the prior version."""
+    capabilities_dir = Path("capabilities")
+    if not capabilities_dir.is_dir():
+        return
+
+    by_namespace_id: dict = {}
+    for contract_path in sorted(capabilities_dir.rglob("contract.json")):
+        parts = contract_path.parts
+        try:
+            idx = parts.index("capabilities")
+            namespace_seg, id_seg, version_seg = parts[idx + 1], parts[idx + 2], parts[idx + 3]
+        except (ValueError, IndexError):
+            continue
+        by_namespace_id.setdefault((namespace_seg, id_seg), []).append((version_seg, contract_path))
+
+    for (namespace_seg, id_seg), versions in by_namespace_id.items():
+        parsed = [(v, p, _semver_tuple(v)) for v, p in versions]
+        parsed = [t for t in parsed if t[2] is not None]
+        parsed.sort(key=lambda t: t[2])
+        for i in range(1, len(parsed)):
+            prev_version, prev_path, prev_tuple = parsed[i - 1]
+            curr_version, curr_path, curr_tuple = parsed[i]
+            try:
+                previous = json.loads(prev_path.read_text())
+                current = json.loads(curr_path.read_text())
+            except Exception:
+                continue
+            change_class = classify_change(previous, current)
+            bump = "major" if curr_tuple[0] > prev_tuple[0] else "minor" if curr_tuple[1] > prev_tuple[1] else "patch"
+            rank = {"patch": 0, "minor": 1, "major": 2}
+            if rank[bump] < rank[change_class]:
+                fail(
+                    errors,
+                    "semver.bump_too_small",
+                    str(curr_path),
+                    f"Detected a '{change_class}' change from {prev_version} but version bump was only '{bump}'",
+                )
+
+
+def check_dependency_resolvability(errors: list) -> None:
+    """FR-005: declared dependencies must resolve against already-published capabilities."""
+    capabilities_dir = Path("capabilities")
+    if not capabilities_dir.is_dir():
+        return
+
+    published: dict = {}
+    for contract_path in sorted(capabilities_dir.rglob("contract.json")):
+        try:
+            contract = json.loads(contract_path.read_text())
+        except Exception:
+            continue
+        key = (contract.get("namespace"), contract.get("id"))
+        published.setdefault(key, []).append(contract.get("version"))
+
+    for contract_path in sorted(capabilities_dir.rglob("contract.json")):
+        try:
+            contract = json.loads(contract_path.read_text())
+        except Exception:
+            continue
+        for dep in contract.get("dependencies", []) or []:
+            dep_id = dep.get("capability_id")
+            dep_range = dep.get("version_range")
+            if not dep_id:
+                continue
+            # capability_id may be "namespace/id" or just "id" (defaults to core namespace)
+            if "/" in dep_id:
+                dep_namespace, dep_short_id = dep_id.split("/", 1)
+            else:
+                dep_namespace, dep_short_id = "core", dep_id
+            versions = published.get((dep_namespace, dep_short_id))
+            if not versions:
+                fail(
+                    errors,
+                    "dependency_unsatisfiable",
+                    str(contract_path),
+                    f"Dependency '{dep_id}' ({dep_range}) does not resolve to any published capability in this registry",
+                )
+
+
+def _is_hex(value) -> bool:
+    if not isinstance(value, str) or not value:
+        return False
+    try:
+        int(value, 16)
+        return True
+    except ValueError:
+        return False
+
+
+SIGNATURE_REQUIRED_FIELDS = {"scheme", "public_key_hex", "signature_hex", "sigstore_bundle_ref", "signed_at"}
+SIGNATURES_ENFORCED_MARKER = Path("capabilities") / ".signatures-enforced"
+
+
+def validate_signature_file(path: Path, errors: list) -> None:
+    """specs/007-artifact-hosting Amendment (registry#331/#333) FR-007/FR-008/FR-012:
+    shape of a `signature.json` sibling. Whole-tree safe -- only inspects files
+    that already exist, so it is a no-op until the CI signing job (registry#334)
+    or the backfill (registry#335) has written any."""
+    version_dir = path.parent
+    try:
+        sig = json.loads(path.read_text())
+    except Exception:
+        fail(errors, "signature.invalid_json", str(path), "signature.json is not valid JSON")
+        return
+    if not isinstance(sig, dict):
+        fail(errors, "signature.invalid_json", str(path), "signature.json must be a JSON object")
+        return
+
+    contract_path = version_dir / "contract.json"
+    artifact = None
+    if contract_path.is_file():
+        try:
+            artifact = json.loads(contract_path.read_text()).get("artifact")
+        except Exception:
+            artifact = None
+    if not isinstance(artifact, dict):
+        fail(
+            errors,
+            "signature.unexpected",
+            str(path),
+            "signature.json present for a version whose contract.json has no 'artifact' "
+            "field -- workflow-backed capabilities have nothing to sign (spec 007 Amendment FR-008)",
+        )
+
+    missing = SIGNATURE_REQUIRED_FIELDS - set(sig)
+    if missing:
+        fail(
+            errors,
+            "signature.missing_fields",
+            str(path),
+            f"signature.json missing required field(s): {sorted(missing)} (spec 007 Amendment FR-007)",
+        )
+        return
+
+    if sig.get("scheme") != "ed25519":
+        fail(errors, "signature.bad_scheme", str(path), "signature.json 'scheme' must be 'ed25519' (spec 007 Amendment)")
+    if sig.get("sigstore_bundle_ref") is not None:
+        fail(
+            errors,
+            "signature.bad_sigstore_ref",
+            str(path),
+            "'sigstore_bundle_ref' must be null under the ed25519 scheme (spec 007 Amendment)",
+        )
+    pub = sig.get("public_key_hex")
+    signature_hex = sig.get("signature_hex")
+    if not _is_hex(pub) or len(pub) != 64:
+        fail(errors, "signature.bad_public_key", str(path), "'public_key_hex' must be 64 hex chars (32-byte Ed25519 key)")
+    if not _is_hex(signature_hex) or len(signature_hex) != 128:
+        fail(errors, "signature.bad_signature", str(path), "'signature_hex' must be 128 hex chars (64-byte Ed25519 signature)")
+    if not isinstance(sig.get("signed_at"), str) or not sig.get("signed_at"):
+        fail(errors, "signature.bad_signed_at", str(path), "'signed_at' must be a non-empty ISO-8601 UTC timestamp string")
+
+
+def check_signature_siblings(errors: list) -> None:
+    """specs/007-artifact-hosting Amendment: every `signature.json` that exists is
+    validated for shape/immutability-of-content. Completeness (FR-007: every
+    non-deprecated, artifact-bearing version HAS one) is only hard-enforced once
+    `capabilities/.signatures-enforced` is committed -- the backfill (registry#335)
+    adds that marker as its final step. Before then the gap is advisory-only,
+    because signatures are written post-merge and pre-backfill history has none."""
+    capabilities_dir = Path("capabilities")
+    if not capabilities_dir.is_dir():
+        return
+
+    for sig_path in sorted(capabilities_dir.rglob("signature.json")):
+        validate_signature_file(sig_path, errors)
+
+    enforced = SIGNATURES_ENFORCED_MARKER.is_file()
+    unsigned = []
+    for contract_path in sorted(capabilities_dir.rglob("contract.json")):
+        version_dir = contract_path.parent
+        if (version_dir / "deprecated.json").is_file():
+            continue
+        try:
+            artifact = json.loads(contract_path.read_text()).get("artifact")
+        except Exception:
+            continue
+        if not isinstance(artifact, dict):
+            continue
+        if not (version_dir / "signature.json").is_file():
+            unsigned.append(str(version_dir))
+
+    if not unsigned:
+        return
+    if enforced:
+        for version_dir in unsigned:
+            fail(
+                errors,
+                "signature.missing",
+                version_dir,
+                "non-deprecated capability version has an 'artifact' but no signature.json "
+                "(spec 007 Amendment FR-007)",
+            )
+    else:
+        print(json.dumps({
+            "advisory": "signature.backfill_pending",
+            "unsigned_count": len(unsigned),
+            "note": "capabilities/.signatures-enforced not committed yet (registry#335 "
+                    "backfill); signature completeness is advisory until then",
+        }, indent=2), file=sys.stderr)
+
+
+def run_event_product_validation(errors: list) -> None:
+    """FR-016: delegate ECCA event-product tree validation to the Rust binary
+    so descriptor rules stay single-sourced in traverse-registry (not
+    reimplemented in Python). Honors VALIDATE_EVENT_PRODUCTS_BIN when set
+    (CI installs a built binary); otherwise `cargo run`s the bin target.
+    """
+    events_dir = Path("events")
+    if not events_dir.is_dir():
+        return
+
+    env_bin = os.environ.get("VALIDATE_EVENT_PRODUCTS_BIN")
+    if env_bin:
+        cmd = [env_bin, "--root", str(Path.cwd())]
+    else:
+        cmd = [
+            "cargo",
+            "run",
+            "--quiet",
+            "--locked",
+            "-p",
+            "traverse-registry",
+            "--bin",
+            "validate_event_products",
+            "--",
+            "--root",
+            str(Path.cwd()),
+        ]
+
+    try:
+        result = subprocess.run(cmd, capture_output=True, text=True, check=False)
+    except FileNotFoundError as exc:
+        fail(
+            errors,
+            "events.validator_unavailable",
+            "events/",
+            f"Unable to invoke event-product validator ({exc})",
+        )
+        return
+
+    if result.returncode == 0:
+        return
+
+    detail = (result.stderr or result.stdout or "").strip()
+    fail(
+        errors,
+        "events.validation_failed",
+        "events/",
+        detail or f"validate_event_products exited {result.returncode}",
+    )
+
+
+def main() -> int:
+    errors: list = []
+    capabilities_dir = Path("capabilities")
+    workflows_dir = Path("workflows")
+    personas_dir = Path("personas")
+
+    if capabilities_dir.is_dir():
+        for contract_path in sorted(capabilities_dir.rglob("contract.json")):
+            validate_contract(contract_path, errors)
+        check_semver_bump(errors)
+        check_dependency_resolvability(errors)
+        check_signature_siblings(errors)
+
+    if personas_dir.is_dir():
+        for persona_path in sorted(personas_dir.rglob("persona.json")):
+            validate_persona(persona_path, errors)
+        check_persona_distinguished_from_resolves(errors)
+
+    if workflows_dir.is_dir():
+        for workflow_path in real_workflow_paths(workflows_dir):
+            validate_workflow(workflow_path, errors)
+        check_workflow_capability_references(errors)
+
+    run_event_product_validation(errors)
+
+    check_ecca_capability_inventory_coverage(errors)
+
+    base_sha = None
+    head_sha = None
+    if len(sys.argv) >= 3:
+        base_sha, head_sha = sys.argv[1], sys.argv[2]
+    if base_sha and head_sha:
+        try:
+            check_immutability(base_sha, head_sha, errors)
+        except subprocess.CalledProcessError as exc:
+            fail(errors, "git.diff_failed", "capabilities/", f"Unable to compute diff: {exc}")
+        try:
+            check_new_scenarios_are_user_stories(base_sha, head_sha, errors)
+        except subprocess.CalledProcessError as exc:
+            fail(errors, "git.diff_failed", "capabilities/", f"Unable to compute diff: {exc}")
+        try:
+            check_new_use_cases_have_persona_ref(base_sha, head_sha, errors)
+        except subprocess.CalledProcessError as exc:
+            fail(errors, "git.diff_failed", "capabilities/", f"Unable to compute diff: {exc}")
+        try:
+            check_new_contracts_action_enum_coverage(base_sha, head_sha, errors)
+        except subprocess.CalledProcessError as exc:
+            fail(errors, "git.diff_failed", "capabilities/", f"Unable to compute diff: {exc}")
+        try:
+            check_new_contracts_use_cases_surface_coverage(base_sha, head_sha, errors)
+        except subprocess.CalledProcessError as exc:
+            fail(errors, "git.diff_failed", "capabilities/", f"Unable to compute diff: {exc}")
+        try:
+            check_new_contracts_have_artifact_reference(base_sha, head_sha, errors)
+        except subprocess.CalledProcessError as exc:
+            fail(errors, "git.diff_failed", "capabilities/", f"Unable to compute diff: {exc}")
+        try:
+            check_new_contracts_have_test_coverage(base_sha, head_sha, errors)
+        except subprocess.CalledProcessError as exc:
+            fail(errors, "git.diff_failed", "capabilities/", f"Unable to compute diff: {exc}")
+
+    status = "passed" if not errors else "failed"
+    print(json.dumps({"status": status, "failures": errors}, indent=2))
+
+    if errors:
+        return 1
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

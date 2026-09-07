@@ -1,0 +1,842 @@
+//! Semver range resolution for the capability registry (spec 037).
+
+use semver::{Version, VersionReq};
+use traverse_contracts::{UsageEvent, UsageEventKind, UsageTelemetrySink};
+
+use crate::{CapabilityRegistry, LookupScope, RegistryScope};
+
+/// Optional usage-telemetry context for [`resolve_version_range`] (spec
+/// `015-runtime-usage-telemetry-resolve-hook`). Bundles the sink with a
+/// caller-supplied timestamp so this crate never depends on a wall clock —
+/// consistent with every other `registered_at`-style field in this crate,
+/// and with `013-inherited-registry-governance`'s portability constraint.
+pub struct ResolveTelemetry<'a> {
+    pub sink: &'a dyn UsageTelemetrySink,
+    pub resolved_at: &'a str,
+}
+
+/// A fully resolved capability registration returned by range resolution.
+///
+/// This is a lightweight view — it carries the registry record and the
+/// `CapabilityRegistration` snapshot needed by callers.  When only the
+/// resolved version string is needed, inspect `record.version`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ResolvedRangeCapability {
+    /// The `id` of the capability.
+    pub capability_id: String,
+    /// The resolved semver version string.
+    pub version: String,
+    /// The artifact reference of the resolved registration.
+    pub artifact_ref: String,
+    /// The registry scope in which the capability was found.
+    pub scope: RegistryScope,
+}
+
+/// Errors that can be returned by [`resolve_version_range`].
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum RangeResolutionError {
+    /// `capability_id` was not present in the registry at all.
+    CapabilityNotFound { id: String },
+    /// The capability exists but no registered version satisfies `range`.
+    NoVersionSatisfies { range: String },
+    /// Multiple registrations at the highest satisfying version with different
+    /// digests — the resolver cannot pick one deterministically.
+    AmbiguousMatch { candidates: Vec<AmbiguousCandidate> },
+    /// `range_str` could not be parsed as a valid semver range expression.
+    InvalidRangeSyntax { range: String, reason: String },
+}
+
+/// One entry in an [`RangeResolutionError::AmbiguousMatch`] set.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AmbiguousCandidate {
+    pub capability_id: String,
+    pub version: String,
+    pub artifact_ref: String,
+    pub scope: RegistryScope,
+}
+
+/// Resolves the highest version of `capability_id` registered in
+/// `workspace_id` (lookup scope) that satisfies `range_str`.
+///
+/// Resolution order:
+/// 1. Parse `range_str` — [`RangeResolutionError::InvalidRangeSyntax`] on failure.
+/// 2. Collect all registered versions of `capability_id` in `lookup_scope`.
+/// 3. Filter to those satisfying the range.
+/// 4. Select the highest satisfying version.
+/// 5. If multiple registrations at that version have different digests →
+///    [`RangeResolutionError::AmbiguousMatch`].
+/// 6. If no versions satisfy → [`RangeResolutionError::NoVersionSatisfies`].
+/// 7. If `capability_id` is absent entirely → [`RangeResolutionError::CapabilityNotFound`].
+///
+/// `telemetry`, when supplied, is invoked exactly once with a `resolve`
+/// event on a successful resolution and never on a failed or ambiguous one
+/// (spec `015-runtime-usage-telemetry-resolve-hook` FR-002/FR-003). Passing
+/// `None` produces output byte-for-byte identical to the pre-telemetry
+/// behavior (FR-001, SC-003).
+///
+/// # Errors
+///
+/// Returns [`RangeResolutionError`] for any of the cases described above.
+pub fn resolve_version_range(
+    registry: &CapabilityRegistry,
+    capability_id: &str,
+    range_str: &str,
+    lookup_scope: LookupScope,
+    telemetry: Option<ResolveTelemetry<'_>>,
+) -> Result<ResolvedRangeCapability, RangeResolutionError> {
+    let req =
+        VersionReq::parse(range_str).map_err(|err| RangeResolutionError::InvalidRangeSyntax {
+            range: range_str.to_string(),
+            reason: err.to_string(),
+        })?;
+
+    // Collect all versions of this capability across the lookup scope.
+    // We probe each applicable scope independently so that cross-scope
+    // ambiguity (same version, different artifact_ref in Public vs. Private)
+    // is visible before `discover`'s shadowing collapses them.
+    let mut all_records: Vec<(RegistryScope, String, String)> = Vec::new(); // (scope, version, artifact_ref)
+    let mut found_any = false;
+
+    let probe_scopes: &[RegistryScope] = match lookup_scope {
+        LookupScope::PublicOnly => &[RegistryScope::Public],
+        LookupScope::PreferPrivate => &[RegistryScope::Private, RegistryScope::Public],
+    };
+
+    for &scope in probe_scopes {
+        let scope_lookup = match scope {
+            RegistryScope::Public => LookupScope::PublicOnly,
+            RegistryScope::Private => LookupScope::PreferPrivate,
+        };
+        let entries =
+            registry.discover_by_id(scope, capability_id, &crate::DiscoveryQuery::default());
+        for entry in &entries {
+            found_any = true;
+            if let Some(resolved) = registry.find_exact(scope_lookup, &entry.id, &entry.version) {
+                all_records.push((
+                    scope,
+                    resolved.record.version.clone(),
+                    resolved.record.artifact_ref.clone(),
+                ));
+            }
+        }
+    }
+
+    if !found_any && all_records.is_empty() {
+        return Err(RangeResolutionError::CapabilityNotFound {
+            id: capability_id.to_string(),
+        });
+    }
+
+    // Filter to versions that satisfy the range.
+    let mut satisfying: Vec<(RegistryScope, Version, String)> = all_records
+        .into_iter()
+        .filter_map(|(scope, version_str, artifact_ref)| {
+            let version = Version::parse(&version_str).ok()?;
+            if req.matches(&version) {
+                Some((scope, version, artifact_ref))
+            } else {
+                None
+            }
+        })
+        .collect();
+
+    if satisfying.is_empty() {
+        return Err(RangeResolutionError::NoVersionSatisfies {
+            range: range_str.to_string(),
+        });
+    }
+
+    // Find the highest satisfying version.
+    satisfying.sort_by(|(_, va, _), (_, vb, _)| va.cmp(vb));
+    // satisfying is non-empty (guarded above); .last() and .next() are safe.
+    let highest = satisfying
+        .last()
+        .ok_or(RangeResolutionError::NoVersionSatisfies {
+            range: range_str.to_string(),
+        })
+        .map(|(_, v, _)| v.clone())?;
+
+    // Collect all registrations at the highest version.
+    let at_highest: Vec<(RegistryScope, Version, String)> = satisfying
+        .into_iter()
+        .filter(|(_, v, _)| *v == highest)
+        .collect();
+
+    // Check for ambiguity: same version, different artifact digests.
+    let unique_refs: std::collections::BTreeSet<&str> =
+        at_highest.iter().map(|(_, _, r)| r.as_str()).collect();
+
+    if unique_refs.len() > 1 {
+        let candidates = at_highest
+            .iter()
+            .map(|(scope, version, artifact_ref)| AmbiguousCandidate {
+                capability_id: capability_id.to_string(),
+                version: version.to_string(),
+                artifact_ref: artifact_ref.clone(),
+                scope: *scope,
+            })
+            .collect();
+        return Err(RangeResolutionError::AmbiguousMatch { candidates });
+    }
+
+    // at_highest is non-empty because satisfying is non-empty and we filter to
+    // the highest version which is present by construction.
+    let (scope, version, artifact_ref) =
+        at_highest
+            .into_iter()
+            .next()
+            .ok_or(RangeResolutionError::NoVersionSatisfies {
+                range: range_str.to_string(),
+            })?;
+
+    if let Some(telemetry) = telemetry {
+        telemetry.sink.record(UsageEvent {
+            kind: UsageEventKind::Resolve,
+            capability_ref: format!("{capability_id}@{version}"),
+            timestamp: telemetry.resolved_at.to_string(),
+        });
+    }
+
+    Ok(ResolvedRangeCapability {
+        capability_id: capability_id.to_string(),
+        version: version.to_string(),
+        artifact_ref,
+        scope,
+    })
+}
+
+/// Approximates whether two semver ranges can be simultaneously satisfied by
+/// some version.
+///
+/// `semver::VersionReq` has no intersection operator, so this checks each
+/// range's own lower-bound ("floor") version against the other range: a
+/// true overlap always makes at least one direction match, and true
+/// disjoint ranges always make both directions fail. This is exact for the
+/// single-comparator caret/tilde/exact ranges used throughout this registry
+/// (e.g. `^1.0.0`) and only approximate for compound or upper-bound-only
+/// comparators.
+#[must_use]
+pub fn version_ranges_overlap(a: &str, b: &str) -> bool {
+    let (Ok(req_a), Ok(req_b)) = (VersionReq::parse(a), VersionReq::parse(b)) else {
+        return false;
+    };
+    let floor_a = comparator_floor_version(&req_a);
+    let floor_b = comparator_floor_version(&req_b);
+    floor_a.is_some_and(|version| req_b.matches(&version))
+        || floor_b.is_some_and(|version| req_a.matches(&version))
+}
+
+fn comparator_floor_version(req: &VersionReq) -> Option<Version> {
+    let comparator = req.comparators.first()?;
+    Some(Version::new(
+        comparator.major,
+        comparator.minor.unwrap_or(0),
+        comparator.patch.unwrap_or(0),
+    ))
+}
+
+#[cfg(test)]
+mod tests {
+    #![allow(clippy::expect_used)]
+
+    use super::*;
+    use crate::{
+        ArtifactDigests, BinaryFormat, BinaryReference, CapabilityArtifactRecord,
+        CapabilityRegistration, ComposabilityMetadata, CompositionKind, CompositionPattern,
+        ImplementationKind, RegistryProvenance, RegistryScope, SourceKind, SourceReference,
+    };
+    use serde_json::json;
+    use traverse_contracts::{
+        BinaryFormat as ContractBinaryFormat, Condition, Entrypoint, EntrypointKind,
+        EvidenceStatus, EvidenceType, Execution, ExecutionConstraints, ExecutionTarget,
+        FilesystemAccess, HostApiAccess, Lifecycle, NetworkAccess, Owner, Provenance,
+        ProvenanceSource, SchemaContainer, ServiceType, SideEffect, SideEffectKind,
+        ValidationEvidence,
+    };
+
+    fn base_contract(id: &str, version: &str) -> traverse_contracts::CapabilityContract {
+        let (namespace, name) = split_id(id);
+        traverse_contracts::CapabilityContract {
+            kind: "capability_contract".to_string(),
+            schema_version: "1.0.0".to_string(),
+            id: id.to_string(),
+            namespace,
+            name,
+            version: version.to_string(),
+            lifecycle: Lifecycle::Active,
+            owner: Owner {
+                team: "traverse-core".to_string(),
+                contact: "enrico.piovesan10@gmail.com".to_string(),
+            },
+            summary: "Test capability.".to_string(),
+            description: "Test capability for range resolution.".to_string(),
+            inputs: SchemaContainer {
+                schema: json!({"type": "object"}),
+            },
+            outputs: SchemaContainer {
+                schema: json!({"type": "object"}),
+            },
+            preconditions: vec![Condition {
+                id: "request-authenticated".to_string(),
+                description: "Caller identity has been established.".to_string(),
+            }],
+            postconditions: vec![Condition {
+                id: "draft-created".to_string(),
+                description: "A draft payload is produced.".to_string(),
+            }],
+            side_effects: vec![SideEffect {
+                kind: SideEffectKind::MemoryOnly,
+                description: "In-memory state only.".to_string(),
+            }],
+            emits: vec![],
+            consumes: vec![],
+            permissions: vec![traverse_contracts::IdReference {
+                id: "test.read".to_string(),
+            }],
+            execution: Execution {
+                binary_format: ContractBinaryFormat::Wasm,
+                entrypoint: Entrypoint {
+                    kind: EntrypointKind::WasiCommand,
+                    command: "run".to_string(),
+                },
+                preferred_targets: vec![ExecutionTarget::Local],
+                constraints: ExecutionConstraints {
+                    host_api_access: HostApiAccess::None,
+                    network_access: NetworkAccess::Forbidden,
+                    filesystem_access: FilesystemAccess::None,
+                },
+            },
+            policies: vec![],
+            dependencies: vec![],
+            provenance: Provenance {
+                source: ProvenanceSource::Greenfield,
+                author: "test".to_string(),
+                created_at: "2026-04-20T00:00:00Z".to_string(),
+                spec_ref: Some("037-semver-range-resolution".to_string()),
+                adr_refs: vec![],
+                exception_refs: vec![],
+            },
+            evidence: vec![ValidationEvidence {
+                evidence_id: "validation:contract".to_string(),
+                evidence_type: EvidenceType::ContractValidation,
+                status: EvidenceStatus::Passed,
+            }],
+            service_type: ServiceType::Stateless,
+            permitted_targets: vec![ExecutionTarget::Local],
+            event_trigger: None,
+            connector_requirements: Vec::new(),
+            state_schema: None,
+        }
+    }
+
+    fn executable_artifact(
+        contract: &traverse_contracts::CapabilityContract,
+        digest_suffix: &str,
+    ) -> CapabilityArtifactRecord {
+        CapabilityArtifactRecord {
+            artifact_ref: format!(
+                "artifact:{}:{}:{}",
+                contract.name, contract.version, digest_suffix
+            ),
+            implementation_kind: ImplementationKind::Executable,
+            source: SourceReference {
+                kind: SourceKind::Git,
+                location: format!("https://github.com/test/{}", contract.name),
+            },
+            binary: Some(BinaryReference {
+                format: BinaryFormat::Wasm,
+                location: format!("artifacts/{}/{}.wasm", contract.name, contract.version),
+                signature: None,
+            }),
+            workflow_ref: None,
+            digests: ArtifactDigests {
+                source_digest: format!(
+                    "sha256:source-{}-{}-{}",
+                    contract.name, contract.version, digest_suffix
+                ),
+                binary_digest: Some(format!(
+                    "sha256:binary-{}-{}-{}",
+                    contract.name, contract.version, digest_suffix
+                )),
+            },
+            provenance: RegistryProvenance {
+                source: "greenfield".to_string(),
+                author: "test".to_string(),
+                created_at: "2026-04-20T00:00:00Z".to_string(),
+            },
+        }
+    }
+
+    fn registration(
+        scope: RegistryScope,
+        contract: traverse_contracts::CapabilityContract,
+        digest_suffix: &str,
+    ) -> CapabilityRegistration {
+        CapabilityRegistration {
+            scope,
+            contract_path: format!(
+                "registry/{}/{}/{}",
+                scope_label(scope),
+                contract.id,
+                contract.version
+            ) + "/contract.json",
+            artifact: executable_artifact(&contract, digest_suffix),
+            registered_at: "2026-04-20T00:00:00Z".to_string(),
+            tags: vec!["test".to_string()],
+            composability: ComposabilityMetadata {
+                kind: CompositionKind::Atomic,
+                patterns: vec![CompositionPattern::Sequential],
+                provides: vec!["test-output".to_string()],
+                requires: vec!["test-input".to_string()],
+            },
+            governing_spec: "037-semver-range-resolution".to_string(),
+            validator_version: "test".to_string(),
+            contract,
+        }
+    }
+
+    fn scope_label(scope: RegistryScope) -> &'static str {
+        match scope {
+            RegistryScope::Public => "public",
+            RegistryScope::Private => "private",
+        }
+    }
+
+    fn split_id(id: &str) -> (String, String) {
+        let mut parts = id.rsplitn(2, '.');
+        let name = parts.next().expect("id must include a name").to_string();
+        let namespace = parts
+            .next()
+            .expect("id must include a namespace")
+            .to_string();
+        (namespace, name)
+    }
+
+    fn registry_with_versions(id: &str, versions: &[&str]) -> CapabilityRegistry {
+        let mut registry = CapabilityRegistry::new();
+        for version in versions {
+            registry
+                .register(registration(
+                    RegistryScope::Public,
+                    base_contract(id, version),
+                    "default",
+                ))
+                .expect("registration should succeed");
+        }
+        registry
+    }
+
+    const CAP_ID: &str = "test.range.resolver";
+
+    /// Registers `count` unrelated Public capabilities, split between ids
+    /// that sort before and after [`CAP_ID`] in the registry's `BTreeMap`
+    /// key order, so tests exercise both the lower- and upper-bound edges of
+    /// a targeted `discover_by_id` range scan around the target id.
+    fn register_noise_capabilities(registry: &mut CapabilityRegistry, count: usize) {
+        for i in 0..count {
+            let prefix = if i % 2 == 0 { "aaa" } else { "zzz" };
+            let id = format!("test.{prefix}.noise-cap-{i:04}");
+            registry
+                .register(registration(
+                    RegistryScope::Public,
+                    base_contract(&id, "1.0.0"),
+                    "noise",
+                ))
+                .expect("noise registration should succeed");
+        }
+    }
+
+    // Scenario 1: ^1.0.0 selects highest satisfying version
+    #[test]
+    fn resolves_highest_satisfying_version() {
+        let registry = registry_with_versions(CAP_ID, &["1.0.0", "1.1.0", "1.2.0"]);
+        let result = resolve_version_range(&registry, CAP_ID, "^1.0.0", LookupScope::PublicOnly, None)
+            .expect("^1.0.0 should resolve");
+        assert_eq!(result.version, "1.2.0");
+        assert_eq!(result.capability_id, CAP_ID);
+    }
+
+    // Scenario 2: ^1.0.0 with only 2.0.0 → NoVersionSatisfies
+    #[test]
+    fn no_version_satisfies_range() {
+        let registry = registry_with_versions(CAP_ID, &["2.0.0"]);
+        let err = resolve_version_range(&registry, CAP_ID, "^1.0.0", LookupScope::PublicOnly, None)
+            .expect_err("should fail with NoVersionSatisfies");
+        assert!(
+            matches!(err, RangeResolutionError::NoVersionSatisfies { range } if range == "^1.0.0")
+        );
+    }
+
+    // Scenario 3: two 1.2.0 registrations with different digests → AmbiguousMatch
+    #[test]
+    fn ambiguous_match_on_different_digests() {
+        let mut registry = CapabilityRegistry::new();
+        // Register 1.2.0 in Public scope
+        registry
+            .register(registration(
+                RegistryScope::Public,
+                base_contract(CAP_ID, "1.2.0"),
+                "digest-a",
+            ))
+            .expect("public registration should succeed");
+        // Register 1.2.0 in Private scope (different digest, different artifact_ref)
+        registry
+            .register(registration(
+                RegistryScope::Private,
+                base_contract(CAP_ID, "1.2.0"),
+                "digest-b",
+            ))
+            .expect("private registration should succeed");
+
+        let err = resolve_version_range(&registry, CAP_ID, "^1.0.0", LookupScope::PreferPrivate, None)
+            .expect_err("should fail with AmbiguousMatch");
+        assert!(matches!(
+            err,
+            RangeResolutionError::AmbiguousMatch { candidates } if candidates.len() == 2
+        ));
+    }
+
+    // Scenario 4: exact version string resolves via exact lookup in runtime — tested
+    // at the registry level by confirming `^1.2.3` (caret is not exact) and checking
+    // the resolver selects 1.2.3 when only that version is registered.
+    #[test]
+    fn exact_version_string_resolves() {
+        let registry = registry_with_versions(CAP_ID, &["1.2.3"]);
+        let result = resolve_version_range(&registry, CAP_ID, "1.2.3", LookupScope::PublicOnly, None)
+            .expect("exact version string should resolve");
+        assert_eq!(result.version, "1.2.3");
+    }
+
+    // Scenario 5: * selects highest overall
+    #[test]
+    fn wildcard_selects_highest_version() {
+        let registry = registry_with_versions(CAP_ID, &["1.0.0", "1.1.0", "2.3.0", "0.9.0"]);
+        let result = resolve_version_range(&registry, CAP_ID, "*", LookupScope::PublicOnly, None)
+            .expect("* should resolve to highest");
+        assert_eq!(result.version, "2.3.0");
+    }
+
+    // Scenario 6: malformed range → InvalidRangeSyntax
+    #[test]
+    fn malformed_range_returns_invalid_syntax_error() {
+        let registry = registry_with_versions(CAP_ID, &["1.0.0"]);
+        let err = resolve_version_range(&registry, CAP_ID, ">>1.0", LookupScope::PublicOnly, None)
+            .expect_err("malformed range should fail");
+        assert!(
+            matches!(err, RangeResolutionError::InvalidRangeSyntax { range, .. } if range == ">>1.0")
+        );
+    }
+
+    // Scenario 7: unknown capability → CapabilityNotFound
+    #[test]
+    fn unknown_capability_id_returns_not_found() {
+        let registry = CapabilityRegistry::new();
+        let err = resolve_version_range(
+            &registry,
+            "test.range.nonexistent",
+            "^1.0.0",
+            LookupScope::PublicOnly,
+            None,
+        )
+        .expect_err("unknown capability should fail");
+        assert!(
+            matches!(err, RangeResolutionError::CapabilityNotFound { id } if id == "test.range.nonexistent")
+        );
+    }
+
+    // Scenario 8: PreferPrivate probe with a Public-only registration — the Private probe
+    // leg's inner loop hits `continue` (line 96) because entry.scope (Public) != scope (Private).
+    #[test]
+    fn prefer_private_resolves_public_only_capability() {
+        let registry = registry_with_versions(CAP_ID, &["1.3.0", "1.4.0"]);
+        let result = resolve_version_range(&registry, CAP_ID, "^1.0.0", LookupScope::PreferPrivate, None)
+            .expect("should fall back to Public and resolve 1.4.0");
+        assert_eq!(result.version, "1.4.0");
+        assert_eq!(result.scope, RegistryScope::Public);
+    }
+
+    // Scenario 9: AmbiguousMatch candidates list is inspectable.
+    #[test]
+    fn ambiguous_match_exposes_candidate_details() {
+        let mut registry = CapabilityRegistry::new();
+        registry
+            .register(registration(
+                RegistryScope::Public,
+                base_contract(CAP_ID, "2.0.0"),
+                "alpha",
+            ))
+            .expect("public registration should succeed");
+        registry
+            .register(registration(
+                RegistryScope::Private,
+                base_contract(CAP_ID, "2.0.0"),
+                "beta",
+            ))
+            .expect("private registration should succeed");
+        let err = resolve_version_range(&registry, CAP_ID, "^2.0.0", LookupScope::PreferPrivate, None)
+            .expect_err("should return AmbiguousMatch");
+        assert!(
+            matches!(err, RangeResolutionError::AmbiguousMatch { ref candidates } if candidates.len() == 2
+                && candidates.iter().all(|c| c.capability_id == CAP_ID)
+                && candidates.iter().all(|c| c.version == "2.0.0")),
+            "expected AmbiguousMatch with 2 candidates, got {err:?}"
+        );
+    }
+
+    // Regression-safety scenario: `resolve_version_range` now uses a targeted
+    // `discover_by_id` lookup instead of a full-registry `discover` scan+sort.
+    // Populate a registry representative of the issue's evidence (hundreds of
+    // unrelated capabilities interleaved alphabetically around the target id,
+    // across both scopes) and confirm the resolved version, scope and
+    // artifact are unaffected by the surrounding noise.
+    #[test]
+    fn resolve_version_range_unaffected_by_surrounding_registry_noise() {
+        let mut registry = CapabilityRegistry::new();
+        register_noise_capabilities(&mut registry, 250);
+
+        for version in ["1.0.0", "1.1.0", "1.2.0", "2.0.0"] {
+            registry
+                .register(registration(
+                    RegistryScope::Public,
+                    base_contract(CAP_ID, version),
+                    "default",
+                ))
+                .expect("target registration should succeed");
+        }
+        registry
+            .register(registration(
+                RegistryScope::Private,
+                base_contract(CAP_ID, "1.5.0"),
+                "private",
+            ))
+            .expect("private target registration should succeed");
+
+        let result = resolve_version_range(&registry, CAP_ID, "^1.0.0", LookupScope::PreferPrivate, None)
+            .expect("^1.0.0 should resolve despite surrounding noise");
+        assert_eq!(result.version, "1.5.0");
+        assert_eq!(result.scope, RegistryScope::Private);
+        assert_eq!(result.capability_id, CAP_ID);
+
+        let public_only =
+            resolve_version_range(&registry, CAP_ID, "^1.0.0", LookupScope::PublicOnly, None)
+                .expect("^1.0.0 should resolve in Public-only scope");
+        assert_eq!(public_only.version, "1.2.0");
+        assert_eq!(public_only.scope, RegistryScope::Public);
+    }
+
+    // Scan-size assertion: the targeted lookup underlying `resolve_version_range`
+    // returns entries proportional to the target capability's own version
+    // count, not the ~250-capability registry it is embedded in.
+    #[test]
+    fn resolve_version_range_lookup_scales_with_target_versions_not_registry_size() {
+        let mut registry = CapabilityRegistry::new();
+        register_noise_capabilities(&mut registry, 250);
+
+        for version in ["1.0.0", "1.1.0", "1.2.0"] {
+            registry
+                .register(registration(
+                    RegistryScope::Public,
+                    base_contract(CAP_ID, version),
+                    "default",
+                ))
+                .expect("target registration should succeed");
+        }
+
+        let targeted = registry.discover_by_id(
+            RegistryScope::Public,
+            CAP_ID,
+            &crate::DiscoveryQuery::default(),
+        );
+        assert_eq!(targeted.len(), 3);
+
+        let full_scan =
+            registry.discover(LookupScope::PublicOnly, &crate::DiscoveryQuery::default());
+        assert_eq!(full_scan.len(), 253);
+    }
+
+    #[test]
+    fn version_ranges_overlap_detects_overlapping_caret_ranges() {
+        assert!(version_ranges_overlap("^1.0.0", "^1.2.0"));
+        assert!(version_ranges_overlap("^1.2.0", "^1.0.0"));
+        assert!(version_ranges_overlap("~1.2.0", "^1.0.0"));
+    }
+
+    #[test]
+    fn version_ranges_overlap_rejects_disjoint_caret_ranges() {
+        assert!(!version_ranges_overlap("^1.0.0", "^2.0.0"));
+        assert!(!version_ranges_overlap("^2.0.0", "^1.5.0"));
+    }
+
+    #[test]
+    fn version_ranges_overlap_rejects_unparseable_ranges() {
+        assert!(!version_ranges_overlap("not a range", "^1.0.0"));
+        assert!(!version_ranges_overlap("^1.0.0", "not a range"));
+    }
+
+    #[test]
+    fn version_ranges_overlap_matches_identical_exact_versions() {
+        assert!(version_ranges_overlap("=1.2.3", "=1.2.3"));
+        assert!(!version_ranges_overlap("=1.2.3", "=1.2.4"));
+    }
+
+    /// Test double for spec `015-runtime-usage-telemetry-resolve-hook`:
+    /// captures every event recorded through it for inspection.
+    #[derive(Default)]
+    struct RecordingSink {
+        events: std::sync::Mutex<Vec<UsageEvent>>,
+    }
+
+    impl UsageTelemetrySink for RecordingSink {
+        fn record(&self, event: UsageEvent) {
+            self.events
+                .lock()
+                .expect("recording sink mutex should not be poisoned")
+                .push(event);
+        }
+    }
+
+    // SC-001: a successful resolution with a supplied sink invokes it
+    // exactly once with the correct namespace/id@version.
+    #[test]
+    fn resolve_with_telemetry_invokes_sink_exactly_once_on_success() {
+        let registry = registry_with_versions(CAP_ID, &["1.0.0", "1.1.0", "1.2.0"]);
+        let sink = RecordingSink::default();
+
+        let result = resolve_version_range(
+            &registry,
+            CAP_ID,
+            "^1.0.0",
+            LookupScope::PublicOnly,
+            Some(ResolveTelemetry {
+                sink: &sink,
+                resolved_at: "2026-08-17T00:00:00Z",
+            }),
+        )
+        .expect("^1.0.0 should resolve");
+        assert_eq!(result.version, "1.2.0");
+
+        let events = sink.events.lock().expect("mutex should not be poisoned");
+        assert_eq!(events.len(), 1);
+        assert_eq!(events[0].kind, UsageEventKind::Resolve);
+        assert_eq!(events[0].capability_ref, format!("{CAP_ID}@1.2.0"));
+        assert_eq!(events[0].timestamp, "2026-08-17T00:00:00Z");
+    }
+
+    // SC-002 (capability not found branch): a failed resolution never
+    // invokes the sink, even when one is supplied.
+    #[test]
+    fn resolve_with_telemetry_does_not_invoke_sink_on_capability_not_found() {
+        let registry = CapabilityRegistry::new();
+        let sink = RecordingSink::default();
+
+        let _ = resolve_version_range(
+            &registry,
+            "test.range.nonexistent",
+            "^1.0.0",
+            LookupScope::PublicOnly,
+            Some(ResolveTelemetry {
+                sink: &sink,
+                resolved_at: "2026-08-17T00:00:00Z",
+            }),
+        )
+        .expect_err("unknown capability should fail");
+
+        assert!(
+            sink.events
+                .lock()
+                .expect("mutex should not be poisoned")
+                .is_empty()
+        );
+    }
+
+    // SC-002 (no satisfying version branch).
+    #[test]
+    fn resolve_with_telemetry_does_not_invoke_sink_on_no_version_satisfies() {
+        let registry = registry_with_versions(CAP_ID, &["1.0.0"]);
+        let sink = RecordingSink::default();
+
+        let _ = resolve_version_range(
+            &registry,
+            CAP_ID,
+            "^2.0.0",
+            LookupScope::PublicOnly,
+            Some(ResolveTelemetry {
+                sink: &sink,
+                resolved_at: "2026-08-17T00:00:00Z",
+            }),
+        )
+        .expect_err("no version should satisfy ^2.0.0");
+
+        assert!(
+            sink.events
+                .lock()
+                .expect("mutex should not be poisoned")
+                .is_empty()
+        );
+    }
+
+    // SC-002 (ambiguous match branch).
+    #[test]
+    fn resolve_with_telemetry_does_not_invoke_sink_on_ambiguous_match() {
+        let mut registry = CapabilityRegistry::new();
+        registry
+            .register(registration(
+                RegistryScope::Public,
+                base_contract(CAP_ID, "1.2.0"),
+                "digest-a",
+            ))
+            .expect("public registration should succeed");
+        registry
+            .register(registration(
+                RegistryScope::Private,
+                base_contract(CAP_ID, "1.2.0"),
+                "digest-b",
+            ))
+            .expect("private registration should succeed");
+        let sink = RecordingSink::default();
+
+        let _ = resolve_version_range(
+            &registry,
+            CAP_ID,
+            "^1.0.0",
+            LookupScope::PreferPrivate,
+            Some(ResolveTelemetry {
+                sink: &sink,
+                resolved_at: "2026-08-17T00:00:00Z",
+            }),
+        )
+        .expect_err("should fail with AmbiguousMatch");
+
+        assert!(
+            sink.events
+                .lock()
+                .expect("mutex should not be poisoned")
+                .is_empty()
+        );
+    }
+
+    // SC-003: passing no telemetry produces output byte-for-byte identical
+    // to a supplied-sink call's `Result`, for the same inputs.
+    #[test]
+    fn resolve_without_telemetry_matches_result_of_call_with_telemetry() {
+        let registry = registry_with_versions(CAP_ID, &["1.0.0", "1.1.0"]);
+        let sink = RecordingSink::default();
+
+        let without_telemetry =
+            resolve_version_range(&registry, CAP_ID, "^1.0.0", LookupScope::PublicOnly, None)
+                .expect("^1.0.0 should resolve");
+        let with_telemetry = resolve_version_range(
+            &registry,
+            CAP_ID,
+            "^1.0.0",
+            LookupScope::PublicOnly,
+            Some(ResolveTelemetry {
+                sink: &sink,
+                resolved_at: "2026-08-17T00:00:00Z",
+            }),
+        )
+        .expect("^1.0.0 should resolve");
+
+        assert_eq!(without_telemetry, with_telemetry);
+    }
+}

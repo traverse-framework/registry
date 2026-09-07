@@ -1,0 +1,228 @@
+{
+  "artifact": {
+    "digest": "sha256:0464da7ebe4784a3b24717b08d26c168b5e901f4d8d5b6efc9693c3323d1d5dd",
+    "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/summary.aggregate-1.0.0/aggregate.wasm"
+  },
+  "connector_requirements": [],
+  "consumes": [],
+  "dependencies": [],
+  "description": "Pure standalone summary aggregation policy. It counts included and pending references, carries forward the supplied coverage state, and returns a normalized summary for a bounded scope and period. It does not render visuals, score uncertainty, persist state, or know any application workflow.",
+  "emits": [],
+  "event_trigger": null,
+  "evidence": [],
+  "execution": {
+    "binary_format": "wasm",
+    "constraints": {
+      "filesystem_access": "none",
+      "host_api_access": "none",
+      "network_access": "forbidden"
+    },
+    "entrypoint": {
+      "command": "run",
+      "kind": "wasi-command"
+    },
+    "preferred_targets": [
+      "local",
+      "browser",
+      "edge",
+      "device"
+    ]
+  },
+  "id": "summary.aggregate",
+  "inputs": {
+    "schema": {
+      "additionalProperties": false,
+      "properties": {
+        "coverage_state": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "included_reference_ids": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "pending_reference_ids": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "period_key": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "policy": {
+          "additionalProperties": false,
+          "properties": {
+            "version": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "version"
+          ],
+          "type": "object"
+        },
+        "scope_id": {
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "scope_id",
+        "period_key",
+        "coverage_state",
+        "policy"
+      ],
+      "type": "object"
+    }
+  },
+  "kind": "capability_contract",
+  "lifecycle": "active",
+  "name": "aggregate",
+  "namespace": "summary",
+  "outputs": {
+    "schema": {
+      "additionalProperties": false,
+      "properties": {
+        "coverage_state": {
+          "type": "string"
+        },
+        "included_count": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "pending_count": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "period_key": {
+          "type": "string"
+        },
+        "policy_version": {
+          "type": "string"
+        },
+        "scope_id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "scope_id",
+        "period_key",
+        "included_count",
+        "pending_count",
+        "coverage_state",
+        "policy_version"
+      ],
+      "type": "object"
+    }
+  },
+  "owner": {
+    "contact": "maintainers@callweave.local",
+    "team": "callweave"
+  },
+  "permissions": [
+    {
+      "id": "summary.aggregate.execute"
+    }
+  ],
+  "permitted_targets": [
+    "local",
+    "browser",
+    "edge",
+    "device"
+  ],
+  "policies": [
+    {
+      "id": "deterministic-policy-only"
+    }
+  ],
+  "postconditions": [
+    {
+      "description": "The result contains counts only and does not preserve the original reference lists.",
+      "id": "counts-are-explicit"
+    }
+  ],
+  "preconditions": [
+    {
+      "description": "A non-empty scope id, period key, coverage state, and policy version are supplied.",
+      "id": "summary-boundary-is-supplied"
+    }
+  ],
+  "provenance": {
+    "adr_refs": [],
+    "author": "Callweave",
+    "created_at": "2026-08-21T00:00:00Z",
+    "exception_refs": [],
+    "source": "greenfield",
+    "spec_ref": "100-capability-package-authoring@1.0.0"
+  },
+  "schema_version": "1.0.0",
+  "service_type": "stateless",
+  "side_effects": [
+    {
+      "description": "Pure calculation; no host, network, filesystem, model, state, or workflow access.",
+      "kind": "memory_only"
+    }
+  ],
+  "state_schema": null,
+  "summary": "Aggregate bounded-scope references into a deterministic summary record.",
+  "use_cases": [
+    {
+      "happy": true,
+      "input_example": {
+        "coverage_state": "partial",
+        "included_reference_ids": [
+          "obs-1",
+          "obs-2",
+          "obs-3"
+        ],
+        "pending_reference_ids": [
+          "unk-1"
+        ],
+        "period_key": "2026-08-17",
+        "policy": {
+          "version": "summary-policy-1"
+        },
+        "scope_id": "golden-bc"
+      },
+      "output_example": {
+        "coverage_state": "partial",
+        "included_count": 3,
+        "pending_count": 1,
+        "period_key": "2026-08-17",
+        "policy_version": "summary-policy-1",
+        "scope_id": "golden-bc"
+      },
+      "persona_ref": "summary-consumer",
+      "scenario": "As a summary consumer, I want included and pending references counted deterministically so that later policies can consume a stable aggregate without re-reading the original reference lists."
+    },
+    {
+      "happy": true,
+      "input_example": {
+        "coverage_state": "complete",
+        "included_reference_ids": [],
+        "pending_reference_ids": [],
+        "period_key": "2026-08-17",
+        "policy": {
+          "version": "summary-policy-1"
+        },
+        "scope_id": "quiet-site"
+      },
+      "output_example": {
+        "coverage_state": "complete",
+        "included_count": 0,
+        "pending_count": 0,
+        "period_key": "2026-08-17",
+        "policy_version": "summary-policy-1",
+        "scope_id": "quiet-site"
+      },
+      "persona_ref": "summary-consumer",
+      "scenario": "As a summary consumer, I want an empty period summarized explicitly so that downstream scoring can distinguish zero evidence from missing input handling."
+    }
+  ],
+  "version": "1.0.0"
+}

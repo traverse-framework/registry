@@ -1,0 +1,23 @@
+{
+  "kind": "runtime_request",
+  "schema_version": "1.0.0",
+  "request_id": "revision-successor-02",
+  "intent": {
+    "capability_id": "revision.successor-assign",
+    "capability_version": "1.0.0"
+  },
+  "input": {
+    "subject_id": "knowledge-record-2",
+    "previous_revision": 0,
+    "policy": { "version": "revision-policy-1" }
+  },
+  "lookup": {
+    "scope": "prefer_private",
+    "allow_ambiguity": false
+  },
+  "context": {
+    "requested_target": "local",
+    "caller": "callweave-smoke"
+  },
+  "governing_spec": "006-runtime-request-execution"
+}

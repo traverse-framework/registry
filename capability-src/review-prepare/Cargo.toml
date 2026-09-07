@@ -1,0 +1,17 @@
+[workspace]
+
+[package]
+name = "review-prepare-agent"
+version = "1.0.0"
+edition = "2015"
+publish = false
+description = "Callweave-owned source mirror of review.prepare for independently measured registry coverage."
+
+[[bin]]
+name = "review-prepare-agent"
+path = "src/main.rs"
+
+[profile.release]
+opt-level = "s"
+lto = true
+panic = "abort"

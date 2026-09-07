@@ -1,0 +1,17 @@
+{
+  "id": "collaboration-product-owner",
+  "version": "1.0.0",
+  "name": "Collaboration Product Owner",
+  "summary": "Owns document collaboration UX where resource owners retain update rights.",
+  "description": "Sets product rules so document owners can always update their resources regardless of coarse role. Uses core.authorize ownership conditions (principal.id == resource.owner_id) to keep collaboration defaults intuitive.",
+  "distinguished_from": [
+    {
+      "persona_id": "multi-tenant-saas-developer",
+      "how": "Cares about ownership UX within a tenant, not cross-tenant isolation mechanics."
+    },
+    {
+      "persona_id": "platform-developer",
+      "how": "Defines product ownership behavior; does not implement the evaluator runtime."
+    }
+  ]
+}

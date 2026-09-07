@@ -1,0 +1,23 @@
+{
+  "kind": "runtime_request",
+  "schema_version": "1.0.0",
+  "request_id": "review-state-01",
+  "intent": {
+    "capability_id": "review.state-transition-decide",
+    "capability_version": "1.0.0"
+  },
+  "input": {
+    "current_state": "provisional",
+    "review_decision": "verify",
+    "policy": { "version": "review-policy-1" }
+  },
+  "lookup": {
+    "scope": "prefer_private",
+    "allow_ambiguity": false
+  },
+  "context": {
+    "requested_target": "local",
+    "caller": "callweave-smoke"
+  },
+  "governing_spec": "006-runtime-request-execution"
+}

@@ -1,0 +1,235 @@
+{
+  "artifact": {
+    "digest": "sha256:6d1d35da1c6c270057ef451313b93918c138fe73df20cf5915fff184c3f1ed0e",
+    "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/embedding.cluster-organize-1.0.0/cluster-organize.wasm"
+  },
+  "connector_requirements": [],
+  "consumes": [],
+  "dependencies": [],
+  "description": "Pure standalone clustering policy. It groups supplied equal-length embeddings by deterministic cosine threshold, returns stable cluster identifiers and representative members, and never assigns a semantic label. It does not load embeddings, read storage, or mutate any workflow-owned state.",
+  "emits": [],
+  "event_trigger": null,
+  "evidence": [],
+  "execution": {
+    "binary_format": "wasm",
+    "constraints": {
+      "filesystem_access": "none",
+      "host_api_access": "none",
+      "network_access": "forbidden"
+    },
+    "entrypoint": {
+      "command": "run",
+      "kind": "wasi-command"
+    },
+    "preferred_targets": [
+      "local",
+      "browser",
+      "edge",
+      "device"
+    ]
+  },
+  "id": "embedding.cluster-organize",
+  "inputs": {
+    "schema": {
+      "additionalProperties": false,
+      "properties": {
+        "items": {
+          "items": {
+            "additionalProperties": true,
+            "properties": {
+              "embedding": {
+                "items": {
+                  "type": "number"
+                },
+                "minItems": 1,
+                "type": "array"
+              },
+              "id": {
+                "minLength": 1,
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "embedding"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "policy": {
+          "additionalProperties": false,
+          "properties": {
+            "minimum_cosine": {
+              "maximum": 1,
+              "minimum": -1,
+              "type": "number"
+            },
+            "version": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "version",
+            "minimum_cosine"
+          ],
+          "type": "object"
+        }
+      },
+      "required": [
+        "items",
+        "policy"
+      ],
+      "type": "object"
+    }
+  },
+  "kind": "capability_contract",
+  "lifecycle": "active",
+  "name": "cluster-organize",
+  "namespace": "embedding",
+  "outputs": {
+    "schema": {
+      "items": {
+        "additionalProperties": true,
+        "properties": {
+          "member_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "policy_version": {
+            "type": "string"
+          },
+          "representative_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "member_ids",
+          "representative_id",
+          "policy_version"
+        ],
+        "type": "object"
+      },
+      "type": "array"
+    }
+  },
+  "owner": {
+    "contact": "maintainers@callweave.local",
+    "team": "callweave"
+  },
+  "permissions": [
+    {
+      "id": "embedding.cluster-organize.execute"
+    }
+  ],
+  "permitted_targets": [
+    "local",
+    "browser",
+    "edge",
+    "device"
+  ],
+  "policies": [
+    {
+      "id": "deterministic-policy-only"
+    },
+    {
+      "id": "clustering-never-implies-identification"
+    }
+  ],
+  "postconditions": [
+    {
+      "description": "The same items and cosine threshold produce the same grouping and ordering.",
+      "id": "clustering-is-deterministic"
+    },
+    {
+      "description": "Outputs contain only cluster structure, not a semantic identification.",
+      "id": "semantic-labels-are-not-inferred"
+    }
+  ],
+  "preconditions": [
+    {
+      "description": "Every input item has a non-empty id and equal-length finite embeddings.",
+      "id": "equal-finite-embeddings"
+    }
+  ],
+  "provenance": {
+    "adr_refs": [
+      "DECISION_RECORD.md"
+    ],
+    "author": "Callweave",
+    "created_at": "2026-08-21T00:00:00Z",
+    "exception_refs": [],
+    "source": "greenfield",
+    "spec_ref": "100-capability-package-authoring@1.0.0"
+  },
+  "schema_version": "1.0.0",
+  "service_type": "stateless",
+  "side_effects": [
+    {
+      "description": "Pure calculation; no host, network, filesystem, model provider, or workflow access.",
+      "kind": "memory_only"
+    }
+  ],
+  "state_schema": null,
+  "summary": "Cluster supplied embeddings into stable local groups.",
+  "use_cases": [
+    {
+      "happy": true,
+      "input_example": {
+        "items": [
+          {
+            "embedding": [
+              1,
+              0,
+              0
+            ],
+            "id": "ev-1"
+          },
+          {
+            "embedding": [
+              0.99,
+              0.01,
+              0
+            ],
+            "id": "ev-2"
+          },
+          {
+            "embedding": [
+              0,
+              1,
+              0
+            ],
+            "id": "ev-3"
+          }
+        ],
+        "policy": {
+          "minimum_cosine": 0.95,
+          "version": "cluster-1"
+        }
+      },
+      "output_example": [
+        {
+          "member_ids": [
+            "ev-1",
+            "ev-2"
+          ],
+          "policy_version": "cluster-1",
+          "representative_id": "ev-1"
+        },
+        {
+          "member_ids": [
+            "ev-3"
+          ],
+          "policy_version": "cluster-1",
+          "representative_id": "ev-3"
+        }
+      ],
+      "persona_ref": "cluster-reviewer",
+      "scenario": "As a cluster reviewer, I want similar embedded items grouped together so that I can inspect one local cluster instead of isolated items."
+    }
+  ],
+  "version": "1.0.0"
+}

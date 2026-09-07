@@ -1,0 +1,19 @@
+{
+  "kind": "persona",
+  "schema_version": "1.0.0",
+  "id": "revision-consumer",
+  "version": "1.0.0",
+  "name": "Revision Consumer",
+  "summary": "Consumes deterministic append-only revision successor assignments for versioned subjects.",
+  "description": "Uses revision.successor-assign to derive the next append-only revision identifier and predecessor linkage for a versioned subject. Needs monotonic successor numbering without coupling the capability to any domain-specific artifact format or storage engine.",
+  "distinguished_from": [
+    {
+      "persona_id": "artifact-consumer",
+      "how": "Needs successor numbering for a generic versioned subject, rather than artifact-specific correction metadata and immutable lineage handling."
+    },
+    {
+      "persona_id": "approval-consumer",
+      "how": "Consumes append-only successor assignment metadata, rather than a governed proposal approval application decision."
+    }
+  ]
+}

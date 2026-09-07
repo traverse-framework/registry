@@ -1,0 +1,5 @@
+{
+  "deprecated": true,
+  "reason": "Superseded by honesty republish under Spec 102 v1.1.0 / Decision 58 (declared surface not fully covered by use_cases/smokes)",
+  "deprecated_at": "2026-08-10T07:10:52Z"
+}
