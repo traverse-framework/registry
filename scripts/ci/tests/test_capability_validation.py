@@ -871,6 +871,88 @@ class CheckNewContractArtifactReferenceTests(unittest.TestCase):
             self.assertIn("contract.invalid_artifact_url", codes)
 
 
+class CheckNewContractAuthoringMethodTests(unittest.TestCase):
+    """check_new_contract_authoring_method implements spec
+    023-authoring-assurance FR-001/FR-003 for newly ADDED or CHANGED
+    contracts. Diff-based only -- pre-023 immutable publishes have no
+    `authoring` block and must never be retro-flagged."""
+
+    LLM_AUDIT = {
+        "source_revision": "abc1234",
+        "test_evidence": "https://github.com/traverse-framework/registry/actions/runs/1",
+        "review": "approved by @owner in PR #999",
+    }
+
+    def _contract(self, authoring):
+        c = valid_contract()
+        if authoring is not None:
+            c["authoring"] = authoring
+        return c
+
+    def test_human_method_passes(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = write_contract(tmp, self._contract({"method": "human"}))
+            errors: list = []
+            capability_validation.check_new_contract_authoring_method(path, errors)
+            self.assertEqual(errors, [])
+
+    def test_llm_assisted_with_full_audit_passes(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = write_contract(
+                tmp, self._contract({"method": "llm-assisted", **self.LLM_AUDIT})
+            )
+            errors: list = []
+            capability_validation.check_new_contract_authoring_method(path, errors)
+            self.assertEqual(errors, [])
+
+    def test_missing_authoring_block_is_rejected(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = write_contract(tmp, self._contract(None))
+            errors: list = []
+            capability_validation.check_new_contract_authoring_method(path, errors)
+            self.assertIn(
+                "contract.missing_authoring_method", [e["code"] for e in errors]
+            )
+
+    def test_authoring_without_method_is_rejected(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = write_contract(tmp, self._contract({"note": "no method here"}))
+            errors: list = []
+            capability_validation.check_new_contract_authoring_method(path, errors)
+            self.assertIn(
+                "contract.missing_authoring_method", [e["code"] for e in errors]
+            )
+
+    def test_unknown_method_is_rejected(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = write_contract(tmp, self._contract({"method": "ai-generated"}))
+            errors: list = []
+            capability_validation.check_new_contract_authoring_method(path, errors)
+            self.assertIn(
+                "contract.invalid_authoring_method", [e["code"] for e in errors]
+            )
+
+    def test_llm_assisted_missing_audit_field_is_rejected(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            partial = {"method": "llm-assisted", **self.LLM_AUDIT}
+            del partial["review"]
+            path = write_contract(tmp, self._contract(partial))
+            errors: list = []
+            capability_validation.check_new_contract_authoring_method(path, errors)
+            self.assertIn(
+                "contract.missing_authoring_audit", [e["code"] for e in errors]
+            )
+
+    def test_human_method_needs_no_audit_fields(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = write_contract(tmp, self._contract({"method": "human"}))
+            errors: list = []
+            capability_validation.check_new_contract_authoring_method(path, errors)
+            self.assertEqual(
+                [e for e in errors if e["code"] == "contract.missing_authoring_audit"], []
+            )
+
+
 class ExpectedCapabilitySrcCrateTests(unittest.TestCase):
     def test_dots_replaced_with_dashes(self):
         self.assertEqual(
