@@ -529,6 +529,13 @@
       "evidence": "side_effects=[memory_only], empty emits/consumes, and a direct deterministic successor result; the capability does not store, publish, or broadcast an asynchronous domain fact."
     },
     {
+      "capability_id": "core.evaluate-schedule-trigger",
+      "published_versions": ["1.0.0"],
+      "path": "capabilities/core/core.evaluate-schedule-trigger/1.0.0/contract.json",
+      "classification": "no-event-required",
+      "evidence": "side_effects=[memory_only], empty emits/consumes, and a direct deterministic schedule evaluation result; the capability does not install a timer or broadcast an asynchronous domain fact."
+    },
+    {
       "capability_id": "core.validate-audio-source-profile",
       "published_versions": [
         "1.0.0"

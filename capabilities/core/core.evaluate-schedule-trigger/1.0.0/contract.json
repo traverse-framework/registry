@@ -1,0 +1,242 @@
+{
+  "kind": "capability_contract",
+  "schema_version": "1.0.0",
+  "id": "core.evaluate-schedule-trigger",
+  "namespace": "core",
+  "name": "evaluate-schedule-trigger",
+  "version": "1.0.0",
+  "lifecycle": "active",
+  "owner": {
+    "team": "traverse-core",
+    "contact": "maintainers@traverse-framework.org"
+  },
+  "summary": "Evaluate declared trigger context into a connector-neutral scheduling plan.",
+  "description": "Pure scheduling-policy evaluation. It does not read a clock, install a timer, or invoke a scheduler; a host supplies trigger context and owns wake-up authority.",
+  "use_cases": [
+    {
+      "scenario": "As an operations operator, I want a due trigger turned into a portable scheduler plan so that a compatible host may execute it.",
+      "input_example": {
+        "trigger_id": "trigger:daily-close",
+        "job_kind": "close-period",
+        "calendar_policy_ref": "policy:local-day",
+        "logical_deadline": "2026-09-06T06:00:00Z",
+        "is_due": true,
+        "idempotency_key": "close-1"
+      },
+      "output_example": {
+        "connector_id": "traverse.scheduler",
+        "operation": "schedule_invocation",
+        "job_kind": "close-period",
+        "calendar_policy_ref": "policy:local-day",
+        "logical_deadline": "2026-09-06T06:00:00Z",
+        "idempotency_key": "close-1",
+        "result_class": "planned"
+      },
+      "happy": true,
+      "persona_ref": "operations-operator"
+    },
+    {
+      "scenario": "As an operations operator, I want a not-due trigger represented without scheduling anything so that duplicate work is avoided.",
+      "input_example": {
+        "trigger_id": "trigger:daily-close",
+        "job_kind": "close-period",
+        "calendar_policy_ref": "policy:local-day",
+        "logical_deadline": "2026-09-06T06:00:00Z",
+        "is_due": false,
+        "idempotency_key": "close-1"
+      },
+      "output_example": {
+        "connector_id": "",
+        "operation": "",
+        "job_kind": "",
+        "calendar_policy_ref": "",
+        "logical_deadline": "",
+        "idempotency_key": "",
+        "result_class": "not_due"
+      },
+      "happy": true,
+      "persona_ref": "operations-operator"
+    },
+    {
+      "scenario": "As an operations operator, I want missing trigger context rejected before a scheduler is invoked, so that no ambiguous timer request is created.",
+      "input_example": {
+        "trigger_id": "",
+        "job_kind": "close-period",
+        "calendar_policy_ref": "policy:local-day",
+        "logical_deadline": "2026-09-06T06:00:00Z",
+        "is_due": true,
+        "idempotency_key": "close-1"
+      },
+      "output_example": {
+        "connector_id": "",
+        "operation": "",
+        "job_kind": "",
+        "calendar_policy_ref": "",
+        "logical_deadline": "",
+        "idempotency_key": "",
+        "result_class": "invalid_request"
+      },
+      "happy": false,
+      "persona_ref": "operations-operator"
+    }
+  ],
+  "inputs": {
+    "schema": {
+      "type": "object",
+      "required": [
+        "trigger_id",
+        "job_kind",
+        "calendar_policy_ref",
+        "logical_deadline",
+        "is_due",
+        "idempotency_key"
+      ],
+      "properties": {
+        "trigger_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "job_kind": {
+          "type": "string",
+          "minLength": 1
+        },
+        "calendar_policy_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "logical_deadline": {
+          "type": "string",
+          "minLength": 1
+        },
+        "is_due": {
+          "type": "boolean"
+        },
+        "idempotency_key": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "outputs": {
+    "schema": {
+      "type": "object",
+      "required": [
+        "connector_id",
+        "operation",
+        "job_kind",
+        "calendar_policy_ref",
+        "logical_deadline",
+        "idempotency_key",
+        "result_class"
+      ],
+      "properties": {
+        "connector_id": {
+          "type": "string"
+        },
+        "operation": {
+          "type": "string"
+        },
+        "job_kind": {
+          "type": "string"
+        },
+        "calendar_policy_ref": {
+          "type": "string"
+        },
+        "logical_deadline": {
+          "type": "string"
+        },
+        "idempotency_key": {
+          "type": "string"
+        },
+        "result_class": {
+          "type": "string",
+          "enum": [
+            "planned",
+            "not_due",
+            "invalid_request"
+          ]
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "preconditions": [
+    {
+      "id": "host-provided-trigger-context",
+      "description": "A host supplies declared trigger context rather than the capability reading ambient time."
+    }
+  ],
+  "postconditions": [
+    {
+      "id": "deterministic",
+      "description": "Identical trigger context produces identical output."
+    },
+    {
+      "id": "no-timer-authority",
+      "description": "The capability never installs, cancels, or invokes a timer."
+    }
+  ],
+  "side_effects": [
+    {
+      "kind": "memory_only",
+      "description": "Pure scheduling plan calculation."
+    }
+  ],
+  "emits": [],
+  "consumes": [],
+  "permissions": [
+    {
+      "id": "core.evaluate-schedule-trigger.execute"
+    }
+  ],
+  "execution": {
+    "binary_format": "wasm",
+    "entrypoint": {
+      "kind": "wasi-command",
+      "command": "run"
+    },
+    "preferred_targets": [
+      "local",
+      "browser",
+      "edge",
+      "device"
+    ],
+    "constraints": {
+      "host_api_access": "none",
+      "network_access": "forbidden",
+      "filesystem_access": "none"
+    }
+  },
+  "policies": [
+    {
+      "id": "declared-trigger-policy"
+    }
+  ],
+  "dependencies": [],
+  "provenance": {
+    "source": "greenfield",
+    "author": "traverse-core",
+    "created_at": "2026-09-07T00:00:00Z",
+    "spec_ref": "100-capability-package-authoring@1.0.0",
+    "adr_refs": [
+      "ADR-0039"
+    ],
+    "exception_refs": []
+  },
+  "evidence": [],
+  "state_schema": null,
+  "service_type": "stateless",
+  "permitted_targets": [
+    "local",
+    "browser",
+    "edge",
+    "device"
+  ],
+  "artifact_type": "native",
+  "artifact": {
+    "digest": "sha256:c8d85da189bbf102fee82fdbc7c1aaaceb4348e11f8074badd98084602cb7fa7",
+    "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/core.evaluate-schedule-trigger-1.0.0/core-evaluate-schedule-trigger.wasm"
+  }
+}
