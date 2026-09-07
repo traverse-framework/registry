@@ -1,0 +1,29 @@
+{
+  "kind": "capability_package",
+  "schema_version": "1.0.0",
+  "package_id": "inference.evidence-normalize",
+  "version": "1.0.0",
+  "summary": "Portable WASI package for deterministic inference evidence normalization.",
+  "capability_ref": {
+    "id": "inference.evidence-normalize",
+    "version": "1.0.0",
+    "contract_path": "contract.json"
+  },
+  "binary": {
+    "format": "wasm",
+    "path": "artifacts/evidence-normalize.wasm",
+    "abi_version": "1.0.0",
+    "expected_digest": "sha256:849318a47433948d6c7e964bbcb644a60adad63ddc193e4b6f6d3c20502466a3"
+  },
+  "source": {
+    "language": "rust",
+    "path": "src/agent.rs",
+    "entry": "run"
+  },
+  "constraints": {
+    "host_api_access": "none",
+    "network_access": "forbidden",
+    "filesystem_access": "none"
+  },
+  "known_compositions": []
+}
