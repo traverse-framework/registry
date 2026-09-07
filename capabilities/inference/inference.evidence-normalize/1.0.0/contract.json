@@ -5,7 +5,7 @@
   "namespace": "inference",
   "name": "evidence-normalize",
   "version": "1.0.0",
-  "lifecycle": "draft",
+  "lifecycle": "active",
   "owner": {
     "team": "callweave",
     "contact": "maintainers@callweave.local"
