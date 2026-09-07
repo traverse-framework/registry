@@ -58,7 +58,7 @@
       "persona_ref": "operations-operator"
     },
     {
-      "scenario": "As an operations operator, I want missing trigger context rejected before a scheduler is invoked.",
+      "scenario": "As an operations operator, I want missing trigger context rejected before a scheduler is invoked, so that no ambiguous timer request is created.",
       "input_example": {
         "trigger_id": "",
         "job_kind": "close-period",
