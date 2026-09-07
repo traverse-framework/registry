@@ -1184,12 +1184,12 @@ class SignatureCompletenessTests(unittest.TestCase):
         if enforced:
             (Path(tmp) / "capabilities" / ".signatures-enforced").write_text("enforced\n")
 
-    def _run(self, tmp):
+    def _run(self, tmp, pr_added_dirs=None):
         errors: list = []
         cwd = os.getcwd()
         try:
             os.chdir(tmp)
-            capability_validation.check_signature_siblings(errors)
+            capability_validation.check_signature_siblings(errors, pr_added_dirs)
         finally:
             os.chdir(cwd)
         return errors
@@ -1213,6 +1213,27 @@ class SignatureCompletenessTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             self._tree(tmp, signed=True, enforced=True)
             self.assertEqual(self._run(tmp), [])
+
+    def test_unsigned_version_added_by_this_pr_is_exempt_when_enforced(self):
+        """spec 007 Amendment FR-007/FR-009: the first publish of an
+        artifact-bearing capability cannot carry its own signature.json (the
+        sign-artifacts job runs post-merge), so an ADDED-in-PR version dir must
+        not hard-fail even with the marker committed."""
+        with tempfile.TemporaryDirectory() as tmp:
+            self._tree(tmp, signed=False, enforced=True)
+            added = {"capabilities/core/core.example/1.0.0"}
+            self.assertEqual(self._run(tmp, pr_added_dirs=added), [])
+
+    def test_preexisting_unsigned_version_still_fails_even_with_a_pr_add(self):
+        """The drift / self-healing net must not be silenced just because the
+        same PR also adds a (different) new capability."""
+        with tempfile.TemporaryDirectory() as tmp:
+            self._tree(tmp, signed=False, enforced=True)
+            unrelated_add = {"capabilities/core/core.other/2.0.0"}
+            self.assertIn(
+                "signature.missing",
+                [e["code"] for e in self._run(tmp, pr_added_dirs=unrelated_add)],
+            )
 
 
 if __name__ == "__main__":

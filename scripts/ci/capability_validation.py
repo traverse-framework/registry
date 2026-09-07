@@ -87,6 +87,12 @@ once written (FR-012, wired into check_immutability). Signature
 having one -- is advisory until capabilities/.signatures-enforced is
 committed by the backfill (registry#335), since the CI signing job
 (registry#334) writes these post-merge and pre-backfill history has none.
+Once enforced, completeness is still diff-aware: a version whose
+contract.json is ADDED by the PR under test is exempt (FR-007 binds only
+"once the CI signing job (FR-009) has run", and FR-009 runs on merge to
+main, not on a PR) -- it is reported as an advisory worklist for the
+post-merge signer, never as a merge blocker. Pre-existing unsigned
+versions still hard-fail, as the drift / self-healing net.
 """
 
 import json
@@ -1354,22 +1360,53 @@ def validate_signature_file(path: Path, errors: list) -> None:
         fail(errors, "signature.bad_signed_at", str(path), "'signed_at' must be a non-empty ISO-8601 UTC timestamp string")
 
 
-def check_signature_siblings(errors: list) -> None:
+def pr_added_contract_version_dirs(base_sha: str, head_sha: str) -> set:
+    """Version dirs whose contract.json is ADDED (git status 'A') in this PR's
+    diff -- the same 'newly-ADDED only' basis every other new-contract check in
+    this file works from. Raises subprocess.CalledProcessError if the diff can't
+    be computed; callers wrap it exactly as they wrap the other diff helpers."""
+    diff = subprocess.check_output(
+        ["git", "diff", "--name-status", f"{base_sha}...{head_sha}", "--", "capabilities/"],
+        text=True,
+    )
+    added = set()
+    for line in diff.splitlines():
+        if not line.strip():
+            continue
+        parts = line.split("\t")
+        status, path = parts[0], parts[-1]
+        if status == "A" and path.endswith("contract.json"):
+            added.add(str(Path(path).parent))
+    return added
+
+
+def check_signature_siblings(errors: list, pr_added_dirs: set = None) -> None:
     """specs/007-artifact-hosting Amendment: every `signature.json` that exists is
-    validated for shape/immutability-of-content. Completeness (FR-007: every
-    non-deprecated, artifact-bearing version HAS one) is only hard-enforced once
-    `capabilities/.signatures-enforced` is committed -- the backfill (registry#335)
-    adds that marker as its final step. Before then the gap is advisory-only,
-    because signatures are written post-merge and pre-backfill history has none."""
+    validated for shape/immutability-of-content (whole-tree, always).
+
+    Completeness -- FR-007, every non-deprecated artifact-bearing version HAS one
+    -- is only hard-enforced once `capabilities/.signatures-enforced` is committed
+    (the registry#335 backfill's final step). Even then, a version whose
+    contract.json is ADDED by *this* PR (``pr_added_dirs``) is exempt from the
+    hard failure: FR-007 binds only "once the CI signing job (FR-009) has run",
+    and FR-009 signs on merge to `main`, never on a PR -- so the first publish of
+    any artifact-bearing capability structurally cannot carry its own
+    signature.json. Those are surfaced as an advisory (the post-merge signer's
+    worklist), not a merge blocker. Pre-existing unsigned versions still hard-fail
+    when the marker is set -- that branch is the drift / self-healing net, and a
+    new PR must not silence it."""
     capabilities_dir = Path("capabilities")
     if not capabilities_dir.is_dir():
         return
+
+    pr_added_dirs = pr_added_dirs or set()
 
     for sig_path in sorted(capabilities_dir.rglob("signature.json")):
         validate_signature_file(sig_path, errors)
 
     enforced = SIGNATURES_ENFORCED_MARKER.is_file()
-    unsigned = []
+    unsigned_preexisting = []
+    unsigned_new_in_pr = []
     for contract_path in sorted(capabilities_dir.rglob("contract.json")):
         version_dir = contract_path.parent
         if (version_dir / "deprecated.json").is_file():
@@ -1380,13 +1417,25 @@ def check_signature_siblings(errors: list) -> None:
             continue
         if not isinstance(artifact, dict):
             continue
-        if not (version_dir / "signature.json").is_file():
-            unsigned.append(str(version_dir))
+        if (version_dir / "signature.json").is_file():
+            continue
+        if str(version_dir) in pr_added_dirs:
+            unsigned_new_in_pr.append(str(version_dir))
+        else:
+            unsigned_preexisting.append(str(version_dir))
 
-    if not unsigned:
+    if unsigned_new_in_pr:
+        print(json.dumps({
+            "advisory": "signature.pending_post_merge",
+            "version_dirs": sorted(unsigned_new_in_pr),
+            "note": "added by this PR; the sign-artifacts job signs these on merge to "
+                    "main (spec 007 Amendment FR-009) -- not a PR merge blocker",
+        }, indent=2), file=sys.stderr)
+
+    if not unsigned_preexisting:
         return
     if enforced:
-        for version_dir in unsigned:
+        for version_dir in unsigned_preexisting:
             fail(
                 errors,
                 "signature.missing",
@@ -1397,7 +1446,7 @@ def check_signature_siblings(errors: list) -> None:
     else:
         print(json.dumps({
             "advisory": "signature.backfill_pending",
-            "unsigned_count": len(unsigned),
+            "unsigned_count": len(unsigned_preexisting),
             "note": "capabilities/.signatures-enforced not committed yet (registry#335 "
                     "backfill); signature completeness is advisory until then",
         }, indent=2), file=sys.stderr)
@@ -1460,12 +1509,24 @@ def main() -> int:
     workflows_dir = Path("workflows")
     personas_dir = Path("personas")
 
+    base_sha = None
+    head_sha = None
+    if len(sys.argv) >= 3:
+        base_sha, head_sha = sys.argv[1], sys.argv[2]
+
+    pr_added_dirs: set = set()
+    if base_sha and head_sha:
+        try:
+            pr_added_dirs = pr_added_contract_version_dirs(base_sha, head_sha)
+        except subprocess.CalledProcessError as exc:
+            fail(errors, "git.diff_failed", "capabilities/", f"Unable to compute diff: {exc}")
+
     if capabilities_dir.is_dir():
         for contract_path in sorted(capabilities_dir.rglob("contract.json")):
             validate_contract(contract_path, errors)
         check_semver_bump(errors)
         check_dependency_resolvability(errors)
-        check_signature_siblings(errors)
+        check_signature_siblings(errors, pr_added_dirs)
 
     if personas_dir.is_dir():
         for persona_path in sorted(personas_dir.rglob("persona.json")):
@@ -1481,10 +1542,6 @@ def main() -> int:
 
     check_ecca_capability_inventory_coverage(errors)
 
-    base_sha = None
-    head_sha = None
-    if len(sys.argv) >= 3:
-        base_sha, head_sha = sys.argv[1], sys.argv[2]
     if base_sha and head_sha:
         try:
             check_immutability(base_sha, head_sha, errors)
