@@ -1,0 +1,12 @@
+//! Pure bounded capture-request planning; host microphone access is external.
+#![cfg_attr(not(test), no_std)]
+#![cfg_attr(not(test), no_main)]
+extern crate alloc;
+use alloc::string::String;
+use wasi_capability_runtime::{object,Value};
+fn text<'a>(v:Option<&'a Value>,k:&str)->Option<&'a str>{v?.get(k)?.as_str().filter(|s|!s.is_empty())}
+fn positive(v:Option<&Value>)->Option<i64>{let n=v?.as_f64()?;(n.is_finite()&&n>=1.0&&n<=i64::MAX as f64&&n==(n as i64) as f64).then_some(n as i64)}
+fn output(id:&str,profile:&str,duration:i64,key:&str,result:&str)->Value{let connector=if result=="planned"{"traverse.audio-input"}else{""};let operation=if result=="planned"{"capture_segment"}else{""};object(alloc::vec![("connector_id",Value::String(String::from(connector))), ("operation",Value::String(String::from(operation))), ("request_id",Value::String(String::from(id))), ("source_profile_ref",Value::String(String::from(profile))), ("duration_seconds",Value::Number(duration as f64)), ("idempotency_key",Value::String(String::from(key))), ("result_class",Value::String(String::from(result)))])}
+fn plan(input:Value)->Value{let id=text(Some(&input),"request_id").unwrap_or("");let profile=text(Some(&input),"source_profile_ref").unwrap_or("");let key=text(Some(&input),"idempotency_key").unwrap_or("");let duration=positive(input.get("duration_seconds"));if id.is_empty()||profile.is_empty()||key.is_empty(){return output(id,"",0,"","invalid_request")}if duration.is_none_or(|n|n>3600){return output(id,"",0,"","duration_out_of_bounds")}output(id,profile,duration.unwrap_or_default(),key,"planned")}
+#[cfg(not(test))]#[unsafe(no_mangle)]pub extern "C" fn _start(){wasi_capability_runtime::run_capability(plan)}
+#[cfg(test)]mod tests{use super::*;fn req(d:Value)->Value{object(alloc::vec![("request_id",Value::String(String::from("r"))),("source_profile_ref",Value::String(String::from("profile:p"))),("duration_seconds",d),("idempotency_key",Value::String(String::from("k")))])}fn result(v:&Value)->Option<&str>{v.get("result_class").and_then(Value::as_str)}#[test]fn accepts_bounded(){assert_eq!(result(&plan(req(Value::Number(900.0)))),Some("planned"))}#[test]fn rejects_long(){assert_eq!(result(&plan(req(Value::Number(3601.0)))),Some("duration_out_of_bounds"))}#[test]fn rejects_missing(){assert_eq!(result(&plan(object(alloc::vec![]))),Some("invalid_request"))}#[test]fn rejects_fractional(){assert_eq!(positive(Some(&Value::Number(1.5))),None)} }
