@@ -506,6 +506,15 @@
       "evidence": "side_effects=[memory_only], empty emits/consumes, and a direct deterministic planning result; the capability does not create or broadcast an asynchronous domain fact."
     },
     {
+      "capability_id": "core.prepare-inference-request",
+      "published_versions": [
+        "1.0.0"
+      ],
+      "path": "capabilities/core/core.prepare-inference-request/1.0.0/contract.json",
+      "classification": "no-event-required",
+      "evidence": "side_effects=[memory_only], empty emits/consumes, and a direct deterministic inference request plan; the capability does not select or execute a model or broadcast an asynchronous domain fact."
+    },
+    {
       "capability_id": "core.validate-audio-source-profile",
       "published_versions": [
         "1.0.0"
