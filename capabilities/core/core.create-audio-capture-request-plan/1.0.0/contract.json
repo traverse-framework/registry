@@ -1,0 +1,247 @@
+{
+  "kind": "capability_contract",
+  "schema_version": "1.0.0",
+  "id": "core.create-audio-capture-request-plan",
+  "namespace": "core",
+  "name": "create-audio-capture-request-plan",
+  "version": "1.0.0",
+  "lifecycle": "active",
+  "owner": {
+    "team": "traverse-core",
+    "contact": "maintainers@traverse-framework.org"
+  },
+  "summary": "Create a deterministic bounded audio capture request plan.",
+  "description": "Plans one bounded capture request using opaque identifiers. It does not discover devices, request permission, capture audio, access storage, invoke connectors, or know an application or workflow.",
+  "use_cases": [
+    {
+      "scenario": "As an audio operator, I want a valid bounded segment represented as a portable plan, so that a compatible host may later execute it.",
+      "input_example": {
+        "request_id": "capture-1",
+        "source_profile_ref": "profile:mono-48k",
+        "duration_seconds": 900,
+        "idempotency_key": "capture-1"
+      },
+      "output_example": {
+        "connector_id": "traverse.audio-input",
+        "operation": "capture_segment",
+        "request_id": "capture-1",
+        "source_profile_ref": "profile:mono-48k",
+        "duration_seconds": 900,
+        "idempotency_key": "capture-1",
+        "result_class": "planned"
+      },
+      "happy": true,
+      "persona_ref": "audio-operator"
+    },
+    {
+      "scenario": "As an audio operator, I want the one-hour maximum enforced, so that capture resource limits remain portable.",
+      "input_example": {
+        "request_id": "capture-long",
+        "source_profile_ref": "profile:p",
+        "duration_seconds": 3601,
+        "idempotency_key": "capture-long"
+      },
+      "output_example": {
+        "connector_id": "",
+        "operation": "",
+        "request_id": "capture-long",
+        "source_profile_ref": "",
+        "duration_seconds": 0,
+        "idempotency_key": "",
+        "result_class": "duration_out_of_bounds"
+      },
+      "happy": false,
+      "persona_ref": "audio-operator"
+    },
+    {
+      "scenario": "As an audio operator, I want missing identifiers rejected, so that a host is never asked to infer capture intent from ambient state.",
+      "input_example": {
+        "request_id": "",
+        "source_profile_ref": "profile:p",
+        "duration_seconds": 900,
+        "idempotency_key": "k"
+      },
+      "output_example": {
+        "connector_id": "",
+        "operation": "",
+        "request_id": "",
+        "source_profile_ref": "",
+        "duration_seconds": 0,
+        "idempotency_key": "",
+        "result_class": "invalid_request"
+      },
+      "happy": false,
+      "persona_ref": "audio-operator"
+    },
+    {
+      "scenario": "As an audio operator, I want fractional duration rejected, so that plans remain integer and reproducible.",
+      "input_example": {
+        "request_id": "capture-fraction",
+        "source_profile_ref": "profile:p",
+        "duration_seconds": 1.5,
+        "idempotency_key": "k"
+      },
+      "output_example": {
+        "connector_id": "",
+        "operation": "",
+        "request_id": "capture-fraction",
+        "source_profile_ref": "",
+        "duration_seconds": 0,
+        "idempotency_key": "",
+        "result_class": "invalid_request"
+      },
+      "happy": false,
+      "persona_ref": "audio-operator"
+    }
+  ],
+  "inputs": {
+    "schema": {
+      "type": "object",
+      "required": [
+        "request_id",
+        "source_profile_ref",
+        "duration_seconds",
+        "idempotency_key"
+      ],
+      "properties": {
+        "request_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_profile_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "duration_seconds": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 3600
+        },
+        "idempotency_key": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "outputs": {
+    "schema": {
+      "type": "object",
+      "required": [
+        "connector_id",
+        "operation",
+        "request_id",
+        "source_profile_ref",
+        "duration_seconds",
+        "idempotency_key",
+        "result_class"
+      ],
+      "properties": {
+        "connector_id": {
+          "type": "string"
+        },
+        "operation": {
+          "type": "string"
+        },
+        "request_id": {
+          "type": "string"
+        },
+        "source_profile_ref": {
+          "type": "string"
+        },
+        "duration_seconds": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "idempotency_key": {
+          "type": "string"
+        },
+        "result_class": {
+          "type": "string",
+          "enum": [
+            "planned",
+            "duration_out_of_bounds",
+            "invalid_request"
+          ]
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "preconditions": [
+    {
+      "id": "bounded-request",
+      "description": "Opaque identifiers and a duration no greater than one hour are supplied."
+    }
+  ],
+  "postconditions": [
+    {
+      "id": "deterministic",
+      "description": "Identical input creates identical output."
+    },
+    {
+      "id": "no-host-invocation",
+      "description": "Planning never invokes an audio-input connector."
+    }
+  ],
+  "side_effects": [
+    {
+      "kind": "memory_only",
+      "description": "Pure plan creation."
+    }
+  ],
+  "emits": [],
+  "consumes": [],
+  "permissions": [
+    {
+      "id": "core.create-audio-capture-request-plan.execute"
+    }
+  ],
+  "execution": {
+    "binary_format": "wasm",
+    "entrypoint": {
+      "kind": "wasi-command",
+      "command": "run"
+    },
+    "preferred_targets": [
+      "local",
+      "edge",
+      "device"
+    ],
+    "constraints": {
+      "host_api_access": "none",
+      "network_access": "forbidden",
+      "filesystem_access": "none"
+    }
+  },
+  "policies": [
+    {
+      "id": "bounded-capture-request"
+    }
+  ],
+  "dependencies": [],
+  "provenance": {
+    "source": "greenfield",
+    "author": "traverse-core",
+    "created_at": "2026-09-07T00:00:00Z",
+    "spec_ref": "100-capability-package-authoring@1.0.0",
+    "adr_refs": [
+      "ADR-0039"
+    ],
+    "exception_refs": []
+  },
+  "evidence": [],
+  "state_schema": null,
+  "service_type": "stateless",
+  "permitted_targets": [
+    "local",
+    "edge",
+    "device"
+  ],
+  "artifact_type": "native",
+  "artifact": {
+    "digest": "sha256:10fcd7c6e53d0f16cf396b2601864c85436d686e79dee4ae8ffec50b083a6baf",
+    "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/core.create-audio-capture-request-plan-1.0.0/core-create-audio-capture-request-plan.wasm"
+  }
+}
