@@ -1,0 +1,15 @@
+[workspace]
+[package]
+name = "audio-calibration-plan-create"
+version = "1.0.0"
+edition = "2021"
+publish = false
+[[bin]]
+name = "audio-calibration-plan-create"
+path = "src/main.rs"
+[dependencies]
+wasi-capability-runtime = { path = "../wasi-capability-runtime" }
+[profile.release]
+opt-level = "s"
+lto = true
+panic = "abort"
