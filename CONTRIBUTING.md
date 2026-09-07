@@ -94,6 +94,31 @@ FR-019 (decision-log entry 83). Whether a genuinely lighter-weight shared path
 is ever worth building is an open question the publication-lifecycle report
 (`docs/publication-lifecycle-report.md`) is meant to inform with evidence.
 
+## Agent-assisted contributions
+
+An LLM or coding agent may materially help author a contract, artifact source, or
+any other change here. When it does, **two records must stay separate**:
+
+- **How it was authored** belongs in the contract's `authoring` block —
+  `authoring.method` is `human` or `llm-assisted`
+  (`specs/023-authoring-assurance/spec.md` FR-001/FR-003). This is the governed
+  provenance record, and the only place LLM assistance is declared.
+- **Who is accountable** is the git author identity on every commit, which the
+  org CLA gate (`traverse-framework/.github` → `reusable-cla.yml`) checks against
+  its allowlist. Every commit MUST be authored by a CLA-covered identity: the
+  operating human, or a sanctioned bot already on the allowlist (`claude`,
+  `cursoragent`, any `*[bot]`). A tool-local author such as `Codex <codex@local>`
+  matches no allowlist entry, cannot accept the CLA, and fails the required `cla`
+  check (this is what `#369` hit).
+
+Set a CLA-covered `user.name` / `user.email` *before* committing and record the
+LLM assistance in `authoring.method`. Do **not** clear a CLA failure by squashing
+agent commits down to a human author just to pass the gate — that also destroys
+the per-commit attribution `023` is trying to preserve. Sanctioning a new agent
+identity means adding it to the `traverse-framework/.github` CLA allowlist first
+(a separate, org-level change); `claude` and `cursoragent` are already covered,
+so no allowlist change is needed to use them.
+
 ## Core Rules
 
 - Approved specs are versioned, immutable, and merge-gating.
@@ -111,5 +136,6 @@ Every pull request should:
 Pull requests should not merge if:
 
 - deterministic CI checks fail
-- a required CLA has not been accepted
+- a required CLA has not been accepted — including a commit authored by a
+  non-CLA-covered identity (see [Agent-assisted contributions](#agent-assisted-contributions))
 - the change edits an already-published capability version in place instead of adding a new one
