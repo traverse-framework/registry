@@ -318,6 +318,20 @@
         "crates/traverse-registry/",
         "specs/021-host-load-trust-boundary-adoption/"
       ]
+    },
+    {
+      "id": "022-publication-lifecycle-measurement",
+      "version": "1.0.0",
+      "status": "approved",
+      "immutable": true,
+      "path": "specs/022-publication-lifecycle-measurement/spec.md",
+      "governs": [
+        "specs/022-publication-lifecycle-measurement/",
+        "scripts/ci/measurement_validation.py",
+        "scripts/ci/tests/test_measurement_validation.py",
+        "scripts/metrics/",
+        "metrics/"
+      ]
     }
   ],
   "draft_specs": [

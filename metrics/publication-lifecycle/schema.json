@@ -1,0 +1,107 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://registry.traverse-framework.com/schemas/publication-lifecycle-record-1.0.0.json",
+  "title": "Publication lifecycle measurement record",
+  "description": "Opt-in, aggregate, per-PR record of capability publication friction for traverse-framework/registry. Governed by specs/022-publication-lifecycle-measurement. Contains no capability id, namespace, owner, author, or wall-clock timestamp by construction; scripts/ci/measurement_validation.py enforces the redaction rules this schema cannot express.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "record_schema_version",
+    "pr_number",
+    "period",
+    "outcome",
+    "hours_open_to_conclusion",
+    "review_rounds",
+    "complexity",
+    "rubric",
+    "ci_failure_counts"
+  ],
+  "properties": {
+    "record_schema_version": {
+      "const": "1.0.0"
+    },
+    "pr_number": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "The traverse-framework/registry PR this record measures. Must equal the <n> in the pr-<n>.json filename."
+    },
+    "period": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-(0[1-9]|1[0-2])$",
+      "description": "Calendar month (YYYY-MM) the PR reached its outcome. Month precision only — no day, no time (FR-003)."
+    },
+    "outcome": {
+      "enum": ["merged", "closed_unmerged"]
+    },
+    "hours_open_to_conclusion": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Whole hours from PR open to merge or close."
+    },
+    "review_rounds": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Count of distinct review submissions / change-request cycles on the PR."
+    },
+    "complexity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["computed", "final", "override", "override_reason"],
+      "properties": {
+        "computed": { "enum": ["simple", "complex"] },
+        "final": { "enum": ["simple", "complex"] },
+        "override": { "type": "boolean" },
+        "override_reason": {
+          "type": ["string", "null"],
+          "maxLength": 200,
+          "description": "Null unless override is true. When set: 1-200 chars, no email / @handle / URL (FR-002, FR-005)."
+        }
+      }
+    },
+    "rubric": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "effectful",
+        "dependency_count",
+        "changed_specs",
+        "added_persona",
+        "schema_field_count",
+        "schema_field_threshold"
+      ],
+      "properties": {
+        "effectful": { "type": "boolean" },
+        "dependency_count": { "type": "integer", "minimum": 0 },
+        "changed_specs": { "type": "boolean" },
+        "added_persona": { "type": "boolean" },
+        "schema_field_count": { "type": "integer", "minimum": 0 },
+        "schema_field_threshold": { "type": "integer", "minimum": 1 }
+      },
+      "description": "The six deterministic signals behind complexity.computed. measurement_validation.py recomputes the verdict and rejects a record where it disagrees with complexity.computed (FR-006, FR-008)."
+    },
+    "ci_failure_counts": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Count of CI validation failures the PR hit, by stable category (FR-010). Absent keys mean zero.",
+      "properties": {
+        "schema": { "type": "integer", "minimum": 0 },
+        "semver": { "type": "integer", "minimum": 0 },
+        "digest": { "type": "integer", "minimum": 0 },
+        "namespace_collision": { "type": "integer", "minimum": 0 },
+        "dependency_resolvability": { "type": "integer", "minimum": 0 },
+        "immutability": { "type": "integer", "minimum": 0 },
+        "persona_ref": { "type": "integer", "minimum": 0 },
+        "use_cases_format": { "type": "integer", "minimum": 0 },
+        "use_cases_coverage": { "type": "integer", "minimum": 0 },
+        "action_enum_coverage": { "type": "integer", "minimum": 0 },
+        "artifact_reference": { "type": "integer", "minimum": 0 },
+        "test_coverage": { "type": "integer", "minimum": 0 },
+        "signature": { "type": "integer", "minimum": 0 },
+        "ecca_inventory": { "type": "integer", "minimum": 0 },
+        "event_product": { "type": "integer", "minimum": 0 },
+        "spec_alignment": { "type": "integer", "minimum": 0 },
+        "other": { "type": "integer", "minimum": 0 }
+      }
+    }
+  }
+}

@@ -28,6 +28,10 @@ echo "== capability-validation (BASE=${BASE_SHA:0:12} HEAD=${HEAD_SHA:0:12}) =="
 python3 scripts/ci/capability_validation.py "$BASE_SHA" "$HEAD_SHA"
 
 echo
+echo "== measurement-validation (specs/022, runs inside the capability-validation job) =="
+python3 scripts/ci/measurement_validation.py "$BASE_SHA" "$HEAD_SHA"
+
+echo
 echo "== spec-alignment =="
 BASE_SHA="$BASE_SHA" HEAD_SHA="$HEAD_SHA" bash scripts/ci/spec_alignment_check.sh "$PR_BODY_FILE"
 
