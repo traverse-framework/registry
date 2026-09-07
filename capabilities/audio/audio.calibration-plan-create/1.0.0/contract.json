@@ -1,0 +1,241 @@
+{
+  "artifact": {
+    "digest": "sha256:84107a0473b6a34f6ffe89099319cd1bf1d2aadcdd21676edf8607d638c9098e",
+    "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/audio.calibration-plan-create-1.0.0/calibration-plan-create.wasm"
+  },
+  "connector_requirements": [],
+  "consumes": [],
+  "dependencies": [],
+  "description": "Pure planning for calibration of any audio input. It validates configurable targets and bounds without accessing a device, reading audio, persisting state, or assuming a domain, location, vendor, or operating system.",
+  "emits": [],
+  "event_trigger": null,
+  "evidence": [],
+  "execution": {
+    "binary_format": "wasm",
+    "constraints": {
+      "filesystem_access": "none",
+      "host_api_access": "none",
+      "network_access": "forbidden"
+    },
+    "entrypoint": {
+      "command": "run",
+      "kind": "wasi-command"
+    },
+    "preferred_targets": [
+      "local",
+      "browser",
+      "edge",
+      "device"
+    ]
+  },
+  "id": "audio.calibration-plan-create",
+  "inputs": {
+    "schema": {
+      "additionalProperties": false,
+      "properties": {
+        "duration_seconds": {
+          "maximum": 300,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "idempotency_key": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "plan_id": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "target_level_dbfs": {
+          "maximum": 0,
+          "minimum": -60,
+          "type": "integer"
+        },
+        "tolerance_db": {
+          "maximum": 20,
+          "minimum": 1,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "plan_id",
+        "target_level_dbfs",
+        "tolerance_db",
+        "duration_seconds",
+        "idempotency_key"
+      ],
+      "type": "object"
+    }
+  },
+  "kind": "capability_contract",
+  "lifecycle": "active",
+  "name": "calibration-plan-create",
+  "namespace": "audio",
+  "outputs": {
+    "schema": {
+      "additionalProperties": false,
+      "properties": {
+        "connector_id": {
+          "type": "string"
+        },
+        "duration_seconds": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "idempotency_key": {
+          "type": "string"
+        },
+        "operation": {
+          "type": "string"
+        },
+        "plan_id": {
+          "type": "string"
+        },
+        "result_class": {
+          "enum": [
+            "planned",
+            "target_out_of_bounds",
+            "tolerance_out_of_bounds",
+            "duration_out_of_bounds",
+            "invalid_request"
+          ],
+          "type": "string"
+        },
+        "target_level_dbfs": {
+          "type": "integer"
+        },
+        "tolerance_db": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "connector_id",
+        "operation",
+        "plan_id",
+        "target_level_dbfs",
+        "tolerance_db",
+        "duration_seconds",
+        "idempotency_key",
+        "result_class"
+      ],
+      "type": "object"
+    }
+  },
+  "owner": {
+    "contact": "maintainers@callweave.local",
+    "team": "callweave"
+  },
+  "permissions": [
+    {
+      "id": "audio.calibration-plan-create.execute"
+    }
+  ],
+  "permitted_targets": [
+    "local",
+    "browser",
+    "edge",
+    "device"
+  ],
+  "policies": [
+    {
+      "id": "bounded-audio-calibration"
+    }
+  ],
+  "postconditions": [
+    {
+      "description": "Identical requests produce identical plans.",
+      "id": "deterministic"
+    },
+    {
+      "description": "Plan creation does not access or configure an audio device.",
+      "id": "no-device-access"
+    }
+  ],
+  "preconditions": [
+    {
+      "description": "A version-independent bounded calibration policy is supplied.",
+      "id": "bounded-policy"
+    }
+  ],
+  "provenance": {
+    "adr_refs": [
+      "ADR-0039"
+    ],
+    "author": "Callweave",
+    "created_at": "2026-09-06T00:00:00Z",
+    "exception_refs": [],
+    "source": "greenfield",
+    "spec_ref": "100-capability-package-authoring@1.0.0"
+  },
+  "risk": {
+    "data_flow": {
+      "accepted_data_classifications": [],
+      "egress_policy": "denied",
+      "produced_data_classifications": []
+    },
+    "determinism_class": "model_derived",
+    "effect_class": "irreversible_effect",
+    "reliability": {
+      "compensation_available": false,
+      "idempotency_required": true,
+      "retryable": false
+    }
+  },
+  "schema_version": "1.0.0",
+  "service_type": "stateless",
+  "side_effects": [
+    {
+      "description": "Pure plan creation.",
+      "kind": "memory_only"
+    }
+  ],
+  "state_schema": null,
+  "summary": "Create a bounded, connector-neutral audio calibration plan.",
+  "use_cases": [
+    {
+      "happy": true,
+      "input_example": {
+        "duration_seconds": 10,
+        "idempotency_key": "cal-001",
+        "plan_id": "cal-001",
+        "target_level_dbfs": -18,
+        "tolerance_db": 3
+      },
+      "output_example": {
+        "connector_id": "traverse.audio-input",
+        "duration_seconds": 10,
+        "idempotency_key": "cal-001",
+        "operation": "calibrate",
+        "plan_id": "cal-001",
+        "result_class": "planned",
+        "target_level_dbfs": -18,
+        "tolerance_db": 3
+      },
+      "persona_ref": "audio-operator",
+      "scenario": "As an audio operator, I want a valid calibration policy represented as a portable plan so that a compatible audio-input host can measure it."
+    },
+    {
+      "happy": false,
+      "input_example": {
+        "duration_seconds": 10,
+        "idempotency_key": "cal-invalid",
+        "plan_id": "cal-invalid",
+        "target_level_dbfs": -2,
+        "tolerance_db": 3
+      },
+      "output_example": {
+        "connector_id": "",
+        "duration_seconds": 0,
+        "idempotency_key": "",
+        "operation": "",
+        "plan_id": "cal-invalid",
+        "result_class": "target_out_of_bounds",
+        "target_level_dbfs": 0,
+        "tolerance_db": 0
+      },
+      "persona_ref": "audio-operator",
+      "scenario": "As an audio operator, I want an unsafe target rejected before a host is invoked so that calibration remains bounded."
+    }
+  ],
+  "version": "1.0.0"
+}
