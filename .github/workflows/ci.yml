@@ -108,6 +108,16 @@ jobs:
             python3 scripts/ci/measurement_validation.py
           fi
 
+      # Guards that every capability-src/ crate is reachable from some
+      # published capability id, so the public catalog can never again lose a
+      # coverage badge to an unmapped crate (decision-log entry 95). Whole-tree
+      # and deterministic (no cargo) -- safe to run unconditionally.
+      - name: Run catalog coverage-resolution unit tests
+        run: python3 -m unittest scripts/ci/tests/test_catalog_coverage_check.py -v
+
+      - name: Run catalog coverage-resolution check
+        run: python3 scripts/ci/catalog_coverage_check.py
+
   # traverse-registry crate test suite (specs/011-013, 015, 016). Was
   # previously local-only -- cargo test was never run in CI, so drift like
   # the bundled approved-specs.json mismatch (#148) went unnoticed until
@@ -393,6 +403,25 @@ jobs:
             capability-src/core-transition-action-status
             capability-src/core-validate-action-item
             capability-src/platform-decide-state-transition
+            # Post-specs/018 capabilities: crate name == id with "." -> "-"
+            # (no CURRENT_CRATE_FOR_ID entry needed; gather_catalog_data.py
+            # resolves them via the canonical rule). Listed here only so
+            # `cargo llvm-cov` for their coverage badge is cached like the
+            # rest -- keep in step with capability-src/ (decision-log entry 95).
+            capability-src/audio-calibration-plan-create
+            capability-src/commerce-cart-line-changed
+            capability-src/commerce-order-status-changed
+            capability-src/core-create-artifact-revision
+            capability-src/core-create-audio-capture-request-plan
+            capability-src/core-create-audio-transform-plan
+            capability-src/core-create-audio-window-plan
+            capability-src/core-evaluate-schedule-trigger
+            capability-src/core-prepare-inference-request
+            capability-src/core-validate-audio-source-profile
+            capability-src/identity-session-revoked
+            capability-src/inference-evidence-normalize
+            capability-src/support-ticket-sla-breached
+            capability-src/support-ticket-status-changed
 
       - name: Install wasmtime
         run: |
