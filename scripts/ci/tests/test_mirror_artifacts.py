@@ -1,9 +1,12 @@
 #!/usr/bin/env python3
-"""Unit tests for the artifact-mirroring CI step (registry#304)."""
+"""Unit tests for the artifact-mirroring CI step (registry#304, registry#383)."""
 
+import hashlib
 import importlib.util
+import json
 import os
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 from unittest import mock
@@ -87,6 +90,110 @@ class MainDigestVerificationTests(unittest.TestCase):
 
             self.assertEqual(rc, 1)
             self.assertFalse((out_dir / "artifacts" / "core.foo-1.0.0" / "core-foo.wasm").exists())
+
+
+class ContractMirrorTests(unittest.TestCase):
+    """registry#383: verbatim contract file + registry-authored digest, on the
+    CORS-open Pages mirror, referenced from catalog.json."""
+
+    def setUp(self):
+        self.mod = load_module()
+
+    WASM = b"fake wasm bytes"
+    URL = (
+        "https://github.com/traverse-framework/registry/releases/download/"
+        "artifacts/core.foo-1.0.0/core-foo.wasm"
+    )
+
+    def _write_contract(self, tmp_path: Path) -> bytes:
+        contract_dir = tmp_path / "capabilities" / "core" / "core.foo" / "1.0.0"
+        contract_dir.mkdir(parents=True)
+        # Deliberately not re-serialized here: the mirror must copy whatever
+        # bytes are on disk, and the digest must be over those exact bytes.
+        raw = (
+            b'{\n  "namespace": "core",\n  "id": "core.foo",\n  "version": "1.0.0",\n'
+            b'  "artifact": {"digest": "%s", "url": "%s"}\n}\n'
+            % (
+                f"sha256:{hashlib.sha256(self.WASM).hexdigest()}".encode(),
+                self.URL.encode(),
+            )
+        )
+        (contract_dir / "contract.json").write_bytes(raw)
+        return raw
+
+    def _run(self, tmp_path: Path, out_dir: Path, argv_extra=None):
+        argv = ["mirror_artifacts.py", str(out_dir), *(argv_extra or [])]
+        with mock.patch.object(self.mod, "ROOT", tmp_path), mock.patch.object(
+            self.mod, "fetch", return_value=self.WASM
+        ):
+            return self.mod.main(argv)
+
+    def test_contract_is_mirrored_verbatim_with_digest_sibling(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            raw = self._write_contract(tmp_path)
+            out_dir = tmp_path / "catalog"
+
+            self.assertEqual(self._run(tmp_path, out_dir), 0)
+
+            mirrored = out_dir / "artifacts" / "core.foo-1.0.0" / "contract.json"
+            digest_sibling = out_dir / "artifacts" / "core.foo-1.0.0" / "contract.json.sha256"
+            self.assertEqual(mirrored.read_bytes(), raw)
+            # Same recipe build_index.py uses for index.json's contract_digest.
+            self.assertEqual(
+                digest_sibling.read_text().strip(),
+                f"sha256:{hashlib.sha256(raw).hexdigest()}",
+            )
+
+    def test_catalog_json_entry_gains_contract_url_and_digest(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            raw = self._write_contract(tmp_path)
+            out_dir = tmp_path / "catalog"
+            out_dir.mkdir()
+            (out_dir / "catalog.json").write_text(
+                json.dumps(
+                    {
+                        "capabilities": [
+                            {"reference": "core/core.foo@1.0.0", "deprecated": False, "contract": {}},
+                            {"reference": "core/core.bar@2.0.0", "deprecated": False, "contract": {}},
+                        ]
+                    }
+                )
+            )
+
+            self.assertEqual(
+                self._run(tmp_path, out_dir, ["https://example.test/"]), 0
+            )
+
+            catalog = json.loads((out_dir / "catalog.json").read_text())
+            foo = next(c for c in catalog["capabilities"] if c["reference"] == "core/core.foo@1.0.0")
+            bar = next(c for c in catalog["capabilities"] if c["reference"] == "core/core.bar@2.0.0")
+            self.assertEqual(
+                foo["contract_url"],
+                "https://example.test/artifacts/core.foo-1.0.0/contract.json",
+            )
+            self.assertEqual(
+                foo["contract_digest"], f"sha256:{hashlib.sha256(raw).hexdigest()}"
+            )
+            # An entry with no mirrored contract is left untouched.
+            self.assertNotIn("contract_url", bar)
+            self.assertNotIn("contract_digest", bar)
+
+    def test_missing_catalog_json_is_tolerated(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            self._write_contract(tmp_path)
+            out_dir = tmp_path / "catalog"
+
+            self.assertEqual(self._run(tmp_path, out_dir), 0)
+            self.assertTrue((out_dir / "artifacts" / "core.foo-1.0.0" / "contract.json").exists())
+            self.assertFalse((out_dir / "catalog.json").exists())
+
+    def test_rejects_too_many_args(self):
+        self.assertEqual(
+            self.mod.main(["mirror_artifacts.py", "catalog", "https://x", "extra"]), 2
+        )
 
 
 if __name__ == "__main__":
