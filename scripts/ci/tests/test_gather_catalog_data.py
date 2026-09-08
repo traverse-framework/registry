@@ -2,6 +2,7 @@
 """Unit tests for observed-lineage join in gather_catalog_data (registry#256)."""
 
 import importlib.util
+import json
 import os
 import sys
 import tempfile
@@ -19,6 +20,59 @@ def load_module():
     assert spec.loader is not None
     spec.loader.exec_module(module)
     return module
+
+
+class ResolveCurrentCrateTests(unittest.TestCase):
+    """decision-log entry 95: a capability published after specs/018 must get
+    its coverage badge via the canonical id-with-dots-as-dashes crate name,
+    with no hand-added CURRENT_CRATE_FOR_ID entry."""
+
+    def setUp(self):
+        self.mod = load_module()
+
+    def test_canonical_rule_replaces_every_dot(self):
+        self.assertEqual(
+            self.mod.canonical_crate_for_id("commerce.cart-line-changed"),
+            "commerce-cart-line-changed",
+        )
+        self.assertEqual(
+            self.mod.canonical_crate_for_id("core.action-item.status"),
+            "core-action-item-status",
+        )
+
+    def test_legacy_ids_still_resolve_through_the_explicit_dict(self):
+        # validate-luhn's crate is NOT its canonical name (validation-validate-luhn).
+        self.assertEqual(self.mod.CURRENT_CRATE_FOR_ID["validation.validate-luhn"], "validate-luhn")
+        self.assertEqual(self.mod.resolve_current_crate("validation.validate-luhn"), "validate-luhn")
+
+    def test_post_spec018_id_resolves_via_canonical_fallback(self):
+        # This id has real source at capability-src/commerce-cart-line-changed/
+        # but no CURRENT_CRATE_FOR_ID entry -- it used to render with no badge.
+        self.assertNotIn("commerce.cart-line-changed", self.mod.CURRENT_CRATE_FOR_ID)
+        self.assertEqual(
+            self.mod.resolve_current_crate("commerce.cart-line-changed"),
+            "commerce-cart-line-changed",
+        )
+
+    def test_unknown_id_resolves_to_none(self):
+        self.assertIsNone(self.mod.resolve_current_crate("nope.does-not-exist"))
+
+    def test_every_current_capability_now_resolves(self):
+        """The regression that lost 14 badges: iterate every latest
+        non-deprecated contract and require a resolvable crate."""
+        latest: dict = {}
+        for contract_path in sorted(Path("capabilities").rglob("contract.json")):
+            contract = json.loads(contract_path.read_text())
+            cid, ver = contract["id"], contract["version"]
+            deprecated = (contract_path.parent / "deprecated.json").is_file()
+            cur = latest.get(cid)
+            if cur is None or self.mod.semver_tuple(ver) > self.mod.semver_tuple(cur[0]):
+                latest[cid] = (ver, deprecated)
+        unresolved = sorted(
+            cid for cid, (ver, dep) in latest.items()
+            if not dep and self.mod.resolve_current_crate(cid) is None
+        )
+        self.assertEqual(unresolved, [], f"capabilities with no resolvable crate: {unresolved}")
 
 
 class AttachObservedLineageTests(unittest.TestCase):

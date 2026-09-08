@@ -35,6 +35,17 @@ older/deprecated versions: their real implementation isn't retained
 separately in this repo (only the current logic is), so there is nothing
 honest to measure for them.
 
+The crate backing a capability id is resolved by `resolve_current_crate()`:
+an explicit `CURRENT_CRATE_FOR_ID` entry for the pre-`specs/018` crates that
+are inconsistently named, otherwise the `specs/018-capability-test-coverage`
+FR-001 canonical rule (id with every "." replaced by "-"). Before the
+canonical fallback existed here, every capability published after spec 018
+rendered on the public catalog with no coverage badge until someone hand-
+added it to the dict -- 14 fully-tested capabilities had silently regressed
+this way (decision-log entry 95). `scripts/ci/catalog_coverage_check.py` is
+the CI guard that a `capability-src/` crate no id resolves to now fails
+loudly instead of just costing a badge.
+
 Usage: gather_catalog_data.py <output_path>
 """
 
@@ -46,9 +57,12 @@ from pathlib import Path
 from typing import Optional
 
 # Maps a capability id to the capability-src/ crate whose current source
-# backs it. A future capability must be added here explicitly, following the
-# same deliberate-no-magic policy verify_use_cases.py (registry#107) uses for
-# its own binary-path mapping.
+# backs it, for the pre-`specs/018` crates whose names do NOT follow the
+# canonical id-with-dots-as-dashes rule. A capability published after
+# specs/018-capability-test-coverage does NOT need an entry here -- it is
+# resolved by the canonical rule in `resolve_current_crate()` below. Adding
+# a redundant entry that just restates the canonical name is harmless but
+# pointless; add an entry only when the crate name genuinely differs.
 CURRENT_CRATE_FOR_ID = {
     # Callweave-owned source mirrors.  These are explicit (rather than
     # discovered heuristically) so the catalog only reports independently
@@ -146,6 +160,36 @@ def measure_test_coverage(crate_dir: str) -> Optional[dict]:
     }
 
 
+def canonical_crate_for_id(capability_id: str) -> str:
+    """specs/018-capability-test-coverage FR-001: the canonical, deterministic
+    crate name for every capability published after that spec -- the id with
+    each "." replaced by "-". Kept byte-for-byte in step with
+    scripts/ci/capability_validation.py's `expected_capability_src_crate()`,
+    which is the gate that *requires* a new capability's crate to live here.
+    """
+    return capability_id.replace(".", "-")
+
+
+def resolve_current_crate(capability_id: str) -> Optional[str]:
+    """The `capability-src/` crate whose current source backs this capability
+    id, or None if this repo genuinely retains no source for it (registry#302).
+
+    Resolution order: an explicit `CURRENT_CRATE_FOR_ID` entry (the pre-spec-018
+    crates whose names don't follow the canonical rule), otherwise the
+    spec-018 canonical name. Either way the crate must actually exist on disk
+    -- a mapping or canonical name that points at a missing `Cargo.toml`
+    resolves to None, exactly as before, so nothing is fabricated.
+
+    The canonical fallback is what stops a spec-018-compliant capability from
+    silently rendering with no coverage badge just because nobody hand-added
+    it to `CURRENT_CRATE_FOR_ID` (decision-log entry 95).
+    """
+    crate_dir = CURRENT_CRATE_FOR_ID.get(capability_id) or canonical_crate_for_id(capability_id)
+    if (Path("capability-src") / crate_dir / "Cargo.toml").is_file():
+        return crate_dir
+    return None
+
+
 def gather_capabilities() -> list:
     capabilities_dir = Path("capabilities")
     entries = []
@@ -175,9 +219,9 @@ def gather_capabilities() -> list:
         if current_latest is None or semver_tuple(version) > semver_tuple(current_latest["contract"]["version"]):
             latest_by_id[capability_id] = entry
 
-    for capability_id, crate_dir in CURRENT_CRATE_FOR_ID.items():
-        latest_entry = latest_by_id.get(capability_id)
-        if latest_entry is not None:
+    for capability_id, latest_entry in latest_by_id.items():
+        crate_dir = resolve_current_crate(capability_id)
+        if crate_dir is not None:
             latest_entry["test_coverage"] = measure_test_coverage(crate_dir)
 
     return entries
