@@ -1,0 +1,678 @@
+{
+  "kind": "capability_contract",
+  "schema_version": "1.0.0",
+  "lifecycle": "active",
+  "owner": {
+    "team": "traverse/registry",
+    "contact": "founders@loop.dev"
+  },
+  "connector_requirements": [],
+  "consumes": [],
+  "dependencies": [],
+  "execution": {
+    "binary_format": "wasm",
+    "constraints": {
+      "filesystem_access": "none",
+      "host_api_access": "none",
+      "network_access": "forbidden"
+    },
+    "entrypoint": {
+      "command": "run",
+      "kind": "wasi-command"
+    },
+    "preferred_targets": [
+      "local",
+      "edge",
+      "browser"
+    ]
+  },
+  "permitted_targets": [
+    "local",
+    "edge",
+    "browser",
+    "cloud"
+  ],
+  "policies": [
+    {
+      "id": "fail-closed"
+    }
+  ],
+  "postconditions": [
+    {
+      "description": "Identical inputs produce identical outputs",
+      "id": "deterministic"
+    }
+  ],
+  "state_schema": null,
+  "service_type": "subscribable",
+  "permissions": [
+    {
+      "id": "commerce.order-status-changed"
+    }
+  ],
+  "evidence": [
+    {
+      "evidence_id": "commerce-order-status-changed-1.0.0-contract-validation",
+      "status": "passed",
+      "type": "contract_validation"
+    }
+  ],
+  "id": "commerce.order-status-changed",
+  "namespace": "commerce",
+  "name": "order-status-changed",
+  "version": "1.0.0",
+  "authoring": {
+    "method": "llm-assisted",
+    "source_revision": "feat/service-type-fill-wave1",
+    "test_evidence": "capability-src/commerce-order-status-changed cargo test (6 passing)",
+    "review": {
+      "decision": "pending-qualified-review",
+      "reviewer": "traverse-registry-maintainer"
+    }
+  },
+  "summary": "Deterministic order status transition under a caller-supplied allowed graph.",
+  "description": "Evaluates current_status \u2192 requested_status against transition_config.allowed_transitions for known commerce order statuses (pending, confirmed, fulfilled, shipped, delivered, cancelled, returned). On accepted transitions (reason_code=ok) emits commerce.order.status-changed@1.0.0 via traverse_host::emit_event. Does not persist orders.",
+  "event_trigger": "commerce.order-status-changed.triggered",
+  "emits": [
+    {
+      "event_id": "commerce.order.status-changed",
+      "version": "1.0.0"
+    }
+  ],
+  "side_effects": [
+    {
+      "description": "Pure order status transition evaluation",
+      "kind": "memory_only"
+    },
+    {
+      "description": "Emits commerce.order.status-changed@1.0.0 via traverse_host::emit_event when accepted (ok)",
+      "kind": "event_emission"
+    }
+  ],
+  "preconditions": [
+    {
+      "id": "statuses-valid",
+      "description": "current and requested status must be known order statuses"
+    }
+  ],
+  "provenance": {
+    "source": "greenfield",
+    "author": "traverse/registry",
+    "created_at": "2026-09-08T00:00:00Z",
+    "spec_ref": "001-registry-foundation",
+    "adr_refs": [],
+    "exception_refs": []
+  },
+  "artifact": {
+    "digest": "sha256:e6301d00e45f41bbf0baf7d1009d53f1edba00d99f2a49b8f8c8566505933a5f",
+    "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/commerce.order-status-changed-1.0.0/commerce-order-status-changed.wasm"
+  },
+  "inputs": {
+    "schema": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "order_id",
+        "current_status",
+        "requested_status",
+        "actor_id",
+        "transition_config"
+      ],
+      "properties": {
+        "order_id": {
+          "type": "string"
+        },
+        "current_status": {
+          "type": "string",
+          "enum": [
+            "pending",
+            "confirmed",
+            "fulfilled",
+            "shipped",
+            "delivered",
+            "cancelled",
+            "returned"
+          ]
+        },
+        "requested_status": {
+          "type": "string",
+          "enum": [
+            "pending",
+            "confirmed",
+            "fulfilled",
+            "shipped",
+            "delivered",
+            "cancelled",
+            "returned"
+          ]
+        },
+        "actor_id": {
+          "type": "string"
+        },
+        "transition_config": {
+          "type": "object",
+          "required": [
+            "version",
+            "allowed_transitions"
+          ],
+          "properties": {
+            "version": {
+              "type": "string"
+            },
+            "allowed_transitions": {
+              "type": "object"
+            }
+          }
+        }
+      }
+    }
+  },
+  "outputs": {
+    "schema": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "allowed",
+        "new_status",
+        "reason_code"
+      ],
+      "properties": {
+        "allowed": {
+          "type": "boolean"
+        },
+        "new_status": {
+          "type": "string"
+        },
+        "reason_code": {
+          "type": "string",
+          "enum": [
+            "ok",
+            "illegal_transition",
+            "invalid_status"
+          ]
+        },
+        "evaluation_trace": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  },
+  "use_cases": [
+    {
+      "happy": true,
+      "persona_ref": "checkout-flow-developer",
+      "scenario": "As a checkout flow developer, I want pending \u2192 confirmed accepted, so that payment success advances the order.",
+      "input_example": {
+        "order_id": "ord-1",
+        "current_status": "pending",
+        "requested_status": "confirmed",
+        "actor_id": "ops-1",
+        "transition_config": {
+          "version": "1.0",
+          "allowed_transitions": {
+            "pending": [
+              "confirmed",
+              "cancelled"
+            ],
+            "confirmed": [
+              "fulfilled",
+              "cancelled"
+            ],
+            "fulfilled": [
+              "shipped",
+              "cancelled"
+            ],
+            "shipped": [
+              "delivered",
+              "returned"
+            ],
+            "delivered": [],
+            "cancelled": [],
+            "returned": []
+          }
+        }
+      },
+      "output_example": {
+        "allowed": true,
+        "new_status": "confirmed",
+        "reason_code": "ok",
+        "evaluation_trace": [
+          "pending \u2192 confirmed is allowed"
+        ]
+      }
+    },
+    {
+      "happy": true,
+      "persona_ref": "checkout-flow-developer",
+      "scenario": "As a checkout flow developer, I want confirmed \u2192 fulfilled accepted, so that warehouse pick can begin.",
+      "input_example": {
+        "order_id": "ord-1b",
+        "current_status": "confirmed",
+        "requested_status": "fulfilled",
+        "actor_id": "ops-1",
+        "transition_config": {
+          "version": "1.0",
+          "allowed_transitions": {
+            "pending": [
+              "confirmed",
+              "cancelled"
+            ],
+            "confirmed": [
+              "fulfilled",
+              "cancelled"
+            ],
+            "fulfilled": [
+              "shipped",
+              "cancelled"
+            ],
+            "shipped": [
+              "delivered",
+              "returned"
+            ],
+            "delivered": [],
+            "cancelled": [],
+            "returned": []
+          }
+        }
+      },
+      "output_example": {
+        "allowed": true,
+        "new_status": "fulfilled",
+        "reason_code": "ok",
+        "evaluation_trace": [
+          "confirmed \u2192 fulfilled is allowed"
+        ]
+      }
+    },
+    {
+      "happy": true,
+      "persona_ref": "checkout-flow-developer",
+      "scenario": "As a checkout flow developer, I want fulfilled \u2192 shipped accepted, so that carrier handoff is recorded.",
+      "input_example": {
+        "order_id": "ord-1c",
+        "current_status": "fulfilled",
+        "requested_status": "shipped",
+        "actor_id": "ops-1",
+        "transition_config": {
+          "version": "1.0",
+          "allowed_transitions": {
+            "pending": [
+              "confirmed",
+              "cancelled"
+            ],
+            "confirmed": [
+              "fulfilled",
+              "cancelled"
+            ],
+            "fulfilled": [
+              "shipped",
+              "cancelled"
+            ],
+            "shipped": [
+              "delivered",
+              "returned"
+            ],
+            "delivered": [],
+            "cancelled": [],
+            "returned": []
+          }
+        }
+      },
+      "output_example": {
+        "allowed": true,
+        "new_status": "shipped",
+        "reason_code": "ok",
+        "evaluation_trace": [
+          "fulfilled \u2192 shipped is allowed"
+        ]
+      }
+    },
+    {
+      "happy": true,
+      "persona_ref": "checkout-flow-developer",
+      "scenario": "As a checkout flow developer, I want shipped \u2192 delivered accepted, so that delivery completion notifies subscribers.",
+      "input_example": {
+        "order_id": "ord-5",
+        "current_status": "shipped",
+        "requested_status": "delivered",
+        "actor_id": "ops-1",
+        "transition_config": {
+          "version": "1.0",
+          "allowed_transitions": {
+            "pending": [
+              "confirmed",
+              "cancelled"
+            ],
+            "confirmed": [
+              "fulfilled",
+              "cancelled"
+            ],
+            "fulfilled": [
+              "shipped",
+              "cancelled"
+            ],
+            "shipped": [
+              "delivered",
+              "returned"
+            ],
+            "delivered": [],
+            "cancelled": [],
+            "returned": []
+          }
+        }
+      },
+      "output_example": {
+        "allowed": true,
+        "new_status": "delivered",
+        "reason_code": "ok",
+        "evaluation_trace": [
+          "shipped \u2192 delivered is allowed"
+        ]
+      }
+    },
+    {
+      "happy": true,
+      "persona_ref": "checkout-flow-developer",
+      "scenario": "As a checkout flow developer, I want shipped \u2192 returned accepted, so that reverse logistics can start from in-transit.",
+      "input_example": {
+        "order_id": "ord-5b",
+        "current_status": "shipped",
+        "requested_status": "returned",
+        "actor_id": "ops-1",
+        "transition_config": {
+          "version": "1.0",
+          "allowed_transitions": {
+            "pending": [
+              "confirmed",
+              "cancelled"
+            ],
+            "confirmed": [
+              "fulfilled",
+              "cancelled"
+            ],
+            "fulfilled": [
+              "shipped",
+              "cancelled"
+            ],
+            "shipped": [
+              "delivered",
+              "returned"
+            ],
+            "delivered": [],
+            "cancelled": [],
+            "returned": []
+          }
+        }
+      },
+      "output_example": {
+        "allowed": true,
+        "new_status": "returned",
+        "reason_code": "ok",
+        "evaluation_trace": [
+          "shipped \u2192 returned is allowed"
+        ]
+      }
+    },
+    {
+      "happy": true,
+      "persona_ref": "checkout-flow-developer",
+      "scenario": "As a checkout flow developer, I want pending \u2192 cancelled accepted, so that unpaid carts can abort cleanly.",
+      "input_example": {
+        "order_id": "ord-1d",
+        "current_status": "pending",
+        "requested_status": "cancelled",
+        "actor_id": "ops-1",
+        "transition_config": {
+          "version": "1.0",
+          "allowed_transitions": {
+            "pending": [
+              "confirmed",
+              "cancelled"
+            ],
+            "confirmed": [
+              "fulfilled",
+              "cancelled"
+            ],
+            "fulfilled": [
+              "shipped",
+              "cancelled"
+            ],
+            "shipped": [
+              "delivered",
+              "returned"
+            ],
+            "delivered": [],
+            "cancelled": [],
+            "returned": []
+          }
+        }
+      },
+      "output_example": {
+        "allowed": true,
+        "new_status": "cancelled",
+        "reason_code": "ok",
+        "evaluation_trace": [
+          "pending \u2192 cancelled is allowed"
+        ]
+      }
+    },
+    {
+      "happy": false,
+      "persona_ref": "checkout-flow-developer",
+      "scenario": "As a checkout flow developer, I want pending \u2192 delivered rejected, so that illegal jumps cannot skip fulfillment.",
+      "input_example": {
+        "order_id": "ord-2",
+        "current_status": "pending",
+        "requested_status": "delivered",
+        "actor_id": "ops-1",
+        "transition_config": {
+          "version": "1.0",
+          "allowed_transitions": {
+            "pending": [
+              "confirmed",
+              "cancelled"
+            ],
+            "confirmed": [
+              "fulfilled",
+              "cancelled"
+            ],
+            "fulfilled": [
+              "shipped",
+              "cancelled"
+            ],
+            "shipped": [
+              "delivered",
+              "returned"
+            ],
+            "delivered": [],
+            "cancelled": [],
+            "returned": []
+          }
+        }
+      },
+      "output_example": {
+        "allowed": false,
+        "new_status": "pending",
+        "reason_code": "illegal_transition",
+        "evaluation_trace": [
+          "pending has no allowed transition to delivered"
+        ]
+      }
+    },
+    {
+      "happy": false,
+      "persona_ref": "checkout-flow-developer",
+      "scenario": "As a checkout flow developer, I want missing required fields rejected with invalid_status, so that incomplete transition requests fail closed.",
+      "input_example": {
+        "order_id": "ord-3",
+        "current_status": "pending",
+        "requested_status": "confirmed",
+        "actor_id": "",
+        "transition_config": {
+          "version": "1.0",
+          "allowed_transitions": {
+            "pending": [
+              "confirmed",
+              "cancelled"
+            ],
+            "confirmed": [
+              "fulfilled",
+              "cancelled"
+            ],
+            "fulfilled": [
+              "shipped",
+              "cancelled"
+            ],
+            "shipped": [
+              "delivered",
+              "returned"
+            ],
+            "delivered": [],
+            "cancelled": [],
+            "returned": []
+          }
+        }
+      },
+      "output_example": {
+        "allowed": false,
+        "new_status": "pending",
+        "reason_code": "invalid_status",
+        "evaluation_trace": [
+          "precondition failed: required fields missing"
+        ]
+      }
+    },
+    {
+      "happy": false,
+      "persona_ref": "checkout-flow-developer",
+      "scenario": "As a checkout flow developer, I want cancelled \u2192 pending rejected, so that cancelled orders stay terminal.",
+      "input_example": {
+        "order_id": "ord-4",
+        "current_status": "cancelled",
+        "requested_status": "pending",
+        "actor_id": "ops-1",
+        "transition_config": {
+          "version": "1.0",
+          "allowed_transitions": {
+            "pending": [
+              "confirmed",
+              "cancelled"
+            ],
+            "confirmed": [
+              "fulfilled",
+              "cancelled"
+            ],
+            "fulfilled": [
+              "shipped",
+              "cancelled"
+            ],
+            "shipped": [
+              "delivered",
+              "returned"
+            ],
+            "delivered": [],
+            "cancelled": [],
+            "returned": []
+          }
+        }
+      },
+      "output_example": {
+        "allowed": false,
+        "new_status": "cancelled",
+        "reason_code": "illegal_transition",
+        "evaluation_trace": [
+          "cancelled has no allowed transition to pending"
+        ]
+      }
+    },
+    {
+      "happy": false,
+      "persona_ref": "checkout-flow-developer",
+      "scenario": "As a checkout flow developer, I want delivered \u2192 shipped rejected, so that completed deliveries cannot regress.",
+      "input_example": {
+        "order_id": "ord-6",
+        "current_status": "delivered",
+        "requested_status": "shipped",
+        "actor_id": "ops-1",
+        "transition_config": {
+          "version": "1.0",
+          "allowed_transitions": {
+            "pending": [
+              "confirmed",
+              "cancelled"
+            ],
+            "confirmed": [
+              "fulfilled",
+              "cancelled"
+            ],
+            "fulfilled": [
+              "shipped",
+              "cancelled"
+            ],
+            "shipped": [
+              "delivered",
+              "returned"
+            ],
+            "delivered": [],
+            "cancelled": [],
+            "returned": []
+          }
+        }
+      },
+      "output_example": {
+        "allowed": false,
+        "new_status": "delivered",
+        "reason_code": "illegal_transition",
+        "evaluation_trace": [
+          "delivered has no allowed transition to shipped"
+        ]
+      }
+    },
+    {
+      "happy": false,
+      "persona_ref": "checkout-flow-developer",
+      "scenario": "As a checkout flow developer, I want returned \u2192 confirmed rejected, so that returned orders stay terminal.",
+      "input_example": {
+        "order_id": "ord-7",
+        "current_status": "returned",
+        "requested_status": "confirmed",
+        "actor_id": "ops-1",
+        "transition_config": {
+          "version": "1.0",
+          "allowed_transitions": {
+            "pending": [
+              "confirmed",
+              "cancelled"
+            ],
+            "confirmed": [
+              "fulfilled",
+              "cancelled"
+            ],
+            "fulfilled": [
+              "shipped",
+              "cancelled"
+            ],
+            "shipped": [
+              "delivered",
+              "returned"
+            ],
+            "delivered": [],
+            "cancelled": [],
+            "returned": []
+          }
+        }
+      },
+      "output_example": {
+        "allowed": false,
+        "new_status": "returned",
+        "reason_code": "illegal_transition",
+        "evaluation_trace": [
+          "returned has no allowed transition to confirmed"
+        ]
+      }
+    }
+  ]
+}

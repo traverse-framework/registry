@@ -634,3 +634,24 @@ Also updated `CONTRIBUTING.md`'s existing entry-62 guidance to state the new saf
 - **Not done (out of scope, disclosed)**: surfacing the mirror link in the SPA / static capability pages (the SPA reads the deployed `catalog.json` at runtime so the data is already there for a later JS tweak); and the companion risk-metadata ask (registry#384), which needs a governing decision — see below.
 
 91. **registry#384 (spec-109 risk metadata + `is_automatic_eligible` in the public catalog) is NOT actionable under registry-ops autonomy — needs an owner decision or a governing spec (2026-09-08)**: the ticket asks the catalog to publish, per capability, a computed `is_automatic_eligible` verdict plus the `effect_class` / `determinism_class` / `data_flow` / `egress_policy` class fields spec 109 defines. Blockers: (a) spec 109 is a `traverse-framework/traverse` spec with no counterpart in this repo's `specs/`, and no `governs` entry in `specs/governance/approved-specs.json` covers a "capability risk classification" surface; (b) published contracts carry only adjacent signals (`execution.constraints`, `side_effects[].kind`, `policies`, a `deterministic` postcondition), not the structured spec-109 fields — so `is_automatic_eligible` would have to be *derived*, and defining that derivation is choosing the semantics of a safety gate for unattended/unauthenticated execution. That is a public-API + security-posture decision the registry-ops guardrails reserve for the owner (no self-approval of specs; cross-repo/security-posture changes need standalone confirmation). Recommended next step: a `/brainstorm` to decide whether this registry defines its own risk-classification spec (deriving from existing contract fields, or requiring new ones) or defers to a `traverse`-side amendment. Ticket left in `Ready` with the evidence recorded here rather than implemented on an invented rule.
+
+92. **Service-type catalog fill map + Wave 1 implementation (2026-09-08, `/brainstorm`)**: the public catalog still shows 1 subscribable (`core.transition-action-status@1.3.0`) and 0 stateful (~54 other latest IDs are `stateless`) while the taxonomy is under active test. Owner goal: ≥10 real subscribable + ≥10 real stateful — no placeholders/utilities. Decisions (owner took the recommended option each time):
+
+- **ROI**: A+C — runtime/taxonomy coverage *and* multi-domain breadth.
+- **Domains**: Commerce, Support/Tickets, Approvals/Governance, Collaboration/Work, Identity/Access (~2+2 each).
+- **Promote vs greenfield**: promote Collaboration + Approvals; greenfield Commerce + Support + Identity.
+- **Semantics**: UMA white paper §5.1.2 + Traverse spec 014/208 (Stateful excludes Browser).
+- **Archetypes**: UMA archetypes for greenfield; promote-native for Collaboration/Approvals.
+- **Slate**: balanced emitters + stores.
+- **Ship order**: Wave 1 subscribable first; Wave 2 stateful second.
+- **Promote mechanic**: new semver of same capability id.
+- **Wave 1 bar**: runtime-honest `emit_event` + event product (no declare-only).
+- **Naming**: `commerce.*` / `support.*` / `identity.*` for greenfield.
+- **Wave 2 bar**: lifecycle + managed persistence via runtime storage (no affinity-only fakes).
+- **Roster A**: Identity Wave 1 = `identity.session-revoked` only; `identity.challenge-completed` pairs with Wave 2.
+
+**Wave 1 roster (10)**: `core.transition-action-status` (shipped); promotes `core.assign-ownership`, `core.process-comment`, `doc-approval.recommend`, `platform.decide-state-transition`; greenfield `commerce.cart-line-changed`, `commerce.order-status-changed`, `support.ticket-status-changed`, `support.ticket-sla-breached`, `identity.session-revoked`.
+
+**Wave 2 roster (10)**: `core.action-item-store`, `core.followup-session`, `doc-approval.packet-store`, `doc-approval.policy-store`, `commerce.cart`, `commerce.pricing-config`, `support.ticket-workspace`, `support.agent-session`, `identity.challenge-session`, `identity.principal-session`.
+
+**Implementation note (checked against Traverse `host_abi_v1.json`)**: Wave 2 remains blocked until a host storage/lifecycle ABI exists — current whitelist has `emit_event` and `connector_invoke` but no managed-persistence import, so honest UMA stateful cannot be published without violating this entry's Wave 2 bar. Wave 1 ships in this PR.

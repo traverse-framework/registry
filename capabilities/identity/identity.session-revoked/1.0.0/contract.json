@@ -1,0 +1,301 @@
+{
+  "kind": "capability_contract",
+  "schema_version": "1.0.0",
+  "lifecycle": "active",
+  "owner": {
+    "team": "traverse/registry",
+    "contact": "founders@loop.dev"
+  },
+  "connector_requirements": [],
+  "consumes": [],
+  "dependencies": [],
+  "execution": {
+    "binary_format": "wasm",
+    "constraints": {
+      "filesystem_access": "none",
+      "host_api_access": "none",
+      "network_access": "forbidden"
+    },
+    "entrypoint": {
+      "command": "run",
+      "kind": "wasi-command"
+    },
+    "preferred_targets": [
+      "local",
+      "edge",
+      "browser"
+    ]
+  },
+  "permitted_targets": [
+    "local",
+    "edge",
+    "browser",
+    "cloud"
+  ],
+  "policies": [
+    {
+      "id": "fail-closed"
+    }
+  ],
+  "postconditions": [
+    {
+      "description": "Identical inputs produce identical outputs",
+      "id": "deterministic"
+    }
+  ],
+  "state_schema": null,
+  "service_type": "subscribable",
+  "permissions": [
+    {
+      "id": "identity.session-revoked"
+    }
+  ],
+  "evidence": [
+    {
+      "evidence_id": "identity-session-revoked-1.0.0-contract-validation",
+      "status": "passed",
+      "type": "contract_validation"
+    }
+  ],
+  "id": "identity.session-revoked",
+  "namespace": "identity",
+  "name": "session-revoked",
+  "version": "1.0.0",
+  "authoring": {
+    "method": "llm-assisted",
+    "source_revision": "feat/service-type-fill-wave1",
+    "test_evidence": "capability-src/identity-session-revoked cargo test (6 passing)",
+    "review": {
+      "decision": "pending-qualified-review",
+      "reviewer": "traverse-registry-maintainer"
+    }
+  },
+  "summary": "Validate a session revocation request and emit a governed session.revoked event.",
+  "description": "Given session_id, principal_id, reason, and actor_id, validates the reason enum and enforces actor_id == principal_id for self-service reasons (user_logout, password_change, idle_timeout) while allowing admin_revoke and security_compromise by a different actor. On success emits identity.session.revoked@1.0.0. Does not persist sessions.",
+  "event_trigger": "identity.session-revoked.triggered",
+  "emits": [
+    {
+      "event_id": "identity.session.revoked",
+      "version": "1.0.0"
+    }
+  ],
+  "side_effects": [
+    {
+      "description": "Pure session revocation validation",
+      "kind": "memory_only"
+    },
+    {
+      "description": "Emits identity.session.revoked@1.0.0 via traverse_host::emit_event when accepted (ok)",
+      "kind": "event_emission"
+    }
+  ],
+  "preconditions": [
+    {
+      "id": "fields-present",
+      "description": "session_id, principal_id, reason, and actor_id required"
+    },
+    {
+      "id": "reason-known",
+      "description": "reason must be a known revocation reason"
+    }
+  ],
+  "provenance": {
+    "source": "greenfield",
+    "author": "traverse/registry",
+    "created_at": "2026-09-08T00:00:00Z",
+    "spec_ref": "001-registry-foundation",
+    "adr_refs": [],
+    "exception_refs": []
+  },
+  "artifact": {
+    "digest": "sha256:a30f11d9b685d4d6a6669b9af8b9cae39da948eaaeaff24acd1bd97888c3bd99",
+    "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/identity.session-revoked-1.0.0/identity-session-revoked.wasm"
+  },
+  "inputs": {
+    "schema": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "session_id",
+        "principal_id",
+        "reason",
+        "actor_id"
+      ],
+      "properties": {
+        "session_id": {
+          "type": "string"
+        },
+        "principal_id": {
+          "type": "string"
+        },
+        "reason": {
+          "type": "string",
+          "enum": [
+            "user_logout",
+            "admin_revoke",
+            "security_compromise",
+            "idle_timeout",
+            "password_change"
+          ]
+        },
+        "actor_id": {
+          "type": "string"
+        }
+      }
+    }
+  },
+  "outputs": {
+    "schema": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "accepted",
+        "reason_code"
+      ],
+      "properties": {
+        "accepted": {
+          "type": "boolean"
+        },
+        "reason_code": {
+          "type": "string",
+          "enum": [
+            "ok",
+            "actor_mismatch",
+            "invalid_input"
+          ]
+        },
+        "evaluation_trace": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  },
+  "use_cases": [
+    {
+      "happy": true,
+      "persona_ref": "multi-tenant-saas-developer",
+      "scenario": "As a multi-tenant SaaS developer, I want user_logout accepted when actor equals principal, so that logout fans out to subscribers.",
+      "input_example": {
+        "session_id": "sess-1",
+        "principal_id": "user-ada",
+        "reason": "user_logout",
+        "actor_id": "user-ada"
+      },
+      "output_example": {
+        "accepted": true,
+        "reason_code": "ok",
+        "evaluation_trace": [
+          "user_logout accepted"
+        ]
+      }
+    },
+    {
+      "happy": true,
+      "persona_ref": "multi-tenant-saas-developer",
+      "scenario": "As a multi-tenant SaaS developer, I want admin_revoke accepted for another principal, so that admins can force-logout users.",
+      "input_example": {
+        "session_id": "sess-2",
+        "principal_id": "user-ada",
+        "reason": "admin_revoke",
+        "actor_id": "admin-1"
+      },
+      "output_example": {
+        "accepted": true,
+        "reason_code": "ok",
+        "evaluation_trace": [
+          "admin_revoke accepted"
+        ]
+      }
+    },
+    {
+      "happy": true,
+      "persona_ref": "multi-tenant-saas-developer",
+      "scenario": "As a multi-tenant SaaS developer, I want security_compromise accepted from a security actor, so that breach response can revoke sessions broadly.",
+      "input_example": {
+        "session_id": "sess-5",
+        "principal_id": "user-ada",
+        "reason": "security_compromise",
+        "actor_id": "sec-bot"
+      },
+      "output_example": {
+        "accepted": true,
+        "reason_code": "ok",
+        "evaluation_trace": [
+          "security_compromise accepted"
+        ]
+      }
+    },
+    {
+      "happy": true,
+      "persona_ref": "multi-tenant-saas-developer",
+      "scenario": "As a multi-tenant SaaS developer, I want idle_timeout accepted for the principal, so that inactivity policies emit revocation facts.",
+      "input_example": {
+        "session_id": "sess-6",
+        "principal_id": "user-ada",
+        "reason": "idle_timeout",
+        "actor_id": "user-ada"
+      },
+      "output_example": {
+        "accepted": true,
+        "reason_code": "ok",
+        "evaluation_trace": [
+          "idle_timeout accepted"
+        ]
+      }
+    },
+    {
+      "happy": true,
+      "persona_ref": "multi-tenant-saas-developer",
+      "scenario": "As a multi-tenant SaaS developer, I want password_change accepted for the principal, so that credential rotation invalidates sessions.",
+      "input_example": {
+        "session_id": "sess-7",
+        "principal_id": "user-ada",
+        "reason": "password_change",
+        "actor_id": "user-ada"
+      },
+      "output_example": {
+        "accepted": true,
+        "reason_code": "ok",
+        "evaluation_trace": [
+          "password_change accepted"
+        ]
+      }
+    },
+    {
+      "happy": false,
+      "persona_ref": "multi-tenant-saas-developer",
+      "scenario": "As a multi-tenant SaaS developer, I want user_logout by a different actor rejected, so that self-service reasons cannot be forged.",
+      "input_example": {
+        "session_id": "sess-3",
+        "principal_id": "user-ada",
+        "reason": "user_logout",
+        "actor_id": "admin-1"
+      },
+      "output_example": {
+        "accepted": false,
+        "reason_code": "actor_mismatch",
+        "evaluation_trace": [
+          "self-service reasons require actor_id == principal_id"
+        ]
+      }
+    },
+    {
+      "happy": false,
+      "persona_ref": "multi-tenant-saas-developer",
+      "scenario": "As a multi-tenant SaaS developer, I want missing fields rejected with invalid_input, so that incomplete revocation requests fail closed.",
+      "input_example": {
+        "session_id": "sess-4"
+      },
+      "output_example": {
+        "accepted": false,
+        "reason_code": "invalid_input",
+        "evaluation_trace": [
+          "precondition failed: required fields missing"
+        ]
+      }
+    }
+  ]
+}

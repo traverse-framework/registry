@@ -1,4 +1,7 @@
-//! core.assign-ownership — pure owner resolution against workspace members.
+//! core.assign-ownership — owner resolution with governed emit on success.
+//!
+//! On reason_code=ok with a resolved owner_id, emits
+//! `core.action-item.ownership-assigned@1.0.0` via `traverse_host::emit_event`.
 #![cfg_attr(not(test), no_std)]
 #![cfg_attr(not(test), no_main)]
 
@@ -20,8 +23,22 @@ unsafe extern "C" {
     fn fd_write(fd: u32, vectors: *const IoVec, count: usize, written: *mut usize) -> u32;
 }
 
+#[cfg(not(test))]
+#[link(wasm_import_module = "traverse_host")]
+unsafe extern "C" {
+    fn emit_event(ptr: i32, len: i32) -> i32;
+}
+
+#[cfg(test)]
+unsafe fn emit_event(_ptr: i32, _len: i32) -> i32 {
+    0
+}
+
 static mut INPUT_BUF: [u8; 12288] = [0; 12288];
 static mut OUTPUT_BUF: [u8; 4096] = [0; 4096];
+static mut EVENT_BUF: [u8; 1024] = [0; 1024];
+static mut ACTION_ITEM_ID_BUF: [u8; 128] = [0; 128];
+static mut ACTION_ITEM_ID_LEN: usize = 0;
 
 const MAX_TRACE: usize = 4;
 
@@ -55,6 +72,7 @@ pub extern "C" fn _start() {
 }
 
 pub unsafe fn evaluate(input: &[u8], out: &mut [u8]) -> usize {
+    let action_item_id = extract_string_at_depth(input, b"\"action_item_id\"", 1);
     let members = array_after_key(input, b"\"workspace_members\"").unwrap_or(b"[]");
     let config = object_after_key(input, b"\"ownership_config\"").unwrap_or(b"");
     let creator = extract_string_at_depth(input, b"\"creator_id\"", 1);
@@ -64,6 +82,25 @@ pub unsafe fn evaluate(input: &[u8], out: &mut [u8]) -> usize {
     } else {
         extract_string_at_depth(input, b"\"suggested_owner\"", 1)
     };
+
+    if action_item_id.is_empty() {
+        unsafe {
+            ACTION_ITEM_ID_LEN = 0;
+        }
+        return write_result(
+            out,
+            None,
+            b"config_error",
+            b"config_error",
+            &[b"action_item_id missing"],
+        );
+    }
+
+    unsafe {
+        let n = core::cmp::min(action_item_id.len(), ACTION_ITEM_ID_BUF.len());
+        ACTION_ITEM_ID_BUF[..n].copy_from_slice(&action_item_id[..n]);
+        ACTION_ITEM_ID_LEN = n;
+    }
 
     if config.is_empty() {
         return write_result(
@@ -256,6 +293,13 @@ fn write_result(
     reason: &[u8],
     traces: &[&[u8]],
 ) -> usize {
+    if reason == b"ok" {
+        if let Some(id) = owner_id {
+            unsafe {
+                emit_ownership_assigned(id, method);
+            }
+        }
+    }
     let mut i = 0usize;
     i = copy(out, i, b"{\"owner_id\":");
     if let Some(id) = owner_id {
@@ -280,6 +324,32 @@ fn write_result(
     }
     i = copy(out, i, b"]}");
     i
+}
+
+/// Build and emit the governed ownership-assigned event. Best-effort: a
+/// non-zero host status does not change the capability's own evaluation result.
+unsafe fn emit_ownership_assigned(owner_id: &[u8], resolution_method: &[u8]) {
+    let action_item_id = &ACTION_ITEM_ID_BUF[..ACTION_ITEM_ID_LEN];
+    if action_item_id.is_empty() || owner_id.is_empty() {
+        return;
+    }
+    let buf = &mut EVENT_BUF;
+    let mut i = 0usize;
+    i = copy(
+        buf,
+        i,
+        br#"{"event_id":"core.action-item.ownership-assigned","version":"1.0.0","payload":{"action_item_id":""#,
+    );
+    i = copy(buf, i, action_item_id);
+    i = copy(buf, i, br#"","owner_id":""#);
+    i = copy(buf, i, owner_id);
+    i = copy(buf, i, br#"","resolution_method":""#);
+    i = copy(buf, i, resolution_method);
+    i = copy(buf, i, br#""}}"#);
+    if i == 0 || i > buf.len() {
+        return;
+    }
+    let _ = emit_event(buf.as_ptr() as i32, i as i32);
 }
 
 fn eq_ascii_ci(a: &[u8], b: &[u8]) -> bool {
@@ -471,9 +541,35 @@ mod catalog_coverage_tests {
     use super::*;
 
     fn run(input: &str) -> String {
+        let with_id = if input.contains("\"action_item_id\"") {
+            input.to_string()
+        } else if input.trim() == "{}" {
+            "{\"action_item_id\":\"item-test\"}".to_string()
+        } else if let Some(rest) = input.strip_prefix('{') {
+            format!("{{\"action_item_id\":\"item-test\",{rest}")
+        } else {
+            input.to_string()
+        };
         let mut out = vec![0u8; 65536];
-        let n = unsafe { evaluate(input.as_bytes(), &mut out) };
+        let n = unsafe { evaluate(with_id.as_bytes(), &mut out) };
         String::from_utf8_lossy(&out[..n]).into_owned()
+    }
+
+    #[test]
+    fn missing_action_item_id_is_config_error() {
+        let mut out = vec![0u8; 4096];
+        let n = unsafe {
+            evaluate(
+                br#"{"suggested_owner":null,"creator_id":"user-carol","workspace_members":[],"ownership_config":{"fallback":"creator"}}"#,
+                &mut out,
+            )
+        };
+        let s = String::from_utf8_lossy(&out[..n]);
+        assert!(
+            s.contains("\"reason_code\":\"config_error\""),
+            "expected config_error in {s}"
+        );
+        assert!(s.contains("action_item_id missing"));
     }
 
     #[test]

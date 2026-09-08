@@ -1,0 +1,293 @@
+{
+  "kind": "capability_contract",
+  "schema_version": "1.0.0",
+  "lifecycle": "active",
+  "owner": {
+    "team": "traverse/registry",
+    "contact": "founders@loop.dev"
+  },
+  "connector_requirements": [],
+  "consumes": [],
+  "dependencies": [],
+  "execution": {
+    "binary_format": "wasm",
+    "constraints": {
+      "filesystem_access": "none",
+      "host_api_access": "none",
+      "network_access": "forbidden"
+    },
+    "entrypoint": {
+      "command": "run",
+      "kind": "wasi-command"
+    },
+    "preferred_targets": [
+      "local",
+      "edge",
+      "browser"
+    ]
+  },
+  "permitted_targets": [
+    "local",
+    "edge",
+    "browser",
+    "cloud"
+  ],
+  "policies": [
+    {
+      "id": "fail-closed"
+    }
+  ],
+  "postconditions": [
+    {
+      "description": "Identical inputs produce identical outputs",
+      "id": "deterministic"
+    }
+  ],
+  "state_schema": null,
+  "service_type": "subscribable",
+  "permissions": [
+    {
+      "id": "commerce.cart-line-changed"
+    }
+  ],
+  "evidence": [
+    {
+      "evidence_id": "commerce-cart-line-changed-1.0.0-contract-validation",
+      "status": "passed",
+      "type": "contract_validation"
+    }
+  ],
+  "id": "commerce.cart-line-changed",
+  "namespace": "commerce",
+  "name": "cart-line-changed",
+  "version": "1.0.0",
+  "authoring": {
+    "method": "llm-assisted",
+    "source_revision": "feat/service-type-fill-wave1",
+    "test_evidence": "capability-src/commerce-cart-line-changed cargo test (6 passing)",
+    "review": {
+      "decision": "pending-qualified-review",
+      "reviewer": "traverse-registry-maintainer"
+    }
+  },
+  "summary": "Validate a cart line quantity change and emit a governed cart.line-changed event.",
+  "description": "Given cart_id, line_id, sku, qty_before, qty_after, and actor_id, validates that identity fields are present and both quantities are integers >= 0, and that the quantities actually differ. On success (reason_code=ok) the WASM guest calls traverse_host::emit_event for commerce.cart.line-changed@1.0.0 with the full line-change payload. Does not persist cart state.",
+  "event_trigger": "commerce.cart-line-changed.triggered",
+  "emits": [
+    {
+      "event_id": "commerce.cart.line-changed",
+      "version": "1.0.0"
+    }
+  ],
+  "side_effects": [
+    {
+      "description": "Pure validation of cart line quantity change",
+      "kind": "memory_only"
+    },
+    {
+      "description": "Emits commerce.cart.line-changed@1.0.0 via traverse_host::emit_event when accepted (ok)",
+      "kind": "event_emission"
+    }
+  ],
+  "preconditions": [
+    {
+      "id": "fields-present",
+      "description": "Required string fields and integer quantities are present"
+    },
+    {
+      "id": "qty-non-negative",
+      "description": "qty_before and qty_after must be >= 0"
+    }
+  ],
+  "provenance": {
+    "source": "greenfield",
+    "author": "traverse/registry",
+    "created_at": "2026-09-08T00:00:00Z",
+    "spec_ref": "001-registry-foundation",
+    "adr_refs": [],
+    "exception_refs": []
+  },
+  "artifact": {
+    "digest": "sha256:f67c6b8466d39f79fe879e03a09aa5cbf08422616d90975e850dda4941961dba",
+    "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/commerce.cart-line-changed-1.0.0/commerce-cart-line-changed.wasm"
+  },
+  "inputs": {
+    "schema": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "cart_id",
+        "line_id",
+        "sku",
+        "qty_before",
+        "qty_after",
+        "actor_id"
+      ],
+      "properties": {
+        "cart_id": {
+          "type": "string"
+        },
+        "line_id": {
+          "type": "string"
+        },
+        "sku": {
+          "type": "string"
+        },
+        "qty_before": {
+          "type": "integer"
+        },
+        "qty_after": {
+          "type": "integer"
+        },
+        "actor_id": {
+          "type": "string"
+        }
+      }
+    }
+  },
+  "outputs": {
+    "schema": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "accepted",
+        "qty_before",
+        "qty_after",
+        "reason_code"
+      ],
+      "properties": {
+        "accepted": {
+          "type": "boolean"
+        },
+        "qty_before": {
+          "type": "integer"
+        },
+        "qty_after": {
+          "type": "integer"
+        },
+        "reason_code": {
+          "type": "string",
+          "enum": [
+            "ok",
+            "invalid_qty",
+            "no_change",
+            "invalid_input"
+          ]
+        },
+        "evaluation_trace": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  },
+  "use_cases": [
+    {
+      "happy": true,
+      "persona_ref": "checkout-flow-developer",
+      "scenario": "As a checkout flow developer, I want a quantity increase accepted and emitted, so that inventory and UI subscribers stay in sync.",
+      "input_example": {
+        "cart_id": "cart-1",
+        "line_id": "line-1",
+        "sku": "SKU-A",
+        "qty_before": 1,
+        "qty_after": 3,
+        "actor_id": "user-ada"
+      },
+      "output_example": {
+        "accepted": true,
+        "qty_before": 1,
+        "qty_after": 3,
+        "reason_code": "ok",
+        "evaluation_trace": [
+          "line-1 qty changed"
+        ]
+      }
+    },
+    {
+      "happy": true,
+      "persona_ref": "checkout-flow-developer",
+      "scenario": "As a checkout flow developer, I want qty_after=0 accepted, so that removing a line is a real line-changed fact.",
+      "input_example": {
+        "cart_id": "cart-1",
+        "line_id": "line-1",
+        "sku": "SKU-A",
+        "qty_before": 2,
+        "qty_after": 0,
+        "actor_id": "user-ada"
+      },
+      "output_example": {
+        "accepted": true,
+        "qty_before": 2,
+        "qty_after": 0,
+        "reason_code": "ok",
+        "evaluation_trace": [
+          "line-1 qty changed"
+        ]
+      }
+    },
+    {
+      "happy": false,
+      "persona_ref": "checkout-flow-developer",
+      "scenario": "As a checkout flow developer, I want negative quantities rejected, so that corrupt cart updates fail closed.",
+      "input_example": {
+        "cart_id": "cart-1",
+        "line_id": "line-1",
+        "sku": "SKU-A",
+        "qty_before": 1,
+        "qty_after": -1,
+        "actor_id": "user-ada"
+      },
+      "output_example": {
+        "accepted": false,
+        "qty_before": 1,
+        "qty_after": -1,
+        "reason_code": "invalid_qty",
+        "evaluation_trace": [
+          "qty_before and qty_after must be >= 0"
+        ]
+      }
+    },
+    {
+      "happy": false,
+      "persona_ref": "checkout-flow-developer",
+      "scenario": "As a checkout flow developer, I want identical before/after quantities rejected, so that no-op updates do not spam subscribers.",
+      "input_example": {
+        "cart_id": "cart-1",
+        "line_id": "line-1",
+        "sku": "SKU-A",
+        "qty_before": 2,
+        "qty_after": 2,
+        "actor_id": "user-ada"
+      },
+      "output_example": {
+        "accepted": false,
+        "qty_before": 2,
+        "qty_after": 2,
+        "reason_code": "no_change",
+        "evaluation_trace": [
+          "qty_before equals qty_after; nothing to emit"
+        ]
+      }
+    },
+    {
+      "happy": false,
+      "persona_ref": "checkout-flow-developer",
+      "scenario": "As a checkout flow developer, I want incomplete payloads rejected with invalid_input, so that partial updates cannot emit events.",
+      "input_example": {
+        "cart_id": "cart-1"
+      },
+      "output_example": {
+        "accepted": false,
+        "qty_before": 0,
+        "qty_after": 0,
+        "reason_code": "invalid_input",
+        "evaluation_trace": [
+          "precondition failed: required string fields missing"
+        ]
+      }
+    }
+  ]
+}
