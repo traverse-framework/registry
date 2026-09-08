@@ -50,6 +50,7 @@ Usage: gather_catalog_data.py <output_path>
 """
 
 import json
+import os
 import re
 import subprocess
 import sys
@@ -190,6 +191,43 @@ def resolve_current_crate(capability_id: str) -> Optional[str]:
     return None
 
 
+def resolve_capability_risk() -> dict:
+    """spec 024-capability-risk-classification-adoption FR-003/FR-004: map every
+    `<namespace>/<id>@<version>` to its {risk, is_automatic_eligible,
+    risk_source}, computed by the traverse-registry `resolve_capability_risk`
+    binary -- which applies `traverse-contracts`' own RiskMetadata /
+    is_automatic_eligible / default_risk_metadata. Never re-derived here (or in
+    the no_std catalog-builder): a Python re-implementation would silently drift
+    from the crate rule, which is the whole point of FR-004.
+
+    Honors RESOLVE_CAPABILITY_RISK_BIN when set (CI installs a built binary);
+    otherwise `cargo run`s the bin target. A failure is fatal -- an incomplete
+    risk surface must not reach catalog.json."""
+    env_bin = os.environ.get("RESOLVE_CAPABILITY_RISK_BIN")
+    if env_bin:
+        cmd = [env_bin, "--root", "."]
+    else:
+        cmd = [
+            "cargo", "run", "--quiet", "--locked",
+            "-p", "traverse-registry", "--bin", "resolve_capability_risk",
+            "--", "--root", ".",
+        ]
+    result = subprocess.run(cmd, capture_output=True, text=True, check=False)
+    if result.returncode != 0:
+        raise RuntimeError(
+            f"resolve_capability_risk failed (exit {result.returncode}):\n{result.stderr.strip()}"
+        )
+    payload = json.loads(result.stdout)
+    by_reference = {}
+    for projection in payload.get("capabilities", []):
+        by_reference[projection["reference"]] = {
+            "risk": projection["risk"],
+            "is_automatic_eligible": projection["is_automatic_eligible"],
+            "risk_source": projection["risk_source"],
+        }
+    return by_reference
+
+
 def gather_capabilities() -> list:
     capabilities_dir = Path("capabilities")
     entries = []
@@ -197,15 +235,24 @@ def gather_capabilities() -> list:
     if not capabilities_dir.is_dir():
         return entries
 
+    risk_by_reference = resolve_capability_risk()
+
     for contract_path in sorted(capabilities_dir.rglob("contract.json")):
         contract = json.loads(contract_path.read_text())
         deprecated = (contract_path.parent / "deprecated.json").is_file()
+        reference = f"{contract['namespace']}/{contract['id']}@{contract['version']}"
+        risk = risk_by_reference.get(reference)
+        if risk is None:
+            raise RuntimeError(f"resolve_capability_risk produced no projection for {reference}")
 
         entries.append(
             {
                 "deprecated": deprecated,
                 "contract": contract,
                 "test_coverage": None,
+                "risk": risk["risk"],
+                "is_automatic_eligible": risk["is_automatic_eligible"],
+                "risk_source": risk["risk_source"],
             }
         )
 

@@ -7,8 +7,12 @@
 //! `events/**/product.json` (the WASM ABI only allows a single input/single
 //! output via `fd_read`/`fd_write`, no filesystem access, so this crate
 //! cannot walk those trees itself):
-//! `{capabilities: [{deprecated, contract, test_coverage}],
-//! personas: [{persona}], events: [{deprecated, product, observed_lineage?}]}`.
+//! `{capabilities: [{deprecated, contract, test_coverage, risk?,
+//! is_automatic_eligible?, risk_source?}], personas: [{persona}],
+//! events: [{deprecated, product, observed_lineage?}]}`. The three risk
+//! fields (specs/024-capability-risk-classification-adoption) are computed
+//! upstream through `traverse-contracts` and passed through verbatim here,
+//! exactly like `test_coverage`.
 //! Output: one JSON object with a deterministically sorted `capabilities`
 //! list (each entry carrying the *entire* source contract, not a hand-picked
 //! field subset -- the catalog's per-capability detail page needs "all the
@@ -192,6 +196,17 @@ fn build_catalog(input: &Value) -> Value {
             .and_then(Value::as_bool)
             .unwrap_or(false);
         let test_coverage = record.get("test_coverage").cloned().unwrap_or(Value::Null);
+        // specs/024-capability-risk-classification-adoption FR-003: pass the
+        // risk projection through verbatim, same as test_coverage. The verdict
+        // itself is computed upstream (gather_catalog_data.py -> the
+        // traverse-registry resolve_capability_risk binary -> traverse-contracts);
+        // this no_std transform never derives it.
+        let risk = record.get("risk").cloned().unwrap_or(Value::Null);
+        let is_automatic_eligible = record
+            .get("is_automatic_eligible")
+            .cloned()
+            .unwrap_or(Value::Null);
+        let risk_source = record.get("risk_source").cloned().unwrap_or(Value::Null);
 
         let reference = capability_reference(namespace, id, version);
 
@@ -225,6 +240,9 @@ fn build_catalog(input: &Value) -> Value {
             ("deprecated", Value::Bool(deprecated)),
             ("contract", contract.clone()),
             ("test_coverage", test_coverage),
+            ("risk", risk),
+            ("is_automatic_eligible", is_automatic_eligible),
+            ("risk_source", risk_source),
         ]));
     }
 
@@ -443,6 +461,41 @@ mod tests {
 
         let b = capabilities.iter().find(|c| c.get("reference").unwrap().as_str() == Some("core/core.b@1.0.0")).unwrap();
         assert_eq!(b.get("test_coverage").unwrap(), &Value::Null);
+    }
+
+    #[test]
+    fn risk_projection_is_passed_through_verbatim_and_null_when_absent() {
+        let risk_obj = object(vec![
+            ("effect_class", Value::String(String::from("pure_read"))),
+            ("determinism_class", Value::String(String::from("deterministic"))),
+        ]);
+        let with_risk = object(vec![
+            ("deprecated", Value::Bool(false)),
+            (
+                "contract",
+                contract("core", "core.a", "1.0.0", "alpha", "alpha capability"),
+            ),
+            ("risk", risk_obj.clone()),
+            ("is_automatic_eligible", Value::Bool(true)),
+            ("risk_source", Value::String(String::from("declared"))),
+        ]);
+        let without_risk = record(
+            contract("core", "core.b", "1.0.0", "bravo", "bravo capability"),
+            false,
+        );
+
+        let catalog = build_catalog(&capabilities_input(vec![with_risk, without_risk]));
+        let capabilities = catalog.get("capabilities").unwrap().as_array().unwrap();
+
+        let a = capabilities.iter().find(|c| c.get("reference").unwrap().as_str() == Some("core/core.a@1.0.0")).unwrap();
+        assert_eq!(a.get("risk").unwrap(), &risk_obj);
+        assert_eq!(a.get("is_automatic_eligible").unwrap().as_bool(), Some(true));
+        assert_eq!(a.get("risk_source").unwrap().as_str(), Some("declared"));
+
+        let b = capabilities.iter().find(|c| c.get("reference").unwrap().as_str() == Some("core/core.b@1.0.0")).unwrap();
+        assert_eq!(b.get("risk").unwrap(), &Value::Null);
+        assert_eq!(b.get("is_automatic_eligible").unwrap(), &Value::Null);
+        assert_eq!(b.get("risk_source").unwrap(), &Value::Null);
     }
 
     #[test]

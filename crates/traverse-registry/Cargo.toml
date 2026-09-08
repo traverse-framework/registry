@@ -22,6 +22,10 @@ path = "src/bin/validate_event_products.rs"
 name = "export_async_api"
 path = "src/bin/export_async_api.rs"
 
+[[bin]]
+name = "resolve_capability_risk"
+path = "src/bin/resolve_capability_risk.rs"
+
 [dev-dependencies]
 [lints]
 workspace = true

@@ -5,6 +5,7 @@ mod artifact_resolution;
 mod async_api;
 mod async_api_export;
 mod bundle;
+pub mod capability_risk;
 mod connector_activation;
 pub mod dependency_resolver;
 mod event_products;
@@ -2296,6 +2297,8 @@ mod tests {
             name,
             version: version.to_string(),
             lifecycle: Lifecycle::Active,
+            risk: traverse_contracts::default_risk_metadata(),
+            use_cases: Vec::new(),
             owner: Owner {
                 team: "traverse-core".to_string(),
                 contact: "enrico.piovesan10@gmail.com".to_string(),

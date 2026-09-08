@@ -834,6 +834,8 @@ mod tests {
             name: name.clone(),
             version: version.to_string(),
             lifecycle: Lifecycle::Active,
+            risk: traverse_contracts::default_risk_metadata(),
+            use_cases: Vec::new(),
             owner: Owner {
                 team: "graph".to_string(),
                 contact: "graph@example.com".to_string(),

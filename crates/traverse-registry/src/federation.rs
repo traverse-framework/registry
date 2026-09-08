@@ -2762,6 +2762,8 @@ mod tests {
             name: "echo".to_string(),
             version: "1.0.0".to_string(),
             lifecycle: Lifecycle::Active,
+            risk: traverse_contracts::default_risk_metadata(),
+            use_cases: Vec::new(),
             owner: Owner {
                 team: "platform".to_string(),
                 contact: "platform@example.com".to_string(),

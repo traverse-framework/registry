@@ -835,6 +835,8 @@ fn base_contract(id: &str, version: &str) -> CapabilityContract {
         name: name.to_string(),
         version: version.to_string(),
         lifecycle: Lifecycle::Active,
+        risk: traverse_contracts::default_risk_metadata(),
+        use_cases: Vec::new(),
         owner: Owner {
             team: "traverse-core".to_string(),
             contact: "enrico.piovesan10@gmail.com".to_string(),

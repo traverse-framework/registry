@@ -6,8 +6,10 @@ import json
 import os
 import sys
 import tempfile
+import types
 import unittest
 from pathlib import Path
+from unittest import mock
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 MODULE_PATH = REPO_ROOT / "scripts" / "ci" / "gather_catalog_data.py"
@@ -139,6 +141,53 @@ class AttachObservedLineageTests(unittest.TestCase):
             entries[0]["observed_lineage"],
             {"interactions": [], "drift": []},
         )
+
+
+class ResolveCapabilityRiskTests(unittest.TestCase):
+    """spec 024-capability-risk-classification-adoption FR-003/FR-004."""
+
+    def setUp(self):
+        self.mod = load_module()
+
+    def _fake_run(self, stdout, returncode=0):
+        def run(cmd, capture_output, text, check):  # noqa: ARG001
+            return types.SimpleNamespace(returncode=returncode, stdout=stdout, stderr="boom")
+        return run
+
+    def test_parses_binary_output_into_reference_map(self):
+        payload = json.dumps({
+            "capabilities": [
+                {
+                    "reference": "core/core.thing@1.0.0",
+                    "risk": {"effect_class": "pure_read"},
+                    "is_automatic_eligible": True,
+                    "risk_source": "declared",
+                }
+            ]
+        })
+        with mock.patch.object(self.mod.subprocess, "run", self._fake_run(payload)):
+            out = self.mod.resolve_capability_risk()
+        self.assertEqual(
+            out["core/core.thing@1.0.0"],
+            {"risk": {"effect_class": "pure_read"}, "is_automatic_eligible": True, "risk_source": "declared"},
+        )
+
+    def test_nonzero_exit_is_fatal(self):
+        with mock.patch.object(self.mod.subprocess, "run", self._fake_run("", returncode=1)):
+            with self.assertRaises(RuntimeError):
+                self.mod.resolve_capability_risk()
+
+    def test_env_bin_is_used_when_set(self):
+        seen = {}
+
+        def run(cmd, capture_output, text, check):  # noqa: ARG001
+            seen["cmd"] = cmd
+            return types.SimpleNamespace(returncode=0, stdout='{"capabilities": []}', stderr="")
+
+        with mock.patch.dict(os.environ, {"RESOLVE_CAPABILITY_RISK_BIN": "/opt/rcr"}), \
+             mock.patch.object(self.mod.subprocess, "run", run):
+            self.mod.resolve_capability_risk()
+        self.assertEqual(seen["cmd"][:1], ["/opt/rcr"])
 
 
 if __name__ == "__main__":
