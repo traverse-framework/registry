@@ -354,6 +354,21 @@
         "crates/traverse-registry/",
         "specs/996-registry-app-preparation/"
       ]
+    },
+    {
+      "id": "024-capability-risk-classification-adoption",
+      "version": "1.0.0",
+      "status": "approved",
+      "immutable": true,
+      "path": "specs/024-capability-risk-classification-adoption/spec.md",
+      "governs": [
+        "capabilities/",
+        "scripts/ci/capability_validation.py",
+        "scripts/ci/gather_catalog_data.py",
+        "scripts/ci/build_index.py",
+        "capability-src/catalog-builder/",
+        "specs/024-capability-risk-classification-adoption/"
+      ]
     }
   ],
   "draft_specs": [
