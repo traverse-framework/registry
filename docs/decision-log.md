@@ -656,7 +656,7 @@ Also updated `CONTRIBUTING.md`'s existing entry-62 guidance to state the new saf
 
 **Implementation note (checked against Traverse `host_abi_v1.json`)**: Wave 2 remains blocked until a host storage/lifecycle ABI exists — current whitelist has `emit_event` and `connector_invoke` but no managed-persistence import, so honest UMA stateful cannot be published without violating this entry's Wave 2 bar. Wave 1 ships in this PR.
 
-92. **`/brainstorm to unblock`: registry#387 needs no new registry spec (owner already mirrored `traverse` Spec 996 via #391); registry#384 gets adoption spec `024-capability-risk-classification-adoption` and a concrete design (2026-09-08, live owner brainstorm)**: entry 91 parked `#384` pending an owner decision, and `#387` was blocked on `traverse` Spec `996-registry-app-preparation` (which had no counterpart here). Both are now unblocked.
+93. **`/brainstorm to unblock`: registry#387 needs no new registry spec (owner already mirrored `traverse` Spec 996 via #391); registry#384 gets adoption spec `024-capability-risk-classification-adoption` and a concrete design (2026-09-08, live owner brainstorm)**: entry 91 parked `#384` pending an owner decision, and `#387` was blocked on `traverse` Spec `996-registry-app-preparation` (which had no counterpart here). Both are now unblocked.
 
 - **`#387` — governance already done, don't add a spec.** Mid-brainstorm check found the owner had merged #391 ~30 min earlier: `traverse` Spec 996 copied **verbatim** into `specs/996-registry-app-preparation/spec.md`, `approved`/`immutable`, `governs: ["crates/traverse-registry/", "specs/996-registry-app-preparation/"]`, in both `approved-specs.json` copies. My Q1 recommendation (a registry-authored adoption spec `024-registry-app-preparation-adoption`, per the `011`/`021` precedent) is **superseded** — the owner chose the verbatim-mirror option directly. No spec 024 for app-preparation. `#387` is now pure implementation against Spec 996's FR-001–FR-0NN: a new public API in `crates/traverse-registry/` (request inputs, exact-version selection with no fallback, ordered outcome list, immutable non-secret evidence, digest-keyed cache-writer contract that rejects conflicting bytes, stable redacted failure taxonomy). **Depth decision**: this brainstorm settles governance + sequencing only; the Rust type/trait/error-enum shapes are left to a dedicated Plan+implement session against the spec (re-deriving them here just risks drift from Spec 996). Workspace version bumps `0.18.0 → 0.19.0` in that PR; the crates.io publish rides the normal `v0.19.0` tag push (`010-crate-publish-pipeline`), not a merge blocker. Board: move `#387` `Blocked → Ready`.
 
@@ -671,3 +671,18 @@ Also updated `CONTRIBUTING.md`'s existing entry-62 guidance to state the new saf
 - **Sequencing (Q6): `#384` first (this registry-ops loop), `#387` as its own Plan+implement session.** `#384` is contained (spec 024 + one validation check + one small bin + gather/catalog-builder passthrough + a `build_index.py` projection) and unblocks browser-demo work with downstream pressure; `#387` is a larger public-API build that deserves a focused pass against Spec 996.
 
 - **Execution boundary of *this* entry/PR**: the decision log above, `specs/024-capability-risk-classification-adoption/spec.md` (`approved`/`immutable`, per the co-brainstormed-specs-approval policy — owner-participated brainstorm), and its entry in both `approved-specs.json` copies. No validation-code, catalog-pipeline, or crate change here — those are `#384`'s implementation PR. `#387` implementation is untouched. Board: `#387` and `#384` both `Blocked → Ready`.
+
+94. **Wave 2 Stateful host ABI design via `/brainstorm` (2026-09-08)**: after Wave 1 merged (10 subscribable), Wave 2 stayed blocked on missing managed-persistence guest imports (Traverse #1285). Owner took the recommended option on each question:
+
+- **Surface**: wire existing `DataStore` / `RuntimeDataStore` into `traverse_host` (not a parallel session ABI, not connector-only).
+- **Imports**: `state_get` / `state_put` / `state_delete` only (no list-prefix in v1).
+- **Key isolation**: host prefixes guest keys with `capability_id/`.
+- **Missing store**: hard-fail call with `data_store_not_configured`; tests inject explicit in-memory adapter (never silent fallback).
+- **Record metadata**: host stamps `lamport_clock` + `writer_id`; guest sends `{key,value}` only.
+- **Schema keys**: fixed `state_schema.properties` keys; resource ids live inside values (no patternProperties yet).
+- **Contract rule**: `service_type=stateful` requires non-empty `state_schema` and excludes Browser.
+- **Sequence**: Traverse ABI + release first, then registry Wave 2 publishes.
+- **Governance**: new Traverse host-ABI spec (098 playbook), not an amend of taxonomy 014/208.
+- **ABI version**: extend `host_abi_v1` / `1.0.0` whitelist (optional imports), same as `emit_event`/`connector_invoke`.
+
+**Execution boundary**: design only in this entry. Implementation lives in `traverse-framework/traverse` (spec + runtime), tracked by #1285; registry Wave 2 follows once the ABI is callable.
