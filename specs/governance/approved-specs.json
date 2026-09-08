@@ -343,6 +343,17 @@
         "capabilities/",
         "scripts/ci/capability_validation.py"
       ]
+    },
+    {
+      "id": "996-registry-app-preparation",
+      "version": "0.1.0",
+      "status": "approved",
+      "immutable": true,
+      "path": "specs/996-registry-app-preparation/spec.md",
+      "governs": [
+        "crates/traverse-registry/",
+        "specs/996-registry-app-preparation/"
+      ]
     }
   ],
   "draft_specs": [
