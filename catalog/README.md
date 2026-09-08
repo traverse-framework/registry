@@ -49,10 +49,12 @@ registry#106's job, not this one -- see that issue for the deployment side
 (`actions/upload-pages-artifact` + `actions/deploy-pages`, and the
 repo-owner-only GitHub Pages settings toggle).
 
-`catalog.json` shape (produced by `catalog-builder`) -- each capability entry
-carries its **entire source `contract.json`**, not a hand-picked field
-subset, so the detail page always has "all the infos" without this pipeline
-needing to grow a new field mapping every time the contract schema does:
+`catalog.json` shape (produced by `catalog-builder`, then `contract_url` /
+`contract_digest` added per entry by `mirror_artifacts.py` -- see "Browser
+verified-retrieval mirror" below) -- each capability entry carries its
+**entire source `contract.json`**, not a hand-picked field subset, so the
+detail page always has "all the infos" without this pipeline needing to grow
+a new field mapping every time the contract schema does:
 
 ```json
 {
@@ -61,7 +63,9 @@ needing to grow a new field mapping every time the contract schema does:
       "reference": "validation/validation.validate-luhn@1.1.0",
       "deprecated": false,
       "contract": { "namespace": "validation", "id": "validation.validate-luhn", "version": "1.1.0", "...": "the full contract.json" },
-      "test_coverage": { "lines_percent": 98.8, "functions_percent": 100.0, "regions_percent": 99.3, "test_count": 5 }
+      "test_coverage": { "lines_percent": 98.8, "functions_percent": 100.0, "regions_percent": 99.3, "test_count": 5 },
+      "contract_url": "https://registry.traverse-framework.com/artifacts/validation.validate-luhn-1.1.0/contract.json",
+      "contract_digest": "sha256:…"
     }
   ],
   "personas": [
@@ -151,6 +155,42 @@ hash-fragment one.
 pipeline (`gather_catalog_data.py`/`catalog-builder`) doesn't process
 `workflows/` at all yet (registry#124's own disclosed gap), so there's
 nothing to statically render for them until that lands.
+
+## Browser verified-retrieval mirror (registry#304, registry#383)
+
+`scripts/ci/mirror_artifacts.py` (the `build-catalog` job's "Mirror artifact
+WASM + verified contract files" step) re-hosts, under the same CORS-open
+Pages origin as `catalog.json`, everything a browser at an arbitrary origin
+needs to run `traverse-embedder-web`'s `registryCache` path (spec
+`080-embedded-registry-cache`) against the public registry -- fetch **and
+digest-verify** a capability's WASM *and* its contract, then hand the
+verified bytes to `BundleEmbedder`.
+
+For every published capability version, at a path that is a fixed prefix
+swap of the authoritative `contract.artifact.url`
+(`.../releases/download/artifacts/<ns>.<id>-<ver>/…` →
+`https://registry.traverse-framework.com/artifacts/<ns>.<id>-<ver>/…`):
+
+| File | Contents |
+| --- | --- |
+| `artifacts/<ns>.<id>-<ver>/<asset>.wasm` | the compiled artifact, bytes re-verified against `contract.artifact.digest` at build time (registry#304) |
+| `artifacts/<ns>.<id>-<ver>/contract.json` | the immutable `capabilities/<ns>/<id>/<ver>/contract.json`, copied **verbatim** (registry#383) |
+| `artifacts/<ns>.<id>-<ver>/contract.json.sha256` | `sha256:<hex>` of those exact contract bytes |
+
+The same `contract` mirror URL and digest are also added to each
+`catalog.json` capability entry as `contract_url` / `contract_digest` (see
+the shape example above) so a consumer building a
+`SyncedPublicRegistryState` snapshot has them inline. `contract_digest`
+uses the identical `"sha256:" + sha256(raw_bytes)` recipe
+`scripts/ci/build_index.py` uses for `index.json`'s `contract_digest` (spec
+`009-contract-metadata-in-index`), computed over the identical bytes, so the
+two public surfaces agree for any given version.
+
+`contract.json`'s own `artifact.digest`/`url` remain the sole authoritative
+record per spec `007-artifact-hosting`; this mirror is a convenience
+read-path, never referenced by a contract, and is regenerated fresh on
+every catalog build (deprecated versions included -- a yanked version must
+stay fetchable and verifiable too).
 
 ## Analytics (registry#133, decision-log entry 45)
 
