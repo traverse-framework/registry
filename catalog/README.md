@@ -65,7 +65,10 @@ a new field mapping every time the contract schema does:
       "contract": { "namespace": "validation", "id": "validation.validate-luhn", "version": "1.1.0", "...": "the full contract.json" },
       "test_coverage": { "lines_percent": 98.8, "functions_percent": 100.0, "regions_percent": 99.3, "test_count": 5 },
       "contract_url": "https://registry.traverse-framework.com/artifacts/validation.validate-luhn-1.1.0/contract.json",
-      "contract_digest": "sha256:…"
+      "contract_digest": "sha256:…",
+      "risk": { "effect_class": "pure_read", "determinism_class": "deterministic", "data_flow": { "egress_policy": "denied", "accepted_data_classifications": [], "produced_data_classifications": [] }, "reliability": { "idempotency_required": false, "retryable": true, "compensation_available": false } },
+      "is_automatic_eligible": true,
+      "risk_source": "declared"
     }
   ],
   "personas": [
@@ -191,6 +194,39 @@ record per spec `007-artifact-hosting`; this mirror is a convenience
 read-path, never referenced by a contract, and is regenerated fresh on
 every catalog build (deprecated versions included -- a yanked version must
 stay fetchable and verifiable too).
+
+## Capability risk classification (spec 024, registry#384)
+
+Every capability entry in `catalog.json` (and every capability entry in the
+GitHub-Release `index.json`) carries three additive fields adopting
+`traverse-framework/traverse` Spec 109 FR-005/FR-006:
+
+- `risk` -- the `traverse-contracts::RiskMetadata` object: `effect_class`
+  (`pure_read` | `state_write` | `external_effect` | `irreversible_effect`),
+  `determinism_class` (`deterministic` | `externally_variable` |
+  `model_derived`), `data_flow` (`egress_policy` plus field-level
+  accepted/produced data classifications), and `reliability`
+  (`idempotency_required` / `retryable` / `compensation_available`).
+- `is_automatic_eligible` -- a boolean: `traverse_contracts::is_automatic_eligible`
+  applied to `risk` (`pure_read` ∧ `deterministic` ∧ egress `denied` ∧
+  ¬`idempotency_required`). Filter to `is_automatic_eligible === true` for the
+  subset safe to run unattended and unauthenticated -- no `null`-handling,
+  legacy versions are already `false`.
+- `risk_source` -- `"declared"` when the contract declares its own `risk`
+  block, `"conservative_default"` when it does not (the ~115 versions
+  published before spec 024; resolved via
+  `traverse_contracts::default_risk_metadata()`, exactly as the runtime
+  treats them).
+
+The verdict is **always** computed by the `traverse-registry`
+`resolve_capability_risk` binary through `traverse-contracts` --
+`gather_catalog_data.py` and `build_index.py` invoke it, `catalog-builder`
+passes the result through verbatim. Neither the Python pipeline nor the
+`no_std` wasm ever re-derives the rule (spec 024 FR-004). New/changed
+contracts must declare a well-formed `risk` block or `capability-validation`
+fails (`contract.missing_risk_metadata` / `contract.invalid_risk_metadata`);
+`traverse-cli capability publish` does not emit it yet, so add it by hand
+until it does.
 
 ## Analytics (registry#133, decision-log entry 45)
 

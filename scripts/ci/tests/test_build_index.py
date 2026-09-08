@@ -74,6 +74,44 @@ class BuildIndexContractMetadataTests(unittest.TestCase):
 
             self.assertEqual(ctx.exception.code, "index.contract_unreadable")
 
+    def test_risk_projection_attached_when_resolver_has_the_reference(self):
+        """spec 024-capability-risk-classification-adoption FR-003."""
+        import unittest.mock as _mock
+
+        projection = {
+            "core/example-capability@1.0.0": {
+                "risk": {"effect_class": "pure_read", "determinism_class": "deterministic"},
+                "is_automatic_eligible": True,
+                "risk_source": "declared",
+            }
+        }
+        with tempfile.TemporaryDirectory() as tmp:
+            write_contract(tmp, valid_contract())
+            with _mock.patch.object(
+                build_index_module, "resolve_capability_risk", return_value=projection
+            ):
+                index = self._run_in(tmp, 0, "deadbeef", "traverse-framework/registry")
+
+            entry = index["capabilities"][0]
+            self.assertEqual(entry["is_automatic_eligible"], True)
+            self.assertEqual(entry["risk_source"], "declared")
+            self.assertEqual(entry["risk"]["effect_class"], "pure_read")
+
+    def test_risk_fields_omitted_when_resolver_returns_nothing(self):
+        import unittest.mock as _mock
+
+        with tempfile.TemporaryDirectory() as tmp:
+            write_contract(tmp, valid_contract())
+            with _mock.patch.object(
+                build_index_module, "resolve_capability_risk", return_value={}
+            ):
+                index = self._run_in(tmp, 0, "deadbeef", "traverse-framework/registry")
+
+            entry = index["capabilities"][0]
+            self.assertNotIn("risk", entry)
+            self.assertNotIn("is_automatic_eligible", entry)
+            self.assertNotIn("risk_source", entry)
+
     def test_yanked_version_retains_contract_fields(self):
         with tempfile.TemporaryDirectory() as tmp:
             path = write_contract(tmp, valid_contract())

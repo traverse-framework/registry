@@ -170,13 +170,14 @@ dependencies = [
 
 [[package]]
 name = "traverse-contracts"
-version = "0.9.1"
+version = "0.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e9daf814e807b2c75e40066985f684e971e6f7f55cc46d957308e93e23101560"
+checksum = "15826a0e3f086d7c471d58e72853c0e08b18c5faafb1857753f70b59485e6030"
 dependencies = [
  "semver",
  "serde",
  "serde_json",
+ "sha2",
 ]
 
 [[package]]

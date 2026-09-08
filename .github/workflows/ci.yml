@@ -219,6 +219,20 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
 
+      # specs/024-capability-risk-classification-adoption FR-003/FR-004: the
+      # index carries the same risk projection catalog.json does, computed by
+      # the traverse-registry binary (through traverse-contracts).
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: "1.94.0"
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+
+      - name: Build capability-risk resolver
+        run: cargo build --locked --release -p traverse-registry --bin resolve_capability_risk
+
       - name: Determine previous index version
         id: prev
         env:
@@ -231,6 +245,8 @@ jobs:
         run: python3 -m unittest scripts/ci/tests/test_build_index.py -v
 
       - name: Build index
+        env:
+          RESOLVE_CAPABILITY_RISK_BIN: ${{ github.workspace }}/target/release/resolve_capability_risk
         run: python3 scripts/ci/build_index.py "${{ steps.prev.outputs.version }}" "${{ github.sha }}" /tmp/index.json "${{ github.repository }}"
 
       - name: Publish index as GitHub Release
@@ -434,9 +450,18 @@ jobs:
       - name: Build catalog-builder
         run: cargo build --release --target wasm32-unknown-unknown --manifest-path capability-src/catalog-builder/Cargo.toml
 
+      # specs/024-capability-risk-classification-adoption FR-004: the risk
+      # verdict is computed here, through traverse-contracts, never in the
+      # Python or the no_std catalog-builder.
+      - name: Build capability-risk resolver
+        run: cargo build --locked --release -p traverse-registry --bin resolve_capability_risk
+
       - name: Gather capability metadata
         # Also measures real test_coverage per capability (cargo llvm-cov)
-        # for each id's current version -- see gather_catalog_data.py.
+        # for each id's current version -- see gather_catalog_data.py -- and
+        # attaches each version's risk projection (spec 024).
+        env:
+          RESOLVE_CAPABILITY_RISK_BIN: ${{ github.workspace }}/target/release/resolve_capability_risk
         run: python3 scripts/ci/gather_catalog_data.py /tmp/gathered.json
 
       - name: Run catalog-builder

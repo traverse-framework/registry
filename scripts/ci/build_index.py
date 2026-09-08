@@ -62,6 +62,8 @@ Usage: build_index.py <previous_index_version_or_0> <source_commit_sha> <output_
 
 import hashlib
 import json
+import os
+import subprocess
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -90,9 +92,59 @@ def sanitized_use_cases(use_cases) -> list:
     ]
 
 
+def resolve_capability_risk() -> dict:
+    """specs/024-capability-risk-classification-adoption FR-003/FR-004: map
+    `<namespace>/<id>@<version>` -> {risk, is_automatic_eligible, risk_source},
+    computed by the traverse-registry `resolve_capability_risk` binary (which
+    applies `traverse-contracts`' own RiskMetadata / is_automatic_eligible /
+    default_risk_metadata -- never re-derived in Python). Same helper as
+    scripts/ci/gather_catalog_data.py's; kept a local copy because the two CI
+    scripts share no module.
+
+    Honors RESOLVE_CAPABILITY_RISK_BIN (CI installs a built binary); otherwise
+    `cargo run`s the target. Returns {} on failure -- the catalog build
+    (gather_catalog_data.py) is the surface that hard-requires a projection for
+    every active version; here the fields are an additive projection and a
+    missing binary in a local `build_index.py` invocation must not break the
+    index build. CI's publish-index job builds the binary so the fields are
+    always populated there."""
+    env_bin = os.environ.get("RESOLVE_CAPABILITY_RISK_BIN")
+    cmd = (
+        [env_bin, "--root", "."]
+        if env_bin
+        else [
+            "cargo", "run", "--quiet", "--locked",
+            "-p", "traverse-registry", "--bin", "resolve_capability_risk",
+            "--", "--root", ".",
+        ]
+    )
+    try:
+        result = subprocess.run(cmd, capture_output=True, text=True, check=False)
+    except FileNotFoundError as exc:
+        print(f"warning: resolve_capability_risk unavailable ({exc}); index risk fields omitted", file=sys.stderr)
+        return {}
+    if result.returncode != 0:
+        print(
+            f"warning: resolve_capability_risk failed (exit {result.returncode}); "
+            f"index risk fields omitted:\n{result.stderr.strip()}",
+            file=sys.stderr,
+        )
+        return {}
+    payload = json.loads(result.stdout)
+    return {
+        projection["reference"]: {
+            "risk": projection["risk"],
+            "is_automatic_eligible": projection["is_automatic_eligible"],
+            "risk_source": projection["risk_source"],
+        }
+        for projection in payload.get("capabilities", [])
+    }
+
+
 def build_index(previous_index_version: int, source_commit: str, repo_slug: str = DEFAULT_REPO_SLUG) -> dict:
     capabilities_dir = Path("capabilities")
     entries = []
+    risk_by_reference = resolve_capability_risk()
 
     if capabilities_dir.is_dir():
         for contract_path in sorted(capabilities_dir.rglob("contract.json")):
@@ -129,25 +181,34 @@ def build_index(previous_index_version: int, source_commit: str, repo_slug: str 
             contract_digest = f"sha256:{hashlib.sha256(raw_bytes).hexdigest()}"
             contract_url = f"https://raw.githubusercontent.com/{repo_slug}/{source_commit}/{contract_path.as_posix()}"
 
-            entries.append(
-                {
-                    "namespace": contract.get("namespace"),
-                    "id": contract.get("id"),
-                    "version": contract.get("version"),
-                    "digest": artifact_digest,
-                    "artifact_url": artifact_url,
-                    "contract_digest": contract_digest,
-                    "contract_url": contract_url,
-                    "deprecated": deprecated,
-                    "summary": contract.get("summary") or "",
-                    "description": contract.get("description") or "",
-                    "use_cases": sanitized_use_cases(contract.get("use_cases")),
-                    "service_type": contract.get("service_type") or "",
-                    "permitted_targets": contract.get("permitted_targets") or [],
-                    "lifecycle": contract.get("lifecycle") or "",
-                    "provenance": contract.get("provenance"),
-                }
-            )
+            entry = {
+                "namespace": contract.get("namespace"),
+                "id": contract.get("id"),
+                "version": contract.get("version"),
+                "digest": artifact_digest,
+                "artifact_url": artifact_url,
+                "contract_digest": contract_digest,
+                "contract_url": contract_url,
+                "deprecated": deprecated,
+                "summary": contract.get("summary") or "",
+                "description": contract.get("description") or "",
+                "use_cases": sanitized_use_cases(contract.get("use_cases")),
+                "service_type": contract.get("service_type") or "",
+                "permitted_targets": contract.get("permitted_targets") or [],
+                "lifecycle": contract.get("lifecycle") or "",
+                "provenance": contract.get("provenance"),
+            }
+
+            # specs/024-capability-risk-classification-adoption FR-003: same
+            # projection catalog.json carries, computed once via traverse-contracts.
+            reference = f"{contract.get('namespace')}/{contract.get('id')}@{contract.get('version')}"
+            risk = risk_by_reference.get(reference)
+            if risk is not None:
+                entry["risk"] = risk["risk"]
+                entry["is_automatic_eligible"] = risk["is_automatic_eligible"]
+                entry["risk_source"] = risk["risk_source"]
+
+            entries.append(entry)
 
     return {
         "index_version": previous_index_version + 1,

@@ -953,6 +953,90 @@ class CheckNewContractAuthoringMethodTests(unittest.TestCase):
             )
 
 
+class CheckNewContractRiskMetadataTests(unittest.TestCase):
+    """check_new_contract_risk_metadata implements spec
+    024-capability-risk-classification-adoption FR-001/FR-002 for newly ADDED
+    or CHANGED contracts. Diff-based only -- the ~115 pre-024 immutable
+    publishes have no `risk` block and must never be retro-flagged."""
+
+    ELIGIBLE_RISK = {
+        "effect_class": "pure_read",
+        "determinism_class": "deterministic",
+        "data_flow": {"egress_policy": "denied"},
+        "reliability": {
+            "idempotency_required": False,
+            "retryable": True,
+            "compensation_available": False,
+        },
+    }
+
+    def _contract(self, risk="__unset__"):
+        c = valid_contract()
+        if risk != "__unset__":
+            c["risk"] = risk
+        return c
+
+    def _codes(self, risk="__unset__"):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = write_contract(tmp, self._contract(risk))
+            errors: list = []
+            capability_validation.check_new_contract_risk_metadata(path, errors)
+            return [e["code"] for e in errors]
+
+    def test_well_formed_risk_passes(self):
+        self.assertEqual(self._codes(self.ELIGIBLE_RISK), [])
+
+    def test_minimal_risk_without_data_flow_passes(self):
+        risk = {k: v for k, v in self.ELIGIBLE_RISK.items() if k != "data_flow"}
+        self.assertEqual(self._codes(risk), [])
+
+    def test_missing_risk_block_is_rejected(self):
+        self.assertIn("contract.missing_risk_metadata", self._codes())
+
+    def test_null_risk_block_is_rejected(self):
+        self.assertIn("contract.missing_risk_metadata", self._codes(None))
+
+    def test_unknown_effect_class_is_rejected(self):
+        risk = {**self.ELIGIBLE_RISK, "effect_class": "read_only"}
+        self.assertIn("contract.invalid_risk_metadata", self._codes(risk))
+
+    def test_unknown_determinism_class_is_rejected(self):
+        risk = {**self.ELIGIBLE_RISK, "determinism_class": "random"}
+        self.assertIn("contract.invalid_risk_metadata", self._codes(risk))
+
+    def test_missing_reliability_is_rejected(self):
+        risk = {k: v for k, v in self.ELIGIBLE_RISK.items() if k != "reliability"}
+        self.assertIn("contract.invalid_risk_metadata", self._codes(risk))
+
+    def test_reliability_field_not_boolean_is_rejected(self):
+        risk = {
+            **self.ELIGIBLE_RISK,
+            "reliability": {**self.ELIGIBLE_RISK["reliability"], "retryable": "yes"},
+        }
+        self.assertIn("contract.invalid_risk_metadata", self._codes(risk))
+
+    def test_allowed_connectors_egress_policy_passes(self):
+        risk = {
+            **self.ELIGIBLE_RISK,
+            "data_flow": {"egress_policy": {"allowed_connectors": ["smtp", "slack"]}},
+        }
+        self.assertEqual(self._codes(risk), [])
+
+    def test_malformed_egress_policy_is_rejected(self):
+        risk = {**self.ELIGIBLE_RISK, "data_flow": {"egress_policy": "allow_all"}}
+        self.assertIn("contract.invalid_risk_metadata", self._codes(risk))
+
+    def test_malformed_data_classification_entry_is_rejected(self):
+        risk = {
+            **self.ELIGIBLE_RISK,
+            "data_flow": {
+                "egress_policy": "denied",
+                "accepted_data_classifications": [{"field_path": "/a", "classification": "secret"}],
+            },
+        }
+        self.assertIn("contract.invalid_risk_metadata", self._codes(risk))
+
+
 class ExpectedCapabilitySrcCrateTests(unittest.TestCase):
     def test_dots_replaced_with_dashes(self):
         self.assertEqual(

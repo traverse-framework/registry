@@ -132,6 +132,16 @@ KNOWN_SERVICE_TYPES = {"stateless", "subscribable", "stateful"}
 AUTHORING_METHODS = {"human", "llm-assisted"}
 LLM_ASSISTED_AUDIT_FIELDS = ("source_revision", "test_evidence", "review")
 
+# spec 024-capability-risk-classification-adoption FR-001/FR-002: the vocab
+# `traverse` Spec 109 FR-005 defines and `traverse-contracts::RiskMetadata`
+# encodes. Kept in exact lockstep with that crate -- the risk *verdict*
+# (is_automatic_eligible) is always computed there via the resolve_capability_risk
+# binary (FR-004), never here; this gate only checks contract-declared shape.
+RISK_EFFECT_CLASSES = {"pure_read", "state_write", "external_effect", "irreversible_effect"}
+RISK_DETERMINISM_CLASSES = {"deterministic", "externally_variable", "model_derived"}
+RISK_DATA_CLASSIFICATIONS = {"public", "internal", "confidential", "restricted"}
+RISK_RELIABILITY_FIELDS = ("idempotency_required", "retryable", "compensation_available")
+
 
 def fail(errors, code, path, message):
     errors.append({"code": code, "path": path, "message": message})
@@ -853,6 +863,125 @@ def check_new_contracts_declare_authoring_method(base_sha: str, head_sha: str, e
         status, path = parts[0], parts[-1]
         if path.endswith("contract.json") and (status == "A" or status.startswith("M")):
             check_new_contract_authoring_method(Path(path), errors)
+
+
+def _risk_shape_error(risk):
+    """Return a human-readable reason `risk` is not a valid
+    `traverse-contracts::RiskMetadata` shape, or None if it is well-formed.
+    Mirrors that struct's required fields (no serde default for effect_class /
+    determinism_class / reliability) and Spec 109 FR-005's enum vocabularies.
+    A contract whose `risk` fails this would also fail to deserialize
+    crate-side and break every `traverse` consumer."""
+    if not isinstance(risk, dict):
+        return "`risk` must be an object"
+
+    effect_class = risk.get("effect_class")
+    if effect_class is None:
+        return "`risk.effect_class` is required"
+    if effect_class not in RISK_EFFECT_CLASSES:
+        return f"`risk.effect_class` must be one of {sorted(RISK_EFFECT_CLASSES)}, got {effect_class!r}"
+
+    determinism_class = risk.get("determinism_class")
+    if determinism_class is None:
+        return "`risk.determinism_class` is required"
+    if determinism_class not in RISK_DETERMINISM_CLASSES:
+        return (
+            f"`risk.determinism_class` must be one of {sorted(RISK_DETERMINISM_CLASSES)}, "
+            f"got {determinism_class!r}"
+        )
+
+    reliability = risk.get("reliability")
+    if not isinstance(reliability, dict):
+        return "`risk.reliability` is required and must be an object"
+    for field in RISK_RELIABILITY_FIELDS:
+        if field not in reliability:
+            return f"`risk.reliability.{field}` is required"
+        if not isinstance(reliability[field], bool):
+            return f"`risk.reliability.{field}` must be a boolean"
+
+    data_flow = risk.get("data_flow")
+    if data_flow is not None:
+        if not isinstance(data_flow, dict):
+            return "`risk.data_flow` must be an object when present"
+        egress_policy = data_flow.get("egress_policy")
+        if egress_policy is not None and egress_policy != "denied":
+            if not (
+                isinstance(egress_policy, dict)
+                and set(egress_policy) == {"allowed_connectors"}
+                and isinstance(egress_policy["allowed_connectors"], list)
+                and all(isinstance(c, str) for c in egress_policy["allowed_connectors"])
+            ):
+                return (
+                    '`risk.data_flow.egress_policy` must be "denied" or '
+                    '{"allowed_connectors": [<string>, ...]}'
+                )
+        for key in ("accepted_data_classifications", "produced_data_classifications"):
+            entries = data_flow.get(key)
+            if entries is None:
+                continue
+            if not isinstance(entries, list):
+                return f"`risk.data_flow.{key}` must be a list when present"
+            for entry in entries:
+                if (
+                    not isinstance(entry, dict)
+                    or not isinstance(entry.get("field_path"), str)
+                    or entry.get("classification") not in RISK_DATA_CLASSIFICATIONS
+                ):
+                    return (
+                        f"each `risk.data_flow.{key}` entry must be "
+                        '{"field_path": <string>, "classification": '
+                        f"<one of {sorted(RISK_DATA_CLASSIFICATIONS)}>}}"
+                    )
+    return None
+
+
+def check_new_contract_risk_metadata(path: Path, errors: list) -> None:
+    """spec 024-capability-risk-classification-adoption FR-001/FR-002: a newly
+    ADDED or CHANGED contract.json MUST declare a `risk` object that
+    deserializes as `traverse-contracts::RiskMetadata` (effect_class,
+    determinism_class, reliability required; data_flow optional). Diff-based,
+    never whole-tree: the ~115 contracts published before spec 024 predate the
+    field and are immutable (same posture as spec 023's authoring.method gate,
+    decision-log entry 87)."""
+    try:
+        contract = json.loads(path.read_text())
+    except Exception:
+        return
+    if "risk" not in contract or contract.get("risk") is None:
+        fail(
+            errors,
+            "contract.missing_risk_metadata",
+            str(path),
+            "newly added/changed contract.json must declare a `risk` block "
+            "(effect_class, determinism_class, reliability) -- spec "
+            "024-capability-risk-classification-adoption FR-001",
+        )
+        return
+    reason = _risk_shape_error(contract.get("risk"))
+    if reason is not None:
+        fail(
+            errors,
+            "contract.invalid_risk_metadata",
+            str(path),
+            f"{reason} (spec 024-capability-risk-classification-adoption FR-002)",
+        )
+
+
+def check_new_contracts_declare_risk_metadata(base_sha: str, head_sha: str, errors: list) -> None:
+    """Only validates contract.json files ADDED or CHANGED in this PR's diff --
+    see check_new_contract_risk_metadata's docstring for why this must not run
+    against the whole historical tree."""
+    diff = subprocess.check_output(
+        ["git", "diff", "--name-status", f"{base_sha}...{head_sha}", "--", "capabilities/"],
+        text=True,
+    )
+    for line in diff.splitlines():
+        if not line.strip():
+            continue
+        parts = line.split("\t")
+        status, path = parts[0], parts[-1]
+        if path.endswith("contract.json") and (status == "A" or status.startswith("M")):
+            check_new_contract_risk_metadata(Path(path), errors)
 
 
 COVERAGE_MIN_FUNCTIONS_PERCENT = 100.0
@@ -1635,6 +1764,10 @@ def main() -> int:
             fail(errors, "git.diff_failed", "capabilities/", f"Unable to compute diff: {exc}")
         try:
             check_new_contracts_declare_authoring_method(base_sha, head_sha, errors)
+        except subprocess.CalledProcessError as exc:
+            fail(errors, "git.diff_failed", "capabilities/", f"Unable to compute diff: {exc}")
+        try:
+            check_new_contracts_declare_risk_metadata(base_sha, head_sha, errors)
         except subprocess.CalledProcessError as exc:
             fail(errors, "git.diff_failed", "capabilities/", f"Unable to compute diff: {exc}")
         try:
