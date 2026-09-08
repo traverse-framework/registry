@@ -1,0 +1,17 @@
+[workspace]
+
+[package]
+name = "identity-session-revoked-agent"
+version = "0.1.0"
+edition = "2021"
+publish = false
+description = "Catalog-source mirror of identity.session-revoked — session revocation with governed emit."
+
+[[bin]]
+name = "identity-session-revoked-agent"
+path = "src/main.rs"
+
+[profile.release]
+opt-level = "s"
+lto = true
+panic = "abort"

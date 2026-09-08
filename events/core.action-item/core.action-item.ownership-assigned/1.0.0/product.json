@@ -1,0 +1,94 @@
+{
+  "contract": {
+    "kind": "event_contract",
+    "schema_version": "1.0.0",
+    "id": "core.action-item.ownership-assigned",
+    "namespace": "core.action-item",
+    "name": "ownership-assigned",
+    "version": "1.0.0",
+    "lifecycle": "active",
+    "owner": {
+      "team": "loop",
+      "contact": "founders@loop.dev"
+    },
+    "summary": "Published when an action item's ownership has been assigned.",
+    "description": "Governed domain event emitted when core.assign-ownership resolves a concrete owner (reason_code=ok with a non-null owner_id). Carries the action item identity, resolved owner, and resolution method so independent consumers can react without re-querying the capability.",
+    "payload": {
+      "schema": {
+        "type": "object",
+        "required": [
+          "action_item_id",
+          "owner_id",
+          "resolution_method"
+        ],
+        "properties": {
+          "action_item_id": {
+            "type": "string"
+          },
+          "owner_id": {
+            "type": "string"
+          },
+          "resolution_method": {
+            "type": "string"
+          }
+        }
+      },
+      "compatibility": "backward-compatible"
+    },
+    "classification": {
+      "domain": "core.action-item",
+      "bounded_context": "action-items",
+      "event_type": "domain",
+      "tags": [
+        "action-items",
+        "ownership"
+      ]
+    },
+    "publishers": [
+      {
+        "capability_id": "core.assign-ownership",
+        "version": "1.2.0"
+      }
+    ],
+    "subscribers": [],
+    "policies": [
+      {
+        "id": "default-action-item-event-safety"
+      }
+    ],
+    "tags": [
+      "action-items",
+      "ownership"
+    ],
+    "provenance": {
+      "source": "greenfield",
+      "author": "loop",
+      "created_at": "2026-09-08T00:00:00Z"
+    },
+    "evidence": []
+  },
+  "support_route": "https://github.com/traverse-framework/registry/issues",
+  "exposure": "internal",
+  "field_classifications": [
+    {
+      "field_path": "action_item_id",
+      "classification": "none"
+    },
+    {
+      "field_path": "owner_id",
+      "classification": "personal"
+    },
+    {
+      "field_path": "resolution_method",
+      "classification": "none"
+    }
+  ],
+  "replacement": null,
+  "cloud_events_source": "traverse://capability/core.assign-ownership",
+  "cloud_events_subject_field": "action_item_id",
+  "deduplication_id_field": "envelope.id",
+  "ordering_scope_field": "action_item_id",
+  "correlation_id_field": "envelope.correlation_id",
+  "causation_id_field": null,
+  "retention_policy": "retain 90 days"
+}

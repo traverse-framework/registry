@@ -24,8 +24,28 @@ unsafe extern "C" {
     fn fd_write(fd: u32, vectors: *const IoVec, count: usize, written: *mut usize) -> u32;
 }
 
+#[cfg(not(test))]
+#[link(wasm_import_module = "traverse_host")]
+unsafe extern "C" {
+    fn emit_event(ptr: i32, len: i32) -> i32;
+}
+
+#[cfg(test)]
+unsafe fn emit_event(_ptr: i32, _len: i32) -> i32 {
+    0
+}
+
 static mut INPUT_BUF: [u8; 24576] = [0; 24576];
 static mut OUTPUT_BUF: [u8; 16384] = [0; 16384];
+static mut EVENT_BUF: [u8; 1024] = [0; 1024];
+static mut EMIT_ACTION: [u8; 32] = [0; 32];
+static mut EMIT_ACTION_LEN: usize = 0;
+static mut EMIT_ACTOR: [u8; 64] = [0; 64];
+static mut EMIT_ACTOR_LEN: usize = 0;
+static mut EMIT_RESOURCE_TYPE: [u8; 64] = [0; 64];
+static mut EMIT_RESOURCE_TYPE_LEN: usize = 0;
+static mut EMIT_RESOURCE_ID: [u8; 64] = [0; 64];
+static mut EMIT_RESOURCE_ID_LEN: usize = 0;
 
 const MAX_MENTIONS: usize = 8;
 const MAX_LINKS: usize = 4;
@@ -89,6 +109,12 @@ pub unsafe fn process(input: &[u8], out: &mut [u8]) -> usize {
             br#"["precondition failed: actor.id missing"]"#,
             policy,
         );
+    }
+
+    let resource_type = extract_string(resource, b"\"type\"");
+    let resource_id = extract_string(resource, b"\"id\"");
+    unsafe {
+        store_emit_ctx(action, actor_id, resource_type, resource_id);
     }
 
     let mut roles: [&[u8]; MAX_ROLES] = [&b""[..]; MAX_ROLES];
@@ -320,6 +346,9 @@ fn process_react(out: &mut [u8], actor_id: &[u8], comment: &[u8], policy: &[u8])
     i = copy(out, i, br#"],"count":1}],"created_by":null},"obligations":[{"type":"audit_log","severity":"recommended"},{"type":"realtime_fanout","severity":"recommended","metadata":{"event":"reaction_added"}}],"evaluation_trace":["action=react","actor has react permission","reaction normalized"],"policy_hash":"#);
     i = write_policy_hash(out, i, policy);
     i = copy(out, i, br#","confidence":"high"}"#);
+    unsafe {
+        emit_comment_processed(b"ok", comment_id);
+    }
     i
 }
 
@@ -372,6 +401,9 @@ fn process_delete(out: &mut [u8], actor_id: &[u8], comment: &[u8], policy: &[u8]
     i = copy(out, i, br#"},"obligations":[{"type":"audit_log","severity":"required","metadata":{"soft_delete":true}},{"type":"retain_for_ediscovery","severity":"required"}],"evaluation_trace":["action=delete","soft_delete=true in policy","actor is creator -> allow","body retained for audit"],"policy_hash":"#);
     i = write_policy_hash(out, i, policy);
     i = copy(out, i, br#","confidence":"high"}"#);
+    unsafe {
+        emit_comment_processed(b"ok", comment_id);
+    }
     i
 }
 
@@ -497,6 +529,9 @@ fn write_allow_normalized(
     i = copy(out, i, br#","policy_hash":"#);
     i = write_policy_hash(out, i, policy);
     i = copy(out, i, br#","confidence":"high"}"#);
+    unsafe {
+        emit_comment_processed(reason_code, comment_id);
+    }
     i
 }
 
@@ -521,6 +556,60 @@ fn deny(
     i = write_policy_hash(out, i, policy);
     i = copy(out, i, br#","confidence":"high"}"#);
     i
+}
+
+unsafe fn store_emit_ctx(action: &[u8], actor_id: &[u8], resource_type: &[u8], resource_id: &[u8]) {
+    let copy_into = |dst: &mut [u8], len: &mut usize, src: &[u8]| {
+        let n = core::cmp::min(src.len(), dst.len());
+        dst[..n].copy_from_slice(&src[..n]);
+        *len = n;
+    };
+    copy_into(&mut EMIT_ACTION, &mut EMIT_ACTION_LEN, action);
+    copy_into(&mut EMIT_ACTOR, &mut EMIT_ACTOR_LEN, actor_id);
+    copy_into(
+        &mut EMIT_RESOURCE_TYPE,
+        &mut EMIT_RESOURCE_TYPE_LEN,
+        resource_type,
+    );
+    copy_into(
+        &mut EMIT_RESOURCE_ID,
+        &mut EMIT_RESOURCE_ID_LEN,
+        resource_id,
+    );
+}
+
+/// Best-effort governed emit on allow paths. Host failure does not alter the decision.
+unsafe fn emit_comment_processed(reason_code: &[u8], comment_id: &[u8]) {
+    let action = &EMIT_ACTION[..EMIT_ACTION_LEN];
+    let actor_id = &EMIT_ACTOR[..EMIT_ACTOR_LEN];
+    let resource_type = &EMIT_RESOURCE_TYPE[..EMIT_RESOURCE_TYPE_LEN];
+    let resource_id = &EMIT_RESOURCE_ID[..EMIT_RESOURCE_ID_LEN];
+    if action.is_empty() || actor_id.is_empty() {
+        return;
+    }
+    let buf = &mut EVENT_BUF;
+    let mut i = 0usize;
+    i = copy(
+        buf,
+        i,
+        br#"{"event_id":"core.comment.processed","version":"1.0.0","payload":{"action":""#,
+    );
+    i = copy(buf, i, action);
+    i = copy(buf, i, br#"","actor_id":""#);
+    i = copy(buf, i, actor_id);
+    i = copy(buf, i, br#"","resource_type":""#);
+    i = copy(buf, i, resource_type);
+    i = copy(buf, i, br#"","resource_id":""#);
+    i = copy(buf, i, resource_id);
+    i = copy(buf, i, br#"","reason_code":""#);
+    i = copy(buf, i, reason_code);
+    i = copy(buf, i, br#"","comment_id":""#);
+    i = copy(buf, i, comment_id);
+    i = copy(buf, i, br#""}}"#);
+    if i == 0 || i > buf.len() {
+        return;
+    }
+    let _ = emit_event(buf.as_ptr() as i32, i as i32);
 }
 
 fn write_policy_hash(out: &mut [u8], at: usize, policy: &[u8]) -> usize {

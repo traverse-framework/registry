@@ -1,0 +1,117 @@
+{
+  "contract": {
+    "kind": "event_contract",
+    "schema_version": "1.0.0",
+    "id": "core.comment.processed",
+    "namespace": "core.comment",
+    "name": "processed",
+    "version": "1.0.0",
+    "lifecycle": "active",
+    "owner": {
+      "team": "loop",
+      "contact": "founders@loop.dev"
+    },
+    "summary": "Published when a comment action has been allowed by policy.",
+    "description": "Governed domain event emitted when core.process-comment allows a create/edit/reply/delete/react action. Carries the action, actor, resource coordinates, reason_code, and optional comment_id so independent consumers can react without re-querying the capability.",
+    "payload": {
+      "schema": {
+        "type": "object",
+        "required": [
+          "action",
+          "actor_id",
+          "resource_type",
+          "resource_id",
+          "reason_code"
+        ],
+        "properties": {
+          "action": {
+            "type": "string"
+          },
+          "actor_id": {
+            "type": "string"
+          },
+          "resource_type": {
+            "type": "string"
+          },
+          "resource_id": {
+            "type": "string"
+          },
+          "reason_code": {
+            "type": "string"
+          },
+          "comment_id": {
+            "type": "string"
+          }
+        }
+      },
+      "compatibility": "backward-compatible"
+    },
+    "classification": {
+      "domain": "core.comment",
+      "bounded_context": "collaboration",
+      "event_type": "domain",
+      "tags": [
+        "comments",
+        "collaboration"
+      ]
+    },
+    "publishers": [
+      {
+        "capability_id": "core.process-comment",
+        "version": "1.2.0"
+      }
+    ],
+    "subscribers": [],
+    "policies": [
+      {
+        "id": "default-comment-event-safety"
+      }
+    ],
+    "tags": [
+      "comments",
+      "collaboration"
+    ],
+    "provenance": {
+      "source": "greenfield",
+      "author": "loop",
+      "created_at": "2026-09-08T00:00:00Z"
+    },
+    "evidence": []
+  },
+  "support_route": "https://github.com/traverse-framework/registry/issues",
+  "exposure": "internal",
+  "field_classifications": [
+    {
+      "field_path": "action",
+      "classification": "none"
+    },
+    {
+      "field_path": "actor_id",
+      "classification": "personal"
+    },
+    {
+      "field_path": "resource_type",
+      "classification": "none"
+    },
+    {
+      "field_path": "resource_id",
+      "classification": "none"
+    },
+    {
+      "field_path": "reason_code",
+      "classification": "none"
+    },
+    {
+      "field_path": "comment_id",
+      "classification": "none"
+    }
+  ],
+  "replacement": null,
+  "cloud_events_source": "traverse://capability/core.process-comment",
+  "cloud_events_subject_field": "resource_id",
+  "deduplication_id_field": "envelope.id",
+  "ordering_scope_field": "resource_id",
+  "correlation_id_field": "envelope.correlation_id",
+  "causation_id_field": null,
+  "retention_policy": "retain 90 days"
+}

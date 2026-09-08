@@ -625,3 +625,25 @@ Also updated `CONTRIBUTING.md`'s existing entry-62 guidance to state the new saf
 - **Board — add a `Deferred` status option to Project 3, move `#341`/`#365`/`#371` into it.** Options: add-Deferred-lane / leave-in-Blocked / close-all-three-and-reopen-on-trigger. **Chosen: add `Deferred`.** Why: `Blocked` was conflating "stuck, needs a person" with "deliberately waiting on an objective condition" — the exact ambiguity that made every status check awkward. A `Deferred` lane fixes it permanently for a one-time config cost and keeps each ticket's trigger visible (unlike closing them, where `#365`/`#371`'s countable-but-not-self-checking triggers would depend on someone remembering to look). After the move, `Blocked` is empty and honestly means "genuinely stuck".
 
 **Execution boundary**: this entry + the issue/board changes are the whole output. `#355` closed with a pointer to spec `023` + `#371`; `#371`'s body rewritten so its activation condition is the ≥ 5 count (with current progress noted) and its DoD absorbs any unfinished `#355` DoD item; `Deferred` option added to Project 3's Status field and `#341`/`#365`/`#371` moved there. No code, spec, or CI change. `#365`'s threshold, `#341`'s decision, and the deferred evaluation's own methodology are untouched.
+
+90. **Service-type catalog fill map + Wave 1 implementation start (2026-09-08, `/brainstorm`)**: the public catalog still shows 1 subscribable (`core.transition-action-status@1.3.0`) and 0 stateful (~54 other latest IDs are `stateless`) while the taxonomy is under active test. Owner goal: ≥10 real subscribable + ≥10 real stateful — no placeholders/utilities. Decisions (owner took the recommended option each time):
+
+- **ROI**: A+C — runtime/taxonomy coverage *and* multi-domain breadth.
+- **Domains**: Commerce, Support/Tickets, Approvals/Governance, Collaboration/Work, Identity/Access (~2+2 each).
+- **Promote vs greenfield**: promote Collaboration + Approvals; greenfield Commerce + Support + Identity.
+- **Semantics**: UMA white paper §5.1.2 + Traverse spec 014/208 (Stateful excludes Browser).
+- **Archetypes**: UMA archetypes for greenfield; promote-native for Collaboration/Approvals.
+- **Slate**: balanced emitters + stores.
+- **Ship order**: Wave 1 subscribable first; Wave 2 stateful second.
+- **Promote mechanic**: new semver of same capability id.
+- **Wave 1 bar**: runtime-honest `emit_event` + event product (no declare-only).
+- **Naming**: `commerce.*` / `support.*` / `identity.*` for greenfield.
+- **Wave 2 bar**: lifecycle + managed persistence via runtime storage (no affinity-only fakes).
+- **Roster A**: Identity Wave 1 = `identity.session-revoked` only; `identity.challenge-completed` pairs with Wave 2.
+
+**Wave 1 roster (10)**: `core.transition-action-status` (shipped); promotes `core.assign-ownership`, `core.process-comment`, `doc-approval.recommend`, `platform.decide-state-transition`; greenfield `commerce.cart-line-changed`, `commerce.order-status-changed`, `support.ticket-status-changed`, `support.ticket-sla-breached`, `identity.session-revoked`.
+
+**Wave 2 roster (10)**: `core.action-item-store`, `core.followup-session`, `doc-approval.packet-store`, `doc-approval.policy-store`, `commerce.cart`, `commerce.pricing-config`, `support.ticket-workspace`, `support.agent-session`, `identity.challenge-session`, `identity.principal-session`.
+
+**Implementation note (checked against Traverse `host_abi_v1.json`)**: Wave 2 remains blocked until a host storage/lifecycle ABI exists — current whitelist has `emit_event` and `connector_invoke` but no managed-persistence import, so honest UMA stateful cannot be published without violating decision 90's Wave 2 bar. Wave 1 proceeds now.
+
