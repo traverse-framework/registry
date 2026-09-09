@@ -1,8 +1,8 @@
 # Feature Specification: Application-Selected Registry Reference Preparation
 
-**Status**: Approved (2026-09-09, v1.0.0)
+**Status**: Approved (2026-09-09, v1.0.0; v1.0.1 factual correction 2026-09-09)
 **Canonical governing ID**: `997-application-selected-preparation`
-**Version**: 1.0.0
+**Version**: 1.0.1
 **Layers on**: `996-registry-app-preparation` (the versioned single-reference
 preparation contract). This spec constrains *which* references may be
 prepared for offline activation; it does not restate 996's per-reference
@@ -108,9 +108,11 @@ activation preparation cannot express it.
 
 Layered on `crates/traverse-registry/` governance and `996`, per
 `013-inherited-registry-governance` FR-002. Adds a constraint; supersedes no
-existing registry spec. `traverse-registry` `0.19.0` carries both `996` and
-this spec (the version was not yet published when `996` landed; see
-decision-log entries 97 and 99).
+existing registry spec. `traverse-registry` `0.20.0` is the first release
+that carries `996` + this spec together: the already-published `0.19.0`
+(tag `v0.19.0`, #398) predates the spec-997 batch and the
+`RegistryReference` convergence. See decision-log entry 101 (which
+corrects the "0.19.0 was never published" premise in entries 99/100).
 
 ## Out of Scope
 
