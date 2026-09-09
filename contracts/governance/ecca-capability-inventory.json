@@ -375,6 +375,24 @@
       "evidence": "side_effects=[memory_only] on latest published version; empty emits/consumes; result returns directly to the caller with no asynchronous domain fact broadcast to independent consumers."
     },
     {
+      "capability_id": "doc-approval.packet-store",
+      "published_versions": [
+        "1.0.0"
+      ],
+      "path": "capabilities/doc-approval/doc-approval.packet-store/1.0.0/contract.json",
+      "classification": "no-event-required",
+      "evidence": "Host-managed durable approval packet via traverse_host::state_*; side_effects=[memory_only]; empty emits/consumes; packet state is caller-scoped persistence, not an independent consumer event."
+    },
+    {
+      "capability_id": "doc-approval.policy-store",
+      "published_versions": [
+        "1.0.0"
+      ],
+      "path": "capabilities/doc-approval/doc-approval.policy-store/1.0.0/contract.json",
+      "classification": "no-event-required",
+      "evidence": "Host-managed durable approval policy config via traverse_host::state_*; side_effects=[memory_only]; empty emits/consumes; policy state is caller-scoped persistence, not an independent consumer event."
+    },
+    {
       "capability_id": "doc-approval.recommend",
       "published_versions": [
         "1.0.0",
