@@ -173,16 +173,6 @@ unsafe fn do_put(input: &[u8], out: &mut [u8]) -> usize {
     i = copy(req, i, br#"","value":"#);
     i = copy(req, i, session);
     i = copy(req, i, b"}");
-    if i == 0 {
-        return write_result(
-            out,
-            false,
-            b"host_error",
-            None,
-            None,
-            br#"["failed to build state_put envelope"]"#,
-        );
-    }
     let rc = state_put(req.as_ptr() as i32, i as i32);
     if rc != 0 {
         return write_result(
@@ -214,16 +204,6 @@ unsafe fn do_get(out: &mut [u8]) -> usize {
     i = copy(req, i, br#","out_max":"#);
     i = copy_usize(req, i, STATE_OUT.len());
     i = copy(req, i, b"}");
-    if i == 0 {
-        return write_result(
-            out,
-            false,
-            b"host_error",
-            None,
-            None,
-            br#"["failed to build state_get envelope"]"#,
-        );
-    }
     for b in STATE_OUT.iter_mut() {
         *b = 0;
     }
@@ -275,16 +255,6 @@ unsafe fn do_delete(out: &mut [u8]) -> usize {
     i = copy(req, i, br#"{"key":""#);
     i = copy(req, i, STATE_KEY);
     i = copy(req, i, b"\"}");
-    if i == 0 {
-        return write_result(
-            out,
-            false,
-            b"host_error",
-            None,
-            None,
-            br#"["failed to build state_delete envelope"]"#,
-        );
-    }
     let rc = state_delete(req.as_ptr() as i32, i as i32);
     if rc != 0 {
         return write_result(
@@ -554,7 +524,10 @@ fn panic(_: &core::panic::PanicInfo<'_>) -> ! {
 mod tests {
     use super::*;
 
+    static TEST_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
     fn run(input: &str) -> String {
+        let _guard = TEST_LOCK.lock().unwrap();
         TEST_HOST_RC.with(|c| *c.borrow_mut() = 0);
         let mut out = vec![0u8; 65536];
         let n = unsafe { evaluate(input.as_bytes(), &mut out) };
@@ -631,6 +604,7 @@ mod tests {
 
     #[test]
     fn put_host_error() {
+        let _guard = TEST_LOCK.lock().unwrap();
         TEST_HOST_RC.with(|c| *c.borrow_mut() = -2);
         let mut out = vec![0u8; 4096];
         let n = unsafe {
@@ -645,6 +619,7 @@ mod tests {
 
     #[test]
     fn delete_host_error() {
+        let _guard = TEST_LOCK.lock().unwrap();
         TEST_HOST_RC.with(|c| *c.borrow_mut() = -3);
         let mut out = vec![0u8; 4096];
         let n = unsafe { evaluate(br#"{"action":"delete"}"#, &mut out) };
@@ -654,6 +629,7 @@ mod tests {
 
     #[test]
     fn get_host_error() {
+        let _guard = TEST_LOCK.lock().unwrap();
         TEST_HOST_RC.with(|c| *c.borrow_mut() = -4);
         let mut out = vec![0u8; 4096];
         let n = unsafe { evaluate(br#"{"action":"get"}"#, &mut out) };
@@ -671,9 +647,15 @@ mod tests {
     #[test]
     fn helpers_edge_cases() {
         assert_eq!(extract_i64(b"\"out_ptr\": 42", b"\"out_ptr\""), Some(42));
+        assert_eq!(extract_i64(b"\"out_ptr\": -7", b"\"out_ptr\""), Some(-7));
         assert_eq!(extract_i64(b"\"out_ptr\":", b"\"out_ptr\""), None);
+        assert_eq!(extract_i64(b"\"out_ptr\": true", b"\"out_ptr\""), None);
+        assert_eq!(extract_i64(b"\"out_ptr\":\n\t 9", b"\"out_ptr\""), Some(9));
         assert_eq!(string_value_after(b": \"ok\""), b"ok");
+        assert_eq!(string_value_after(b":\n\t\"ok\""), b"ok");
         assert_eq!(string_value_after(b"no"), b"");
+        assert_eq!(string_value_after(b":not"), b"");
+        assert_eq!(string_value_after(b":\"unterminated"), b"");
         let mut tiny = [0u8; 1];
         assert_eq!(copy(&mut tiny, 0, b"ab"), 0);
         let mut buf = [0u8; 8];
@@ -681,11 +663,58 @@ mod tests {
         assert_eq!(&buf[..n0], b"0");
         let n1 = copy_usize(&mut buf, 0, 123);
         assert_eq!(&buf[..n1], b"123");
+        let mut tiny2 = [0u8; 1];
+        assert_eq!(copy_usize(&mut tiny2, 0, 12), 0);
         assert!(extract_object_at_depth(br#"{"session":null}"#, b"\"session\"", 1).is_none());
+        assert!(extract_object_at_depth(br#"{"session":"x"}"#, b"\"session\"", 1).is_none());
         assert_eq!(
             extract_object_at_depth(br#"{"session":{"session_id":"x"}}"#, b"\"session\"", 1),
             Some(br#"{"session_id":"x"}"#.as_slice())
         );
+        assert_eq!(
+            extract_object_at_depth(
+                br#"{"session":{"note":"a\"b","session_id":"x"}}"#,
+                b"\"session\"",
+                1
+            ),
+            Some(br#"{"note":"a\"b","session_id":"x"}"#.as_slice())
+        );
+        assert_eq!(
+            extract_object_at_depth(br#"{"session": {"session_id":"z"}}"#, b"\"session\"", 1),
+            Some(br#"{"session_id":"z"}"#.as_slice())
+        );
+        assert_eq!(
+            extract_object_at_depth(br#"{"session":{"a":{"b":1}}}"#, b"\"session\"", 1),
+            Some(br#"{"a":{"b":1}}"#.as_slice())
+        );
+        assert!(extract_object_at_depth(br#"{"session":{"session_id":"x""#, b"\"session\"", 1)
+            .is_none());
         assert_eq!(trim_c_str(b"{\"a\":1}\0xx"), br#"{"a":1}"#);
+        assert_eq!(trim_c_str(b"no-brace\0"), b"no-brace");
+        assert_eq!(trim_c_str(br#"{"a":"b\"c"}"#), br#"{"a":"b\"c"}"#);
+        let nested = br#"{"wrap":{"x":1},"action":"get"}"#;
+        assert_eq!(extract_string_at_depth(nested, b"\"action\"", 1), b"get");
+        let with_arr = br#"{"tags":["a","b"],"action":"get"}"#;
+        assert_eq!(extract_string_at_depth(with_arr, b"\"action\"", 1), b"get");
+        let with_esc = br#"{"note":"say \"hi\"","action":"get"}"#;
+        assert_eq!(extract_string_at_depth(with_esc, b"\"action\"", 1), b"get");
+    }
+
+    #[test]
+    fn get_response_exact_buffer_len() {
+        set_get_response(r#"{"found":false}"#);
+        let out = run(r#"{"action":"get"}"#);
+        assert!(out.contains("not_found"), "{out}");
+    }
+
+    #[test]
+    fn state_get_oversized_response_returns_host_error() {
+        let _guard = TEST_LOCK.lock().unwrap();
+        TEST_GET_RESPONSE.with(|r| *r.borrow_mut() = vec![b'x'; 5000]);
+        TEST_HOST_RC.with(|c| *c.borrow_mut() = 0);
+        let mut out = vec![0u8; 4096];
+        let n = unsafe { evaluate(br#"{"action":"get"}"#, &mut out) };
+        let s = String::from_utf8_lossy(&out[..n]);
+        assert!(s.contains("\"reason_code\":\"host_error\""), "{s}");
     }
 }
