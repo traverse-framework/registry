@@ -120,7 +120,9 @@ fn commit_cache_entry(temporary: &Path, path: &Path) -> Result<(), PublicRegistr
     })
 }
 
-fn normalize_digest(digest: &str) -> Option<String> {
+/// `sha256:<64 hex>` -> the lowercased 64-hex body, or `None` if the shape is
+/// wrong. Shared with `app_preparation` (spec 996).
+pub(crate) fn normalize_digest(digest: &str) -> Option<String> {
     let digest = digest.strip_prefix("sha256:")?;
     if digest.len() == 64 && digest.bytes().all(|byte| byte.is_ascii_hexdigit()) {
         Some(digest.to_ascii_lowercase())
@@ -129,7 +131,9 @@ fn normalize_digest(digest: &str) -> Option<String> {
     }
 }
 
-fn sha256_hex(bytes: &[u8]) -> String {
+/// Lowercase hex SHA-256 of `bytes` (no `sha256:` prefix). Shared with
+/// `app_preparation` (spec 996).
+pub(crate) fn sha256_hex(bytes: &[u8]) -> String {
     let digest = Sha256::digest(bytes);
     let mut value = String::with_capacity(digest.len() * 2);
     for byte in digest {
