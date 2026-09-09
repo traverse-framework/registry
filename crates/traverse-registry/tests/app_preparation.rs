@@ -17,7 +17,7 @@ use serde_json::json;
 use sha2::{Digest, Sha256};
 use traverse_contracts::{ExecutionTarget, Lifecycle, NetworkAccess};
 use traverse_registry::{
-    AppRegistryReference, ArtifactRetrievalAdapter, CacheCommitRejected, ContractRetrievalAdapter,
+    RegistryReference, ArtifactRetrievalAdapter, CacheCommitRejected, ContractRetrievalAdapter,
     HostPolicyDecision, RegistryPreparationFailureCode, RegistryPreparationRequest,
     RetrievalUnavailable, SelectedRecordRef, SignatureVerifier, SyncedPublicRegistryState,
     VerifiedCacheWriter, prepare_application_registry_reference,
@@ -140,8 +140,8 @@ impl VerifiedCacheWriter for MemoryCache {
     }
 }
 
-fn reference(range: &str) -> AppRegistryReference {
-    AppRegistryReference {
+fn reference(range: &str) -> RegistryReference {
+    RegistryReference {
         namespace: "core".to_string(),
         id: "core.calculate-price".to_string(),
         version_range: range.to_string(),
