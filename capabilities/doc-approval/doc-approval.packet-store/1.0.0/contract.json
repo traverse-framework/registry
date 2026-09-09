@@ -1,0 +1,389 @@
+{
+  "kind": "capability_contract",
+  "schema_version": "1.0.0",
+  "lifecycle": "active",
+  "owner": {
+    "team": "traverse/registry",
+    "contact": "founders@loop.dev"
+  },
+  "connector_requirements": [],
+  "consumes": [],
+  "dependencies": [],
+  "execution": {
+    "binary_format": "wasm",
+    "constraints": {
+      "filesystem_access": "none",
+      "host_api_access": "none",
+      "network_access": "forbidden"
+    },
+    "entrypoint": {
+      "command": "run",
+      "kind": "wasi-command"
+    },
+    "preferred_targets": [
+      "local",
+      "edge",
+      "cloud"
+    ]
+  },
+  "permitted_targets": [
+    "local",
+    "edge",
+    "cloud",
+    "device"
+  ],
+  "policies": [
+    {
+      "id": "fail-closed"
+    }
+  ],
+  "postconditions": [
+    {
+      "description": "Identical inputs produce identical outputs for the same host store contents",
+      "id": "deterministic"
+    }
+  ],
+  "state_schema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "packet": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "packet_id",
+          "document_id",
+          "status",
+          "reviewer_ids"
+        ],
+        "properties": {
+          "packet_id": {
+            "type": "string"
+          },
+          "document_id": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "reviewer_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    }
+  },
+  "service_type": "stateful",
+  "permissions": [
+    {
+      "id": "doc-approval.packet-store"
+    }
+  ],
+  "evidence": [
+    {
+      "evidence_id": "doc-approval-packet-store-1.0.0-contract-validation",
+      "status": "passed",
+      "type": "contract_validation"
+    }
+  ],
+  "id": "doc-approval.packet-store",
+  "namespace": "doc-approval",
+  "name": "packet-store",
+  "version": "1.0.0",
+  "authoring": {
+    "method": "llm-assisted",
+    "source_revision": "publish/wave2-doc-approval-stores-1.0.0",
+    "test_evidence": "capability-src/doc-approval-packet-store cargo test (17 passing); cargo llvm-cov functions=100% lines=99.83% regions=99.5%",
+    "review": {
+      "decision": "pending-qualified-review",
+      "reviewer": "traverse-registry-maintainer"
+    }
+  },
+  "summary": "Put, get, or delete a durable approval packet via host managed state.",
+  "description": "Stateful store for a single approval packet (packet_id, document_id, status, reviewer_ids[]) persisted under the fixed state_schema key `packet` via traverse_host::{state_put,state_get,state_delete}. Resource identity lives inside the value. Does not emit events. Browser targets are excluded.",
+  "emits": [],
+  "side_effects": [
+    {
+      "description": "Reads and writes host DataStore persistence for key packet via state_get/state_put/state_delete",
+      "kind": "memory_only"
+    }
+  ],
+  "preconditions": [
+    {
+      "id": "action-present",
+      "description": "action must be one of get, put, delete"
+    },
+    {
+      "id": "put-packet-complete",
+      "description": "put requires packet with non-empty packet_id, document_id, status, and reviewer_ids array"
+    }
+  ],
+  "risk": {
+    "effect_class": "state_write",
+    "determinism_class": "deterministic",
+    "reliability": {
+      "idempotency_required": true,
+      "retryable": true,
+      "compensation_available": false
+    }
+  },
+  "provenance": {
+    "source": "greenfield",
+    "author": "traverse/registry",
+    "created_at": "2026-09-09T00:00:00Z",
+    "spec_ref": "001-registry-foundation",
+    "adr_refs": [],
+    "exception_refs": []
+  },
+  "artifact": {
+    "digest": "sha256:7197bf0b263e899a6e6e6e3986724378d658a764a3f59fbd3bc1aaaf77a0f533",
+    "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/doc-approval.packet-store-1.0.0/doc-approval-packet-store.wasm"
+  },
+  "inputs": {
+    "schema": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "action"
+      ],
+      "properties": {
+        "action": {
+          "type": "string",
+          "enum": [
+            "get",
+            "put",
+            "delete"
+          ]
+        },
+        "packet": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "packet_id",
+            "document_id",
+            "status",
+            "reviewer_ids"
+          ],
+          "properties": {
+            "packet_id": {
+              "type": "string"
+            },
+            "document_id": {
+              "type": "string"
+            },
+            "status": {
+              "type": "string"
+            },
+            "reviewer_ids": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "outputs": {
+    "schema": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "accepted",
+        "reason_code"
+      ],
+      "properties": {
+        "accepted": {
+          "type": "boolean"
+        },
+        "reason_code": {
+          "type": "string",
+          "enum": [
+            "ok",
+            "invalid_input",
+            "invalid_action",
+            "not_found",
+            "host_error"
+          ]
+        },
+        "found": {
+          "type": "boolean"
+        },
+        "packet": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "packet_id": {
+              "type": "string"
+            },
+            "document_id": {
+              "type": "string"
+            },
+            "status": {
+              "type": "string"
+            },
+            "reviewer_ids": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "evaluation_trace": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  },
+  "use_cases": [
+    {
+      "happy": true,
+      "persona_ref": "approvals-manager",
+      "scenario": "As an approvals manager, I want to put an approval packet into durable store, so that reviewer assignments survive across sessions.",
+      "input_example": {
+        "action": "put",
+        "packet": {
+          "packet_id": "pkt-1",
+          "document_id": "doc-9",
+          "status": "pending",
+          "reviewer_ids": [
+            "rev-a",
+            "rev-b"
+          ]
+        }
+      },
+      "output_example": {
+        "accepted": true,
+        "reason_code": "ok",
+        "found": true,
+        "packet": {
+          "packet_id": "pkt-1",
+          "document_id": "doc-9",
+          "status": "pending",
+          "reviewer_ids": [
+            "rev-a",
+            "rev-b"
+          ]
+        },
+        "evaluation_trace": [
+          "put packet"
+        ]
+      }
+    },
+    {
+      "happy": true,
+      "persona_ref": "approval-consumer",
+      "scenario": "As an approval consumer, I want to get a previously stored approval packet, so that my workflow can render reviewers and status.",
+      "input_example": {
+        "action": "get"
+      },
+      "output_example": {
+        "accepted": true,
+        "reason_code": "ok",
+        "found": true,
+        "packet": {
+          "packet_id": "pkt-1",
+          "document_id": "doc-9",
+          "status": "pending",
+          "reviewer_ids": [
+            "rev-a",
+            "rev-b"
+          ]
+        },
+        "evaluation_trace": [
+          "got packet"
+        ]
+      }
+    },
+    {
+      "happy": true,
+      "persona_ref": "approvals-manager",
+      "scenario": "As an approvals manager, I want to delete a stored approval packet, so that closed packets do not linger in managed state.",
+      "input_example": {
+        "action": "delete"
+      },
+      "output_example": {
+        "accepted": true,
+        "reason_code": "ok",
+        "evaluation_trace": [
+          "deleted packet"
+        ]
+      }
+    },
+    {
+      "happy": false,
+      "persona_ref": "approval-consumer",
+      "scenario": "As an approval consumer, I want get to fail closed when no packet exists, so that absent state is explicit.",
+      "input_example": {
+        "action": "get"
+      },
+      "output_example": {
+        "accepted": false,
+        "reason_code": "not_found",
+        "found": false,
+        "evaluation_trace": [
+          "packet absent"
+        ]
+      }
+    },
+    {
+      "happy": false,
+      "persona_ref": "approvals-manager",
+      "scenario": "As an approvals manager, I want put with an incomplete packet rejected, so that partial writes cannot corrupt the store.",
+      "input_example": {
+        "action": "put",
+        "packet": {
+          "packet_id": "pkt-1",
+          "document_id": "",
+          "status": "pending",
+          "reviewer_ids": []
+        }
+      },
+      "output_example": {
+        "accepted": false,
+        "reason_code": "invalid_input",
+        "evaluation_trace": [
+          "precondition failed: packet.packet_id/document_id/status/reviewer_ids required"
+        ]
+      }
+    },
+    {
+      "happy": false,
+      "persona_ref": "compliance-officer",
+      "scenario": "As a compliance officer, I want unknown actions rejected, so that clients cannot invent store verbs.",
+      "input_example": {
+        "action": "list"
+      },
+      "output_example": {
+        "accepted": false,
+        "reason_code": "invalid_action",
+        "evaluation_trace": [
+          "action must be get, put, or delete"
+        ]
+      }
+    },
+    {
+      "happy": false,
+      "persona_ref": "compliance-officer",
+      "scenario": "As a compliance officer, I want host persistence failures surfaced as host_error, so that callers can fail closed when DataStore is unavailable.",
+      "input_example": {
+        "action": "delete"
+      },
+      "output_example": {
+        "accepted": false,
+        "reason_code": "host_error",
+        "evaluation_trace": [
+          "state_delete failed"
+        ]
+      }
+    }
+  ]
+}

@@ -1,0 +1,394 @@
+{
+  "kind": "capability_contract",
+  "schema_version": "1.0.0",
+  "lifecycle": "active",
+  "owner": {
+    "team": "traverse/registry",
+    "contact": "founders@loop.dev"
+  },
+  "connector_requirements": [],
+  "consumes": [],
+  "dependencies": [],
+  "execution": {
+    "binary_format": "wasm",
+    "constraints": {
+      "filesystem_access": "none",
+      "host_api_access": "none",
+      "network_access": "forbidden"
+    },
+    "entrypoint": {
+      "command": "run",
+      "kind": "wasi-command"
+    },
+    "preferred_targets": [
+      "local",
+      "edge",
+      "cloud"
+    ]
+  },
+  "permitted_targets": [
+    "local",
+    "edge",
+    "cloud",
+    "device"
+  ],
+  "policies": [
+    {
+      "id": "fail-closed"
+    }
+  ],
+  "postconditions": [
+    {
+      "description": "Identical inputs produce identical outputs for the same host store contents",
+      "id": "deterministic"
+    }
+  ],
+  "state_schema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "policy": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "policy_id",
+          "thresholds",
+          "required_roles"
+        ],
+        "properties": {
+          "policy_id": {
+            "type": "string"
+          },
+          "thresholds": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "required_roles": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    }
+  },
+  "service_type": "stateful",
+  "permissions": [
+    {
+      "id": "doc-approval.policy-store"
+    }
+  ],
+  "evidence": [
+    {
+      "evidence_id": "doc-approval-policy-store-1.0.0-contract-validation",
+      "status": "passed",
+      "type": "contract_validation"
+    }
+  ],
+  "id": "doc-approval.policy-store",
+  "namespace": "doc-approval",
+  "name": "policy-store",
+  "version": "1.0.0",
+  "authoring": {
+    "method": "llm-assisted",
+    "source_revision": "publish/wave2-doc-approval-stores-1.0.0",
+    "test_evidence": "capability-src/doc-approval-policy-store cargo test (17 passing); cargo llvm-cov functions=100% lines=99.83% regions=99.5%",
+    "review": {
+      "decision": "pending-qualified-review",
+      "reviewer": "traverse-registry-maintainer"
+    }
+  },
+  "summary": "Put, get, or delete a durable approval policy config via host managed state.",
+  "description": "Stateful store for a single approval policy (policy_id, thresholds object, required_roles[]) persisted under the fixed state_schema key `policy` via traverse_host::{state_put,state_get,state_delete}. Resource identity lives inside the value. Does not emit events. Browser targets are excluded.",
+  "emits": [],
+  "side_effects": [
+    {
+      "description": "Reads and writes host DataStore persistence for key policy via state_get/state_put/state_delete",
+      "kind": "memory_only"
+    }
+  ],
+  "preconditions": [
+    {
+      "id": "action-present",
+      "description": "action must be one of get, put, delete"
+    },
+    {
+      "id": "put-policy-complete",
+      "description": "put requires policy with non-empty policy_id, thresholds object, and required_roles array"
+    }
+  ],
+  "risk": {
+    "effect_class": "state_write",
+    "determinism_class": "deterministic",
+    "reliability": {
+      "idempotency_required": true,
+      "retryable": true,
+      "compensation_available": false
+    }
+  },
+  "provenance": {
+    "source": "greenfield",
+    "author": "traverse/registry",
+    "created_at": "2026-09-09T00:00:00Z",
+    "spec_ref": "001-registry-foundation",
+    "adr_refs": [],
+    "exception_refs": []
+  },
+  "artifact": {
+    "digest": "sha256:9ba7ff697a67ae80508bae042920ed118379eaa7c155f74e0c031c1473698d0e",
+    "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/doc-approval.policy-store-1.0.0/doc-approval-policy-store.wasm"
+  },
+  "inputs": {
+    "schema": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "action"
+      ],
+      "properties": {
+        "action": {
+          "type": "string",
+          "enum": [
+            "get",
+            "put",
+            "delete"
+          ]
+        },
+        "policy": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "policy_id",
+            "thresholds",
+            "required_roles"
+          ],
+          "properties": {
+            "policy_id": {
+              "type": "string"
+            },
+            "thresholds": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            },
+            "required_roles": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "outputs": {
+    "schema": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "accepted",
+        "reason_code"
+      ],
+      "properties": {
+        "accepted": {
+          "type": "boolean"
+        },
+        "reason_code": {
+          "type": "string",
+          "enum": [
+            "ok",
+            "invalid_input",
+            "invalid_action",
+            "not_found",
+            "host_error"
+          ]
+        },
+        "found": {
+          "type": "boolean"
+        },
+        "policy": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "policy_id": {
+              "type": "string"
+            },
+            "thresholds": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            },
+            "required_roles": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "evaluation_trace": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  },
+  "use_cases": [
+    {
+      "happy": true,
+      "persona_ref": "compliance-officer",
+      "scenario": "As a compliance officer, I want to put an approval policy into durable store, so that thresholds and required roles survive across sessions.",
+      "input_example": {
+        "action": "put",
+        "policy": {
+          "policy_id": "pol-1",
+          "thresholds": {
+            "confidence_min": "0.8",
+            "amount_max": "10000"
+          },
+          "required_roles": [
+            "approver",
+            "auditor"
+          ]
+        }
+      },
+      "output_example": {
+        "accepted": true,
+        "reason_code": "ok",
+        "found": true,
+        "policy": {
+          "policy_id": "pol-1",
+          "thresholds": {
+            "confidence_min": "0.8",
+            "amount_max": "10000"
+          },
+          "required_roles": [
+            "approver",
+            "auditor"
+          ]
+        },
+        "evaluation_trace": [
+          "put policy"
+        ]
+      }
+    },
+    {
+      "happy": true,
+      "persona_ref": "approvals-manager",
+      "scenario": "As an approvals manager, I want to get the stored approval policy, so that my review UI applies the current thresholds.",
+      "input_example": {
+        "action": "get"
+      },
+      "output_example": {
+        "accepted": true,
+        "reason_code": "ok",
+        "found": true,
+        "policy": {
+          "policy_id": "pol-1",
+          "thresholds": {
+            "confidence_min": "0.8",
+            "amount_max": "10000"
+          },
+          "required_roles": [
+            "approver",
+            "auditor"
+          ]
+        },
+        "evaluation_trace": [
+          "got policy"
+        ]
+      }
+    },
+    {
+      "happy": true,
+      "persona_ref": "compliance-officer",
+      "scenario": "As a compliance officer, I want to delete a stored approval policy, so that retired configs do not linger in managed state.",
+      "input_example": {
+        "action": "delete"
+      },
+      "output_example": {
+        "accepted": true,
+        "reason_code": "ok",
+        "evaluation_trace": [
+          "deleted policy"
+        ]
+      }
+    },
+    {
+      "happy": false,
+      "persona_ref": "approvals-manager",
+      "scenario": "As an approvals manager, I want get to fail closed when no policy exists, so that absent configuration is explicit.",
+      "input_example": {
+        "action": "get"
+      },
+      "output_example": {
+        "accepted": false,
+        "reason_code": "not_found",
+        "found": false,
+        "evaluation_trace": [
+          "policy absent"
+        ]
+      }
+    },
+    {
+      "happy": false,
+      "persona_ref": "compliance-officer",
+      "scenario": "As a compliance officer, I want put with an incomplete policy rejected, so that partial writes cannot corrupt the store.",
+      "input_example": {
+        "action": "put",
+        "policy": {
+          "policy_id": "",
+          "thresholds": {
+            "confidence_min": "0.8"
+          },
+          "required_roles": []
+        }
+      },
+      "output_example": {
+        "accepted": false,
+        "reason_code": "invalid_input",
+        "evaluation_trace": [
+          "precondition failed: policy.policy_id/thresholds/required_roles required"
+        ]
+      }
+    },
+    {
+      "happy": false,
+      "persona_ref": "approval-consumer",
+      "scenario": "As an approval consumer, I want unknown actions rejected, so that clients cannot invent store verbs.",
+      "input_example": {
+        "action": "list"
+      },
+      "output_example": {
+        "accepted": false,
+        "reason_code": "invalid_action",
+        "evaluation_trace": [
+          "action must be get, put, or delete"
+        ]
+      }
+    },
+    {
+      "happy": false,
+      "persona_ref": "approval-consumer",
+      "scenario": "As an approval consumer, I want host persistence failures surfaced as host_error, so that callers can fail closed when DataStore is unavailable.",
+      "input_example": {
+        "action": "delete"
+      },
+      "output_example": {
+        "accepted": false,
+        "reason_code": "host_error",
+        "evaluation_trace": [
+          "state_delete failed"
+        ]
+      }
+    }
+  ]
+}

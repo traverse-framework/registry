@@ -1,0 +1,17 @@
+[workspace]
+
+[package]
+name = "doc-approval-packet-store-agent"
+version = "0.1.0"
+edition = "2021"
+publish = false
+description = "Catalog-source mirror of doc-approval.packet-store — durable approval packet via host state."
+
+[[bin]]
+name = "doc-approval-packet-store-agent"
+path = "src/main.rs"
+
+[profile.release]
+opt-level = "s"
+lto = true
+panic = "abort"
