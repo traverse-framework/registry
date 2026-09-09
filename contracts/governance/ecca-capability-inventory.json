@@ -89,6 +89,15 @@
       "evidence": "Order status transitions are domain facts independent consumers may observe. Contract declares emits=[{event_id: commerce.order.status-changed, version: 1.0.0}], service_type=subscribable, and the WASM guest calls traverse_host::emit_event on accepted transitions (reason_code=ok)."
     },
     {
+      "capability_id": "core.action-item-store",
+      "published_versions": [
+        "1.0.0"
+      ],
+      "path": "capabilities/core/core.action-item-store/1.0.0/contract.json",
+      "classification": "no-event-required",
+      "evidence": "Host-managed durable action-item record via traverse_host::state_*; side_effects=[memory_only]; empty emits/consumes; record state is caller-scoped persistence, not an independent consumer event."
+    },
+    {
       "capability_id": "core.aggregate-team-action-health",
       "published_versions": [
         "1.0.0",
@@ -218,6 +227,15 @@
       "path": "capabilities/core/core.extract-action-items/1.2.0/contract.json",
       "classification": "no-event-required",
       "evidence": "side_effects=[memory_only] on latest published version; empty emits/consumes; result returns directly to the caller with no asynchronous domain fact broadcast to independent consumers."
+    },
+    {
+      "capability_id": "core.followup-session",
+      "published_versions": [
+        "1.0.0"
+      ],
+      "path": "capabilities/core/core.followup-session/1.0.0/contract.json",
+      "classification": "no-event-required",
+      "evidence": "Host-managed durable follow-up working session via traverse_host::state_*; side_effects=[memory_only]; empty emits/consumes; session state is caller-scoped persistence, not an independent consumer event."
     },
     {
       "capability_id": "core.generate-nudge-message",

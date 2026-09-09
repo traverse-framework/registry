@@ -351,6 +351,21 @@
           "action must be get, put, or delete"
         ]
       }
+    },
+    {
+      "happy": false,
+      "persona_ref": "collaboration-platform-engineer",
+      "scenario": "As a collaboration platform engineer, I want host persistence failures surfaced as host_error, so that callers can fail closed when DataStore is unavailable.",
+      "input_example": {
+        "action": "delete"
+      },
+      "output_example": {
+        "accepted": false,
+        "reason_code": "host_error",
+        "evaluation_trace": [
+          "state_delete failed"
+        ]
+      }
     }
   ]
 }
