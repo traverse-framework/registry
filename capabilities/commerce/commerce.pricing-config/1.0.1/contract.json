@@ -1,0 +1,361 @@
+{
+  "kind": "capability_contract",
+  "schema_version": "1.0.0",
+  "lifecycle": "active",
+  "owner": {
+    "team": "traverse/registry",
+    "contact": "founders@loop.dev"
+  },
+  "connector_requirements": [],
+  "consumes": [],
+  "dependencies": [],
+  "execution": {
+    "binary_format": "wasm",
+    "constraints": {
+      "filesystem_access": "none",
+      "host_api_access": "none",
+      "network_access": "forbidden"
+    },
+    "entrypoint": {
+      "command": "run",
+      "kind": "wasi-command"
+    },
+    "preferred_targets": [
+      "local",
+      "edge",
+      "cloud"
+    ]
+  },
+  "permitted_targets": [
+    "local",
+    "edge",
+    "cloud"
+  ],
+  "policies": [
+    {
+      "id": "fail-closed"
+    }
+  ],
+  "postconditions": [
+    {
+      "description": "Put/get/delete outcomes reflect host state store results for the fixed config key",
+      "id": "host-state-consistent"
+    }
+  ],
+  "state_schema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "config": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "config_id",
+          "currency",
+          "rates"
+        ],
+        "properties": {
+          "config_id": {
+            "type": "string"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "rates": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "number"
+            }
+          }
+        }
+      }
+    }
+  },
+  "service_type": "stateful",
+  "permissions": [
+    {
+      "id": "commerce.pricing-config"
+    }
+  ],
+  "evidence": [
+    {
+      "evidence_id": "commerce-pricing-config-1.0.1-contract-validation",
+      "status": "passed",
+      "type": "contract_validation"
+    }
+  ],
+  "id": "commerce.pricing-config",
+  "namespace": "commerce",
+  "name": "pricing-config",
+  "version": "1.0.1",
+  "authoring": {
+    "method": "llm-assisted",
+    "source_revision": "publish/wave2-commerce-stateful-1.0.0",
+    "test_evidence": "capability-src/commerce-pricing-config cargo test (17 passing); cargo llvm-cov functions=100% lines=98.67% regions=98.90%",
+    "review": {
+      "decision": "pending-qualified-review",
+      "reviewer": "traverse-registry-maintainer"
+    }
+  },
+  "risk": {
+    "effect_class": "state_write",
+    "determinism_class": "deterministic",
+    "reliability": {
+      "idempotency_required": true,
+      "retryable": true,
+      "compensation_available": false
+    }
+  },
+  "summary": "Durable pricing configuration retained via host managed state.",
+  "description": "Stateful put/get/delete for a single fixed-schema pricing config (config_id, currency, rates as string->number object). Resource identity lives inside the value; the relative host key is always config. Uses traverse_host state_put/state_get/state_delete. Browser targets are excluded. Supersedes 1.0.0 which string-encoded rates_json.",
+  "emits": [],
+  "side_effects": [
+    {
+      "description": "Validates action envelope and config fields in memory",
+      "kind": "memory_only"
+    },
+    {
+      "description": "Reads or mutates host-managed DataStore pricing config via traverse_host state_*",
+      "kind": "memory_only"
+    }
+  ],
+  "preconditions": [
+    {
+      "id": "action-valid",
+      "description": "action must be put, get, or delete; put requires a complete config object"
+    }
+  ],
+  "provenance": {
+    "source": "greenfield",
+    "author": "traverse/registry",
+    "created_at": "2026-09-09T06:20:00Z",
+    "spec_ref": "001-registry-foundation",
+    "adr_refs": [],
+    "exception_refs": []
+  },
+  "artifact": {
+    "digest": "sha256:825eda9b6cf9269ace61717f8f215027c062fa58ebb9535ab7ad051da9294b57",
+    "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/commerce.pricing-config-1.0.1/commerce-pricing-config.wasm"
+  },
+  "inputs": {
+    "schema": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "action"
+      ],
+      "properties": {
+        "action": {
+          "type": "string",
+          "enum": [
+            "put",
+            "get",
+            "delete"
+          ]
+        },
+        "config": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "config_id",
+            "currency",
+            "rates"
+          ],
+          "properties": {
+            "config_id": {
+              "type": "string"
+            },
+            "currency": {
+              "type": "string"
+            },
+            "rates": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "number"
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "outputs": {
+    "schema": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "accepted",
+        "reason_code",
+        "evaluation_trace"
+      ],
+      "properties": {
+        "accepted": {
+          "type": "boolean"
+        },
+        "reason_code": {
+          "type": "string",
+          "enum": [
+            "ok",
+            "invalid_input",
+            "invalid_action",
+            "host_error",
+            "not_found"
+          ]
+        },
+        "found": {
+          "type": "boolean"
+        },
+        "config": {
+          "type": "object"
+        },
+        "evaluation_trace": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  },
+  "use_cases": [
+    {
+      "happy": true,
+      "persona_ref": "platform-developer",
+      "scenario": "As a platform developer, I want to put durable pricing rates for a currency, so that checkout hosts apply consistent multipliers across sessions.",
+      "input_example": {
+        "action": "put",
+        "config": {
+          "config_id": "pc-1",
+          "currency": "USD",
+          "rates": {
+            "base": 1.0,
+            "vip": 0.9
+          }
+        }
+      },
+      "output_example": {
+        "accepted": true,
+        "reason_code": "ok",
+        "found": true,
+        "config": {
+          "config_id": "pc-1",
+          "currency": "USD",
+          "rates": {
+            "base": 1.0,
+            "vip": 0.9
+          }
+        },
+        "evaluation_trace": [
+          "put config"
+        ]
+      }
+    },
+    {
+      "happy": true,
+      "persona_ref": "checkout-flow-developer",
+      "scenario": "As a checkout flow developer, I want to get the stored pricing config, so that my checkout page can display adjusted prices for the shopper.",
+      "input_example": {
+        "action": "get"
+      },
+      "output_example": {
+        "accepted": true,
+        "reason_code": "ok",
+        "found": true,
+        "config": {
+          "config_id": "pc-1",
+          "currency": "USD",
+          "rates": {
+            "base": 1.0,
+            "vip": 0.9
+          }
+        },
+        "evaluation_trace": [
+          "got config"
+        ]
+      }
+    },
+    {
+      "happy": true,
+      "persona_ref": "platform-developer",
+      "scenario": "As a platform developer, I want to delete a retired pricing config, so that obsolete rate maps do not linger in managed state.",
+      "input_example": {
+        "action": "delete"
+      },
+      "output_example": {
+        "accepted": true,
+        "reason_code": "ok",
+        "evaluation_trace": [
+          "deleted config"
+        ]
+      }
+    },
+    {
+      "happy": false,
+      "persona_ref": "checkout-flow-developer",
+      "scenario": "As a checkout flow developer, I want get to report not_found when no pricing config exists, so that the host can fall back to default rates explicitly.",
+      "input_example": {
+        "action": "get"
+      },
+      "output_example": {
+        "accepted": false,
+        "reason_code": "not_found",
+        "found": false,
+        "evaluation_trace": [
+          "config absent"
+        ]
+      }
+    },
+    {
+      "happy": false,
+      "persona_ref": "platform-developer",
+      "scenario": "As a platform developer, I want put without a config object rejected as invalid_input, so that incomplete rate writes cannot corrupt host state.",
+      "input_example": {
+        "action": "put"
+      },
+      "output_example": {
+        "accepted": false,
+        "reason_code": "invalid_input",
+        "evaluation_trace": [
+          "precondition failed: config object required for put"
+        ]
+      }
+    },
+    {
+      "happy": false,
+      "persona_ref": "checkout-flow-developer",
+      "scenario": "As a checkout flow developer, I want an unknown action rejected as invalid_action, so that unsupported verbs fail closed before touching the store.",
+      "input_example": {
+        "action": "list"
+      },
+      "output_example": {
+        "accepted": false,
+        "reason_code": "invalid_action",
+        "evaluation_trace": [
+          "action must be get, put, or delete"
+        ]
+      }
+    },
+    {
+      "happy": false,
+      "persona_ref": "platform-developer",
+      "scenario": "As a platform developer, I want host store failures surfaced as host_error, so that I can retry pricing config persistence instead of treating a failed put as success.",
+      "input_example": {
+        "action": "put",
+        "config": {
+          "config_id": "pc-err",
+          "currency": "USD",
+          "rates": {
+            "base": 1.0
+          }
+        }
+      },
+      "output_example": {
+        "accepted": false,
+        "reason_code": "host_error",
+        "evaluation_trace": [
+          "state_put failed"
+        ]
+      }
+    }
+  ]
+}

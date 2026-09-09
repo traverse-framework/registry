@@ -5,7 +5,7 @@ name = "commerce-cart-agent"
 version = "0.1.0"
 edition = "2021"
 publish = false
-description = "Stateful commerce.cart host state_* capability."
+description = "Catalog-source mirror of commerce.cart — durable cart via host state."
 
 [[bin]]
 name = "commerce-cart-agent"

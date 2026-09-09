@@ -1,0 +1,6 @@
+{
+  "deprecated": true,
+  "reason": "1.0.0 used string-encoded lines_json/rates_json instead of structured lines[]/rates object required by Wave 2 commerce stateful schema; superseded by aligned 1.0.1.",
+  "deprecated_at": "2026-09-09T06:20:00Z",
+  "superseded_by": "1.0.1"
+}

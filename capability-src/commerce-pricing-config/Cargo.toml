@@ -5,7 +5,7 @@ name = "commerce-pricing-config-agent"
 version = "0.1.0"
 edition = "2021"
 publish = false
-description = "Stateful commerce.pricing-config host state_* capability."
+description = "Catalog-source mirror of commerce.pricing-config — durable pricing config via host state."
 
 [[bin]]
 name = "commerce-pricing-config-agent"

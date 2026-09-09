@@ -63,11 +63,12 @@
     {
       "capability_id": "commerce.cart",
       "published_versions": [
-        "1.0.0"
+        "1.0.0",
+        "1.0.1"
       ],
-      "path": "capabilities/commerce/commerce.cart/1.0.0/contract.json",
+      "path": "capabilities/commerce/commerce.cart/1.0.1/contract.json",
       "classification": "no-event-required",
-      "evidence": "Host-managed durable cart via traverse_host::state_*; side_effects=[memory_only]; empty emits/consumes; caller-scoped persistence, not an independent consumer event."
+      "evidence": "Host-managed durable cart via traverse_host::state_*; side_effects=[memory_only]; empty emits/consumes; cart state is caller-scoped persistence, not an independent consumer event. Distinct from commerce.cart-line-changed. 1.0.0 deprecated (lines_json string encoding); 1.0.1 is the aligned publish with lines[{sku,qty}]."
     },
     {
       "capability_id": "commerce.cart-line-changed",
@@ -100,11 +101,12 @@
     {
       "capability_id": "commerce.pricing-config",
       "published_versions": [
-        "1.0.0"
+        "1.0.0",
+        "1.0.1"
       ],
-      "path": "capabilities/commerce/commerce.pricing-config/1.0.0/contract.json",
+      "path": "capabilities/commerce/commerce.pricing-config/1.0.1/contract.json",
       "classification": "no-event-required",
-      "evidence": "Host-managed durable config via traverse_host::state_*; side_effects=[memory_only]; empty emits/consumes; caller-scoped persistence, not an independent consumer event."
+      "evidence": "Host-managed durable pricing config via traverse_host::state_*; side_effects=[memory_only]; empty emits/consumes; pricing config is caller-scoped persistence, not an independent consumer event. 1.0.0 deprecated (rates_json string encoding); 1.0.1 is the aligned publish with rates object."
     },
     {
       "capability_id": "core.action-item-store",

@@ -1,6 +1,7 @@
-//! commerce.pricing-config — put/get/delete durable state via host state_*.
+//! commerce.pricing-config — put/get/delete a durable pricing config via host state.
 //!
-//! Relative state key is fixed schema property `config`. Resource ids live inside the value.
+//! Relative state key is fixed schema property `config`. Resource id lives inside the value
+//! (`config_id`, `currency`, `rates`). Calls traverse_host::{state_put,state_get,state_delete}.
 #![cfg_attr(not(test), no_std)]
 #![cfg_attr(not(test), no_main)]
 
@@ -136,7 +137,7 @@ pub unsafe fn evaluate(input: &[u8], out: &mut [u8]) -> usize {
 }
 
 unsafe fn do_put(input: &[u8], out: &mut [u8]) -> usize {
-    let Some(session) = extract_object_at_depth(input, b"\"config\"", 1) else {
+    let Some(config) = extract_object_at_depth(input, b"\"config\"", 1) else {
         return write_result(
             out,
             false,
@@ -146,20 +147,17 @@ unsafe fn do_put(input: &[u8], out: &mut [u8]) -> usize {
             br#"["precondition failed: config object required for put"]"#,
         );
     };
-    let config_id = extract_string_at_depth(session, b"\"config_id\"", 1);
-    let currency = extract_string_at_depth(session, b"\"currency\"", 1);
-    let rates_json = extract_string_at_depth(session, b"\"rates_json\"", 1);
-    if config_id.is_empty()
-        || currency.is_empty()
-        || rates_json.is_empty()
-    {
+    let config_id = extract_string_at_depth(config, b"\"config_id\"", 1);
+    let currency = extract_string_at_depth(config, b"\"currency\"", 1);
+    let rates = extract_object_at_depth(config, b"\"rates\"", 1);
+    if config_id.is_empty() || currency.is_empty() || rates.is_none() {
         return write_result(
             out,
             false,
             b"invalid_input",
             None,
             None,
-            br#"["precondition failed: config.config_id/currency/rates_json required"]"#,
+            br#"["precondition failed: config.config_id/currency/rates required"]"#,
         );
     }
 
@@ -168,7 +166,7 @@ unsafe fn do_put(input: &[u8], out: &mut [u8]) -> usize {
     i = copy(req, i, br#"{"key":""#);
     i = copy(req, i, STATE_KEY);
     i = copy(req, i, br#"","value":"#);
-    i = copy(req, i, session);
+    i = copy(req, i, config);
     i = copy(req, i, b"}");
     let rc = state_put(req.as_ptr() as i32, i as i32);
     if rc != 0 {
@@ -186,8 +184,8 @@ unsafe fn do_put(input: &[u8], out: &mut [u8]) -> usize {
         true,
         b"ok",
         Some(true),
-        Some(session),
-        br#"["put session"]"#,
+        Some(config),
+        br#"["put config"]"#,
     )
 }
 
@@ -224,7 +222,7 @@ unsafe fn do_get(out: &mut [u8]) -> usize {
                 b"ok",
                 Some(true),
                 Some(value),
-                br#"["got session"]"#,
+                br#"["got config"]"#,
             );
         }
         return write_result(
@@ -242,7 +240,7 @@ unsafe fn do_get(out: &mut [u8]) -> usize {
         b"not_found",
         Some(false),
         None,
-        br#"["session absent"]"#,
+        br#"["config absent"]"#,
     )
 }
 
@@ -269,7 +267,7 @@ unsafe fn do_delete(out: &mut [u8]) -> usize {
         b"ok",
         None,
         None,
-        br#"["deleted session"]"#,
+        br#"["deleted config"]"#,
     )
 }
 
@@ -278,7 +276,7 @@ fn write_result(
     accepted: bool,
     reason_code: &[u8],
     found: Option<bool>,
-    session: Option<&[u8]>,
+    config: Option<&[u8]>,
     evaluation_trace: &[u8],
 ) -> usize {
     let mut i = 0usize;
@@ -291,9 +289,9 @@ fn write_result(
         i = copy(out, i, b",\"found\":");
         i = copy(out, i, if f { b"true" } else { b"false" });
     }
-    if let Some(sess) = session {
+    if let Some(config_val) = config {
         i = copy(out, i, b",\"config\":");
-        i = copy(out, i, sess);
+        i = copy(out, i, config_val);
     }
     i = copy(out, i, b",\"evaluation_trace\":");
     i = copy(out, i, evaluation_trace);
@@ -373,6 +371,52 @@ fn extract_object_at_depth<'a>(hay: &'a [u8], key: &[u8], depth: i32) -> Option<
             b'}' => {
                 depth_obj -= 1;
                 if depth_obj == 0 {
+                    return Some(&rest[..=i]);
+                }
+            }
+            _ => {}
+        }
+        i += 1;
+    }
+    None
+}
+
+fn extract_array_at_depth<'a>(hay: &'a [u8], key: &[u8], depth: i32) -> Option<&'a [u8]> {
+    let pos = find_key_at_depth(hay, key, depth)?;
+    let after = &hay[pos + key.len()..];
+    let colon = after.iter().position(|b| *b == b':')?;
+    let mut rest = &after[colon + 1..];
+    while rest.first() == Some(&b' ')
+        || rest.first() == Some(&b'\n')
+        || rest.first() == Some(&b'\t')
+    {
+        rest = &rest[1..];
+    }
+    if rest.first() != Some(&b'[') {
+        return None;
+    }
+    let mut depth_arr = 0i32;
+    let mut in_str = false;
+    let mut i = 0usize;
+    while i < rest.len() {
+        let b = rest[i];
+        if in_str {
+            if b == b'\\' {
+                i += 2;
+                continue;
+            }
+            if b == b'"' {
+                in_str = false;
+            }
+            i += 1;
+            continue;
+        }
+        match b {
+            b'"' => in_str = true,
+            b'[' => depth_arr += 1,
+            b']' => {
+                depth_arr -= 1;
+                if depth_arr == 0 {
                     return Some(&rest[..=i]);
                 }
             }
@@ -538,23 +582,31 @@ mod tests {
     #[test]
     fn happy_put() {
         let out = run(
-            r#"{"action":"put","config":{"config_id":"price-1","currency":"USD","rates_json":"base=1.0"}}"#,
+            r#"{"action":"put","config":{"config_id":"pc-1","currency":"USD","rates":{"base":1.0,"vip":0.9}}}"#,
         );
         assert!(out.contains("\"reason_code\":\"ok\""), "{out}");
         assert!(out.contains("\"accepted\":true"));
         assert!(out.contains("\"config\":{"));
-        assert!(out.contains("\"config_id\":\"price-1\""));
+        assert!(out.contains("\"config_id\":\"pc-1\""));
+    }
+
+    #[test]
+    fn happy_put_empty_rates() {
+        let out = run(
+            r#"{"action":"put","config":{"config_id":"pc-2","currency":"EUR","rates":{}}}"#,
+        );
+        assert!(out.contains("\"reason_code\":\"ok\""), "{out}");
     }
 
     #[test]
     fn happy_get_found() {
         set_get_response(
-            r#"{"found":true,"value":{"config_id":"price-1","currency":"USD","rates_json":"base=1.0"}}"#,
+            r#"{"found":true,"value":{"config_id":"pc-1","currency":"USD","rates":{"base":1.0}}}"#,
         );
         let out = run(r#"{"action":"get"}"#);
         assert!(out.contains("\"reason_code\":\"ok\""), "{out}");
         assert!(out.contains("\"found\":true"));
-        assert!(out.contains("\"config_id\":\"price-1\""));
+        assert!(out.contains("\"config_id\":\"pc-1\""));
     }
 
     #[test]
@@ -575,7 +627,7 @@ mod tests {
 
     #[test]
     fn rejects_missing_action() {
-        let out = run(r#"{"config":{"config_id":"price-1"}}"#);
+        let out = run(r#"{"config":{"config_id":"pc-1"}}"#);
         assert!(out.contains("\"reason_code\":\"invalid_input\""), "{out}");
     }
 
@@ -586,7 +638,7 @@ mod tests {
     }
 
     #[test]
-    fn rejects_put_without_session() {
+    fn rejects_put_without_config() {
         let out = run(r#"{"action":"put"}"#);
         assert!(out.contains("\"reason_code\":\"invalid_input\""), "{out}");
     }
@@ -594,7 +646,15 @@ mod tests {
     #[test]
     fn rejects_put_missing_fields() {
         let out = run(
-            r#"{"action":"put","config":{"config_id":"price-1","currency":"","rates_json":"base=1.0"}}"#,
+            r#"{"action":"put","config":{"config_id":"pc-1","currency":"","rates":{}}}"#,
+        );
+        assert!(out.contains("\"reason_code\":\"invalid_input\""), "{out}");
+    }
+
+    #[test]
+    fn rejects_put_missing_rates() {
+        let out = run(
+            r#"{"action":"put","config":{"config_id":"pc-1","currency":"USD"}}"#,
         );
         assert!(out.contains("\"reason_code\":\"invalid_input\""), "{out}");
     }
@@ -606,7 +666,7 @@ mod tests {
         let mut out = vec![0u8; 4096];
         let n = unsafe {
             evaluate(
-                br#"{"action":"put","config":{"config_id":"price-1","currency":"USD","rates_json":"base=1.0"}}"#,
+                br#"{"action":"put","config":{"config_id":"pc-1","currency":"USD","rates":{"base":1.0}}}"#,
                 &mut out,
             )
         };
@@ -644,12 +704,15 @@ mod tests {
     #[test]
     fn helpers_edge_cases() {
         assert_eq!(extract_i64(b"\"out_ptr\": 42", b"\"out_ptr\""), Some(42));
+        assert_eq!(extract_i64(b"\"out_ptr\": -7", b"\"out_ptr\""), Some(-7));
         assert_eq!(extract_i64(b"\"out_ptr\":", b"\"out_ptr\""), None);
-        assert_eq!(extract_i64(b"\"n\": -7", b"\"n\""), Some(-7));
+        assert_eq!(extract_i64(b"\"out_ptr\": true", b"\"out_ptr\""), None);
+        assert_eq!(extract_i64(b"\"out_ptr\":\n\t 9", b"\"out_ptr\""), Some(9));
         assert_eq!(string_value_after(b": \"ok\""), b"ok");
-        assert_eq!(string_value_after(b":
-	 \"ok\""), b"ok");
+        assert_eq!(string_value_after(b":\n\t\"ok\""), b"ok");
         assert_eq!(string_value_after(b"no"), b"");
+        assert_eq!(string_value_after(b":not"), b"");
+        assert_eq!(string_value_after(b":\"unterminated"), b"");
         let mut tiny = [0u8; 1];
         assert_eq!(copy(&mut tiny, 0, b"ab"), 0);
         let mut buf = [0u8; 8];
@@ -657,21 +720,59 @@ mod tests {
         assert_eq!(&buf[..n0], b"0");
         let n1 = copy_usize(&mut buf, 0, 123);
         assert_eq!(&buf[..n1], b"123");
+        let mut tiny2 = [0u8; 1];
+        assert_eq!(copy_usize(&mut tiny2, 0, 12), 0);
         assert!(extract_object_at_depth(br#"{"config":null}"#, b"\"config\"", 1).is_none());
+        assert!(extract_object_at_depth(br#"{"config":"x"}"#, b"\"config\"", 1).is_none());
         assert_eq!(
             extract_object_at_depth(br#"{"config":{"config_id":"x"}}"#, b"\"config\"", 1),
             Some(br#"{"config_id":"x"}"#.as_slice())
         );
         assert_eq!(
+            extract_object_at_depth(
+                br#"{"config":{"note":"a\"b","config_id":"x"}}"#,
+                b"\"config\"",
+                1
+            ),
+            Some(br#"{"note":"a\"b","config_id":"x"}"#.as_slice())
+        );
+        assert_eq!(
             extract_object_at_depth(br#"{"config": {"config_id":"z"}}"#, b"\"config\"", 1),
             Some(br#"{"config_id":"z"}"#.as_slice())
         );
-        assert!(
-            extract_object_at_depth(br#"{"config":{"note":"a\"b","config_id":"x"}}"#, b"\"config\"", 1)
-                .is_some()
+        assert_eq!(
+            extract_object_at_depth(br#"{"config":{"a":{"b":1}}}"#, b"\"config\"", 1),
+            Some(br#"{"a":{"b":1}}"#.as_slice())
         );
-        assert!(extract_object_at_depth(br#"{"config":{"config_id":"x""#, b"\"config\"", 1).is_none());
-        assert_eq!(trim_c_str(b"{\"a\":1} xx"), br#"{"a":1}"#);
+        assert!(extract_object_at_depth(br#"{"config":{"config_id":"x""#, b"\"config\"", 1)
+            .is_none());
+        assert_eq!(
+            extract_object_at_depth(br#"{"rates":{"base":1.0}}"#, b"\"rates\"", 1),
+            Some(br#"{"base":1.0}"#.as_slice())
+        );
+        assert_eq!(
+            extract_object_at_depth(br#"{"rates":{}}"#, b"\"rates\"", 1),
+            Some(br#"{}"#.as_slice())
+        );
+        assert_eq!(
+            extract_object_at_depth(br#"{"rates": {"vip":0.9}}"#, b"\"rates\"", 1),
+            Some(br#"{"vip":0.9}"#.as_slice())
+        );
+        assert!(extract_object_at_depth(br#"{"rates":"x"}"#, b"\"rates\"", 1).is_none());
+        assert!(extract_object_at_depth(br#"{"rates":{"base":1.0"#, b"\"rates\"", 1).is_none());
+        assert_eq!(
+            extract_array_at_depth(br#"{"tags":["a","b"]}"#, b"\"tags\"", 1),
+            Some(br#"["a","b"]"#.as_slice())
+        );
+        assert_eq!(trim_c_str(b"{\"a\":1}\0xx"), br#"{"a":1}"#);
+        assert_eq!(trim_c_str(b"no-brace\0"), b"no-brace");
+        assert_eq!(trim_c_str(br#"{"a":"b\"c"}"#), br#"{"a":"b\"c"}"#);
+        let nested = br#"{"wrap":{"x":1},"action":"get"}"#;
+        assert_eq!(extract_string_at_depth(nested, b"\"action\"", 1), b"get");
+        let with_obj = br#"{"rates":{"base":1.0},"action":"get"}"#;
+        assert_eq!(extract_string_at_depth(with_obj, b"\"action\"", 1), b"get");
+        let with_esc = br#"{"note":"say \"hi\"","action":"get"}"#;
+        assert_eq!(extract_string_at_depth(with_esc, b"\"action\"", 1), b"get");
     }
 
     #[test]
