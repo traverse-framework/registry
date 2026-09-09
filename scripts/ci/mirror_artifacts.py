@@ -150,31 +150,46 @@ def main(argv) -> int:
             skipped += 1
             continue
 
-        version_dir_rel = Path(relpath).parent  # artifacts/<namespace>.<id>-<version>
-        version_dir = out_dir / version_dir_rel
+        namespace = contract.get("namespace") or ""
+        capability_id = contract.get("id") or ""
+        version = contract.get("version") or ""
 
         # (2) Mirror the immutable contract verbatim + a registry-authored
         # digest sibling, and record the provenance pair for the catalog.json
         # injection below. Cheap, local, and independent of the WASM fetch --
         # so it runs for every recognized version, deduped or not.
-        contract_digest = contract_digest_for_bytes(raw_contract)
-        version_dir.mkdir(parents=True, exist_ok=True)
-        (version_dir / "contract.json").write_bytes(raw_contract)
-        (version_dir / "contract.json.sha256").write_text(contract_digest + "\n")
-        contracts_mirrored += 1
-
-        namespace = contract.get("namespace") or ""
-        capability_id = contract.get("id") or ""
-        version = contract.get("version") or ""
+        #
+        # The contract mirror path is keyed on the capability's own
+        # <namespace>.<id>-<version> identity -- NOT on artifact.url's release
+        # tag. When a later version reuses an earlier version's artifact
+        # release (byte-identical WASM, a legitimate pattern), that tag names
+        # the earlier version, so an artifact-URL-derived path collides: every
+        # reusing version overwrites one file and no per-version mirror is
+        # written for the newer ones (registry#421). Identity-keyed paths give
+        # each version its own contract mirror regardless.
         if namespace and capability_id and version:
+            contract_dir_rel = Path("artifacts") / f"{capability_id}-{version}"
+            contract_dir = out_dir / contract_dir_rel
+            contract_digest = contract_digest_for_bytes(raw_contract)
+            contract_dir.mkdir(parents=True, exist_ok=True)
+            (contract_dir / "contract.json").write_bytes(raw_contract)
+            (contract_dir / "contract.json.sha256").write_text(contract_digest + "\n")
+            contracts_mirrored += 1
+
             reference = f"{namespace}/{capability_id}@{version}"
             provenance_by_ref[reference] = {
-                "contract_url": f"{site_base_url}/{version_dir_rel.as_posix()}/contract.json",
+                "contract_url": f"{site_base_url}/{contract_dir_rel.as_posix()}/contract.json",
                 "contract_digest": contract_digest,
             }
+        else:
+            print(
+                f"SKIP contract mirror (contract.json lacks namespace/id/version): {contract_path}",
+                file=sys.stderr,
+            )
 
         # (1) Mirror the WASM bytes: dedup by URL, verify against
-        # artifact.digest, skip if already present.
+        # artifact.digest, skip if already present. Path stays a fixed
+        # prefix-swap of artifact.url (spec 007 CORS mirror invariant).
         if url in seen_urls:
             continue
         seen_urls.add(url)
