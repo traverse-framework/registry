@@ -1,0 +1,17 @@
+[workspace]
+
+[package]
+name = "support-ticket-workspace-agent"
+version = "0.1.0"
+edition = "2021"
+publish = false
+description = "Catalog-source mirror of support.ticket-workspace — durable ticket workspace via host state."
+
+[[bin]]
+name = "support-ticket-workspace-agent"
+path = "src/main.rs"
+
+[profile.release]
+opt-level = "s"
+lto = true
+panic = "abort"
