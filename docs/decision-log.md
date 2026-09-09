@@ -735,3 +735,7 @@ Also updated `CONTRIBUTING.md`'s existing entry-62 guidance to state the new saf
 **Noted defaults (not separately decided):** a manifest with zero `registry_ref` components prepares trivially (`{ prepared: [], failed: None }`); duplicate references dedupe by `(namespace, id, version_range)` + identical narrowing (the FR-007 cache is idempotent anyway), and differing narrowings are kept as distinct selections.
 
 **Execution boundary of this entry:** the decision log above. Next steps (own PRs): draft `specs/997-application-selected-preparation/spec.md` + both `approved-specs.json` entries (approved via this brainstorm); file the Project 3 issue with this DoD; then implement the helper + batch + `RegistryReference` convergence + tests against 997. No code in this entry.
+## 2026-09-09 — Commerce stateful 1.0.1 schema alignment
+
+Deprecate `commerce.cart@1.0.0` / `commerce.pricing-config@1.0.0` (`lines_json` / `rates_json` string encoding from #402) and publish structured `lines[{sku,qty}]` / `rates` object schemas as `@1.0.1` (PR publish/wave2-commerce-stateful-1.0.0).
+
