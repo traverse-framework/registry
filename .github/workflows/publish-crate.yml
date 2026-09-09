@@ -48,3 +48,17 @@ jobs:
       # dependency, not just buildable from within this workspace. Read-only.
       - name: Verify published crate from an isolated external consumer
         run: bash scripts/ci/verify_external_consumer.sh
+
+      # `cargo publish` above extracts the packaged crate into
+      # target/package/traverse-registry-<version>/ for its verify build. Nothing
+      # after this step needs that tree, but Swatinem/rust-cache's post-run
+      # "Cleaning target" walk descends into it and logs non-fatal
+      # `ENOENT ... opendir '.../tests/{target,trybuild}'` annotations for
+      # subdirectories the extracted layout never contains (registry#414). Remove
+      # the scratch tree before the cache-save post step so `publish-crate` stays
+      # annotation-clean and a future fatal `read_dir` can't turn a green release
+      # red without a code change. `if: always()` keeps the guarantee on a failed
+      # verify; a missing path makes `rm -rf` a successful no-op.
+      - name: Drop cargo publish scratch tree before cache save
+        if: always()
+        run: rm -rf target/package
