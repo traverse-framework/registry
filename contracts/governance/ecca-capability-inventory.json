@@ -454,20 +454,22 @@
     {
       "capability_id": "identity.challenge-session",
       "published_versions": [
-        "1.0.0"
+        "1.0.0",
+        "1.0.1"
       ],
-      "path": "capabilities/identity/identity.challenge-session/1.0.0/contract.json",
+      "path": "capabilities/identity/identity.challenge-session/1.0.1/contract.json",
       "classification": "no-event-required",
-      "evidence": "Host-managed durable challenge via traverse_host::state_*; side_effects=[memory_only]; empty emits/consumes; caller-scoped persistence, not an independent consumer event."
+      "evidence": "Host-managed durable challenge via traverse_host::state_*; side_effects=[memory_only]; empty emits/consumes; caller-scoped persistence, not an independent consumer event. 1.0.0 deprecated after release/signature digest divergence; 1.0.1 is the aligned publish."
     },
     {
       "capability_id": "identity.principal-session",
       "published_versions": [
-        "1.0.0"
+        "1.0.0",
+        "1.0.1"
       ],
-      "path": "capabilities/identity/identity.principal-session/1.0.0/contract.json",
+      "path": "capabilities/identity/identity.principal-session/1.0.1/contract.json",
       "classification": "no-event-required",
-      "evidence": "Host-managed durable session via traverse_host::state_*; side_effects=[memory_only]; empty emits/consumes; caller-scoped persistence, not an independent consumer event."
+      "evidence": "Host-managed durable session via traverse_host::state_*; side_effects=[memory_only]; empty emits/consumes; caller-scoped persistence, not an independent consumer event. 1.0.0 deprecated after release/signature digest divergence; 1.0.1 is the aligned publish."
     },
     {
       "capability_id": "identity.session-revoked",

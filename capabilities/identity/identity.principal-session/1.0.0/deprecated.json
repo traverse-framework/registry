@@ -1,0 +1,6 @@
+{
+  "deprecated": true,
+  "reason": "1.0.0 contract digest and CI-landed signature.json diverged after a conflicting release overwrite from a duplicate publish PR; superseded by aligned 1.0.1.",
+  "deprecated_at": "2026-09-09T05:45:35Z",
+  "superseded_by": "1.0.1"
+}
