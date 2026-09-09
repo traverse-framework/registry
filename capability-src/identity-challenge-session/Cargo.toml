@@ -1,0 +1,17 @@
+[workspace]
+
+[package]
+name = "identity-challenge-session-agent"
+version = "0.1.0"
+edition = "2021"
+publish = false
+description = "Catalog-source mirror of identity.challenge-session — durable auth challenge via host state."
+
+[[bin]]
+name = "identity-challenge-session-agent"
+path = "src/main.rs"
+
+[profile.release]
+opt-level = "s"
+lto = true
+panic = "abort"

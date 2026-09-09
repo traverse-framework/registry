@@ -1,0 +1,374 @@
+{
+  "kind": "capability_contract",
+  "schema_version": "1.0.0",
+  "lifecycle": "active",
+  "owner": {
+    "team": "traverse/registry",
+    "contact": "founders@loop.dev"
+  },
+  "connector_requirements": [],
+  "consumes": [],
+  "dependencies": [],
+  "execution": {
+    "binary_format": "wasm",
+    "constraints": {
+      "filesystem_access": "none",
+      "host_api_access": "none",
+      "network_access": "forbidden"
+    },
+    "entrypoint": {
+      "command": "run",
+      "kind": "wasi-command"
+    },
+    "preferred_targets": [
+      "local",
+      "edge",
+      "cloud"
+    ]
+  },
+  "permitted_targets": [
+    "local",
+    "edge",
+    "cloud"
+  ],
+  "policies": [
+    {
+      "id": "fail-closed"
+    }
+  ],
+  "postconditions": [
+    {
+      "description": "Put/get/delete outcomes reflect host state store results for the fixed session key",
+      "id": "host-state-consistent"
+    }
+  ],
+  "state_schema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "session": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "session_id",
+          "principal_id",
+          "scopes",
+          "issued_at"
+        ],
+        "properties": {
+          "session_id": {
+            "type": "string"
+          },
+          "principal_id": {
+            "type": "string"
+          },
+          "scopes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "issued_at": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  },
+  "service_type": "stateful",
+  "permissions": [
+    {
+      "id": "identity.principal-session"
+    }
+  ],
+  "evidence": [
+    {
+      "evidence_id": "identity-principal-session-1.0.0-contract-validation",
+      "status": "passed",
+      "type": "contract_validation"
+    }
+  ],
+  "id": "identity.principal-session",
+  "namespace": "identity",
+  "name": "principal-session",
+  "version": "1.0.0",
+  "authoring": {
+    "method": "llm-assisted",
+    "source_revision": "publish/wave2-identity-stateful-1.0.0",
+    "test_evidence": "capability-src/identity-principal-session cargo test (17 passing); cargo llvm-cov functions=100%, lines=99.83%, regions=99.5%",
+    "review": {
+      "decision": "pending-qualified-review",
+      "reviewer": "traverse-registry-maintainer"
+    }
+  },
+  "risk": {
+    "effect_class": "state_write",
+    "determinism_class": "deterministic",
+    "reliability": {
+      "idempotency_required": true,
+      "retryable": true,
+      "compensation_available": false
+    }
+  },
+  "summary": "Durable authenticated principal session retained via host managed state.",
+  "description": "Stateful put/get/delete for a single fixed-schema authenticated session record (session_id, principal_id, scopes[], issued_at as string). Resource identity lives inside the value; the relative host key is always session. Uses traverse_host state_put/state_get/state_delete. Browser targets are excluded.",
+  "emits": [],
+  "side_effects": [
+    {
+      "description": "Validates action envelope and session fields in memory",
+      "kind": "memory_only"
+    },
+    {
+      "description": "Reads or mutates host-managed session state via traverse_host state_*",
+      "kind": "memory_only"
+    }
+  ],
+  "preconditions": [
+    {
+      "id": "action-valid",
+      "description": "action must be put, get, or delete; put requires a complete session object"
+    }
+  ],
+  "provenance": {
+    "source": "greenfield",
+    "author": "traverse/registry",
+    "created_at": "2026-09-08T00:00:00Z",
+    "spec_ref": "001-registry-foundation",
+    "adr_refs": [],
+    "exception_refs": []
+  },
+  "artifact": {
+    "digest": "sha256:53a9fce62e02694e84099d3e2be5f007eb54fa55053c3cce23892dfc44a06a38",
+    "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/identity.principal-session-1.0.0/identity-principal-session.wasm"
+  },
+  "inputs": {
+    "schema": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "action"
+      ],
+      "properties": {
+        "action": {
+          "type": "string",
+          "enum": [
+            "put",
+            "get",
+            "delete"
+          ]
+        },
+        "session": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "session_id",
+            "principal_id",
+            "scopes",
+            "issued_at"
+          ],
+          "properties": {
+            "session_id": {
+              "type": "string"
+            },
+            "principal_id": {
+              "type": "string"
+            },
+            "scopes": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "issued_at": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    }
+  },
+  "outputs": {
+    "schema": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "accepted",
+        "reason_code",
+        "evaluation_trace"
+      ],
+      "properties": {
+        "accepted": {
+          "type": "boolean"
+        },
+        "reason_code": {
+          "type": "string",
+          "enum": [
+            "ok",
+            "invalid_input",
+            "invalid_action",
+            "host_error",
+            "not_found"
+          ]
+        },
+        "found": {
+          "type": "boolean"
+        },
+        "session": {
+          "type": "object"
+        },
+        "evaluation_trace": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  },
+  "use_cases": [
+    {
+      "happy": true,
+      "persona_ref": "platform-security-engineer",
+      "scenario": "As a platform security engineer, I want to put a durable authenticated session with scopes, so that authorization context survives across runtime invocations.",
+      "input_example": {
+        "action": "put",
+        "session": {
+          "session_id": "sess-1",
+          "principal_id": "prin-1",
+          "scopes": [
+            "read",
+            "write"
+          ],
+          "issued_at": "2026-09-08T20:00:00Z"
+        }
+      },
+      "output_example": {
+        "accepted": true,
+        "reason_code": "ok",
+        "found": true,
+        "session": {
+          "session_id": "sess-1",
+          "principal_id": "prin-1",
+          "scopes": [
+            "read",
+            "write"
+          ],
+          "issued_at": "2026-09-08T20:00:00Z"
+        },
+        "evaluation_trace": [
+          "put session"
+        ]
+      }
+    },
+    {
+      "happy": true,
+      "persona_ref": "multi-tenant-saas-developer",
+      "scenario": "As a multi-tenant SaaS developer, I want to get the durable principal session, so that my tenant app can restore the authenticated principal and scopes after reconnect.",
+      "input_example": {
+        "action": "get"
+      },
+      "output_example": {
+        "accepted": true,
+        "reason_code": "ok",
+        "found": true,
+        "session": {
+          "session_id": "sess-1",
+          "principal_id": "prin-1",
+          "scopes": [
+            "read",
+            "write"
+          ],
+          "issued_at": "2026-09-08T20:00:00Z"
+        },
+        "evaluation_trace": [
+          "got session"
+        ]
+      }
+    },
+    {
+      "happy": true,
+      "persona_ref": "signup-form-developer",
+      "scenario": "As a signup form developer, I want to delete a principal session on sign-out, so that session state is not left pointing at an idle authenticated context.",
+      "input_example": {
+        "action": "delete"
+      },
+      "output_example": {
+        "accepted": true,
+        "reason_code": "ok",
+        "evaluation_trace": [
+          "deleted session"
+        ]
+      }
+    },
+    {
+      "happy": false,
+      "persona_ref": "multi-tenant-saas-developer",
+      "scenario": "As a multi-tenant SaaS developer, I want get to report not_found when no session exists, so that my client can send the user through auth instead of assuming a live session.",
+      "input_example": {
+        "action": "get"
+      },
+      "output_example": {
+        "accepted": false,
+        "reason_code": "not_found",
+        "found": false,
+        "evaluation_trace": [
+          "session absent"
+        ]
+      }
+    },
+    {
+      "happy": false,
+      "persona_ref": "platform-security-engineer",
+      "scenario": "As a platform security engineer, I want put without a session object rejected as invalid_input, so that incomplete session writes cannot corrupt host state.",
+      "input_example": {
+        "action": "put"
+      },
+      "output_example": {
+        "accepted": false,
+        "reason_code": "invalid_input",
+        "evaluation_trace": [
+          "precondition failed: session object required for put"
+        ]
+      }
+    },
+    {
+      "happy": false,
+      "persona_ref": "signup-form-developer",
+      "scenario": "As a signup form developer, I want an unknown action rejected as invalid_action, so that unsupported verbs fail closed before touching the store.",
+      "input_example": {
+        "action": "list"
+      },
+      "output_example": {
+        "accepted": false,
+        "reason_code": "invalid_action",
+        "evaluation_trace": [
+          "action must be get, put, or delete"
+        ]
+      }
+    },
+    {
+      "happy": false,
+      "persona_ref": "multi-tenant-saas-developer",
+      "scenario": "As a multi-tenant SaaS developer, I want host store failures surfaced as host_error, so that I can retry session persistence instead of treating a failed put as success.",
+      "input_example": {
+        "action": "put",
+        "session": {
+          "session_id": "sess-err",
+          "principal_id": "prin-1",
+          "scopes": [
+            "read",
+            "write"
+          ],
+          "issued_at": "2026-09-08T20:00:00Z"
+        }
+      },
+      "output_example": {
+        "accepted": false,
+        "reason_code": "host_error",
+        "evaluation_trace": [
+          "state_put failed"
+        ]
+      }
+    }
+  ]
+}
