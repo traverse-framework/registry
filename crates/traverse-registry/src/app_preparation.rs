@@ -27,6 +27,9 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use traverse_contracts::{ExecutionConstraints, ExecutionTarget, Lifecycle};
 
+use crate::application_manifest::{
+    ApplicationBundleManifest, RegistryReference, WasmComponentManifest,
+};
 use crate::public_registry_cache::{normalize_digest, sha256_hex};
 use crate::public_registry_state::SyncedPublicRegistryState;
 
@@ -90,15 +93,11 @@ impl RegistryPreparationFailure {
     }
 }
 
-/// The application `registry_ref` a host asks to prepare. `version_range`
-/// MUST be an exact `=X.Y.Z` range; FR-002 forbids selecting any other
-/// version.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct AppRegistryReference {
-    pub namespace: String,
-    pub id: String,
-    pub version_range: String,
-}
+// The reference a host asks to prepare is `crate::RegistryReference`
+// (`{ namespace, id, version_range }`, defined in `application_manifest`) --
+// the same type an application manifest's `registry_ref` component carries,
+// so a manifest-selected reference flows straight into a preparation request.
+// `996` FR-002 requires `version_range` to be an exact `=X.Y.Z` range.
 
 /// FR-003: the host evaluates its own network / host / permission policy and
 /// hands preparation the verdict. Preparation invokes no retrieval adapter
@@ -115,7 +114,7 @@ pub enum HostPolicyDecision {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RegistryPreparationRequest<'a> {
     pub synced_state: &'a SyncedPublicRegistryState,
-    pub reference: AppRegistryReference,
+    pub reference: RegistryReference,
     pub policy: HostPolicyDecision,
     pub requested_target: ExecutionTarget,
     /// Free-form host placement label; recorded in evidence (FR-006). When it
@@ -538,6 +537,177 @@ fn placement_as_target(placement: &str) -> Option<&'static str> {
     }
 }
 
+// ---------------------------------------------------------------------------
+// specs/997-application-selected-preparation: prepare only the references an
+// application manifest selected, and only those.
+// ---------------------------------------------------------------------------
+
+/// One manifest-declared registry reference plus the component's own
+/// permitted-target narrowing (spec 997 FR-002 / FR-005). An empty
+/// `permitted_targets` imposes no narrowing (no invented fallback).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SelectedComponentReference {
+    pub reference: RegistryReference,
+    pub permitted_targets: Vec<ExecutionTarget>,
+}
+
+/// spec 997 FR-004 batch result: fail-fast. `failed` is `Some` iff the batch
+/// is incomplete; `prepared` holds the evidence for every reference verified
+/// before the stop, in selection order.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct BatchApplicationPreparation {
+    pub prepared: Vec<VerifiedRegistryPreparation>,
+    pub failed: Option<BatchPreparationFailure>,
+}
+
+/// The reference that stopped a batch, with its `996` first-failure.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct BatchPreparationFailure {
+    pub reference: RegistryReference,
+    pub failure: RegistryPreparationFailure,
+}
+
+/// The one value each that applies to a whole batch (spec 997 FR-005): the
+/// host's own policy verdict, the target it wants to run on, its placement
+/// label, and the host-ABI it can execute. Per reference, `requested_target`
+/// is additionally narrowed against that component's manifest
+/// `permitted_targets`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BatchPreparationParams {
+    pub policy: HostPolicyDecision,
+    pub requested_target: ExecutionTarget,
+    pub requested_placement: String,
+    pub supported_abi: String,
+}
+
+/// spec 997 FR-001 / FR-002: the manifest-derived registry-reference set --
+/// every `components[].manifest.registry_ref`, with that component's
+/// `permitted_targets`, deduplicated by `(namespace, id, version_range)`
+/// together with the target narrowing (differing narrowings are distinct
+/// selections). This is the *only* reference input to
+/// [`prepare_application_selected_references`]; a caller cannot supply a
+/// reference that is not in it.
+#[must_use]
+pub fn application_selected_references(
+    manifest: &ApplicationBundleManifest,
+) -> Vec<SelectedComponentReference> {
+    selected_component_references(
+        manifest
+            .components
+            .iter()
+            .map(|component| &component.manifest),
+    )
+}
+
+/// The FR-002 extraction logic, over the component manifests directly.
+/// [`application_selected_references`] is the public form over a whole
+/// [`ApplicationBundleManifest`]; this is what its behaviour is unit-tested
+/// against without a full manifest + contract graph.
+pub(crate) fn selected_component_references<'a>(
+    component_manifests: impl Iterator<Item = &'a WasmComponentManifest>,
+) -> Vec<SelectedComponentReference> {
+    let mut selected: Vec<SelectedComponentReference> = Vec::new();
+    for manifest in component_manifests {
+        let Some(reference) = manifest.registry_ref.clone() else {
+            continue;
+        };
+        let candidate = SelectedComponentReference {
+            reference,
+            permitted_targets: manifest.permitted_targets.clone(),
+        };
+        if !selected.contains(&candidate) {
+            selected.push(candidate);
+        }
+    }
+    selected
+}
+
+/// spec 997 FR-001 / FR-003 / FR-004: prepare every reference an application
+/// manifest selected -- and only those -- for offline activation.
+///
+/// This is the sanctioned entrypoint for activation preparation. It composes
+/// [`prepare_application_registry_reference`] over `selected` in order,
+/// stopping at the first reference that fails (fail-fast). The batch result
+/// reports the evidence for each reference prepared before the stop and the
+/// `(reference, failure)` pair for the one that failed. Cache entries
+/// committed for earlier references stay valid (`996` FR-007: digest-keyed,
+/// immutable), so a re-run resumes without re-fetching them.
+///
+/// `params` apply to the whole batch (FR-005); per reference, `requested_target`
+/// is additionally verified against that component's manifest
+/// `permitted_targets` (empty = no narrowing). An empty `selected` returns
+/// `{ prepared: vec![], failed: None }` (FR-006).
+#[must_use]
+pub fn prepare_application_selected_references(
+    selected: &[SelectedComponentReference],
+    synced_state: &SyncedPublicRegistryState,
+    params: &BatchPreparationParams,
+    contract_adapter: &dyn ContractRetrievalAdapter,
+    artifact_adapter: &dyn ArtifactRetrievalAdapter,
+    signature_verifier: &dyn SignatureVerifier,
+    cache: &mut dyn VerifiedCacheWriter,
+) -> BatchApplicationPreparation {
+    let mut prepared: Vec<VerifiedRegistryPreparation> = Vec::new();
+
+    for component in selected {
+        // spec 997 FR-005: the manifest may only tighten the index record's
+        // permitted targets. An empty set imposes no narrowing.
+        if !component.permitted_targets.is_empty()
+            && !component
+                .permitted_targets
+                .contains(&params.requested_target)
+        {
+            return BatchApplicationPreparation {
+                prepared,
+                failed: Some(BatchPreparationFailure {
+                    reference: component.reference.clone(),
+                    failure: RegistryPreparationFailure {
+                        code: RegistryPreparationFailureCode::RegistryTargetIncompatible,
+                        message: format!(
+                            "{}:{} manifest does not permit target {}",
+                            component.reference.namespace,
+                            component.reference.id,
+                            target_wire(&params.requested_target)
+                        ),
+                    },
+                }),
+            };
+        }
+
+        let request = RegistryPreparationRequest {
+            synced_state,
+            reference: component.reference.clone(),
+            policy: params.policy,
+            requested_target: params.requested_target.clone(),
+            requested_placement: params.requested_placement.clone(),
+            supported_abi: params.supported_abi.clone(),
+        };
+        match prepare_application_registry_reference(
+            &request,
+            contract_adapter,
+            artifact_adapter,
+            signature_verifier,
+            cache,
+        ) {
+            Ok(evidence) => prepared.push(evidence),
+            Err(failure) => {
+                return BatchApplicationPreparation {
+                    prepared,
+                    failed: Some(BatchPreparationFailure {
+                        reference: component.reference.clone(),
+                        failure,
+                    }),
+                };
+            }
+        }
+    }
+
+    BatchApplicationPreparation {
+        prepared,
+        failed: None,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     #![allow(clippy::expect_used)]
@@ -686,7 +856,7 @@ mod tests {
     ) -> RegistryPreparationRequest<'a> {
         RegistryPreparationRequest {
             synced_state: state,
-            reference: AppRegistryReference {
+            reference: RegistryReference {
                 namespace: "core".to_string(),
                 id: "core.calculate-price".to_string(),
                 version_range: version_range.to_string(),
@@ -1096,5 +1266,294 @@ mod tests {
                 serde_json::Value::String(wire.to_string())
             );
         }
+    }
+
+    // --- specs/997-application-selected-preparation -----------------------
+
+    use crate::application_manifest::{ComponentExecutionMode, WasmComponentManifest};
+
+    /// `(capability id, contract bytes, artifact bytes)` for `ByIdAdapter`.
+    type ByIdEntry = (&'static str, Vec<u8>, Vec<u8>);
+
+    fn wasm_manifest(
+        registry_ref: Option<(&str, &str, &str)>,
+        targets: &[ExecutionTarget],
+    ) -> WasmComponentManifest {
+        WasmComponentManifest {
+            component_id: "c".to_string(),
+            version: "1.0.0".to_string(),
+            schema_version: "1.0.0".to_string(),
+            execution_mode: ComponentExecutionMode::Wasm,
+            capability_id: registry_ref
+                .map(|(_, id, _)| id.to_string())
+                .unwrap_or_default(),
+            capability_version: registry_ref
+                .map(|(_, _, v)| v.to_string())
+                .unwrap_or_default(),
+            contract_path: None,
+            registry_ref: registry_ref.map(|(ns, id, ver)| RegistryReference {
+                namespace: ns.to_string(),
+                id: id.to_string(),
+                version_range: format!("={ver}"),
+            }),
+            wasm_binary_path: None,
+            wasm_digest: None,
+            platforms: Vec::new(),
+            wrapper_path: None,
+            runtime_constraints: Value::Null,
+            permitted_targets: targets.to_vec(),
+            dependencies: Vec::new(),
+            connector_requirements: Vec::new(),
+            validation_evidence: Vec::new(),
+            executable_pin: None,
+        }
+    }
+
+    fn params(target: ExecutionTarget, policy: HostPolicyDecision) -> BatchPreparationParams {
+        BatchPreparationParams {
+            policy,
+            requested_target: target,
+            requested_placement: "cloud".to_string(),
+            supported_abi: "wasm/wasi-command".to_string(),
+        }
+    }
+
+    /// A retrieval adapter that maps a capability id to its bytes, so a batch
+    /// test can give each selected reference distinct contract/artifact
+    /// content. Artifact bytes are behind a `RefCell` so a test can fix a
+    /// retrieval mid-way and re-run.
+    struct ByIdAdapter {
+        contracts: std::collections::BTreeMap<String, Vec<u8>>,
+        artifacts: std::cell::RefCell<std::collections::BTreeMap<String, Vec<u8>>>,
+    }
+    impl ByIdAdapter {
+        fn new(entries: &[ByIdEntry]) -> Self {
+            let mut contracts = std::collections::BTreeMap::new();
+            let mut artifacts = std::collections::BTreeMap::new();
+            for (id, contract, artifact) in entries {
+                contracts.insert((*id).to_string(), contract.clone());
+                artifacts.insert((*id).to_string(), artifact.clone());
+            }
+            Self {
+                contracts,
+                artifacts: std::cell::RefCell::new(artifacts),
+            }
+        }
+        fn set_artifact(&self, id: &str, bytes: Vec<u8>) {
+            self.artifacts.borrow_mut().insert(id.to_string(), bytes);
+        }
+    }
+    impl ContractRetrievalAdapter for ByIdAdapter {
+        fn fetch_contract(
+            &self,
+            r: &SelectedRecordRef<'_>,
+        ) -> Result<Vec<u8>, RetrievalUnavailable> {
+            self.contracts
+                .get(r.id)
+                .cloned()
+                .ok_or(RetrievalUnavailable)
+        }
+    }
+    impl ArtifactRetrievalAdapter for ByIdAdapter {
+        fn fetch_artifact(
+            &self,
+            r: &SelectedRecordRef<'_>,
+        ) -> Result<Vec<u8>, RetrievalUnavailable> {
+            self.artifacts
+                .borrow()
+                .get(r.id)
+                .cloned()
+                .ok_or(RetrievalUnavailable)
+        }
+    }
+
+    /// SC-002: extraction pulls every declared reference, deduplicates
+    /// `(namespace, id, version_range)` + narrowing, and skips local
+    /// components.
+    #[test]
+    fn selected_references_are_the_declared_distinct_set() {
+        let manifests = [
+            wasm_manifest(Some(("core", "core.a", "1.0.0")), &[ExecutionTarget::Cloud]),
+            wasm_manifest(Some(("core", "core.b", "2.0.0")), &[]),
+            // exact duplicate of the first -> collapsed
+            wasm_manifest(Some(("core", "core.a", "1.0.0")), &[ExecutionTarget::Cloud]),
+            // same ref, different narrowing -> distinct selection
+            wasm_manifest(Some(("core", "core.a", "1.0.0")), &[ExecutionTarget::Local]),
+            // local component (no registry_ref) -> skipped
+            wasm_manifest(None, &[]),
+        ];
+        let selected = selected_component_references(manifests.iter());
+        assert_eq!(selected.len(), 3);
+        assert_eq!(selected[0].reference.id, "core.a");
+        assert_eq!(selected[0].permitted_targets, vec![ExecutionTarget::Cloud]);
+        assert_eq!(selected[1].reference.id, "core.b");
+        assert_eq!(selected[2].reference.id, "core.a");
+        assert_eq!(selected[2].permitted_targets, vec![ExecutionTarget::Local]);
+    }
+
+    fn selected(
+        ns: &str,
+        id: &str,
+        ver: &str,
+        targets: &[ExecutionTarget],
+    ) -> SelectedComponentReference {
+        SelectedComponentReference {
+            reference: RegistryReference {
+                namespace: ns.to_string(),
+                id: id.to_string(),
+                version_range: format!("={ver}"),
+            },
+            permitted_targets: targets.to_vec(),
+        }
+    }
+
+    /// SC-005: an application with only local components prepares trivially.
+    #[test]
+    fn empty_selection_prepares_trivially() {
+        let (state, contract, artifact) = happy_state();
+        let mut cache = MemoryCache::default();
+        let out = prepare_application_selected_references(
+            &[],
+            &state,
+            &params(ExecutionTarget::Cloud, HostPolicyDecision::Permitted),
+            &StaticContract(contract),
+            &StaticArtifact(artifact),
+            &Signature(true),
+            &mut cache,
+        );
+        assert!(out.prepared.is_empty());
+        assert!(out.failed.is_none());
+        assert!(cache.entries.is_empty());
+    }
+
+    fn two_capability_state() -> (SyncedPublicRegistryState, Vec<ByIdEntry>) {
+        let c1 = contract_json("core", "core.one", "1.0.1", "active");
+        let a1 = b"artifact one".to_vec();
+        let c2 = contract_json("core", "core.two", "2.0.0", "active");
+        let a2 = b"artifact two".to_vec();
+        let state = synced(vec![
+            record("core", "core.one", "1.0.1", &c1, &a1, false, &["cloud"]),
+            record("core", "core.two", "2.0.0", &c2, &a2, false, &["cloud"]),
+        ]);
+        (state, vec![("core.one", c1, a1), ("core.two", c2, a2)])
+    }
+
+    fn two_selected() -> [SelectedComponentReference; 2] {
+        [
+            selected("core", "core.one", "1.0.1", &[ExecutionTarget::Cloud]),
+            selected("core", "core.two", "2.0.0", &[ExecutionTarget::Cloud]),
+        ]
+    }
+
+    /// Happy path: every selected reference is prepared, in order.
+    #[test]
+    fn batch_prepares_every_selected_reference() {
+        let (state, entries) = two_capability_state();
+        let adapters = ByIdAdapter::new(&entries);
+        let mut cache = MemoryCache::default();
+        let out = prepare_application_selected_references(
+            &two_selected(),
+            &state,
+            &params(ExecutionTarget::Cloud, HostPolicyDecision::Permitted),
+            &adapters,
+            &adapters,
+            &Signature(true),
+            &mut cache,
+        );
+        assert!(out.failed.is_none());
+        assert_eq!(out.prepared.len(), 2);
+        assert_eq!(out.prepared[0].id, "core.one");
+        assert_eq!(out.prepared[1].id, "core.two");
+    }
+
+    /// SC-003: fail-fast keeps the refs prepared before the stop, reports the
+    /// failing ref + its 996 code, and a re-run resumes over the valid cache.
+    #[test]
+    fn batch_is_fail_fast_and_resumable() {
+        let (state, mut entries) = two_capability_state();
+        // Break core.two's artifact so its digest won't match.
+        entries[1].2 = b"WRONG bytes".to_vec();
+        let adapters = ByIdAdapter::new(&entries);
+        let refs = two_selected();
+        let mut cache = MemoryCache::default();
+
+        let first = prepare_application_selected_references(
+            &refs,
+            &state,
+            &params(ExecutionTarget::Cloud, HostPolicyDecision::Permitted),
+            &adapters,
+            &adapters,
+            &Signature(true),
+            &mut cache,
+        );
+        assert_eq!(first.prepared.len(), 1);
+        assert_eq!(first.prepared[0].id, "core.one");
+        let failure = first.failed.expect("second ref must fail");
+        assert_eq!(failure.reference.id, "core.two");
+        assert_eq!(
+            failure.failure.code,
+            RegistryPreparationFailureCode::RegistryArtifactDigestMismatch
+        );
+        // core.one's cache entries survived the batch failure; core.two's did not.
+        assert!(cache.entries.contains_key(&state.capabilities[0].digest));
+        assert!(!cache.entries.contains_key(&state.capabilities[1].digest));
+
+        // Fix core.two's retrieval and re-run: core.one is a cache hit, batch completes.
+        adapters.set_artifact("core.two", b"artifact two".to_vec());
+        let second = prepare_application_selected_references(
+            &refs,
+            &state,
+            &params(ExecutionTarget::Cloud, HostPolicyDecision::Permitted),
+            &adapters,
+            &adapters,
+            &Signature(true),
+            &mut cache,
+        );
+        assert!(second.failed.is_none());
+        assert_eq!(second.prepared.len(), 2);
+    }
+
+    /// SC-004: a target the manifest component excludes fails with 996's
+    /// `registry_target_incompatible`, before that ref's pipeline runs.
+    #[test]
+    fn manifest_target_narrowing_rejects_before_the_pipeline() {
+        let (state, contract, artifact) = happy_state();
+        let mut cache = MemoryCache::default();
+        let out = prepare_application_selected_references(
+            // index record permits cloud+local, but the manifest narrows to local
+            &[selected(
+                "core",
+                "core.calculate-price",
+                "1.0.1",
+                &[ExecutionTarget::Local],
+            )],
+            &state,
+            &params(ExecutionTarget::Cloud, HostPolicyDecision::Permitted),
+            &StaticContract(contract),
+            &StaticArtifact(artifact),
+            &Signature(true),
+            &mut cache,
+        );
+        let failure = out.failed.expect("manifest narrowing rejects cloud");
+        assert_eq!(
+            failure.failure.code,
+            RegistryPreparationFailureCode::RegistryTargetIncompatible
+        );
+        assert!(out.prepared.is_empty());
+        assert!(cache.entries.is_empty());
+    }
+
+    /// SC-001: the only public producer of the batch's reference input is
+    /// `application_selected_references` / `selected_component_references` --
+    /// there is no path from a caller-built string to a prepared reference
+    /// that doesn't pass through the manifest extraction.
+    #[test]
+    fn selection_set_only_comes_from_the_manifest_extractor() {
+        let manifests = [wasm_manifest(Some(("core", "core.x", "1.2.3")), &[])];
+        let selected = selected_component_references(manifests.iter());
+        assert_eq!(selected[0].reference.version_range, "=1.2.3");
+        // `SelectedComponentReference` has public fields, but the batch entry
+        // point takes `&[SelectedComponentReference]` and this fn is the
+        // sanctioned way to build that slice from an application manifest.
     }
 }
