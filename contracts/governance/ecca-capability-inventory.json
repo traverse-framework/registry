@@ -61,6 +61,15 @@
       "evidence": "side_effects=[memory_only] on published version 1.0.0; empty emits/consumes; deterministic curated-cluster decision returns directly to the caller with no asynchronous domain fact broadcast to independent consumers."
     },
     {
+      "capability_id": "commerce.cart",
+      "published_versions": [
+        "1.0.0"
+      ],
+      "path": "capabilities/commerce/commerce.cart/1.0.0/contract.json",
+      "classification": "no-event-required",
+      "evidence": "Host-managed durable cart via traverse_host::state_*; side_effects=[memory_only]; empty emits/consumes; caller-scoped persistence, not an independent consumer event."
+    },
+    {
       "capability_id": "commerce.cart-line-changed",
       "published_versions": [
         "1.0.0"
@@ -87,6 +96,15 @@
         "path": "events/commerce/commerce.order.status-changed/1.0.0/product.json"
       },
       "evidence": "Order status transitions are domain facts independent consumers may observe. Contract declares emits=[{event_id: commerce.order.status-changed, version: 1.0.0}], service_type=subscribable, and the WASM guest calls traverse_host::emit_event on accepted transitions (reason_code=ok)."
+    },
+    {
+      "capability_id": "commerce.pricing-config",
+      "published_versions": [
+        "1.0.0"
+      ],
+      "path": "capabilities/commerce/commerce.pricing-config/1.0.0/contract.json",
+      "classification": "no-event-required",
+      "evidence": "Host-managed durable config via traverse_host::state_*; side_effects=[memory_only]; empty emits/consumes; caller-scoped persistence, not an independent consumer event."
     },
     {
       "capability_id": "core.action-item-store",
@@ -432,6 +450,24 @@
       "path": "capabilities/formatting/formatting.format-currency/1.1.2/contract.json",
       "classification": "no-event-required",
       "evidence": "side_effects=[memory_only] on latest published version; empty emits/consumes; result returns directly to the caller with no asynchronous domain fact broadcast to independent consumers."
+    },
+    {
+      "capability_id": "identity.challenge-session",
+      "published_versions": [
+        "1.0.0"
+      ],
+      "path": "capabilities/identity/identity.challenge-session/1.0.0/contract.json",
+      "classification": "no-event-required",
+      "evidence": "Host-managed durable challenge via traverse_host::state_*; side_effects=[memory_only]; empty emits/consumes; caller-scoped persistence, not an independent consumer event."
+    },
+    {
+      "capability_id": "identity.principal-session",
+      "published_versions": [
+        "1.0.0"
+      ],
+      "path": "capabilities/identity/identity.principal-session/1.0.0/contract.json",
+      "classification": "no-event-required",
+      "evidence": "Host-managed durable session via traverse_host::state_*; side_effects=[memory_only]; empty emits/consumes; caller-scoped persistence, not an independent consumer event."
     },
     {
       "capability_id": "identity.session-revoked",

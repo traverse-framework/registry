@@ -1,0 +1,344 @@
+{
+  "kind": "capability_contract",
+  "schema_version": "1.0.0",
+  "lifecycle": "active",
+  "owner": {
+    "team": "traverse/registry",
+    "contact": "founders@loop.dev"
+  },
+  "connector_requirements": [],
+  "consumes": [],
+  "dependencies": [],
+  "execution": {
+    "binary_format": "wasm",
+    "constraints": {
+      "filesystem_access": "none",
+      "host_api_access": "none",
+      "network_access": "forbidden"
+    },
+    "entrypoint": {
+      "command": "run",
+      "kind": "wasi-command"
+    },
+    "preferred_targets": [
+      "local",
+      "edge",
+      "cloud"
+    ]
+  },
+  "permitted_targets": [
+    "local",
+    "edge",
+    "cloud"
+  ],
+  "policies": [
+    {
+      "id": "fail-closed"
+    }
+  ],
+  "postconditions": [
+    {
+      "description": "Put/get/delete outcomes reflect host state store results for the fixed session key",
+      "id": "host-state-consistent"
+    }
+  ],
+  "state_schema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "cart": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "cart_id",
+          "currency",
+          "lines_json"
+        ],
+        "properties": {
+          "cart_id": {
+            "type": "string"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "lines_json": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  },
+  "service_type": "stateful",
+  "permissions": [
+    {
+      "id": "commerce.cart"
+    }
+  ],
+  "evidence": [
+    {
+      "evidence_id": "commerce.cart-1.0.0-contract-validation",
+      "status": "passed",
+      "type": "contract_validation"
+    }
+  ],
+  "id": "commerce.cart",
+  "namespace": "commerce",
+  "name": "cart",
+  "version": "1.0.0",
+  "authoring": {
+    "method": "llm-assisted",
+    "source_revision": "publish/wave2-commerce-identity-1.0.0",
+    "test_evidence": "capability-src/commerce-cart cargo test + llvm-cov",
+    "review": {
+      "decision": "pending-qualified-review",
+      "reviewer": "traverse-registry-maintainer"
+    }
+  },
+  "risk": {
+    "effect_class": "state_write",
+    "determinism_class": "deterministic",
+    "reliability": {
+      "idempotency_required": true,
+      "retryable": true,
+      "compensation_available": false
+    }
+  },
+  "summary": "Put, get, or delete a durable shopping cart aggregate via host-managed state.",
+  "description": "Persists cart records (cart_id, currency, lines_json) through traverse_host::state_* under fixed key cart. Browser excluded.",
+  "emits": [],
+  "side_effects": [
+    {
+      "description": "Validates action envelope and cart fields in memory",
+      "kind": "memory_only"
+    },
+    {
+      "description": "Reads or mutates host-managed cart state via traverse_host state_*",
+      "kind": "memory_only"
+    }
+  ],
+  "preconditions": [
+    {
+      "id": "action-valid",
+      "description": "action must be put, get, or delete; put requires a complete session object"
+    }
+  ],
+  "provenance": {
+    "spec_ref": null,
+    "source": "registry-wave2"
+  },
+  "artifact": {
+    "digest": "sha256:50ac96c0c18550cdb6671b3a8ae02e89a36fbefad9f7dd1b80cae51907cfa909",
+    "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/commerce.cart-1.0.0/commerce-cart.wasm"
+  },
+  "inputs": {
+    "schema": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "action"
+      ],
+      "properties": {
+        "action": {
+          "type": "string",
+          "enum": [
+            "put",
+            "get",
+            "delete"
+          ]
+        },
+        "cart": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "cart_id",
+            "currency",
+            "lines_json"
+          ],
+          "properties": {
+            "cart_id": {
+              "type": "string"
+            },
+            "currency": {
+              "type": "string"
+            },
+            "lines_json": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    }
+  },
+  "outputs": {
+    "schema": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "accepted",
+        "reason_code",
+        "evaluation_trace"
+      ],
+      "properties": {
+        "accepted": {
+          "type": "boolean"
+        },
+        "reason_code": {
+          "type": "string",
+          "enum": [
+            "ok",
+            "invalid_input",
+            "invalid_action",
+            "host_error",
+            "not_found"
+          ]
+        },
+        "found": {
+          "type": "boolean"
+        },
+        "cart": {
+          "type": "object"
+        },
+        "evaluation_trace": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  },
+  "use_cases": [
+    {
+      "happy": true,
+      "persona_ref": "checkout-flow-developer",
+      "scenario": "As a checkout flow developer, I want to put a cart record, so that durable state is available on later gets.",
+      "input_example": {
+        "action": "put",
+        "cart": {
+          "cart_id": "cart-1",
+          "currency": "USD",
+          "lines_json": "SKU-A:2"
+        }
+      },
+      "output_example": {
+        "accepted": true,
+        "reason_code": "ok",
+        "cart": {
+          "cart_id": "cart-1",
+          "currency": "USD",
+          "lines_json": "SKU-A:2"
+        },
+        "evaluation_trace": [
+          "cart put"
+        ]
+      }
+    },
+    {
+      "happy": true,
+      "persona_ref": "checkout-flow-developer",
+      "scenario": "As a checkout flow developer, I want to get a stored cart, so that I can resume from host state.",
+      "input_example": {
+        "action": "get"
+      },
+      "output_example": {
+        "accepted": true,
+        "reason_code": "ok",
+        "found": true,
+        "cart": {
+          "cart_id": "cart-1",
+          "currency": "USD",
+          "lines_json": "SKU-A:2"
+        },
+        "evaluation_trace": [
+          "cart found"
+        ]
+      }
+    },
+    {
+      "happy": true,
+      "persona_ref": "checkout-flow-developer",
+      "scenario": "As a checkout flow developer, I want to delete a cart, so that stale durable state is cleared.",
+      "input_example": {
+        "action": "delete"
+      },
+      "output_example": {
+        "accepted": true,
+        "reason_code": "ok",
+        "evaluation_trace": [
+          "cart deleted"
+        ]
+      }
+    },
+    {
+      "happy": false,
+      "persona_ref": "checkout-flow-developer",
+      "scenario": "As a checkout flow developer, I want missing cart fields rejected, so that corrupt puts fail closed.",
+      "input_example": {
+        "action": "put",
+        "cart": {
+          "cart_id": "cart-1",
+          "currency": "",
+          "lines_json": ""
+        }
+      },
+      "output_example": {
+        "accepted": false,
+        "reason_code": "invalid_input",
+        "evaluation_trace": [
+          "precondition failed"
+        ]
+      }
+    },
+    {
+      "happy": false,
+      "persona_ref": "checkout-flow-developer",
+      "scenario": "As a checkout flow developer, I want unknown actions rejected, so that the contract surface stays closed.",
+      "input_example": {
+        "action": "list"
+      },
+      "output_example": {
+        "accepted": false,
+        "reason_code": "invalid_action",
+        "evaluation_trace": [
+          "action must be get, put, or delete"
+        ]
+      }
+    },
+    {
+      "happy": false,
+      "persona_ref": "checkout-flow-developer",
+      "scenario": "As a checkout flow developer, I want a missing cart get to return not_found, so that callers can branch honestly.",
+      "input_example": {
+        "action": "get"
+      },
+      "output_example": {
+        "accepted": false,
+        "reason_code": "not_found",
+        "found": false,
+        "evaluation_trace": [
+          "cart missing"
+        ]
+      }
+    },
+    {
+      "happy": false,
+      "persona_ref": "checkout-flow-developer",
+      "scenario": "As a checkout flow developer, I want host store failures surfaced as host_error, so that misconfiguration is never silent.",
+      "input_example": {
+        "action": "put",
+        "cart": {
+          "cart_id": "cart-1",
+          "currency": "USD",
+          "lines_json": "SKU-A:2"
+        }
+      },
+      "output_example": {
+        "accepted": false,
+        "reason_code": "host_error",
+        "evaluation_trace": [
+          "state_put failed"
+        ]
+      }
+    }
+  ]
+}

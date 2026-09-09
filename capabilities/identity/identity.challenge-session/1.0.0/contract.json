@@ -1,0 +1,370 @@
+{
+  "kind": "capability_contract",
+  "schema_version": "1.0.0",
+  "lifecycle": "active",
+  "owner": {
+    "team": "traverse/registry",
+    "contact": "founders@loop.dev"
+  },
+  "connector_requirements": [],
+  "consumes": [],
+  "dependencies": [],
+  "execution": {
+    "binary_format": "wasm",
+    "constraints": {
+      "filesystem_access": "none",
+      "host_api_access": "none",
+      "network_access": "forbidden"
+    },
+    "entrypoint": {
+      "command": "run",
+      "kind": "wasi-command"
+    },
+    "preferred_targets": [
+      "local",
+      "edge",
+      "cloud"
+    ]
+  },
+  "permitted_targets": [
+    "local",
+    "edge",
+    "cloud"
+  ],
+  "policies": [
+    {
+      "id": "fail-closed"
+    }
+  ],
+  "postconditions": [
+    {
+      "description": "Put/get/delete outcomes reflect host state store results for the fixed session key",
+      "id": "host-state-consistent"
+    }
+  ],
+  "state_schema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "challenge": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "challenge_id",
+          "principal_hint",
+          "method",
+          "expires_at",
+          "status"
+        ],
+        "properties": {
+          "challenge_id": {
+            "type": "string"
+          },
+          "principal_hint": {
+            "type": "string"
+          },
+          "method": {
+            "type": "string"
+          },
+          "expires_at": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  },
+  "service_type": "stateful",
+  "permissions": [
+    {
+      "id": "identity.challenge-session"
+    }
+  ],
+  "evidence": [
+    {
+      "evidence_id": "identity.challenge-session-1.0.0-contract-validation",
+      "status": "passed",
+      "type": "contract_validation"
+    }
+  ],
+  "id": "identity.challenge-session",
+  "namespace": "identity",
+  "name": "challenge-session",
+  "version": "1.0.0",
+  "authoring": {
+    "method": "llm-assisted",
+    "source_revision": "publish/wave2-commerce-identity-1.0.0",
+    "test_evidence": "capability-src/identity-challenge-session cargo test + llvm-cov",
+    "review": {
+      "decision": "pending-qualified-review",
+      "reviewer": "traverse-registry-maintainer"
+    }
+  },
+  "risk": {
+    "effect_class": "state_write",
+    "determinism_class": "deterministic",
+    "reliability": {
+      "idempotency_required": true,
+      "retryable": true,
+      "compensation_available": false
+    }
+  },
+  "summary": "Put, get, or delete a durable authentication challenge session via host-managed state.",
+  "description": "Persists auth challenge records through traverse_host::state_* under fixed key challenge. Browser excluded.",
+  "emits": [],
+  "side_effects": [
+    {
+      "description": "Validates action envelope and challenge fields in memory",
+      "kind": "memory_only"
+    },
+    {
+      "description": "Reads or mutates host-managed challenge state via traverse_host state_*",
+      "kind": "memory_only"
+    }
+  ],
+  "preconditions": [
+    {
+      "id": "action-valid",
+      "description": "action must be put, get, or delete; put requires a complete session object"
+    }
+  ],
+  "provenance": {
+    "spec_ref": null,
+    "source": "registry-wave2"
+  },
+  "artifact": {
+    "digest": "sha256:928385e398b0fc4d1fa50e80d73c1fb45ec042531961b74d28e9bbceee95fdf3",
+    "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/identity.challenge-session-1.0.0/identity-challenge-session.wasm"
+  },
+  "inputs": {
+    "schema": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "action"
+      ],
+      "properties": {
+        "action": {
+          "type": "string",
+          "enum": [
+            "put",
+            "get",
+            "delete"
+          ]
+        },
+        "challenge": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "challenge_id",
+            "principal_hint",
+            "method",
+            "expires_at",
+            "status"
+          ],
+          "properties": {
+            "challenge_id": {
+              "type": "string"
+            },
+            "principal_hint": {
+              "type": "string"
+            },
+            "method": {
+              "type": "string"
+            },
+            "expires_at": {
+              "type": "string"
+            },
+            "status": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    }
+  },
+  "outputs": {
+    "schema": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "accepted",
+        "reason_code",
+        "evaluation_trace"
+      ],
+      "properties": {
+        "accepted": {
+          "type": "boolean"
+        },
+        "reason_code": {
+          "type": "string",
+          "enum": [
+            "ok",
+            "invalid_input",
+            "invalid_action",
+            "host_error",
+            "not_found"
+          ]
+        },
+        "found": {
+          "type": "boolean"
+        },
+        "challenge": {
+          "type": "object"
+        },
+        "evaluation_trace": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  },
+  "use_cases": [
+    {
+      "happy": true,
+      "persona_ref": "platform-security-engineer",
+      "scenario": "As a platform security engineer, I want to put a challenge record, so that durable state is available on later gets.",
+      "input_example": {
+        "action": "put",
+        "challenge": {
+          "challenge_id": "chal-1",
+          "principal_hint": "ada@example.com",
+          "method": "otp",
+          "expires_at": "2026-09-09T00:00:00Z",
+          "status": "pending"
+        }
+      },
+      "output_example": {
+        "accepted": true,
+        "reason_code": "ok",
+        "challenge": {
+          "challenge_id": "chal-1",
+          "principal_hint": "ada@example.com",
+          "method": "otp",
+          "expires_at": "2026-09-09T00:00:00Z",
+          "status": "pending"
+        },
+        "evaluation_trace": [
+          "challenge put"
+        ]
+      }
+    },
+    {
+      "happy": true,
+      "persona_ref": "platform-security-engineer",
+      "scenario": "As a platform security engineer, I want to get a stored challenge, so that I can resume from host state.",
+      "input_example": {
+        "action": "get"
+      },
+      "output_example": {
+        "accepted": true,
+        "reason_code": "ok",
+        "found": true,
+        "challenge": {
+          "challenge_id": "chal-1",
+          "principal_hint": "ada@example.com",
+          "method": "otp",
+          "expires_at": "2026-09-09T00:00:00Z",
+          "status": "pending"
+        },
+        "evaluation_trace": [
+          "challenge found"
+        ]
+      }
+    },
+    {
+      "happy": true,
+      "persona_ref": "platform-security-engineer",
+      "scenario": "As a platform security engineer, I want to delete a challenge, so that stale durable state is cleared.",
+      "input_example": {
+        "action": "delete"
+      },
+      "output_example": {
+        "accepted": true,
+        "reason_code": "ok",
+        "evaluation_trace": [
+          "challenge deleted"
+        ]
+      }
+    },
+    {
+      "happy": false,
+      "persona_ref": "platform-security-engineer",
+      "scenario": "As a platform security engineer, I want missing challenge fields rejected, so that corrupt puts fail closed.",
+      "input_example": {
+        "action": "put",
+        "challenge": {
+          "challenge_id": "chal-1",
+          "principal_hint": "",
+          "method": "",
+          "expires_at": "",
+          "status": ""
+        }
+      },
+      "output_example": {
+        "accepted": false,
+        "reason_code": "invalid_input",
+        "evaluation_trace": [
+          "precondition failed"
+        ]
+      }
+    },
+    {
+      "happy": false,
+      "persona_ref": "platform-security-engineer",
+      "scenario": "As a platform security engineer, I want unknown actions rejected, so that the contract surface stays closed.",
+      "input_example": {
+        "action": "list"
+      },
+      "output_example": {
+        "accepted": false,
+        "reason_code": "invalid_action",
+        "evaluation_trace": [
+          "action must be get, put, or delete"
+        ]
+      }
+    },
+    {
+      "happy": false,
+      "persona_ref": "platform-security-engineer",
+      "scenario": "As a platform security engineer, I want a missing challenge get to return not_found, so that callers can branch honestly.",
+      "input_example": {
+        "action": "get"
+      },
+      "output_example": {
+        "accepted": false,
+        "reason_code": "not_found",
+        "found": false,
+        "evaluation_trace": [
+          "challenge missing"
+        ]
+      }
+    },
+    {
+      "happy": false,
+      "persona_ref": "platform-security-engineer",
+      "scenario": "As a platform security engineer, I want host store failures surfaced as host_error, so that misconfiguration is never silent.",
+      "input_example": {
+        "action": "put",
+        "challenge": {
+          "challenge_id": "chal-1",
+          "principal_hint": "ada@example.com",
+          "method": "otp",
+          "expires_at": "2026-09-09T00:00:00Z",
+          "status": "pending"
+        }
+      },
+      "output_example": {
+        "accepted": false,
+        "reason_code": "host_error",
+        "evaluation_trace": [
+          "state_put failed"
+        ]
+      }
+    }
+  ]
+}

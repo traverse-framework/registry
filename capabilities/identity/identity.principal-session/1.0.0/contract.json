@@ -1,0 +1,357 @@
+{
+  "kind": "capability_contract",
+  "schema_version": "1.0.0",
+  "lifecycle": "active",
+  "owner": {
+    "team": "traverse/registry",
+    "contact": "founders@loop.dev"
+  },
+  "connector_requirements": [],
+  "consumes": [],
+  "dependencies": [],
+  "execution": {
+    "binary_format": "wasm",
+    "constraints": {
+      "filesystem_access": "none",
+      "host_api_access": "none",
+      "network_access": "forbidden"
+    },
+    "entrypoint": {
+      "command": "run",
+      "kind": "wasi-command"
+    },
+    "preferred_targets": [
+      "local",
+      "edge",
+      "cloud"
+    ]
+  },
+  "permitted_targets": [
+    "local",
+    "edge",
+    "cloud"
+  ],
+  "policies": [
+    {
+      "id": "fail-closed"
+    }
+  ],
+  "postconditions": [
+    {
+      "description": "Put/get/delete outcomes reflect host state store results for the fixed session key",
+      "id": "host-state-consistent"
+    }
+  ],
+  "state_schema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "session": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "session_id",
+          "principal_id",
+          "scopes_json",
+          "issued_at"
+        ],
+        "properties": {
+          "session_id": {
+            "type": "string"
+          },
+          "principal_id": {
+            "type": "string"
+          },
+          "scopes_json": {
+            "type": "string"
+          },
+          "issued_at": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  },
+  "service_type": "stateful",
+  "permissions": [
+    {
+      "id": "identity.principal-session"
+    }
+  ],
+  "evidence": [
+    {
+      "evidence_id": "identity.principal-session-1.0.0-contract-validation",
+      "status": "passed",
+      "type": "contract_validation"
+    }
+  ],
+  "id": "identity.principal-session",
+  "namespace": "identity",
+  "name": "principal-session",
+  "version": "1.0.0",
+  "authoring": {
+    "method": "llm-assisted",
+    "source_revision": "publish/wave2-commerce-identity-1.0.0",
+    "test_evidence": "capability-src/identity-principal-session cargo test + llvm-cov",
+    "review": {
+      "decision": "pending-qualified-review",
+      "reviewer": "traverse-registry-maintainer"
+    }
+  },
+  "risk": {
+    "effect_class": "state_write",
+    "determinism_class": "deterministic",
+    "reliability": {
+      "idempotency_required": true,
+      "retryable": true,
+      "compensation_available": false
+    }
+  },
+  "summary": "Put, get, or delete a durable authenticated principal session via host-managed state.",
+  "description": "Persists principal session records through traverse_host::state_* under fixed key session. Browser excluded.",
+  "emits": [],
+  "side_effects": [
+    {
+      "description": "Validates action envelope and session fields in memory",
+      "kind": "memory_only"
+    },
+    {
+      "description": "Reads or mutates host-managed session state via traverse_host state_*",
+      "kind": "memory_only"
+    }
+  ],
+  "preconditions": [
+    {
+      "id": "action-valid",
+      "description": "action must be put, get, or delete; put requires a complete session object"
+    }
+  ],
+  "provenance": {
+    "spec_ref": null,
+    "source": "registry-wave2"
+  },
+  "artifact": {
+    "digest": "sha256:318665450ceda0c4e439285e1dcab9cc15e5f75a245bd508aa73df677aa9ace6",
+    "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/identity.principal-session-1.0.0/identity-principal-session.wasm"
+  },
+  "inputs": {
+    "schema": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "action"
+      ],
+      "properties": {
+        "action": {
+          "type": "string",
+          "enum": [
+            "put",
+            "get",
+            "delete"
+          ]
+        },
+        "session": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "session_id",
+            "principal_id",
+            "scopes_json",
+            "issued_at"
+          ],
+          "properties": {
+            "session_id": {
+              "type": "string"
+            },
+            "principal_id": {
+              "type": "string"
+            },
+            "scopes_json": {
+              "type": "string"
+            },
+            "issued_at": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    }
+  },
+  "outputs": {
+    "schema": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "accepted",
+        "reason_code",
+        "evaluation_trace"
+      ],
+      "properties": {
+        "accepted": {
+          "type": "boolean"
+        },
+        "reason_code": {
+          "type": "string",
+          "enum": [
+            "ok",
+            "invalid_input",
+            "invalid_action",
+            "host_error",
+            "not_found"
+          ]
+        },
+        "found": {
+          "type": "boolean"
+        },
+        "session": {
+          "type": "object"
+        },
+        "evaluation_trace": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  },
+  "use_cases": [
+    {
+      "happy": true,
+      "persona_ref": "multi-tenant-saas-developer",
+      "scenario": "As a multi tenant saas developer, I want to put a session record, so that durable state is available on later gets.",
+      "input_example": {
+        "action": "put",
+        "session": {
+          "session_id": "sess-1",
+          "principal_id": "user-ada",
+          "scopes_json": "read,write",
+          "issued_at": "2026-09-08T20:00:00Z"
+        }
+      },
+      "output_example": {
+        "accepted": true,
+        "reason_code": "ok",
+        "session": {
+          "session_id": "sess-1",
+          "principal_id": "user-ada",
+          "scopes_json": "read,write",
+          "issued_at": "2026-09-08T20:00:00Z"
+        },
+        "evaluation_trace": [
+          "session put"
+        ]
+      }
+    },
+    {
+      "happy": true,
+      "persona_ref": "multi-tenant-saas-developer",
+      "scenario": "As a multi tenant saas developer, I want to get a stored session, so that I can resume from host state.",
+      "input_example": {
+        "action": "get"
+      },
+      "output_example": {
+        "accepted": true,
+        "reason_code": "ok",
+        "found": true,
+        "session": {
+          "session_id": "sess-1",
+          "principal_id": "user-ada",
+          "scopes_json": "read,write",
+          "issued_at": "2026-09-08T20:00:00Z"
+        },
+        "evaluation_trace": [
+          "session found"
+        ]
+      }
+    },
+    {
+      "happy": true,
+      "persona_ref": "multi-tenant-saas-developer",
+      "scenario": "As a multi tenant saas developer, I want to delete a session, so that stale durable state is cleared.",
+      "input_example": {
+        "action": "delete"
+      },
+      "output_example": {
+        "accepted": true,
+        "reason_code": "ok",
+        "evaluation_trace": [
+          "session deleted"
+        ]
+      }
+    },
+    {
+      "happy": false,
+      "persona_ref": "multi-tenant-saas-developer",
+      "scenario": "As a multi tenant saas developer, I want missing session fields rejected, so that corrupt puts fail closed.",
+      "input_example": {
+        "action": "put",
+        "session": {
+          "session_id": "sess-1",
+          "principal_id": "",
+          "scopes_json": "",
+          "issued_at": ""
+        }
+      },
+      "output_example": {
+        "accepted": false,
+        "reason_code": "invalid_input",
+        "evaluation_trace": [
+          "precondition failed"
+        ]
+      }
+    },
+    {
+      "happy": false,
+      "persona_ref": "multi-tenant-saas-developer",
+      "scenario": "As a multi tenant saas developer, I want unknown actions rejected, so that the contract surface stays closed.",
+      "input_example": {
+        "action": "list"
+      },
+      "output_example": {
+        "accepted": false,
+        "reason_code": "invalid_action",
+        "evaluation_trace": [
+          "action must be get, put, or delete"
+        ]
+      }
+    },
+    {
+      "happy": false,
+      "persona_ref": "multi-tenant-saas-developer",
+      "scenario": "As a multi tenant saas developer, I want a missing session get to return not_found, so that callers can branch honestly.",
+      "input_example": {
+        "action": "get"
+      },
+      "output_example": {
+        "accepted": false,
+        "reason_code": "not_found",
+        "found": false,
+        "evaluation_trace": [
+          "session missing"
+        ]
+      }
+    },
+    {
+      "happy": false,
+      "persona_ref": "multi-tenant-saas-developer",
+      "scenario": "As a multi tenant saas developer, I want host store failures surfaced as host_error, so that misconfiguration is never silent.",
+      "input_example": {
+        "action": "put",
+        "session": {
+          "session_id": "sess-1",
+          "principal_id": "user-ada",
+          "scopes_json": "read,write",
+          "issued_at": "2026-09-08T20:00:00Z"
+        }
+      },
+      "output_example": {
+        "accepted": false,
+        "reason_code": "host_error",
+        "evaluation_trace": [
+          "state_put failed"
+        ]
+      }
+    }
+  ]
+}
