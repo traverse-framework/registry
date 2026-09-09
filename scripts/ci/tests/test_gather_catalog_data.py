@@ -42,10 +42,29 @@ class ResolveCurrentCrateTests(unittest.TestCase):
             "core-action-item-status",
         )
 
-    def test_legacy_ids_still_resolve_through_the_explicit_dict(self):
-        # validate-luhn's crate is NOT its canonical name (validation-validate-luhn).
-        self.assertEqual(self.mod.CURRENT_CRATE_FOR_ID["validation.validate-luhn"], "validate-luhn")
-        self.assertEqual(self.mod.resolve_current_crate("validation.validate-luhn"), "validate-luhn")
+    def test_ids_still_resolve_through_the_explicit_dict(self):
+        # Explicit CURRENT_CRATE_FOR_ID entries are consulted first.
+        self.assertEqual(
+            self.mod.CURRENT_CRATE_FOR_ID["approval.decision-apply"], "approval-decision-apply"
+        )
+        self.assertEqual(
+            self.mod.resolve_current_crate("approval.decision-apply"), "approval-decision-apply"
+        )
+
+    def test_renamed_validation_and_formatting_crates_resolve_via_canonical(self):
+        # registry#420: the 5 crates that used to be legacy-named
+        # (validate-luhn, ..., format-currency) were renamed to their
+        # canonical <id-with-dashes> dirs and their CURRENT_CRATE_FOR_ID
+        # entries dropped -- they now resolve by the canonical rule.
+        for cid, crate in (
+            ("validation.validate-luhn", "validation-validate-luhn"),
+            ("validation.validate-email", "validation-validate-email"),
+            ("validation.normalize-phone-number", "validation-normalize-phone-number"),
+            ("validation.score-password-strength", "validation-score-password-strength"),
+            ("formatting.format-currency", "formatting-format-currency"),
+        ):
+            self.assertNotIn(cid, self.mod.CURRENT_CRATE_FOR_ID)
+            self.assertEqual(self.mod.resolve_current_crate(cid), crate)
 
     def test_post_spec018_id_resolves_via_canonical_fallback(self):
         # This id has real source at capability-src/commerce-cart-line-changed/

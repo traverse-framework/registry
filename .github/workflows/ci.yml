@@ -391,11 +391,11 @@ jobs:
             capability-src/summary-aggregate
             capability-src/uncertainty-score
             capability-src/visual-parameter-map
-            capability-src/validate-luhn
-            capability-src/validate-email
-            capability-src/normalize-phone-number
-            capability-src/score-password-strength
-            capability-src/format-currency
+            capability-src/validation-validate-luhn
+            capability-src/validation-validate-email
+            capability-src/validation-normalize-phone-number
+            capability-src/validation-score-password-strength
+            capability-src/formatting-format-currency
             capability-src/traverse-starter-process
             capability-src/traverse-starter-validate
             capability-src/traverse-starter-summarize
