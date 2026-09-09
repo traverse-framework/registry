@@ -195,6 +195,55 @@ class ContractMirrorTests(unittest.TestCase):
             self.mod.main(["mirror_artifacts.py", "catalog", "https://x", "extra"]), 2
         )
 
+    def test_two_versions_sharing_one_artifact_release_each_get_their_own_mirror(self):
+        """registry#421: a v1.1.0 that reuses v1.0.0's artifact release must
+        still get its own artifacts/<ns>.<id>-1.1.0/contract.json -- keyed on
+        the contract's identity, not artifact.url's -1.0.0 tag."""
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            digest = f"sha256:{hashlib.sha256(self.WASM).hexdigest()}"
+            for ver, marker in (("1.0.0", "old"), ("1.1.0", "new")):
+                cdir = tmp_path / "capabilities" / "core" / "core.foo" / ver
+                cdir.mkdir(parents=True)
+                (cdir / "contract.json").write_bytes(
+                    (
+                        '{"namespace":"core","id":"core.foo","version":"%s","marker":"%s",'
+                        '"artifact":{"digest":"%s","url":"%s"}}\n'
+                        % (ver, marker, digest, self.URL)  # both point at the -1.0.0 release
+                    ).encode()
+                )
+            out_dir = tmp_path / "catalog"
+            out_dir.mkdir()
+            (out_dir / "catalog.json").write_text(
+                json.dumps(
+                    {
+                        "capabilities": [
+                            {"reference": "core/core.foo@1.0.0", "deprecated": True, "contract": {}},
+                            {"reference": "core/core.foo@1.1.0", "deprecated": False, "contract": {}},
+                        ]
+                    }
+                )
+            )
+
+            self.assertEqual(self._run(tmp_path, out_dir, ["https://example.test/"]), 0)
+
+            old = out_dir / "artifacts" / "core.foo-1.0.0" / "contract.json"
+            new = out_dir / "artifacts" / "core.foo-1.1.0" / "contract.json"
+            self.assertTrue(old.exists() and new.exists())
+            self.assertEqual(json.loads(old.read_text())["marker"], "old")
+            self.assertEqual(json.loads(new.read_text())["marker"], "new")
+
+            catalog = json.loads((out_dir / "catalog.json").read_text())
+            by_ref = {c["reference"]: c for c in catalog["capabilities"]}
+            self.assertEqual(
+                by_ref["core/core.foo@1.0.0"]["contract_url"],
+                "https://example.test/artifacts/core.foo-1.0.0/contract.json",
+            )
+            self.assertEqual(
+                by_ref["core/core.foo@1.1.0"]["contract_url"],
+                "https://example.test/artifacts/core.foo-1.1.0/contract.json",
+            )
+
 
 if __name__ == "__main__":
     unittest.main()
