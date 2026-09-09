@@ -1,0 +1,17 @@
+[workspace]
+
+[package]
+name = "core-followup-session-agent"
+version = "0.1.0"
+edition = "2021"
+publish = false
+description = "Catalog-source mirror of core.followup-session — follow-up working session via host state."
+
+[[bin]]
+name = "core-followup-session-agent"
+path = "src/main.rs"
+
+[profile.release]
+opt-level = "s"
+lto = true
+panic = "abort"

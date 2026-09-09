@@ -1,0 +1,372 @@
+{
+  "kind": "capability_contract",
+  "schema_version": "1.0.0",
+  "lifecycle": "active",
+  "owner": {
+    "team": "traverse/registry",
+    "contact": "founders@loop.dev"
+  },
+  "connector_requirements": [],
+  "consumes": [],
+  "dependencies": [],
+  "execution": {
+    "binary_format": "wasm",
+    "constraints": {
+      "filesystem_access": "none",
+      "host_api_access": "none",
+      "network_access": "forbidden"
+    },
+    "entrypoint": {
+      "command": "run",
+      "kind": "wasi-command"
+    },
+    "preferred_targets": [
+      "local",
+      "edge",
+      "cloud"
+    ]
+  },
+  "permitted_targets": [
+    "local",
+    "edge",
+    "cloud",
+    "device"
+  ],
+  "policies": [
+    {
+      "id": "fail-closed"
+    }
+  ],
+  "postconditions": [
+    {
+      "description": "Identical inputs produce identical outputs for the same host store contents",
+      "id": "deterministic"
+    }
+  ],
+  "state_schema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "session": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "session_id",
+          "agenda_item_ids",
+          "cursor"
+        ],
+        "properties": {
+          "session_id": {
+            "type": "string"
+          },
+          "agenda_item_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "cursor": {
+            "type": "integer"
+          }
+        }
+      }
+    }
+  },
+  "service_type": "stateful",
+  "permissions": [
+    {
+      "id": "core.followup-session"
+    }
+  ],
+  "evidence": [
+    {
+      "evidence_id": "core-followup-session-1.0.0-contract-validation",
+      "status": "passed",
+      "type": "contract_validation"
+    }
+  ],
+  "id": "core.followup-session",
+  "namespace": "core",
+  "name": "followup-session",
+  "version": "1.0.0",
+  "authoring": {
+    "method": "llm-assisted",
+    "source_revision": "publish/wave2-core-stores-1.0.0",
+    "test_evidence": "capability-src/core-followup-session cargo test (16 passing); cargo llvm-cov functions=100% lines>=95% regions>=95%",
+    "review": {
+      "decision": "pending-qualified-review",
+      "reviewer": "traverse-registry-maintainer"
+    }
+  },
+  "summary": "Put, get, or delete a follow-up working session via host managed state.",
+  "description": "Stateful store for a follow-up working session (session_id, agenda_item_ids[], cursor) persisted under the fixed state_schema key `session` via traverse_host::{state_put,state_get,state_delete}. Resource identity lives inside the value. Does not emit events.",
+  "emits": [],
+  "side_effects": [
+    {
+      "description": "Reads and writes host DataStore persistence for key session via state_get/state_put/state_delete",
+      "kind": "memory_only"
+    }
+  ],
+  "preconditions": [
+    {
+      "id": "action-present",
+      "description": "action must be one of get, put, delete"
+    },
+    {
+      "id": "put-session-complete",
+      "description": "put requires session with session_id, agenda_item_ids array, and integer cursor"
+    }
+  ],
+  "risk": {
+    "effect_class": "state_write",
+    "determinism_class": "deterministic",
+    "reliability": {
+      "idempotency_required": true,
+      "retryable": true,
+      "compensation_available": false
+    }
+  },
+  "provenance": {
+    "source": "greenfield",
+    "author": "traverse/registry",
+    "created_at": "2026-09-09T00:00:00Z",
+    "spec_ref": "001-registry-foundation",
+    "adr_refs": [],
+    "exception_refs": []
+  },
+  "artifact": {
+    "digest": "sha256:966ebcb909339126d9548a5624968ce280cf56cc889b46eed8de7429f3c11f09",
+    "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/core.followup-session-1.0.0/core-followup-session.wasm"
+  },
+  "inputs": {
+    "schema": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "action"
+      ],
+      "properties": {
+        "action": {
+          "type": "string",
+          "enum": [
+            "get",
+            "put",
+            "delete"
+          ]
+        },
+        "session": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "session_id",
+            "agenda_item_ids",
+            "cursor"
+          ],
+          "properties": {
+            "session_id": {
+              "type": "string"
+            },
+            "agenda_item_ids": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "cursor": {
+              "type": "integer"
+            }
+          }
+        }
+      }
+    }
+  },
+  "outputs": {
+    "schema": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "accepted",
+        "reason_code"
+      ],
+      "properties": {
+        "accepted": {
+          "type": "boolean"
+        },
+        "reason_code": {
+          "type": "string",
+          "enum": [
+            "ok",
+            "invalid_input",
+            "invalid_action",
+            "not_found",
+            "host_error"
+          ]
+        },
+        "found": {
+          "type": "boolean"
+        },
+        "session": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "session_id": {
+              "type": "string"
+            },
+            "agenda_item_ids": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "cursor": {
+              "type": "integer"
+            }
+          }
+        },
+        "evaluation_trace": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  },
+  "use_cases": [
+    {
+      "happy": true,
+      "persona_ref": "meeting-organizer",
+      "scenario": "As a meeting organizer, I want to put a follow-up session with agenda ids and cursor, so that the working set is durable across devices.",
+      "input_example": {
+        "action": "put",
+        "session": {
+          "session_id": "sess-1",
+          "agenda_item_ids": [
+            "a1",
+            "a2"
+          ],
+          "cursor": 0
+        }
+      },
+      "output_example": {
+        "accepted": true,
+        "reason_code": "ok",
+        "found": true,
+        "session": {
+          "session_id": "sess-1",
+          "agenda_item_ids": [
+            "a1",
+            "a2"
+          ],
+          "cursor": 0
+        },
+        "evaluation_trace": [
+          "put session"
+        ]
+      }
+    },
+    {
+      "happy": true,
+      "persona_ref": "collaboration-product-owner",
+      "scenario": "As a collaboration product owner, I want to get the current follow-up session, so that facilitators resume at the right agenda cursor.",
+      "input_example": {
+        "action": "get"
+      },
+      "output_example": {
+        "accepted": true,
+        "reason_code": "ok",
+        "found": true,
+        "session": {
+          "session_id": "sess-1",
+          "agenda_item_ids": [
+            "a1"
+          ],
+          "cursor": 1
+        },
+        "evaluation_trace": [
+          "got session"
+        ]
+      }
+    },
+    {
+      "happy": true,
+      "persona_ref": "note-taking-app-developer",
+      "scenario": "As a note-taking app developer, I want to delete a follow-up session when the meeting closes, so that stale cursors do not resurface.",
+      "input_example": {
+        "action": "delete"
+      },
+      "output_example": {
+        "accepted": true,
+        "reason_code": "ok",
+        "evaluation_trace": [
+          "deleted session"
+        ]
+      }
+    },
+    {
+      "happy": false,
+      "persona_ref": "meeting-organizer",
+      "scenario": "As a meeting organizer, I want get to report not_found when no session is stored, so that empty state is explicit.",
+      "input_example": {
+        "action": "get"
+      },
+      "output_example": {
+        "accepted": false,
+        "reason_code": "not_found",
+        "found": false,
+        "evaluation_trace": [
+          "session absent"
+        ]
+      }
+    },
+    {
+      "happy": false,
+      "persona_ref": "collaboration-platform-engineer",
+      "scenario": "As a collaboration platform engineer, I want put without a cursor rejected, so that incomplete session payloads cannot persist.",
+      "input_example": {
+        "action": "put",
+        "session": {
+          "session_id": "sess-1",
+          "agenda_item_ids": []
+        }
+      },
+      "output_example": {
+        "accepted": false,
+        "reason_code": "invalid_input",
+        "evaluation_trace": [
+          "precondition failed: session.cursor required as integer"
+        ]
+      }
+    },
+    {
+      "happy": false,
+      "persona_ref": "note-taking-app-developer",
+      "scenario": "As a note-taking app developer, I want unknown actions rejected, so that clients cannot invent session verbs.",
+      "input_example": {
+        "action": "list"
+      },
+      "output_example": {
+        "accepted": false,
+        "reason_code": "invalid_action",
+        "evaluation_trace": [
+          "action must be get, put, or delete"
+        ]
+      }
+    },
+    {
+      "happy": false,
+      "persona_ref": "collaboration-platform-engineer",
+      "scenario": "As a collaboration platform engineer, I want host persistence failures surfaced as host_error, so that callers can fail closed when DataStore is unavailable.",
+      "input_example": {
+        "action": "delete"
+      },
+      "output_example": {
+        "accepted": false,
+        "reason_code": "host_error",
+        "evaluation_trace": [
+          "state_delete failed"
+        ]
+      }
+    }
+  ]
+}

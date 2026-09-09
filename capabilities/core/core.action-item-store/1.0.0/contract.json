@@ -1,0 +1,371 @@
+{
+  "kind": "capability_contract",
+  "schema_version": "1.0.0",
+  "lifecycle": "active",
+  "owner": {
+    "team": "traverse/registry",
+    "contact": "founders@loop.dev"
+  },
+  "connector_requirements": [],
+  "consumes": [],
+  "dependencies": [],
+  "execution": {
+    "binary_format": "wasm",
+    "constraints": {
+      "filesystem_access": "none",
+      "host_api_access": "none",
+      "network_access": "forbidden"
+    },
+    "entrypoint": {
+      "command": "run",
+      "kind": "wasi-command"
+    },
+    "preferred_targets": [
+      "local",
+      "edge",
+      "cloud"
+    ]
+  },
+  "permitted_targets": [
+    "local",
+    "edge",
+    "cloud",
+    "device"
+  ],
+  "policies": [
+    {
+      "id": "fail-closed"
+    }
+  ],
+  "postconditions": [
+    {
+      "description": "Identical inputs produce identical outputs for the same host store contents",
+      "id": "deterministic"
+    }
+  ],
+  "state_schema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "record": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "title",
+          "status",
+          "owner_id"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "owner_id": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  },
+  "service_type": "stateful",
+  "permissions": [
+    {
+      "id": "core.action-item-store"
+    }
+  ],
+  "evidence": [
+    {
+      "evidence_id": "core-action-item-store-1.0.0-contract-validation",
+      "status": "passed",
+      "type": "contract_validation"
+    }
+  ],
+  "id": "core.action-item-store",
+  "namespace": "core",
+  "name": "action-item-store",
+  "version": "1.0.0",
+  "authoring": {
+    "method": "llm-assisted",
+    "source_revision": "publish/wave2-core-stores-1.0.0",
+    "test_evidence": "capability-src/core-action-item-store cargo test (15 passing); cargo llvm-cov functions=100% lines>=95% regions>=95%",
+    "review": {
+      "decision": "pending-qualified-review",
+      "reviewer": "traverse-registry-maintainer"
+    }
+  },
+  "summary": "Put, get, or delete a durable action-item record via host managed state.",
+  "description": "Stateful store for a single action-item record (id, title, status, owner_id) persisted under the fixed state_schema key `record` via traverse_host::{state_put,state_get,state_delete}. Resource identity lives inside the value. Does not emit events.",
+  "emits": [],
+  "side_effects": [
+    {
+      "description": "Reads and writes host DataStore persistence for key record via state_get/state_put/state_delete",
+      "kind": "memory_only"
+    }
+  ],
+  "preconditions": [
+    {
+      "id": "action-present",
+      "description": "action must be one of get, put, delete"
+    },
+    {
+      "id": "put-record-complete",
+      "description": "put requires record with non-empty id, title, status, and owner_id"
+    }
+  ],
+  "risk": {
+    "effect_class": "state_write",
+    "determinism_class": "deterministic",
+    "reliability": {
+      "idempotency_required": true,
+      "retryable": true,
+      "compensation_available": false
+    }
+  },
+  "provenance": {
+    "source": "greenfield",
+    "author": "traverse/registry",
+    "created_at": "2026-09-09T00:00:00Z",
+    "spec_ref": "001-registry-foundation",
+    "adr_refs": [],
+    "exception_refs": []
+  },
+  "artifact": {
+    "digest": "sha256:d0b9a4dd91c5c735471609a70d6253e3be9041020c3b9971d69f41f8e29eee8e",
+    "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/core.action-item-store-1.0.0/core-action-item-store.wasm"
+  },
+  "inputs": {
+    "schema": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "action"
+      ],
+      "properties": {
+        "action": {
+          "type": "string",
+          "enum": [
+            "get",
+            "put",
+            "delete"
+          ]
+        },
+        "record": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "id",
+            "title",
+            "status",
+            "owner_id"
+          ],
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "title": {
+              "type": "string"
+            },
+            "status": {
+              "type": "string"
+            },
+            "owner_id": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    }
+  },
+  "outputs": {
+    "schema": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "accepted",
+        "reason_code"
+      ],
+      "properties": {
+        "accepted": {
+          "type": "boolean"
+        },
+        "reason_code": {
+          "type": "string",
+          "enum": [
+            "ok",
+            "invalid_input",
+            "invalid_action",
+            "not_found",
+            "host_error"
+          ]
+        },
+        "found": {
+          "type": "boolean"
+        },
+        "record": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "title": {
+              "type": "string"
+            },
+            "status": {
+              "type": "string"
+            },
+            "owner_id": {
+              "type": "string"
+            }
+          }
+        },
+        "evaluation_trace": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  },
+  "use_cases": [
+    {
+      "happy": true,
+      "persona_ref": "collaboration-product-owner",
+      "scenario": "As a collaboration product owner, I want to put an action-item record into durable store, so that ownership and status survive across sessions.",
+      "input_example": {
+        "action": "put",
+        "record": {
+          "id": "ai-1",
+          "title": "Ship Wave 2",
+          "status": "open",
+          "owner_id": "user-ada"
+        }
+      },
+      "output_example": {
+        "accepted": true,
+        "reason_code": "ok",
+        "found": true,
+        "record": {
+          "id": "ai-1",
+          "title": "Ship Wave 2",
+          "status": "open",
+          "owner_id": "user-ada"
+        },
+        "evaluation_trace": [
+          "put record"
+        ]
+      }
+    },
+    {
+      "happy": true,
+      "persona_ref": "note-taking-app-developer",
+      "scenario": "As a note-taking app developer, I want to get a previously stored action-item record, so that my UI can render the current title and owner.",
+      "input_example": {
+        "action": "get"
+      },
+      "output_example": {
+        "accepted": true,
+        "reason_code": "ok",
+        "found": true,
+        "record": {
+          "id": "ai-1",
+          "title": "Ship Wave 2",
+          "status": "open",
+          "owner_id": "user-ada"
+        },
+        "evaluation_trace": [
+          "got record"
+        ]
+      }
+    },
+    {
+      "happy": true,
+      "persona_ref": "collaboration-platform-engineer",
+      "scenario": "As a collaboration platform engineer, I want to delete the stored action-item record, so that completed work does not linger in managed state.",
+      "input_example": {
+        "action": "delete"
+      },
+      "output_example": {
+        "accepted": true,
+        "reason_code": "ok",
+        "evaluation_trace": [
+          "deleted record"
+        ]
+      }
+    },
+    {
+      "happy": false,
+      "persona_ref": "note-taking-app-developer",
+      "scenario": "As a note-taking app developer, I want get to fail closed when no record exists, so that absent state is explicit.",
+      "input_example": {
+        "action": "get"
+      },
+      "output_example": {
+        "accepted": false,
+        "reason_code": "not_found",
+        "found": false,
+        "evaluation_trace": [
+          "record absent"
+        ]
+      }
+    },
+    {
+      "happy": false,
+      "persona_ref": "collaboration-product-owner",
+      "scenario": "As a collaboration product owner, I want put with an incomplete record rejected, so that partial writes cannot corrupt the store.",
+      "input_example": {
+        "action": "put",
+        "record": {
+          "id": "ai-1",
+          "title": "",
+          "status": "open",
+          "owner_id": "user-ada"
+        }
+      },
+      "output_example": {
+        "accepted": false,
+        "reason_code": "invalid_input",
+        "evaluation_trace": [
+          "precondition failed: record.id/title/status/owner_id required"
+        ]
+      }
+    },
+    {
+      "happy": false,
+      "persona_ref": "collaboration-platform-engineer",
+      "scenario": "As a collaboration platform engineer, I want unknown actions rejected, so that clients cannot invent store verbs.",
+      "input_example": {
+        "action": "list"
+      },
+      "output_example": {
+        "accepted": false,
+        "reason_code": "invalid_action",
+        "evaluation_trace": [
+          "action must be get, put, or delete"
+        ]
+      }
+    },
+    {
+      "happy": false,
+      "persona_ref": "collaboration-platform-engineer",
+      "scenario": "As a collaboration platform engineer, I want host persistence failures surfaced as host_error, so that callers can fail closed when DataStore is unavailable.",
+      "input_example": {
+        "action": "delete"
+      },
+      "output_example": {
+        "accepted": false,
+        "reason_code": "host_error",
+        "evaluation_trace": [
+          "state_delete failed"
+        ]
+      }
+    }
+  ]
+}

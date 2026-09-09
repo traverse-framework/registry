@@ -1,0 +1,17 @@
+[workspace]
+
+[package]
+name = "core-action-item-store-agent"
+version = "0.1.0"
+edition = "2021"
+publish = false
+description = "Catalog-source mirror of core.action-item-store — durable action-item record via host state."
+
+[[bin]]
+name = "core-action-item-store-agent"
+path = "src/main.rs"
+
+[profile.release]
+opt-level = "s"
+lto = true
+panic = "abort"
