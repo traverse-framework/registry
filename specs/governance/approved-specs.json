@@ -372,7 +372,7 @@
     },
     {
       "id": "997-application-selected-preparation",
-      "version": "1.0.1",
+      "version": "1.1.0",
       "status": "approved",
       "immutable": true,
       "path": "specs/997-application-selected-preparation/spec.md",

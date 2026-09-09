@@ -719,6 +719,55 @@ struct ModelCandidateSerde {
     metadata: Option<Value>,
 }
 
+/// Reads and `serde`-parses an application manifest file into its raw
+/// `ApplicationManifestSerde`, returning the manifest's parent directory
+/// alongside it. This is the load step common to
+/// [`load_application_bundle_manifest_with_resolver`] and
+/// [`unresolved_component_manifests`]; neither the model-dependency parse,
+/// the effective-config load, nor any component resolution happens here.
+fn read_application_manifest(
+    manifest_path: &Path,
+) -> Result<(PathBuf, ApplicationManifestSerde), ApplicationManifestFailure> {
+    let manifest_dir = manifest_path
+        .parent()
+        .ok_or_else(|| {
+            single_error(
+                ApplicationManifestErrorCode::ManifestParentMissing,
+                manifest_path.display().to_string(),
+                format!(
+                    "application manifest {} has no parent directory",
+                    manifest_path.display()
+                ),
+            )
+        })?
+        .to_path_buf();
+
+    let manifest_contents = fs::read_to_string(manifest_path).map_err(|error| {
+        single_error(
+            ApplicationManifestErrorCode::ManifestReadFailed,
+            manifest_path.display().to_string(),
+            format!(
+                "failed to read application manifest {}: {error}",
+                manifest_path.display()
+            ),
+        )
+    })?;
+
+    let manifest: ApplicationManifestSerde =
+        serde_json::from_str(&manifest_contents).map_err(|error| {
+            single_error(
+                ApplicationManifestErrorCode::ManifestParseFailed,
+                manifest_path.display().to_string(),
+                format!(
+                    "failed to parse application manifest {}: {error}",
+                    manifest_path.display()
+                ),
+            )
+        })?;
+
+    Ok((manifest_dir, manifest))
+}
+
 /// Loads and validates a Traverse application manifest plus its referenced
 /// concrete WASM component manifests.
 ///
@@ -746,39 +795,8 @@ pub fn load_application_bundle_manifest_with_resolver(
     manifest_path: &Path,
     resolver: Option<&dyn RegistryComponentResolver>,
 ) -> Result<ApplicationBundleManifest, ApplicationManifestFailure> {
-    let manifest_dir = manifest_path.parent().ok_or_else(|| {
-        single_error(
-            ApplicationManifestErrorCode::ManifestParentMissing,
-            manifest_path.display().to_string(),
-            format!(
-                "application manifest {} has no parent directory",
-                manifest_path.display()
-            ),
-        )
-    })?;
-
-    let manifest_contents = fs::read_to_string(manifest_path).map_err(|error| {
-        single_error(
-            ApplicationManifestErrorCode::ManifestReadFailed,
-            manifest_path.display().to_string(),
-            format!(
-                "failed to read application manifest {}: {error}",
-                manifest_path.display()
-            ),
-        )
-    })?;
-
-    let manifest: ApplicationManifestSerde =
-        serde_json::from_str(&manifest_contents).map_err(|error| {
-            single_error(
-                ApplicationManifestErrorCode::ManifestParseFailed,
-                manifest_path.display().to_string(),
-                format!(
-                    "failed to parse application manifest {}: {error}",
-                    manifest_path.display()
-                ),
-            )
-        })?;
+    let (manifest_dir, manifest) = read_application_manifest(manifest_path)?;
+    let manifest_dir = manifest_dir.as_path();
 
     ensure_unique_component_refs(&manifest.components)?;
     let model_dependencies = parse_model_dependencies(&manifest.model_dependencies)?;
@@ -808,6 +826,50 @@ pub fn load_application_bundle_manifest_with_resolver(
         public_surfaces: manifest.public_surfaces,
         state_machine,
     })
+}
+
+/// Parses an application manifest and each referenced component manifest far
+/// enough to project the manifest-declared registry selection set, **without
+/// resolving any `registry_ref` component**.
+///
+/// Applies the same component-reference uniqueness
+/// (`ensure_unique_component_refs`) and component-source shape rules
+/// (`validate_component_source`: exactly one of `contract_path` /
+/// `registry_ref`, and a non-empty `registry_ref` triple) as
+/// [`load_application_bundle_manifest`], but performs none of the resolver,
+/// contract, digest, dependency, state-machine, or connector-binding work
+/// that the full load does. The returned [`WasmComponentManifest`] values
+/// carry the parsed `registry_ref` and `permitted_targets` verbatim.
+///
+/// This is the seam for callers that must obtain the selected reference set
+/// *before* a resolver-backed offline cache exists -- the load-order cycle in
+/// spec `997-application-selected-preparation` (a resolver reads the prepared
+/// cache; the cache is filled by preparing the selected set; the selected set
+/// otherwise requires a resolved manifest). Project the set with
+/// [`crate::application_selected_references_from_manifest_path`], prepare it,
+/// then load the manifest normally with a resolver.
+///
+/// # Errors
+///
+/// Returns [`ApplicationManifestFailure`] if the application manifest or any
+/// referenced component manifest is missing, unreadable, unparseable,
+/// declares duplicate component references, or declares an invalid component
+/// source.
+pub fn unresolved_component_manifests(
+    manifest_path: &Path,
+) -> Result<Vec<WasmComponentManifest>, ApplicationManifestFailure> {
+    let (manifest_dir, manifest) = read_application_manifest(manifest_path)?;
+    ensure_unique_component_refs(&manifest.components)?;
+
+    manifest
+        .components
+        .iter()
+        .map(|reference| {
+            let (_, component, execution_mode) =
+                read_component_manifest(manifest_dir.as_path(), reference)?;
+            Ok(to_component_manifest(component, execution_mode))
+        })
+        .collect()
 }
 
 fn load_application_workflows(
@@ -1887,12 +1949,18 @@ fn looks_like_placeholder(value: &str) -> bool {
         .any(|marker| lowered.contains(marker))
 }
 
-#[allow(clippy::too_many_lines)] // Coordinates the complete local and synced component validation flow.
-fn load_component(
+/// Reads, `serde`-parses, and shape-validates one component manifest to the
+/// extent common to the full resolved load ([`load_component`]) and the
+/// unresolved selection projection ([`unresolved_component_manifests`]):
+/// file existence, read, parse, execution-mode parse, and the
+/// `contract_path`/`registry_ref` source-exclusivity rules
+/// (`validate_component_source`). Callers layer their own further validation
+/// and any resolver work on top of the returned value.
+fn read_component_manifest(
     manifest_dir: &Path,
     reference: &ApplicationComponentRef,
-    resolver: Option<&dyn RegistryComponentResolver>,
-) -> Result<ApplicationComponent, ApplicationManifestFailure> {
+) -> Result<(PathBuf, WasmComponentManifestSerde, ComponentExecutionMode), ApplicationManifestFailure>
+{
     let manifest_path = manifest_dir.join(&reference.manifest_path);
     if !manifest_path.is_file() {
         return Err(single_error(
@@ -1931,6 +1999,19 @@ fn load_component(
 
     let execution_mode = parse_component_execution_mode(&component, &manifest_path)?;
     validate_component_source(&component, &manifest_path)?;
+
+    Ok((manifest_path, component, execution_mode))
+}
+
+#[allow(clippy::too_many_lines)] // Coordinates the complete local and synced component validation flow.
+fn load_component(
+    manifest_dir: &Path,
+    reference: &ApplicationComponentRef,
+    resolver: Option<&dyn RegistryComponentResolver>,
+) -> Result<ApplicationComponent, ApplicationManifestFailure> {
+    let (manifest_path, component, execution_mode) =
+        read_component_manifest(manifest_dir, reference)?;
+
     validate_component_execution_mode(&component, execution_mode, &manifest_path)?;
     ensure_concrete_component_dependencies(&component.dependencies, &manifest_path)?;
     validate_executable_pin(&component, &manifest_path)?;

@@ -14,6 +14,7 @@ use traverse_registry::{
     CapabilityRegistry, EventRegistration, EventRegistry, LookupScope, ModelCandidateRejectionCode,
     ModelResolutionEvidence, ModelResolutionPhase, RegistryComponentResolver, RegistryReference,
     RegistryScope, ResolvedRegistryComponent, SelectedModelCandidate, WorkflowRegistry,
+    application_selected_references, application_selected_references_from_manifest_path,
     load_application_bundle_manifest, load_application_bundle_manifest_with_resolver,
 };
 
@@ -230,6 +231,71 @@ fn loads_registry_reference_from_caller_verified_material() {
         bundle.components[0].verified_wasm_digest,
         Some(format!("sha256:{wasm_digest}"))
     );
+}
+
+/// spec 997 FR-002 (#415): the unresolved manifest-path projection returns the
+/// exact same selection set as `application_selected_references` over a fully
+/// resolved bundle -- but without needing the resolver that reads the prepared
+/// offline cache. The whole point of the seam is that the first call succeeds
+/// where a resolver-less `load_application_bundle_manifest` would fail with
+/// `RegistryReferenceRequiresResolution`.
+#[test]
+fn unresolved_selection_matches_resolved_selection_for_a_registry_ref_bundle() {
+    let fixture = AppFixture::new("unresolved-selection-seam");
+    let wasm_digest = fixture.write_wasm("registry component bytes");
+    fixture.write_component_manifest(&json!({
+        "contract_path": null,
+        "wasm_binary_path": null,
+        "wasm_digest": null,
+        "registry_ref": { "namespace": "traverse-starter", "id": "traverse-starter.process", "version_range": "^1.0.0" }
+    }));
+    fixture.write_app_manifest(&json!([component_ref(
+        "expedition.readiness.validate-team-readiness-component",
+        "1.0.0",
+        &format!("sha256:{wasm_digest}"),
+        "components/validate-team-readiness/component.manifest.json",
+    )]));
+    let contract_path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join(
+        "../../contracts/examples/expedition/capabilities/validate-team-readiness/contract.json",
+    );
+    let contract =
+        parse_contract(&fs::read_to_string(&contract_path).expect("contract fixture should read"))
+            .expect("contract fixture should parse");
+    let resolver = StaticRegistryResolver {
+        component: ResolvedRegistryComponent {
+            contract_path,
+            contract,
+            wasm_binary_path: fixture.wasm_path(),
+            wasm_digest: format!("sha256:{wasm_digest}"),
+        },
+    };
+
+    // A resolver-less full load cannot even be attempted for a registry_ref
+    // component -- this is the load-order cycle the seam exists to break.
+    let cycle = load_application_bundle_manifest(&fixture.app_manifest_path())
+        .expect_err("registry_ref component must not resolve without a resolver");
+    assert_eq!(
+        cycle.errors[0].code,
+        ApplicationManifestErrorCode::RegistryReferenceRequiresResolution
+    );
+
+    let from_path =
+        application_selected_references_from_manifest_path(&fixture.app_manifest_path())
+            .expect("unresolved projection should not need a resolver");
+
+    let resolved_bundle = load_application_bundle_manifest_with_resolver(
+        &fixture.app_manifest_path(),
+        Some(&resolver),
+    )
+    .expect("caller-verified registry material should load");
+    let from_resolved = application_selected_references(&resolved_bundle);
+
+    assert_eq!(from_path, from_resolved);
+    assert_eq!(from_path.len(), 1);
+    assert_eq!(from_path[0].reference.namespace, "traverse-starter");
+    assert_eq!(from_path[0].reference.id, "traverse-starter.process");
+    assert_eq!(from_path[0].reference.version_range, "^1.0.0");
+    assert_eq!(from_path[0].permitted_targets, vec![ExecutionTarget::Local]);
 }
 
 #[test]

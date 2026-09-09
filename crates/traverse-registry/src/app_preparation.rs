@@ -27,8 +27,11 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use traverse_contracts::{ExecutionConstraints, ExecutionTarget, Lifecycle};
 
+use std::path::Path;
+
 use crate::application_manifest::{
-    ApplicationBundleManifest, RegistryReference, WasmComponentManifest,
+    ApplicationBundleManifest, ApplicationManifestFailure, RegistryReference,
+    WasmComponentManifest, unresolved_component_manifests,
 };
 use crate::public_registry_cache::{normalize_digest, sha256_hex};
 use crate::public_registry_state::SyncedPublicRegistryState;
@@ -597,6 +600,38 @@ pub fn application_selected_references(
             .iter()
             .map(|component| &component.manifest),
     )
+}
+
+/// spec 997 FR-002: the manifest-declared selection set, projected straight
+/// from an application manifest's component-manifest tree on disk **without
+/// resolving any `registry_ref` component**.
+///
+/// This is the unresolved-tree companion to [`application_selected_references`]:
+/// that one needs an already-resolved [`ApplicationBundleManifest`], and hence
+/// a `RegistryComponentResolver` backed by the prepared offline cache -- which
+/// does not yet exist at the point a host must first choose *what* to prepare.
+/// Both forms run the one crate-owned projection
+/// ([`selected_component_references`]) over the same two per-component fields
+/// (`registry_ref`, `permitted_targets`), so for any manifest that resolves
+/// fully they return the identical set. Feed the result straight into
+/// [`prepare_application_selected_references`].
+///
+/// Parsing and `registry_ref` shape validation are
+/// [`unresolved_component_manifests`]'s; no contract, digest, dependency, or
+/// resolver work happens.
+///
+/// # Errors
+///
+/// Returns [`ApplicationManifestFailure`] if the application manifest or any
+/// referenced component manifest is missing, unreadable, unparseable,
+/// declares duplicate component references, or declares an invalid component
+/// source (`contract_path` / `registry_ref` exclusivity, or an incomplete
+/// `registry_ref`).
+pub fn application_selected_references_from_manifest_path(
+    manifest_path: &Path,
+) -> Result<Vec<SelectedComponentReference>, ApplicationManifestFailure> {
+    let component_manifests = unresolved_component_manifests(manifest_path)?;
+    Ok(selected_component_references(component_manifests.iter()))
 }
 
 /// The FR-002 extraction logic, over the component manifests directly.
