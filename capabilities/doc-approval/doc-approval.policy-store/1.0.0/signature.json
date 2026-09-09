@@ -1,0 +1,7 @@
+{
+  "scheme": "ed25519",
+  "public_key_hex": "39d1745be4d54e30be1180454661e5d8826075692d86b86fb042d19d96cb8522",
+  "signature_hex": "0dcaf587f6009ff5819a1f99ea8b7f4767eb33183756472439e29daf4bb56b451758c88ee6f5fd8afdaa0c3cac82df46f876a5a8812f8728b634c19cbc5ba60b",
+  "sigstore_bundle_ref": null,
+  "signed_at": "2026-09-09T04:36:11Z"
+}
