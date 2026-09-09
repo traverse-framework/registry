@@ -1,8 +1,9 @@
 # Feature Specification: Application-Selected Registry Reference Preparation
 
-**Status**: Approved (2026-09-09, v1.0.0; v1.0.1 factual correction 2026-09-09)
+**Status**: Approved (2026-09-09, v1.0.0; v1.0.1 factual correction 2026-09-09;
+v1.1.0 unresolved-projection seam 2026-09-09)
 **Canonical governing ID**: `997-application-selected-preparation`
-**Version**: 1.0.1
+**Version**: 1.1.0
 **Layers on**: `996-registry-app-preparation` (the versioned single-reference
 preparation contract). This spec constrains *which* references may be
 prepared for offline activation; it does not restate 996's per-reference
@@ -38,11 +39,26 @@ activation preparation cannot express it.
   `components[].manifest.registry_ref`. A caller cannot supply a reference
   that is not in that derived set.
 
-- **FR-002**: The derived set MUST be produced by a single crate-owned
-  helper over the `ApplicationBundleManifest`, not assembled by the caller.
-  Deduplication is by `(namespace, id, version_range)` together with the
-  component-declared target narrowing (FR-005); two components declaring the
-  same reference with different narrowings are distinct selections.
+- **FR-002**: The derived set MUST be produced by one crate-owned
+  projection, never assembled by the caller. That projection is offered in
+  two forms over the same two per-component inputs
+  (`components[].manifest.registry_ref` and that component's
+  `permitted_targets`):
+  - over an already-resolved `ApplicationBundleManifest`
+    (`application_selected_references`); and
+  - over an application manifest's on-disk component-manifest tree, parsed
+    but with **no `registry_ref` component resolved**
+    (`application_selected_references_from_manifest_path`) -- for a caller
+    that must choose what to prepare *before* a resolver-backed offline cache
+    exists (the load-order cycle: a `RegistryComponentResolver` reads the
+    prepared cache; the cache is filled by preparing the selected set; the
+    resolved-manifest form of the selected set otherwise needs that
+    resolver).
+
+  Both forms MUST return the identical set for any manifest that resolves
+  fully. Deduplication is by `(namespace, id, version_range)` together with
+  the component-declared target narrowing (FR-005); two components declaring
+  the same reference with different narrowings are distinct selections.
 
 - **FR-003**: Preparing references for offline activation MUST go through
   this batch entrypoint. `996` FR-001's single-reference
@@ -85,6 +101,16 @@ activation preparation cannot express it.
   selection scope and the batch result shape, and is amended if that layer
   is later moved into `traverse` Spec 996 itself.
 
+- **FR-009** (v1.1.0): The unresolved-tree form of the FR-002 projection
+  MUST apply the same component-reference uniqueness and `registry_ref`
+  source-shape validation (exactly one of `contract_path` / `registry_ref`;
+  a non-empty `namespace` / `id` / `version_range`) as the full manifest
+  load, and MUST perform no contract retrieval, digest verification,
+  dependency resolution, state-machine or connector-binding validation, or
+  any `RegistryComponentResolver` call. It is a parse-and-project seam only,
+  and introduces no failure code beyond `044-application-bundle-manifest`'s
+  existing manifest-load taxonomy.
+
 ## Success Criteria
 
 - **SC-001**: The batch entrypoint's reference input has no public
@@ -103,6 +129,13 @@ activation preparation cannot express it.
   `permitted_targets` fails with `996`'s `registry_target_incompatible`.
 - **SC-005**: A manifest with only local (no `registry_ref`) components
   returns `{ prepared: [], failed: None }`.
+- **SC-006** (v1.1.0): For a bundle whose single `registry_ref` component
+  resolves cleanly,
+  `application_selected_references_from_manifest_path(path)` equals
+  `application_selected_references(&load_application_bundle_manifest_with_resolver(path, Some(&r)).unwrap())`,
+  and the former succeeds where a resolver-less
+  `load_application_bundle_manifest(path)` fails with
+  `RegistryReferenceRequiresResolution`.
 
 ## Governing Relationship
 
@@ -113,6 +146,19 @@ that carries `996` + this spec together: the already-published `0.19.0`
 (tag `v0.19.0`, #398) predates the spec-997 batch and the
 `RegistryReference` convergence. See decision-log entry 101 (which
 corrects the "0.19.0 was never published" premise in entries 99/100).
+
+**v1.1.0 amendment (2026-09-09, registry #415).** FR-002 originally named "a
+single crate-owned helper over the `ApplicationBundleManifest`" as the sole
+selection projection. Consumers (Traverse #1319) hit a load-order cycle:
+that helper needs a resolved manifest, resolution needs a
+`RegistryComponentResolver`, and the resolver reads the very offline cache
+that is only filled by *preparing the selected set*. v1.1.0 keeps one
+crate-owned projection but offers it in two forms -- resolved-manifest and
+unresolved-manifest-tree -- that MUST agree (FR-002, FR-009, SC-006). The
+change is additive: no existing signature, failure code, or the FR-001
+structural guarantee moves. The repo owner selected this "amend 997"
+path over a new layered spec on 2026-09-09 (registry-ops spec-path
+decision). First carried by `traverse-registry` `0.21.0`.
 
 ## Out of Scope
 
