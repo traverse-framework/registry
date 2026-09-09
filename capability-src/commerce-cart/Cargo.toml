@@ -1,0 +1,17 @@
+[workspace]
+
+[package]
+name = "commerce-cart-agent"
+version = "0.1.0"
+edition = "2021"
+publish = false
+description = "Stateful commerce.cart host state_* capability."
+
+[[bin]]
+name = "commerce-cart-agent"
+path = "src/main.rs"
+
+[profile.release]
+opt-level = "s"
+lto = true
+panic = "abort"

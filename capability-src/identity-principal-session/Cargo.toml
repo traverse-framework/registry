@@ -1,0 +1,17 @@
+[workspace]
+
+[package]
+name = "identity-principal-session-agent"
+version = "0.1.0"
+edition = "2021"
+publish = false
+description = "Stateful identity.principal-session host state_* capability."
+
+[[bin]]
+name = "identity-principal-session-agent"
+path = "src/main.rs"
+
+[profile.release]
+opt-level = "s"
+lto = true
+panic = "abort"
