@@ -1,0 +1,408 @@
+{
+  "kind": "capability_contract",
+  "schema_version": "1.0.0",
+  "lifecycle": "active",
+  "owner": {
+    "team": "traverse/registry",
+    "contact": "founders@loop.dev"
+  },
+  "connector_requirements": [],
+  "consumes": [],
+  "dependencies": [],
+  "execution": {
+    "binary_format": "wasm",
+    "constraints": {
+      "filesystem_access": "none",
+      "host_api_access": "none",
+      "network_access": "forbidden"
+    },
+    "entrypoint": {
+      "command": "run",
+      "kind": "wasi-command"
+    },
+    "preferred_targets": [
+      "local",
+      "edge",
+      "cloud"
+    ]
+  },
+  "permitted_targets": [
+    "local",
+    "edge",
+    "cloud"
+  ],
+  "policies": [
+    {
+      "id": "fail-closed"
+    }
+  ],
+  "postconditions": [
+    {
+      "description": "Put/get/delete outcomes reflect host state store results for the fixed cart key",
+      "id": "host-state-consistent"
+    }
+  ],
+  "state_schema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "cart": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "cart_id",
+          "currency",
+          "lines"
+        ],
+        "properties": {
+          "cart_id": {
+            "type": "string"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "lines": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "sku",
+                "qty"
+              ],
+              "properties": {
+                "sku": {
+                  "type": "string"
+                },
+                "qty": {
+                  "type": "number"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "service_type": "stateful",
+  "permissions": [
+    {
+      "id": "commerce.cart"
+    }
+  ],
+  "evidence": [
+    {
+      "evidence_id": "commerce-cart-1.0.1-contract-validation",
+      "status": "passed",
+      "type": "contract_validation"
+    }
+  ],
+  "id": "commerce.cart",
+  "namespace": "commerce",
+  "name": "cart",
+  "version": "1.0.1",
+  "authoring": {
+    "method": "llm-assisted",
+    "source_revision": "publish/wave2-commerce-stateful-1.0.0",
+    "test_evidence": "capability-src/commerce-cart cargo test (17 passing); cargo llvm-cov functions=100% lines=99.83% regions=99.50%",
+    "review": {
+      "decision": "pending-qualified-review",
+      "reviewer": "traverse-registry-maintainer"
+    }
+  },
+  "risk": {
+    "effect_class": "state_write",
+    "determinism_class": "deterministic",
+    "reliability": {
+      "idempotency_required": true,
+      "retryable": true,
+      "compensation_available": false
+    }
+  },
+  "summary": "Durable commerce cart retained via host managed state.",
+  "description": "Stateful put/get/delete for a single fixed-schema cart record (cart_id, currency, lines[{sku,qty}]). Resource identity lives inside the value; the relative host key is always cart. Uses traverse_host state_put/state_get/state_delete. Browser targets are excluded. Distinct from commerce.cart-line-changed. Supersedes 1.0.0 which string-encoded lines_json.",
+  "emits": [],
+  "side_effects": [
+    {
+      "description": "Validates action envelope and cart fields in memory",
+      "kind": "memory_only"
+    },
+    {
+      "description": "Reads or mutates host-managed DataStore cart state via traverse_host state_*",
+      "kind": "memory_only"
+    }
+  ],
+  "preconditions": [
+    {
+      "id": "action-valid",
+      "description": "action must be put, get, or delete; put requires a complete cart object"
+    }
+  ],
+  "provenance": {
+    "source": "greenfield",
+    "author": "traverse/registry",
+    "created_at": "2026-09-09T06:20:00Z",
+    "spec_ref": "001-registry-foundation",
+    "adr_refs": [],
+    "exception_refs": []
+  },
+  "artifact": {
+    "digest": "sha256:9eac8a69be4e1d6c8a8e5f90892ef36c42be0dd0e85172fbe469ff44ef0f1122",
+    "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/commerce.cart-1.0.1/commerce-cart.wasm"
+  },
+  "inputs": {
+    "schema": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "action"
+      ],
+      "properties": {
+        "action": {
+          "type": "string",
+          "enum": [
+            "put",
+            "get",
+            "delete"
+          ]
+        },
+        "cart": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "cart_id",
+            "currency",
+            "lines"
+          ],
+          "properties": {
+            "cart_id": {
+              "type": "string"
+            },
+            "currency": {
+              "type": "string"
+            },
+            "lines": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "sku",
+                  "qty"
+                ],
+                "properties": {
+                  "sku": {
+                    "type": "string"
+                  },
+                  "qty": {
+                    "type": "number"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "outputs": {
+    "schema": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "accepted",
+        "reason_code",
+        "evaluation_trace"
+      ],
+      "properties": {
+        "accepted": {
+          "type": "boolean"
+        },
+        "reason_code": {
+          "type": "string",
+          "enum": [
+            "ok",
+            "invalid_input",
+            "invalid_action",
+            "host_error",
+            "not_found"
+          ]
+        },
+        "found": {
+          "type": "boolean"
+        },
+        "cart": {
+          "type": "object"
+        },
+        "evaluation_trace": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  },
+  "use_cases": [
+    {
+      "happy": true,
+      "persona_ref": "checkout-flow-developer",
+      "scenario": "As a checkout flow developer, I want to put a durable cart with line items, so that the shopper's selections survive across checkout steps.",
+      "input_example": {
+        "action": "put",
+        "cart": {
+          "cart_id": "c-1",
+          "currency": "USD",
+          "lines": [
+            {
+              "sku": "sku-1",
+              "qty": 1
+            },
+            {
+              "sku": "sku-2",
+              "qty": 2
+            }
+          ]
+        }
+      },
+      "output_example": {
+        "accepted": true,
+        "reason_code": "ok",
+        "found": true,
+        "cart": {
+          "cart_id": "c-1",
+          "currency": "USD",
+          "lines": [
+            {
+              "sku": "sku-1",
+              "qty": 1
+            },
+            {
+              "sku": "sku-2",
+              "qty": 2
+            }
+          ]
+        },
+        "evaluation_trace": [
+          "put cart"
+        ]
+      }
+    },
+    {
+      "happy": true,
+      "persona_ref": "platform-developer",
+      "scenario": "As a platform developer, I want to get the durable cart, so that checkout or pricing hosts can restore the shopper basket after reconnect.",
+      "input_example": {
+        "action": "get"
+      },
+      "output_example": {
+        "accepted": true,
+        "reason_code": "ok",
+        "found": true,
+        "cart": {
+          "cart_id": "c-1",
+          "currency": "USD",
+          "lines": [
+            {
+              "sku": "sku-1",
+              "qty": 1
+            },
+            {
+              "sku": "sku-2",
+              "qty": 2
+            }
+          ]
+        },
+        "evaluation_trace": [
+          "got cart"
+        ]
+      }
+    },
+    {
+      "happy": true,
+      "persona_ref": "checkout-flow-developer",
+      "scenario": "As a checkout flow developer, I want to delete a cart after order placement, so that stale baskets do not linger in host state.",
+      "input_example": {
+        "action": "delete"
+      },
+      "output_example": {
+        "accepted": true,
+        "reason_code": "ok",
+        "evaluation_trace": [
+          "deleted cart"
+        ]
+      }
+    },
+    {
+      "happy": false,
+      "persona_ref": "platform-developer",
+      "scenario": "As a platform developer, I want get to report not_found when no cart exists, so that the host can start an empty basket instead of assuming prior lines.",
+      "input_example": {
+        "action": "get"
+      },
+      "output_example": {
+        "accepted": false,
+        "reason_code": "not_found",
+        "found": false,
+        "evaluation_trace": [
+          "cart absent"
+        ]
+      }
+    },
+    {
+      "happy": false,
+      "persona_ref": "checkout-flow-developer",
+      "scenario": "As a checkout flow developer, I want put without a cart object rejected as invalid_input, so that incomplete writes cannot corrupt host state.",
+      "input_example": {
+        "action": "put"
+      },
+      "output_example": {
+        "accepted": false,
+        "reason_code": "invalid_input",
+        "evaluation_trace": [
+          "precondition failed: cart object required for put"
+        ]
+      }
+    },
+    {
+      "happy": false,
+      "persona_ref": "platform-developer",
+      "scenario": "As a platform developer, I want an unknown action rejected as invalid_action, so that unsupported verbs fail closed before touching the store.",
+      "input_example": {
+        "action": "list"
+      },
+      "output_example": {
+        "accepted": false,
+        "reason_code": "invalid_action",
+        "evaluation_trace": [
+          "action must be get, put, or delete"
+        ]
+      }
+    },
+    {
+      "happy": false,
+      "persona_ref": "checkout-flow-developer",
+      "scenario": "As a checkout flow developer, I want host store failures surfaced as host_error, so that I can retry cart persistence instead of treating a failed put as success.",
+      "input_example": {
+        "action": "put",
+        "cart": {
+          "cart_id": "c-err",
+          "currency": "USD",
+          "lines": [
+            {
+              "sku": "sku-1",
+              "qty": 1
+            }
+          ]
+        }
+      },
+      "output_example": {
+        "accepted": false,
+        "reason_code": "host_error",
+        "evaluation_trace": [
+          "state_put failed"
+        ]
+      }
+    }
+  ]
+}
