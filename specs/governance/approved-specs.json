@@ -369,6 +369,17 @@
         "capability-src/catalog-builder/",
         "specs/024-capability-risk-classification-adoption/"
       ]
+    },
+    {
+      "id": "997-application-selected-preparation",
+      "version": "1.0.0",
+      "status": "approved",
+      "immutable": true,
+      "path": "specs/997-application-selected-preparation/spec.md",
+      "governs": [
+        "crates/traverse-registry/",
+        "specs/997-application-selected-preparation/"
+      ]
     }
   ],
   "draft_specs": [
