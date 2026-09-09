@@ -1,5 +1,6 @@
 //! Registry support for Traverse.
 
+mod app_preparation;
 mod application_manifest;
 mod artifact_resolution;
 mod async_api;
@@ -21,6 +22,7 @@ mod public_registry_state;
 pub mod semver_resolver;
 mod workflows;
 mod workspace_app_state;
+pub use app_preparation::*;
 pub use application_manifest::*;
 pub use artifact_resolution::*;
 pub use async_api::*;
