@@ -591,8 +591,16 @@
       "evidence": "side_effects=[memory_only] on published version 1.0.0; empty emits/consumes; deterministic extractive summary returns directly to the caller with no asynchronous domain fact broadcast to independent consumers."
     },
     {
-      "capability_id": "retention.eligibility-classify",
+      "capability_id": "report.translate-fr",
       "published_versions": [
+        "1.0.0"
+      ],
+      "path": "capabilities/report/report.translate-fr/1.0.0/contract.json",
+      "classification": "no-event-required",
+      "evidence": "side_effects=[memory_only] on published version 1.0.0; empty emits/consumes; deterministic EN→FR template/glossary translation returns directly to the caller with no asynchronous domain fact broadcast to independent consumers."
+    },
+    {
+      "capability_id": "retention.eligibility-classify",      "published_versions": [
         "1.0.0"
       ],
       "path": "capabilities/retention/retention.eligibility-classify/1.0.0/contract.json",
