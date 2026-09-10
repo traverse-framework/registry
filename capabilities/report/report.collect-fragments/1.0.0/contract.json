@@ -1,0 +1,219 @@
+{
+  "kind": "capability_contract",
+  "schema_version": "1.0.0",
+  "id": "report.collect-fragments",
+  "namespace": "report",
+  "name": "collect-fragments",
+  "version": "1.0.0",
+  "lifecycle": "active",
+  "owner": {
+    "team": "traverse-core",
+    "contact": "enrico.piovesan10@gmail.com"
+  },
+  "summary": "Normalize caller-supplied source fragments into a clean, de-duplicated, order-preserving source_fragments list.",
+  "description": "First node of the report.* chain, ported from the UMA chapter-13 portable MCP runtime's DataProviderLocal (re-scoped from a canned-fixture provider to a real input normalizer). Genuinely reads the `fragments` input and returns `source_fragments`: each fragment trimmed of surrounding whitespace, empty/whitespace-only fragments dropped, case-insensitive exact duplicates dropped (first occurrence kept), original order preserved, and any fragment longer than 2000 characters clipped on a UTF-8 char boundary. Also returns `dropped_count` (how many input fragments were removed) and `status` (`ok`, or `insufficient_data` when nothing survives normalization). No model, network, randomness, or host state dependency: identical input always produces identical output. Built no_std on the shared capability-src/wasi-capability-runtime shim, verified to import only wasi_snapshot_preview1::{fd_read, fd_write, proc_exit}, so it is genuinely executable by Traverse's runtime ABI whitelist. Known limitation, disclosed rather than hidden: de-duplication is exact-match only (after trim, clip, and lowercase) -- near-duplicate fragments that differ by punctuation or wording are both kept, which is correct for a normalizer that must not lose caller intent. Source: capability-src/report-collect-fragments/ in this repo.",
+  "use_cases": [
+    {
+      "scenario": "As a rollout coordinator, I want three distinct browser/edge/cloud status notes passed straight through in order, so that the rest of the report chain sees exactly the evidence I supplied.",
+      "input_example": {
+        "fragments": [
+          "The browser shell holds recent customer feedback snippets.",
+          "An edge cache exposes regional rollout data with low latency.",
+          "A cloud record confirms that contract validation reduced incident handoff time."
+        ]
+      },
+      "output_example": {
+        "source_fragments": [
+          "The browser shell holds recent customer feedback snippets.",
+          "An edge cache exposes regional rollout data with low latency.",
+          "A cloud record confirms that contract validation reduced incident handoff time."
+        ],
+        "dropped_count": 0,
+        "status": "ok"
+      },
+      "happy": true,
+      "persona_ref": "rollout-coordinator"
+    },
+    {
+      "scenario": "As a rollout coordinator, I want a fragment list that repeats one note (in a different case) and includes a blank line to come back trimmed and de-duplicated, so that the summary is not skewed by accidental repetition.",
+      "input_example": {
+        "fragments": [
+          "  Edge cache is warm  ",
+          "edge cache is warm",
+          "",
+          "Cloud analysis is healthy."
+        ]
+      },
+      "output_example": {
+        "source_fragments": [
+          "Edge cache is warm",
+          "Cloud analysis is healthy."
+        ],
+        "dropped_count": 2,
+        "status": "ok"
+      },
+      "happy": true,
+      "persona_ref": "rollout-coordinator"
+    },
+    {
+      "scenario": "As a rollout coordinator, I want an all-blank fragment list to be flagged rather than silently producing an empty report, so that I know to supply real source material.",
+      "input_example": {
+        "fragments": [
+          "",
+          "   ",
+          "\t\n"
+        ]
+      },
+      "output_example": {
+        "source_fragments": [],
+        "dropped_count": 3,
+        "status": "insufficient_data"
+      },
+      "happy": false,
+      "persona_ref": "rollout-coordinator"
+    }
+  ],
+  "inputs": {
+    "schema": {
+      "type": "object",
+      "required": [
+        "fragments"
+      ],
+      "properties": {
+        "fragments": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "outputs": {
+    "schema": {
+      "type": "object",
+      "required": [
+        "source_fragments",
+        "dropped_count",
+        "status"
+      ],
+      "properties": {
+        "source_fragments": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "dropped_count": {
+          "type": "number"
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "ok",
+            "insufficient_data"
+          ]
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "preconditions": [
+    {
+      "id": "fragments-provided",
+      "description": "The caller provides a `fragments` array of strings; its contents are read and normalized."
+    }
+  ],
+  "postconditions": [
+    {
+      "id": "source-fragments-normalized",
+      "description": "Returns `source_fragments` containing each non-empty input fragment trimmed, clipped to 2000 characters, and de-duplicated case-insensitively with first-seen order preserved; `dropped_count` equals the number of input fragments removed; `status` is `insufficient_data` when `source_fragments` is empty and `ok` otherwise. The same input always produces the same output."
+    }
+  ],
+  "side_effects": [
+    {
+      "kind": "memory_only",
+      "description": "Produces one deterministic normalized fragment list derived from the provided fragments; does not log, persist, or transmit the input."
+    }
+  ],
+  "emits": [],
+  "consumes": [],
+  "permissions": [
+    {
+      "id": "report.collect-fragments"
+    }
+  ],
+  "execution": {
+    "binary_format": "wasm",
+    "entrypoint": {
+      "kind": "wasi-command",
+      "command": "run"
+    },
+    "preferred_targets": [
+      "local",
+      "edge",
+      "browser"
+    ],
+    "constraints": {
+      "host_api_access": "none",
+      "network_access": "forbidden",
+      "filesystem_access": "none"
+    }
+  },
+  "policies": [
+    {
+      "id": "fail-closed-on-invalid-input"
+    },
+    {
+      "id": "pure-computation-only"
+    }
+  ],
+  "dependencies": [],
+  "provenance": {
+    "source": "greenfield",
+    "author": "enricopiovesan",
+    "created_at": "2026-09-09T00:00:00Z",
+    "spec_ref": "100-capability-package-authoring@1.0.0",
+    "adr_refs": [
+      "0001-rust-wasm-foundation"
+    ],
+    "exception_refs": []
+  },
+  "evidence": [],
+  "service_type": "stateless",
+  "permitted_targets": [
+    "local",
+    "edge",
+    "browser",
+    "cloud"
+  ],
+  "artifact_type": "native",
+  "artifact": {
+    "digest": "sha256:0a728d39356a89ff934a80e503a8f199d14727d7fa37bb4a101488d33782e693",
+    "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/report.collect-fragments-1.0.0/collect-fragments-agent.wasm"
+  },
+  "risk": {
+    "effect_class": "pure_read",
+    "determinism_class": "deterministic",
+    "data_flow": {
+      "accepted_data_classifications": [],
+      "produced_data_classifications": [],
+      "egress_policy": "denied"
+    },
+    "reliability": {
+      "idempotency_required": false,
+      "retryable": true,
+      "compensation_available": true
+    }
+  },
+  "authoring": {
+    "method": "llm-assisted",
+    "source_revision": "publish/report-collect-fragments-1.0.0",
+    "test_evidence": "Greenfield no_std capability on capability-src/wasi-capability-runtime; capability-src/report-collect-fragments cargo llvm-cov --summary-only --json: functions=100.00%, lines=100.00%, regions=100.00% (11 #[test] cases covering trim, empty-drop, case-insensitive dedupe, order preservation, char-boundary clip, dedupe-after-clip, all-empty insufficient_data, missing key, end-to-end JSON round-trip, and determinism). Compiled wasm imports verified = wasi_snapshot_preview1::{fd_read, fd_write, proc_exit} only.",
+    "review": {
+      "decision": "pending-qualified-review",
+      "reviewer": "traverse-registry-maintainer"
+    }
+  }
+}

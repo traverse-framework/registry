@@ -1,0 +1,17 @@
+{
+  "id": "rollout-coordinator",
+  "version": "1.0.0",
+  "name": "Rollout Coordinator",
+  "summary": "Assembles a shareable rollout status report from distributed browser, edge, and cloud source fragments.",
+  "description": "Drives the report.* chain (collect-fragments, enrich-insights, summarize or summarize-semantic, optional translate-fr, format) to turn raw distributed source fragments into one deterministic, optionally French-translated status report. Needs the whole raw-fragments-to-formatted-report path to be deterministic and model-free (or, for summarize-semantic, backed only by a pinned static embedding), without any capability inferring intent from names or natural language.",
+  "distinguished_from": [
+    {
+      "persona_id": "summary-consumer",
+      "how": "Assembles a full multi-section report from raw distributed fragments through several capabilities, rather than consuming one already-aggregated bounded-period summary record."
+    },
+    {
+      "persona_id": "coverage-consumer",
+      "how": "Produces a formatted narrative report from source fragments, rather than consuming a single deterministic completeness signal derived from duration and source-health facts."
+    }
+  ]
+}
