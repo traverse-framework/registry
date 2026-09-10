@@ -39,6 +39,8 @@ Copy-paste sequence for a new capability version (manual path today; `traverse-c
 5. **Ensure every `use_cases[].persona_ref` resolves** to an existing `personas/<id>/<version>/persona.json` (see `specs/017-persona-registry/spec.md` and [`personas/README.md`](../personas/README.md)). Author missing personas before opening the contract PR — prefer `bash scripts/scaffold/new-persona.sh` so `distinguished_from` and local `validate_persona` checks pass first.
 6. **Open the PR with the org body sections** required by `spec-alignment`: `## Summary`, `## Governing Spec` (bare approved-spec ids in backticks, one per bullet), `## Project Item`, `## Definition of Done`, `## Validation`. Editing the body alone does not re-run that check — push a new commit after body fixes.
 
+**Optional — declare `ai` if the capability is model-backed (an "agent").** `specs/001-registry-foundation/spec.md` FR-017: add `"ai": { "model_backed": true, "models": ["<id>", …] }` when the capability runs model inference at execution time (a forward pass / model call). Static lookup tables, quantized weights, or embeddings compiled into the WASM and used only for deterministic arithmetic do **not** count — omit `ai` for those. `models` must be a non-empty string array whenever `model_backed` is `true` (CI: `contract.invalid_ai`). The field flows through to the public index and the catalog's "Agent" badge. No published capability declares it today.
+
 Never edit an already-merged `contract.json`; yank via `deprecated.json` and publish a new version instead.
 
 **Optional — contribute a publication-lifecycle measurement record.** After your

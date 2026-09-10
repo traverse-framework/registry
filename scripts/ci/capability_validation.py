@@ -239,6 +239,50 @@ def validate_contract(path: Path, errors: list) -> None:
             "(traverse-framework/traverse spec 014-service-type-taxonomy)",
         )
 
+    # spec 001 FR-017 (decision-log entry 104): optional `ai` object marking a
+    # model-backed capability ("agent"). Whole-tree check like service_type --
+    # no already-published contract declares it, so it can never fail
+    # retroactively.
+    ai = contract.get("ai")
+    if ai is not None:
+        if not isinstance(ai, dict):
+            fail(
+                errors,
+                "contract.invalid_ai",
+                str(path),
+                "contract 'ai' must be an object {model_backed: boolean, models?: string[]} (spec 001 FR-017)",
+            )
+        else:
+            model_backed = ai.get("model_backed")
+            models = ai.get("models")
+            models_well_formed = models is None or (
+                isinstance(models, list)
+                and all(isinstance(m, str) and m.strip() for m in models)
+            )
+            if not isinstance(model_backed, bool):
+                fail(
+                    errors,
+                    "contract.invalid_ai",
+                    str(path),
+                    "ai.model_backed must be a boolean (spec 001 FR-017)",
+                )
+            if not models_well_formed:
+                fail(
+                    errors,
+                    "contract.invalid_ai",
+                    str(path),
+                    "ai.models must be an array of non-empty strings (spec 001 FR-017)",
+                )
+            if model_backed is True and not (
+                models_well_formed and isinstance(models, list) and len(models) > 0
+            ):
+                fail(
+                    errors,
+                    "contract.invalid_ai",
+                    str(path),
+                    "ai.model_backed: true requires a non-empty ai.models array (spec 001 FR-017)",
+                )
+
     if contract.get("id") and contract.get("id") != id_seg:
         fail(
             errors,

@@ -41,5 +41,24 @@ class ArtifactMirrorUrlTests(unittest.TestCase):
         self.assertIsNone(url)
 
 
+class AiFieldHtmlTests(unittest.TestCase):
+    """spec 001 FR-017: the static page's Agent / Models rows."""
+
+    def setUp(self):
+        self.mod = load_module()
+
+    def test_absent_or_not_model_backed_renders_nothing(self):
+        self.assertEqual(self.mod.ai_field_html(None), "")
+        self.assertEqual(self.mod.ai_field_html({"model_backed": False}), "")
+
+    def test_model_backed_renders_agent_and_models_rows(self):
+        html = self.mod.ai_field_html(
+            {"model_backed": True, "models": ["minishlab/potion-base-32M"]}
+        )
+        self.assertIn("badge-agent", html)
+        self.assertIn("Models", html)
+        self.assertIn("minishlab/potion-base-32M", html)
+
+
 if __name__ == "__main__":
     unittest.main()

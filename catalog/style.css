@@ -219,6 +219,11 @@ input[type="search"]::placeholder { color: var(--fg-subtle); }
 .badge-accent { border-color: rgba(255,122,26,0.3); color: var(--accent-hover); background: var(--accent-dim); }
 .badge-success { border-color: rgba(63,185,80,0.3); color: #4fc960; background: rgba(63,185,80,0.08); }
 .badge-danger { border-color: rgba(240,134,106,0.3); color: #f49a82; background: rgba(240,134,106,0.08); }
+/* Agent marker (spec 001 FR-017) -- violet, distinct from accent/success/danger. */
+.badge-agent { border-color: rgba(159,122,255,0.4); color: #c3abff; background: rgba(136,34,204,0.14); }
+.badge-agent::before { content: '\2726'; font-size: 0.8em; line-height: 1; }
+[data-theme="light"] .badge-agent,
+:root:not([data-theme="dark"]) .badge-agent { color: #6b3fd4; background: rgba(107,63,212,0.08); border-color: rgba(107,63,212,0.28); }
 
 /* ─── Detail page ─────────────────────────────────────────────────────── */
 .back-link { display: inline-flex; align-items: center; gap: 0.4rem; font-size: 0.85rem; color: var(--fg-muted); margin-bottom: 1.5rem; }

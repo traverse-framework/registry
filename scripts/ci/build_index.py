@@ -57,6 +57,11 @@ and an unfiltered `provenance` object, matching what traverse spec
 114-mcp-capability-search FR-005 requires its search-result projection to
 carry.
 
+Also implements specs/001-registry-foundation/spec.md FR-017 (decision-log
+entry 104): each capability entry carries the contract's optional `ai`
+object verbatim (null when omitted) so an agent-facing consumer can filter
+model-backed capabilities.
+
 Usage: build_index.py <previous_index_version_or_0> <source_commit_sha> <output_path> [repo_slug]
 """
 
@@ -197,6 +202,10 @@ def build_index(previous_index_version: int, source_commit: str, repo_slug: str 
                 "permitted_targets": contract.get("permitted_targets") or [],
                 "lifecycle": contract.get("lifecycle") or "",
                 "provenance": contract.get("provenance"),
+                # spec 001 FR-017: the optional `ai` object, passed through
+                # verbatim (null when the contract omits it) so an agent-facing
+                # consumer can filter model-backed capabilities.
+                "ai": contract.get("ai"),
             }
 
             # specs/024-capability-risk-classification-adoption FR-003: same
