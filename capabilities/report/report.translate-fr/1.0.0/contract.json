@@ -1,0 +1,200 @@
+{
+  "kind": "capability_contract",
+  "schema_version": "1.0.0",
+  "id": "report.translate-fr",
+  "namespace": "report",
+  "name": "translate-fr",
+  "version": "1.0.0",
+  "lifecycle": "active",
+  "owner": {
+    "team": "traverse-core",
+    "contact": "enrico.piovesan10@gmail.com"
+  },
+  "summary": "Translate an English operational summary and structured facts into French via templates and glossary substitution.",
+  "description": "Fourth node of the report.* chain. Model-free EN→FR translation: PROJECT phrase templates (combines distributed browser / shows how adaptive summarization) fill PROJECT and N placeholders; Fact lines use case-sensitive exact template match; otherwise ordered glossary substitution. Empty input yields empty output. Pure, deterministic, memory-only — no embeddings, model, network, or host state.",
+  "use_cases": [
+    {
+      "scenario": "As a rollout coordinator, I want a named project summary translated with filled placeholders, so that French stakeholders see the same deterministic operational narrative.",
+      "input_example": {
+        "summary": "Acme Rollout combines distributed browser, edge, and cloud evidence into a deterministic operational summary with 2 validated insights.",
+        "structured_facts": []
+      },
+      "output_example": {
+        "translated_summary": "Acme Rollout combine des preuves distribuees du navigateur, de l'edge et du cloud dans un resume operationnel deterministe avec 2 observation(s) validee(s).",
+        "translated_facts": []
+      },
+      "happy": true,
+      "persona_ref": "rollout-coordinator"
+    },
+    {
+      "scenario": "As a rollout coordinator, I want an exact Fact template translated verbatim, so that known enrichment lines stay consistent across locales.",
+      "input_example": {
+        "summary": "",
+        "structured_facts": [
+          "Fact: An edge cache exposes regional rollout data with low latency."
+        ]
+      },
+      "output_example": {
+        "translated_summary": "",
+        "translated_facts": [
+          "Fait : un cache edge expose les donnees de deploiement regional avec une faible latence."
+        ]
+      },
+      "happy": true,
+      "persona_ref": "rollout-coordinator"
+    },
+    {
+      "scenario": "As a rollout coordinator, I want unknown phrasing to fall back to glossary substitution rather than inventing text, so that partial translations remain deterministic and honest.",
+      "input_example": {
+        "summary": "Fact: browser telemetry and low latency matter.",
+        "structured_facts": [
+          "edge cache helps"
+        ]
+      },
+      "output_example": {
+        "translated_summary": "Fait : telemetrie du navigateur and faible latence matter.",
+        "translated_facts": [
+          "cache edge helps"
+        ]
+      },
+      "happy": false,
+      "persona_ref": "rollout-coordinator"
+    }
+  ],
+  "inputs": {
+    "schema": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "summary",
+        "structured_facts"
+      ],
+      "properties": {
+        "summary": {
+          "type": "string"
+        },
+        "structured_facts": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  },
+  "outputs": {
+    "schema": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "translated_summary",
+        "translated_facts"
+      ],
+      "properties": {
+        "translated_summary": {
+          "type": "string"
+        },
+        "translated_facts": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  },
+  "preconditions": [
+    {
+      "id": "summary-and-facts-provided",
+      "description": "Caller supplies summary string and structured_facts array (either may be empty)."
+    }
+  ],
+  "postconditions": [
+    {
+      "id": "deterministic-translation",
+      "description": "Identical input always yields identical translated_summary and translated_facts. Template matching and glossary substitution use no randomness, clocks, embeddings, or host state."
+    }
+  ],
+  "side_effects": [
+    {
+      "kind": "memory_only",
+      "description": "Produces translated strings in memory; does not log, persist, or transmit inputs."
+    }
+  ],
+  "emits": [],
+  "consumes": [],
+  "permissions": [
+    {
+      "id": "report.translate-fr"
+    }
+  ],
+  "execution": {
+    "binary_format": "wasm",
+    "entrypoint": {
+      "kind": "wasi-command",
+      "command": "run"
+    },
+    "preferred_targets": [
+      "local",
+      "browser",
+      "edge",
+      "device"
+    ],
+    "constraints": {
+      "filesystem_access": "none",
+      "host_api_access": "none",
+      "network_access": "forbidden"
+    }
+  },
+  "policies": [],
+  "dependencies": [],
+  "provenance": {
+    "source": "greenfield",
+    "author": "enricopiovesan",
+    "created_at": "2026-09-10T04:28:47Z",
+    "spec_ref": "registry#426 / UMA chapter-13 report chain port",
+    "adr_refs": [
+      "0001-rust-wasm-foundation"
+    ],
+    "exception_refs": []
+  },
+  "evidence": [],
+  "service_type": "stateless",
+  "permitted_targets": [
+    "local",
+    "browser",
+    "edge",
+    "device"
+  ],
+  "event_trigger": null,
+  "connector_requirements": [],
+  "state_schema": null,
+  "artifact_type": "native",
+  "artifact": {
+    "digest": "sha256:92dd5c6cbe7824bd33e77c18ec56c02d34347e1966b4da14f89c5ca6dc7d114a",
+    "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/report.translate-fr-1.0.0/translate-fr-agent.wasm"
+  },
+  "authoring": {
+    "method": "llm-assisted",
+    "source_revision": "publish/report-translate-fr-1.0.0",
+    "test_evidence": "capability-src/report-translate-fr: 11 #[test] cases covering PROJECT combines/shows-how templates, placeholder fill, exact Fact template, glossary-only, passthrough, empty string; cargo llvm-cov functions=100%, lines=100%, regions=100%.",
+    "review": {
+      "decision": "pending-qualified-review",
+      "reviewer": "traverse-registry-maintainer"
+    }
+  },
+  "risk": {
+    "effect_class": "pure_read",
+    "determinism_class": "deterministic",
+    "data_flow": {
+      "accepted_data_classifications": [],
+      "produced_data_classifications": [],
+      "egress_policy": "denied"
+    },
+    "reliability": {
+      "idempotency_required": false,
+      "retryable": true,
+      "compensation_available": true
+    }
+  }
+}

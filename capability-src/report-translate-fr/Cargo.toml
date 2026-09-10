@@ -1,0 +1,20 @@
+[workspace]
+
+[package]
+name = "report-translate-fr-agent"
+version = "0.1.0"
+edition = "2021"
+publish = false
+description = "Model-free EN→FR glossary/template translator for the report.* chain. See registry#430 / #426."
+
+[[bin]]
+name = "translate-fr-agent"
+path = "src/main.rs"
+
+[dependencies]
+wasi-capability-runtime = { path = "../wasi-capability-runtime" }
+
+[profile.release]
+opt-level = "s"
+lto = true
+panic = "abort"
