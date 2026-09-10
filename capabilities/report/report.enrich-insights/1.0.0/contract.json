@@ -1,0 +1,194 @@
+{
+  "kind": "capability_contract",
+  "schema_version": "1.0.0",
+  "id": "report.enrich-insights",
+  "namespace": "report",
+  "name": "enrich-insights",
+  "version": "1.0.0",
+  "lifecycle": "active",
+  "owner": {
+    "team": "traverse-core",
+    "contact": "enrico.piovesan10@gmail.com"
+  },
+  "summary": "Derive structured Fact lines from normalized source fragments for a rollout status report.",
+  "description": "Second node of the report.* chain. For each non-empty source fragment, classifies a signal keyword (browser/edge/cloud/general), tidies whitespace, extracts the first $-prefixed or bare number token if present, emits a Fact line, then stable-sorts by (signal rank, first-seen index). Pure, deterministic, memory-only.",
+  "use_cases": [
+    {
+      "scenario": "As a rollout coordinator, I want browser, edge, and cloud fragments classified into ordered Fact lines, so that the summarize step receives stable structured evidence.",
+      "input_example": {
+        "source_fragments": [
+          "Cloud region latency improved",
+          "Browser session count rose",
+          "Edge cache hit ratio climbed"
+        ]
+      },
+      "output_example": {
+        "structured_facts": [
+          "Fact: browser \u2014 Browser session count rose",
+          "Fact: edge \u2014 Edge cache hit ratio climbed",
+          "Fact: cloud \u2014 Cloud region latency improved"
+        ]
+      },
+      "happy": true,
+      "persona_ref": "rollout-coordinator"
+    },
+    {
+      "scenario": "As a rollout coordinator, I want a dollar amount captured on the Fact line when a fragment mentions spend, so that numeric signals survive into the formatted report.",
+      "input_example": {
+        "source_fragments": [
+          "Browser spend hit $12.50 yesterday"
+        ]
+      },
+      "output_example": {
+        "structured_facts": [
+          "Fact: browser \u2014 Browser spend hit $12.50 yesterday ($12.50)"
+        ]
+      },
+      "happy": true,
+      "persona_ref": "rollout-coordinator"
+    },
+    {
+      "scenario": "As a rollout coordinator, I want an empty fragment list to produce an empty structured_facts array, so that later nodes can fail closed rather than inventing facts.",
+      "input_example": {
+        "source_fragments": []
+      },
+      "output_example": {
+        "structured_facts": []
+      },
+      "happy": false,
+      "persona_ref": "rollout-coordinator"
+    }
+  ],
+  "inputs": {
+    "schema": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source_fragments"
+      ],
+      "properties": {
+        "source_fragments": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  },
+  "outputs": {
+    "schema": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "structured_facts"
+      ],
+      "properties": {
+        "structured_facts": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  },
+  "preconditions": [
+    {
+      "id": "source-fragments-provided",
+      "description": "Caller supplies a source_fragments array of strings (may be empty)."
+    }
+  ],
+  "postconditions": [
+    {
+      "id": "deterministic-enrich",
+      "description": "Identical input always yields identical structured_facts. Classification, tidy, number extraction, and stable sort use no randomness, clocks, or host state."
+    },
+    {
+      "id": "one-fact-per-non-empty",
+      "description": "structured_facts length equals the count of non-empty tidied input fragments."
+    }
+  ],
+  "side_effects": [
+    {
+      "kind": "memory_only",
+      "description": "Produces structured facts in memory; does not log, persist, or transmit fragments."
+    }
+  ],
+  "emits": [],
+  "consumes": [],
+  "permissions": [
+    {
+      "id": "report.enrich-insights"
+    }
+  ],
+  "execution": {
+    "binary_format": "wasm",
+    "entrypoint": {
+      "kind": "wasi-command",
+      "command": "run"
+    },
+    "preferred_targets": [
+      "local",
+      "browser",
+      "edge",
+      "device"
+    ],
+    "constraints": {
+      "filesystem_access": "none",
+      "host_api_access": "none",
+      "network_access": "forbidden"
+    }
+  },
+  "policies": [],
+  "dependencies": [],
+  "provenance": {
+    "source": "greenfield",
+    "author": "enricopiovesan",
+    "created_at": "2026-09-10T04:06:10Z",
+    "spec_ref": "registry#426 / UMA chapter-13 report chain port",
+    "adr_refs": [
+      "0001-rust-wasm-foundation"
+    ],
+    "exception_refs": []
+  },
+  "evidence": [],
+  "service_type": "stateless",
+  "permitted_targets": [
+    "local",
+    "browser",
+    "edge",
+    "device"
+  ],
+  "event_trigger": null,
+  "connector_requirements": [],
+  "state_schema": null,
+  "artifact_type": "native",
+  "artifact": {
+    "digest": "sha256:ea3aae817a437260074cb5b1f637b3f1d1d2baa62cbead6468498839a4f05392",
+    "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/report.enrich-insights-1.0.0/enrich-insights-agent.wasm"
+  },
+  "authoring": {
+    "method": "llm-assisted",
+    "source_revision": "publish/report-enrich-insights-1.0.0",
+    "test_evidence": "capability-src/report-enrich-insights: 11 #[test] cases covering each signal class, number found/not found, sort stability, empty input; cargo llvm-cov functions=100%, lines>=95%, regions>=95%.",
+    "review": {
+      "decision": "pending-qualified-review",
+      "reviewer": "traverse-registry-maintainer"
+    }
+  },
+  "risk": {
+    "effect_class": "pure_read",
+    "determinism_class": "deterministic",
+    "data_flow": {
+      "accepted_data_classifications": [],
+      "produced_data_classifications": [],
+      "egress_policy": "denied"
+    },
+    "reliability": {
+      "idempotency_required": false,
+      "retryable": true,
+      "compensation_available": true
+    }
+  }
+}
