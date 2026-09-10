@@ -1,0 +1,192 @@
+{
+  "kind": "capability_contract",
+  "schema_version": "1.0.0",
+  "id": "report.format",
+  "namespace": "report",
+  "name": "format",
+  "version": "1.0.0",
+  "lifecycle": "active",
+  "owner": {
+    "team": "traverse-core",
+    "contact": "enrico.piovesan10@gmail.com"
+  },
+  "summary": "Render structured facts and a summary into a fixed-section markdown rollout status report.",
+  "description": "Fifth node of the report.* chain. Formats structured_facts and summary_or_translation into a deterministic markdown report with fixed sections: title (# Rollout Status Report), Project line (or '(unnamed)' when missing/blank), Insights (N) bullets in input order, and a Summary block containing the summary verbatim. Single trailing newline; identical input yields identical bytes. Pure, deterministic, memory-only.",
+  "use_cases": [
+    {
+      "scenario": "As a rollout coordinator, I want named project facts and a summary folded into one markdown report, so that stakeholders receive a stable rollout status document.",
+      "input_example": {
+        "structured_facts": [
+          "Fact: browser \u2014 up",
+          "Fact: edge \u2014 warm"
+        ],
+        "summary_or_translation": "Acme looks healthy.",
+        "project_name": "Acme Rollout"
+      },
+      "output_example": {
+        "report": "# Rollout Status Report\nProject: Acme Rollout\nInsights (2):\n- Fact: browser \u2014 up\n- Fact: edge \u2014 warm\nSummary:\nAcme looks healthy.\n"
+      },
+      "happy": true,
+      "persona_ref": "rollout-coordinator"
+    },
+    {
+      "scenario": "As a rollout coordinator, I want missing project names to render as (unnamed), so that the report template stays valid when upstream nodes omit the field.",
+      "input_example": {
+        "structured_facts": [
+          "alpha"
+        ],
+        "summary_or_translation": "s"
+      },
+      "output_example": {
+        "report": "# Rollout Status Report\nProject: (unnamed)\nInsights (1):\n- alpha\nSummary:\ns\n"
+      },
+      "happy": true,
+      "persona_ref": "rollout-coordinator"
+    },
+    {
+      "scenario": "As a rollout coordinator, I want zero structured facts to still produce Insights (0) with no bullets, so that an empty enrichment stage does not invent insight lines.",
+      "input_example": {
+        "structured_facts": [],
+        "summary_or_translation": "Nothing to report.",
+        "project_name": "Acme"
+      },
+      "output_example": {
+        "report": "# Rollout Status Report\nProject: Acme\nInsights (0):\nSummary:\nNothing to report.\n"
+      },
+      "happy": false,
+      "persona_ref": "rollout-coordinator"
+    }
+  ],
+  "inputs": {
+    "schema": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "structured_facts",
+        "summary_or_translation"
+      ],
+      "properties": {
+        "structured_facts": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "summary_or_translation": {
+          "type": "string"
+        },
+        "project_name": {
+          "type": "string"
+        }
+      }
+    }
+  },
+  "outputs": {
+    "schema": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "report"
+      ],
+      "properties": {
+        "report": {
+          "type": "string"
+        }
+      }
+    }
+  },
+  "preconditions": [
+    {
+      "id": "facts-and-summary-provided",
+      "description": "Caller supplies structured_facts array and summary_or_translation string (either may be empty); project_name is optional."
+    }
+  ],
+  "postconditions": [
+    {
+      "id": "deterministic-report",
+      "description": "Identical input always yields an identical report string with fixed section order, stable whitespace, and a single trailing newline. Formatting uses no randomness, clocks, or host state."
+    }
+  ],
+  "side_effects": [
+    {
+      "kind": "memory_only",
+      "description": "Produces one report string in memory; does not log, persist, or transmit inputs."
+    }
+  ],
+  "emits": [],
+  "consumes": [],
+  "permissions": [
+    {
+      "id": "report.format"
+    }
+  ],
+  "execution": {
+    "binary_format": "wasm",
+    "entrypoint": {
+      "kind": "wasi-command",
+      "command": "run"
+    },
+    "preferred_targets": [
+      "local",
+      "browser",
+      "edge",
+      "device"
+    ],
+    "constraints": {
+      "filesystem_access": "none",
+      "host_api_access": "none",
+      "network_access": "forbidden"
+    }
+  },
+  "policies": [],
+  "dependencies": [],
+  "provenance": {
+    "source": "greenfield",
+    "author": "enricopiovesan",
+    "created_at": "2026-09-10T04:34:00Z",
+    "spec_ref": "registry#426 / UMA chapter-13 report chain port",
+    "adr_refs": [
+      "0001-rust-wasm-foundation"
+    ],
+    "exception_refs": []
+  },
+  "evidence": [],
+  "service_type": "stateless",
+  "permitted_targets": [
+    "local",
+    "browser",
+    "edge",
+    "device"
+  ],
+  "event_trigger": null,
+  "connector_requirements": [],
+  "state_schema": null,
+  "artifact_type": "native",
+  "artifact": {
+    "digest": "sha256:cdeff4f080d14d6bf716dd366015ab13ad6cb9d10a85d0f6913c3b8b34c894b2",
+    "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/report.format-1.0.0/format-agent.wasm"
+  },
+  "authoring": {
+    "method": "llm-assisted",
+    "source_revision": "publish/report-format-1.0.0",
+    "test_evidence": "capability-src/report-format: 11 #[test] cases covering zero facts, missing/blank project_name, multiline summary, ordering preserved, determinism; cargo llvm-cov functions=100%, lines=100%, regions=100%.",
+    "review": {
+      "decision": "pending-qualified-review",
+      "reviewer": "traverse-registry-maintainer"
+    }
+  },
+  "risk": {
+    "effect_class": "pure_read",
+    "determinism_class": "deterministic",
+    "data_flow": {
+      "accepted_data_classifications": [],
+      "produced_data_classifications": [],
+      "egress_policy": "denied"
+    },
+    "reliability": {
+      "idempotency_required": false,
+      "retryable": true,
+      "compensation_available": true
+    }
+  }
+}
