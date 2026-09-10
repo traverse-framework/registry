@@ -4,6 +4,13 @@
 //! PROJECT phrase templates and exact Fact templates first, then applies
 //! ordered glossary substitution. No embeddings, model, network, randomness,
 //! or host state.
+//!
+//! `1.1.0` (registry#441): the output also carries `structured_facts`
+//! (echoed verbatim) and `summary_or_translation` (identical to
+//! `translated_summary` -- the French text) so `report.format` can take
+//! every input it needs from this single predecessor on the French path
+//! under `browserLocalPlan`'s linear chain search. Inputs and translation
+//! logic are unchanged.
 
 #![cfg_attr(not(test), no_std)]
 #![cfg_attr(not(test), no_main)]
@@ -248,9 +255,18 @@ fn translate(input: Value) -> Value {
         .map(|fact| translate_one(fact))
         .collect();
 
+    // `structured_facts` echoed verbatim and `summary_or_translation` set to the
+    // French text so `report.format` can draw both of its inputs from this
+    // single predecessor on the French path -- `browserLocalPlan` only extends a
+    // chain by one predecessor that covers the whole remaining gap (registry#441).
     object(alloc::vec![
-        ("translated_summary", Value::String(translated_summary)),
+        ("structured_facts", array_of_strings(&structured_facts)),
+        (
+            "translated_summary",
+            Value::String(translated_summary.clone()),
+        ),
         ("translated_facts", array_of_strings(&translated_facts)),
+        ("summary_or_translation", Value::String(translated_summary)),
     ])
 }
 
@@ -275,6 +291,41 @@ mod tests {
 
     fn facts_of(out: &Value) -> Vec<String> {
         out.get("translated_facts").unwrap().string_array()
+    }
+
+    #[test]
+    fn echoes_structured_facts_verbatim() {
+        let fact = "Fact: An edge cache exposes regional rollout data with low latency.";
+        let out = call(&alloc::format!(
+            r#"{{"summary":"","structured_facts":["{fact}","",  "raw note"]}}"#
+        ));
+        // echoed field carries the ORIGINAL English facts, untouched.
+        assert_eq!(
+            out.get("structured_facts").unwrap().string_array(),
+            vec![String::from(fact), String::new(), String::from("raw note"),]
+        );
+    }
+
+    #[test]
+    fn summary_or_translation_equals_translated_summary() {
+        let out = call(
+            r#"{"summary":"Acme combines distributed browser, edge, and cloud evidence into a deterministic operational summary with 2 validated insights.","structured_facts":[]}"#,
+        );
+        assert_eq!(
+            out.get("summary_or_translation").unwrap().as_str().unwrap(),
+            summary_of(&out)
+        );
+        assert!(summary_of(&out).starts_with("Acme combine des preuves"));
+    }
+
+    #[test]
+    fn echoes_empty_structured_facts() {
+        let out = call(r#"{"summary":"","structured_facts":[]}"#);
+        assert!(out
+            .get("structured_facts")
+            .unwrap()
+            .string_array()
+            .is_empty());
     }
 
     #[test]
