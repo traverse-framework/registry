@@ -40,6 +40,12 @@
   var showDeprecated = true;
   var searchQuery = "";
   var searchDebounceTimer = null;
+  // Capability list layout: "table" (default -- same data, dense) or
+  // "cards". Persisted like the theme toggle so a reload keeps the choice.
+  var VIEW_MODES = ["table", "cards"];
+  var viewMode = VIEW_MODES.indexOf(localStorage.getItem("catalog-view")) !== -1
+    ? localStorage.getItem("catalog-view")
+    : "table";
   var eventFilters = {
     event: "",
     capability: "",
@@ -127,6 +133,16 @@
     return groupedCapabilities().filter(function (group) { return group.latest.contract.service_type === serviceTypeId; });
   }
   function groupKey(reference) { return reference.split("@")[0]; }
+
+  // "AI-assisted" marker: the contract for this capability version was
+  // authored with LLM assistance (contract.authoring.method ==
+  // "llm-assisted"). This is the only machine-checkable AI signal in the
+  // contract schema -- capabilities themselves are deterministic WASM and
+  // never run a model at execution time.
+  function isAiAssisted(contract) {
+    return !!(contract && contract.authoring && contract.authoring.method === "llm-assisted");
+  }
+  var AI_ASSISTED_TITLE = "Contract authored with LLM assistance (authoring.method: \"llm-assisted\")";
 
   // Personas are versioned (specs/017-persona-registry) but a use_case's
   // persona_ref names an id only, not id@version -- resolves to that
@@ -223,11 +239,37 @@
     deprecatedToggle.checked = showDeprecated;
     deprecatedToggle.addEventListener("change", function () { showDeprecated = deprecatedToggle.checked; renderResultsGrid(); });
     var deprecatedLabel = el("label", {}, [deprecatedToggle, document.createTextNode("Include deprecated versions")]);
-    appEl.appendChild(el("div", { className: "controls" }, [deprecatedLabel]));
+    appEl.appendChild(el("div", { className: "controls" }, [deprecatedLabel, renderViewToggle()]));
 
-    appEl.appendChild(el("div", { className: "grid", id: "results" }));
+    appEl.appendChild(el("div", { id: "results" }));
     renderResultsGrid();
     searchInput.focus();
+  }
+
+  function renderViewToggle() {
+    var group = el("div", { className: "view-toggle", role: "group", "aria-label": "Result layout" });
+    [["table", "Table"], ["cards", "Cards"]].forEach(function (opt) {
+      var isActive = viewMode === opt[0];
+      var btn = el("button", {
+        type: "button",
+        className: "view-toggle-btn" + (isActive ? " is-active" : ""),
+        "aria-pressed": isActive ? "true" : "false",
+        textContent: opt[1],
+      });
+      btn.addEventListener("click", function () {
+        if (viewMode === opt[0]) { return; }
+        viewMode = opt[0];
+        localStorage.setItem("catalog-view", viewMode);
+        Array.prototype.forEach.call(group.querySelectorAll(".view-toggle-btn"), function (other, index) {
+          var active = VIEW_MODES[index] === viewMode;
+          other.classList.toggle("is-active", active);
+          other.setAttribute("aria-pressed", active ? "true" : "false");
+        });
+        renderResultsGrid();
+      });
+      group.appendChild(btn);
+    });
+    return group;
   }
 
   function renderResultsGrid() {
@@ -236,34 +278,85 @@
     resultsEl.textContent = "";
     var groups = visibleGroups();
     if (groups.length === 0) {
+      resultsEl.className = "";
       resultsEl.appendChild(el("p", { className: "empty", textContent: "No matching universal capabilities." }));
       return;
     }
+    if (viewMode === "cards") {
+      resultsEl.className = "grid";
+      groups.forEach(function (group) { resultsEl.appendChild(renderCapabilityCard(group)); });
+    } else {
+      resultsEl.className = "table-wrap";
+      resultsEl.appendChild(renderCapabilityTable(groups));
+    }
+  }
+
+  function renderCapabilityCard(group) {
+    var contract = group.latest.contract;
+    var top = [
+      el("span", { className: "badge badge-accent", textContent: contract.namespace }),
+      el("span", { className: "badge", textContent: "v" + contract.version }),
+    ];
+    if (group.versions.length > 1) { top.push(el("span", { className: "badge", textContent: group.versions.length + " versions" })); }
+    if (group.latest.deprecated) { top.push(el("span", { className: "badge badge-danger", textContent: "deprecated" })); }
+    if (isAiAssisted(contract)) { top.push(el("span", { className: "badge badge-ai", title: AI_ASSISTED_TITLE, textContent: "AI-assisted" })); }
+
+    var bottom = [];
+    if (group.latest.test_coverage) {
+      bottom.push(el("span", { className: "badge badge-success", textContent: group.latest.test_coverage.lines_percent + "% covered" }));
+    }
+    if (Array.isArray(contract.use_cases) && contract.use_cases.length > 0) {
+      bottom.push(el("span", { className: "badge", textContent: contract.use_cases.length + " use cases" }));
+    }
+
+    return el("a", { className: "card", href: referenceHash(group.latest.reference) }, [
+      el("div", { className: "card-top" }, top),
+      el("div", { className: "card-id", textContent: contract.id }),
+      el("p", { className: "card-summary", textContent: contract.summary || "" }),
+      el("div", { className: "card-bottom" }, bottom),
+    ]);
+  }
+
+  function renderCapabilityTable(groups) {
+    var headers = ["Capability", "Namespace", "Latest", "Versions", "AI", "Coverage", "Use cases", "Status"];
+    var thead = el("thead", {}, [
+      el("tr", {}, headers.map(function (label) { return el("th", { textContent: label }); })),
+    ]);
+    var tbody = el("tbody", {});
     groups.forEach(function (group) {
       var contract = group.latest.contract;
-      var top = [
-        el("span", { className: "badge badge-accent", textContent: contract.namespace }),
-        el("span", { className: "badge", textContent: "v" + contract.version }),
-      ];
-      if (group.versions.length > 1) { top.push(el("span", { className: "badge", textContent: group.versions.length + " versions" })); }
-      if (group.latest.deprecated) { top.push(el("span", { className: "badge badge-danger", textContent: "deprecated" })); }
+      var href = referenceHash(group.latest.reference);
 
-      var bottom = [];
-      if (group.latest.test_coverage) {
-        bottom.push(el("span", { className: "badge badge-success", textContent: group.latest.test_coverage.lines_percent + "% covered" }));
-      }
-      if (Array.isArray(contract.use_cases) && contract.use_cases.length > 0) {
-        bottom.push(el("span", { className: "badge", textContent: contract.use_cases.length + " use cases" }));
-      }
+      var aiCell = isAiAssisted(contract)
+        ? el("span", { className: "badge badge-ai", title: AI_ASSISTED_TITLE, textContent: "AI-assisted" })
+        : el("span", { className: "t-muted", textContent: "—" });
+      var coverageCell = group.latest.test_coverage
+        ? el("span", { className: "badge badge-success", textContent: group.latest.test_coverage.lines_percent + "%" })
+        : el("span", { className: "t-muted", textContent: "—" });
+      var statusCell = group.latest.deprecated
+        ? el("span", { className: "badge badge-danger", textContent: "deprecated" })
+        : el("span", { className: "badge badge-success", textContent: "active" });
+      var useCount = Array.isArray(contract.use_cases) ? contract.use_cases.length : 0;
 
-      var card = el("a", { className: "card", href: referenceHash(group.latest.reference) }, [
-        el("div", { className: "card-top" }, top),
-        el("div", { className: "card-id", textContent: contract.id }),
-        el("p", { className: "card-summary", textContent: contract.summary || "" }),
-        el("div", { className: "card-bottom" }, bottom),
+      var row = el("tr", { className: "cap-row" }, [
+        el("td", { className: "cap-row-id" }, [el("a", { href: href, className: "t-mono", textContent: contract.id })]),
+        el("td", {}, [el("span", { className: "badge badge-accent", textContent: contract.namespace })]),
+        el("td", { className: "t-mono", textContent: "v" + contract.version }),
+        el("td", { className: "t-mono", textContent: group.versions.length > 1 ? String(group.versions.length) : "1" }),
+        el("td", {}, [aiCell]),
+        el("td", {}, [coverageCell]),
+        el("td", { className: "t-mono", textContent: useCount ? String(useCount) : "—" }),
+        el("td", {}, [statusCell]),
       ]);
-      resultsEl.appendChild(card);
+      // Whole-row click is a mouse convenience; keyboard/AT users get the
+      // real <a> in the first cell.
+      row.addEventListener("click", function (event) {
+        if (event.target.closest("a")) { return; }
+        window.location.hash = href;
+      });
+      tbody.appendChild(row);
     });
+    return el("table", { className: "cap-table" }, [thead, tbody]);
   }
 
   // Never render contract.owner.contact directly -- it is free-form
