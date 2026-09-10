@@ -1,2 +1,5 @@
 target/
 .tmp-wave1-wasm/
+
+# Local Model2Vec int8 table for report.summarize-semantic builds (hosted on GitHub Releases, not git)
+capability-src/report-summarize-semantic/data/potion-base-32M-int8.bin

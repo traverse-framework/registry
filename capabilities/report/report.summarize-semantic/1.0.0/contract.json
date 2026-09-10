@@ -1,0 +1,200 @@
+{
+  "kind": "capability_contract",
+  "schema_version": "1.0.0",
+  "id": "report.summarize-semantic",
+  "namespace": "report",
+  "name": "summarize-semantic",
+  "version": "1.0.0",
+  "lifecycle": "active",
+  "owner": {
+    "team": "traverse-core",
+    "contact": "enrico.piovesan10@gmail.com"
+  },
+  "summary": "Build a deterministic extractive operational summary using Model2Vec static embeddings.",
+  "description": "Independent alternate to report.summarize for the report.* chain. Splits source_fragments into sentences, ranks each by fixed-point cosine similarity of int8 Model2Vec (minishlab/potion-base-32M) mean-pool sums against the structured_facts centroid, keeps the top 3 in original order, and renders the same fixed template as report.summarize. Pure; hot path uses only integer arithmetic (no float).",
+  "use_cases": [
+    {
+      "scenario": "As a rollout coordinator, I want browser and edge evidence folded into a named project summary via static embeddings, so that stakeholders see one deterministic operational narrative ranked by semantic overlap.",
+      "input_example": {
+        "source_fragments": [
+          "Browser adoption rose. Edge cache is warm."
+        ],
+        "structured_facts": [
+          "Fact: browser — Browser adoption rose",
+          "Fact: edge — Edge cache is warm"
+        ],
+        "project_name": "Acme Rollout"
+      },
+      "output_example": {
+        "summary": "Acme Rollout combines distributed browser, edge, and cloud evidence into a deterministic operational summary with 2 validated insights. Browser adoption rose. Edge cache is warm."
+      },
+      "happy": true,
+      "persona_ref": "rollout-coordinator"
+    },
+    {
+      "scenario": "As a rollout coordinator, I want a single validated insight to use singular wording when no project name is supplied, so that the default template still reads correctly under semantic ranking.",
+      "input_example": {
+        "source_fragments": [
+          "Cloud latency improved."
+        ],
+        "structured_facts": [
+          "Fact: cloud — Cloud latency improved"
+        ]
+      },
+      "output_example": {
+        "summary": "The project combines distributed browser, edge, and cloud evidence into a deterministic operational summary with 1 validated insight. Cloud latency improved."
+      },
+      "happy": true,
+      "persona_ref": "rollout-coordinator"
+    },
+    {
+      "scenario": "As a rollout coordinator, I want zero structured facts to still yield a header-only summary, so that an empty enrichment stage does not invent sentences under semantic ranking.",
+      "input_example": {
+        "source_fragments": [
+          "Unrelated chatter here."
+        ],
+        "structured_facts": []
+      },
+      "output_example": {
+        "summary": "The project combines distributed browser, edge, and cloud evidence into a deterministic operational summary with 0 validated insights. Unrelated chatter here."
+      },
+      "happy": false,
+      "persona_ref": "rollout-coordinator"
+    }
+  ],
+  "inputs": {
+    "schema": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source_fragments",
+        "structured_facts"
+      ],
+      "properties": {
+        "source_fragments": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "structured_facts": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "project_name": {
+          "type": "string"
+        }
+      }
+    }
+  },
+  "outputs": {
+    "schema": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "summary"
+      ],
+      "properties": {
+        "summary": {
+          "type": "string"
+        }
+      }
+    }
+  },
+  "preconditions": [
+    {
+      "id": "fragments-and-facts-provided",
+      "description": "Caller supplies source_fragments and structured_facts arrays (either may be empty)."
+    }
+  ],
+  "postconditions": [
+    {
+      "id": "deterministic-summary",
+      "description": "Identical input always yields an identical summary string. Sentence scoring uses int8 table lookup, i32 accumulation, and fixed-point cosine keys with no randomness, clocks, floats in the hot path, or host state."
+    }
+  ],
+  "side_effects": [
+    {
+      "kind": "memory_only",
+      "description": "Produces one summary string in memory; does not log, persist, or transmit inputs."
+    }
+  ],
+  "emits": [],
+  "consumes": [],
+  "permissions": [
+    {
+      "id": "report.summarize-semantic"
+    }
+  ],
+  "execution": {
+    "binary_format": "wasm",
+    "entrypoint": {
+      "kind": "wasi-command",
+      "command": "run"
+    },
+    "preferred_targets": [
+      "local",
+      "browser",
+      "edge",
+      "device"
+    ],
+    "constraints": {
+      "filesystem_access": "none",
+      "host_api_access": "none",
+      "network_access": "forbidden"
+    }
+  },
+  "policies": [],
+  "dependencies": [],
+  "provenance": {
+    "source": "greenfield",
+    "author": "enricopiovesan",
+    "created_at": "2026-09-10T05:20:00Z",
+    "spec_ref": "registry#426 / UMA chapter-13 report chain port (semantic alternate)",
+    "adr_refs": [
+      "0001-rust-wasm-foundation"
+    ],
+    "exception_refs": []
+  },
+  "evidence": [],
+  "service_type": "stateless",
+  "permitted_targets": [
+    "local",
+    "browser",
+    "edge",
+    "device"
+  ],
+  "event_trigger": null,
+  "connector_requirements": [],
+  "state_schema": null,
+  "artifact_type": "native",
+  "artifact": {
+    "digest": "sha256:e0c21babb2f84f9ec7e61cfeb2703900bb18575ecf14108797464167ee7e8b5a",
+    "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/report.summarize-semantic-1.0.0/summarize-semantic-agent.wasm"
+  },
+  "authoring": {
+    "method": "llm-assisted",
+    "source_revision": "publish/report-summarize-semantic-1.0.0",
+    "test_evidence": "capability-src/report-summarize-semantic: 12 #[test] cases (table lookup, OOV→[UNK], empty sentence, zero-facts centroid, top-k>count, subword ## path, corrupt M2V1 parse, integer-path golden); cargo llvm-cov functions=100%, lines/regions>=95%. Hot path is i8/i32/i128-only (no float) ⇒ byte-identical across x86_64/aarch64; golden asserted on build host. Companion model artifact potion-base-32M-int8.bin sha256:159b2efd704766be0bf2a035c3f49fe62d588d29643c7025f7ce38b0b7584cd1 (embedded in WASM; also released for CORS mirror). Licenses: minishlab/potion-base-32M MIT; teacher BAAI/bge-base-en-v1.5 MIT.",
+    "review": {
+      "decision": "pending-qualified-review",
+      "reviewer": "traverse-registry-maintainer"
+    }
+  },
+  "risk": {
+    "effect_class": "pure_read",
+    "determinism_class": "deterministic",
+    "data_flow": {
+      "accepted_data_classifications": [],
+      "produced_data_classifications": [],
+      "egress_policy": "denied"
+    },
+    "reliability": {
+      "idempotency_required": false,
+      "retryable": true,
+      "compensation_available": true
+    }
+  }
+}
