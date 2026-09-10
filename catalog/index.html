@@ -134,16 +134,6 @@
   }
   function groupKey(reference) { return reference.split("@")[0]; }
 
-  // "AI-assisted" marker: the contract for this capability version was
-  // authored with LLM assistance (contract.authoring.method ==
-  // "llm-assisted"). This is the only machine-checkable AI signal in the
-  // contract schema -- capabilities themselves are deterministic WASM and
-  // never run a model at execution time.
-  function isAiAssisted(contract) {
-    return !!(contract && contract.authoring && contract.authoring.method === "llm-assisted");
-  }
-  var AI_ASSISTED_TITLE = "Contract authored with LLM assistance (authoring.method: \"llm-assisted\")";
-
   // Personas are versioned (specs/017-persona-registry) but a use_case's
   // persona_ref names an id only, not id@version -- resolves to that
   // persona's highest published version, the same "current" convention
@@ -291,34 +281,61 @@
     }
   }
 
+  function serviceTypeNode(contract) {
+    var st = contract.service_type;
+    if (!st) { return el("span", { className: "t-muted", textContent: "—" }); }
+    var def = SERVICE_TYPE_DEFINITIONS[st];
+    return el("a", { className: "badge", href: serviceTypeHash(st), title: def ? def.summary : st, textContent: def ? def.name : st });
+  }
+
+  // Single source of truth for the per-capability facts shown in BOTH the
+  // card and the table, so the two views can never drift. Each entry's
+  // `node()` is a factory (a DOM node has one parent -- card and table each
+  // build their own copy). Column order here == column order in the table
+  // == badge order on the card.
+  function capabilityFacts(group) {
+    var contract = group.latest.contract;
+    return [
+      { label: "Namespace", node: function () { return el("span", { className: "badge badge-accent", textContent: contract.namespace }); } },
+      { label: "Service type", node: function () { return serviceTypeNode(contract); } },
+      { label: "Latest", node: function () { return el("span", { className: "badge t-mono", textContent: "v" + contract.version }); } },
+      { label: "Versions", node: function () { return el("span", { className: "badge", textContent: group.versions.length + " version" + (group.versions.length === 1 ? "" : "s") }); } },
+      { label: "Coverage", node: function () {
+          return group.latest.test_coverage
+            ? el("span", { className: "badge badge-success", textContent: group.latest.test_coverage.lines_percent + "% covered" })
+            : el("span", { className: "t-muted", textContent: "—" });
+        } },
+      { label: "Use cases", node: function () {
+          var n = Array.isArray(contract.use_cases) ? contract.use_cases.length : 0;
+          return el("span", { className: "badge", textContent: n + " use case" + (n === 1 ? "" : "s") });
+        } },
+      { label: "Status", node: function () {
+          return group.latest.deprecated
+            ? el("span", { className: "badge badge-danger", textContent: "deprecated" })
+            : el("span", { className: "badge badge-success", textContent: "active" });
+        } },
+    ];
+  }
+
   function renderCapabilityCard(group) {
     var contract = group.latest.contract;
-    var top = [
-      el("span", { className: "badge badge-accent", textContent: contract.namespace }),
-      el("span", { className: "badge", textContent: "v" + contract.version }),
-    ];
-    if (group.versions.length > 1) { top.push(el("span", { className: "badge", textContent: group.versions.length + " versions" })); }
-    if (group.latest.deprecated) { top.push(el("span", { className: "badge badge-danger", textContent: "deprecated" })); }
-    if (isAiAssisted(contract)) { top.push(el("span", { className: "badge badge-ai", title: AI_ASSISTED_TITLE, textContent: "AI-assisted" })); }
-
-    var bottom = [];
-    if (group.latest.test_coverage) {
-      bottom.push(el("span", { className: "badge badge-success", textContent: group.latest.test_coverage.lines_percent + "% covered" }));
-    }
-    if (Array.isArray(contract.use_cases) && contract.use_cases.length > 0) {
-      bottom.push(el("span", { className: "badge", textContent: contract.use_cases.length + " use cases" }));
-    }
-
-    return el("a", { className: "card", href: referenceHash(group.latest.reference) }, [
-      el("div", { className: "card-top" }, top),
-      el("div", { className: "card-id", textContent: contract.id }),
+    var href = referenceHash(group.latest.reference);
+    var card = el("div", { className: "card" }, [
+      el("a", { className: "card-id", href: href, textContent: contract.id }),
       el("p", { className: "card-summary", textContent: contract.summary || "" }),
-      el("div", { className: "card-bottom" }, bottom),
+      el("div", { className: "card-bottom" }, capabilityFacts(group).map(function (fact) { return fact.node(); })),
     ]);
+    // Whole-card click is a mouse convenience; the title <a> (and any
+    // linked badge) covers keyboard/AT and open-in-new-tab.
+    card.addEventListener("click", function (event) {
+      if (event.target.closest("a")) { return; }
+      window.location.hash = href;
+    });
+    return card;
   }
 
   function renderCapabilityTable(groups) {
-    var headers = ["Capability", "Namespace", "Latest", "Versions", "AI", "Coverage", "Use cases", "Status"];
+    var headers = ["Capability"].concat(capabilityFacts(groups[0]).map(function (fact) { return fact.label; }));
     var thead = el("thead", {}, [
       el("tr", {}, headers.map(function (label) { return el("th", { textContent: label }); })),
     ]);
@@ -327,27 +344,15 @@
       var contract = group.latest.contract;
       var href = referenceHash(group.latest.reference);
 
-      var aiCell = isAiAssisted(contract)
-        ? el("span", { className: "badge badge-ai", title: AI_ASSISTED_TITLE, textContent: "AI-assisted" })
-        : el("span", { className: "t-muted", textContent: "—" });
-      var coverageCell = group.latest.test_coverage
-        ? el("span", { className: "badge badge-success", textContent: group.latest.test_coverage.lines_percent + "%" })
-        : el("span", { className: "t-muted", textContent: "—" });
-      var statusCell = group.latest.deprecated
-        ? el("span", { className: "badge badge-danger", textContent: "deprecated" })
-        : el("span", { className: "badge badge-success", textContent: "active" });
-      var useCount = Array.isArray(contract.use_cases) ? contract.use_cases.length : 0;
-
-      var row = el("tr", { className: "cap-row" }, [
-        el("td", { className: "cap-row-id" }, [el("a", { href: href, className: "t-mono", textContent: contract.id })]),
-        el("td", {}, [el("span", { className: "badge badge-accent", textContent: contract.namespace })]),
-        el("td", { className: "t-mono", textContent: "v" + contract.version }),
-        el("td", { className: "t-mono", textContent: group.versions.length > 1 ? String(group.versions.length) : "1" }),
-        el("td", {}, [aiCell]),
-        el("td", {}, [coverageCell]),
-        el("td", { className: "t-mono", textContent: useCount ? String(useCount) : "—" }),
-        el("td", {}, [statusCell]),
+      var idCell = el("td", { className: "cap-row-id" }, [
+        el("a", { href: href, className: "t-mono", textContent: contract.id }),
+        contract.summary ? el("span", { className: "cap-row-summary", textContent: contract.summary }) : null,
       ]);
+      var cells = [idCell].concat(capabilityFacts(group).map(function (fact) {
+        return el("td", {}, [fact.node()]);
+      }));
+
+      var row = el("tr", { className: "cap-row" }, cells);
       // Whole-row click is a mouse convenience; keyboard/AT users get the
       // real <a> in the first cell.
       row.addEventListener("click", function (event) {

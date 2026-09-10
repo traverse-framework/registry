@@ -162,9 +162,14 @@ input[type="search"]::placeholder { color: var(--fg-subtle); }
 }
 .card:hover { border-color: var(--border-hover); transform: translateY(-2px); }
 .card-top { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 0.6rem; }
-.card-id { font-family: var(--font-display); font-weight: 600; font-size: 1rem; letter-spacing: -0.01em; }
-.card-summary { font-size: 0.875rem; color: var(--fg-muted); line-height: 1.55; }
+.card-id { display: block; font-family: var(--font-display); font-weight: 600; font-size: 1rem; letter-spacing: -0.01em; color: var(--fg); }
+.card:hover .card-id { color: var(--accent-hover); }
+.card-summary { font-size: 0.875rem; color: var(--fg-muted); line-height: 1.55; margin-top: 0.35rem; }
 .card-bottom { display: flex; align-items: center; gap: 0.5rem; margin-top: 0.85rem; flex-wrap: wrap; }
+/* Card and table share one fact model -- keep their linked badges (e.g.
+   Service type) visually identical and clearly interactive. */
+.card-bottom a.badge:hover,
+.cap-table td a.badge:hover { border-color: var(--border-hover); color: var(--fg); }
 
 /* ─── View toggle (Table / Cards) ─────────────────────────────────────── */
 .view-toggle { display: inline-flex; margin-left: auto; border: 1px solid var(--border); border-radius: var(--radius-sm); overflow: hidden; }
@@ -187,14 +192,16 @@ input[type="search"]::placeholder { color: var(--fg-subtle); }
   padding: 0.7rem 0.9rem; border-bottom: 1px solid var(--border); white-space: nowrap;
   background: var(--bg-elevated); position: sticky; top: 0;
 }
-.cap-table td { padding: 0.65rem 0.9rem; border-bottom: 1px solid var(--border); vertical-align: middle; color: var(--fg-muted); }
+.cap-table td { padding: 0.65rem 0.9rem; border-bottom: 1px solid var(--border); vertical-align: top; color: var(--fg-muted); white-space: nowrap; }
 .cap-table tbody tr:last-child td { border-bottom: 0; }
 .cap-row { cursor: pointer; transition: background 0.12s; }
 .cap-row:hover { background: var(--accent-dim); }
 .cap-row:focus-within { background: var(--accent-dim); }
+.cap-row-id { min-width: 15rem; white-space: normal; }
 .cap-row-id a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 2px; }
 .cap-row-id a { color: var(--fg); font-weight: 500; }
 .cap-row:hover .cap-row-id a { color: var(--accent-hover); }
+.cap-row-summary { display: block; margin-top: 0.2rem; font-size: 0.8rem; font-weight: 300; line-height: 1.45; color: var(--fg-subtle); white-space: normal; max-width: 44ch; }
 
 /* ─── Badges ──────────────────────────────────────────────────────────── */
 /* registry#130: font-size was 0.68rem (10.88px), below common
@@ -212,13 +219,6 @@ input[type="search"]::placeholder { color: var(--fg-subtle); }
 .badge-accent { border-color: rgba(255,122,26,0.3); color: var(--accent-hover); background: var(--accent-dim); }
 .badge-success { border-color: rgba(63,185,80,0.3); color: #4fc960; background: rgba(63,185,80,0.08); }
 .badge-danger { border-color: rgba(240,134,106,0.3); color: #f49a82; background: rgba(240,134,106,0.08); }
-/* AI-assisted marker -- violet, distinct from the orange accent and the
-   green/red status badges. Signals contract.authoring.method ==
-   "llm-assisted", not model execution. */
-.badge-ai { border-color: rgba(159,122,255,0.4); color: #c3abff; background: rgba(136,34,204,0.14); }
-.badge-ai::before { content: '\2726'; font-size: 0.8em; line-height: 1; }
-[data-theme="light"] .badge-ai,
-:root:not([data-theme="dark"]) .badge-ai { color: #6b3fd4; background: rgba(107,63,212,0.08); border-color: rgba(107,63,212,0.28); }
 
 /* ─── Detail page ─────────────────────────────────────────────────────── */
 .back-link { display: inline-flex; align-items: center; gap: 0.4rem; font-size: 0.85rem; color: var(--fg-muted); margin-bottom: 1.5rem; }
