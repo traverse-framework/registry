@@ -299,7 +299,6 @@
       { label: "Namespace", node: function () { return el("span", { className: "badge badge-accent", textContent: contract.namespace }); } },
       { label: "Service type", node: function () { return serviceTypeNode(contract); } },
       { label: "Latest", node: function () { return el("span", { className: "badge t-mono", textContent: "v" + contract.version }); } },
-      { label: "Versions", node: function () { return el("span", { className: "badge", textContent: group.versions.length + " version" + (group.versions.length === 1 ? "" : "s") }); } },
       { label: "Coverage", node: function () {
           return group.latest.test_coverage
             ? el("span", { className: "badge badge-success", textContent: group.latest.test_coverage.lines_percent + "% covered" })
@@ -309,10 +308,12 @@
           var n = Array.isArray(contract.use_cases) ? contract.use_cases.length : 0;
           return el("span", { className: "badge", textContent: n + " use case" + (n === 1 ? "" : "s") });
         } },
+      // Only surfaced when it is not the default -- an "active" badge on
+      // every row is noise (owner feedback). Deprecated still stands out.
       { label: "Status", node: function () {
           return group.latest.deprecated
             ? el("span", { className: "badge badge-danger", textContent: "deprecated" })
-            : el("span", { className: "badge badge-success", textContent: "active" });
+            : el("span", { className: "t-muted", textContent: "—" });
         } },
     ];
   }
