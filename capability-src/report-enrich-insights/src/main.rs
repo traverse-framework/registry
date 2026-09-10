@@ -7,6 +7,12 @@
 //! by `(signal rank, first-seen index)`. Keyword signal classes are
 //! `browser` / `edge` / `cloud` / `general`. No model, network, randomness,
 //! or host state.
+//!
+//! `1.1.0` (registry#441): also echoes `source_fragments` verbatim so the
+//! chain composes under `browserLocalPlan`'s single-predecessor rule -- the
+//! downstream `report.summarize` node needs both `source_fragments` and
+//! `structured_facts`, and this node is its only predecessor. Enrichment
+//! logic is unchanged.
 
 #![cfg_attr(not(test), no_std)]
 #![cfg_attr(not(test), no_main)]
@@ -166,7 +172,14 @@ fn enrich_insights(input: Value) -> Value {
     });
 
     let facts: Vec<String> = rows.into_iter().map(|r| r.line).collect();
-    object(alloc::vec![("structured_facts", array_of_strings(&facts))])
+    // `source_fragments` is echoed verbatim so the downstream `report.summarize`
+    // node can draw both its inputs from this single predecessor -- the linear
+    // `browserLocalPlan` chain search only extends a chain by one predecessor
+    // that covers the whole remaining input gap (registry#441).
+    object(alloc::vec![
+        ("source_fragments", array_of_strings(&raw)),
+        ("structured_facts", array_of_strings(&facts)),
+    ])
 }
 
 #[cfg(not(test))]
@@ -293,6 +306,40 @@ mod tests {
                 String::from("Fact: cloud — Cloud second"),
             ]
         );
+    }
+
+    #[test]
+    fn echoes_source_fragments_verbatim() {
+        let out = call(r#"{"source_fragments":["Browser up", "", "  ", "Cloud latency $3 down"]}"#);
+        // Passed through exactly as received -- empties included, order kept,
+        // no tidy/dedupe (that already happened in report.collect-fragments).
+        assert_eq!(
+            out.get("source_fragments").unwrap().string_array(),
+            alloc::vec![
+                String::from("Browser up"),
+                String::from(""),
+                String::from("  "),
+                String::from("Cloud latency $3 down"),
+            ]
+        );
+        // structured_facts still only counts non-empty fragments.
+        assert_eq!(facts_of(&out).len(), 2);
+    }
+
+    #[test]
+    fn echoes_empty_source_fragments() {
+        let out = call(r#"{"source_fragments":[]}"#);
+        assert!(out
+            .get("source_fragments")
+            .unwrap()
+            .string_array()
+            .is_empty());
+        let missing = call(r#"{}"#);
+        assert!(missing
+            .get("source_fragments")
+            .unwrap()
+            .string_array()
+            .is_empty());
     }
 
     #[test]
