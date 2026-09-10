@@ -216,6 +216,18 @@ class BuildIndexContractMetadataTests(unittest.TestCase):
             self.assertEqual(entry["permitted_targets"], [])
             self.assertEqual(entry["lifecycle"], "")
             self.assertIsNone(entry["provenance"])
+            self.assertIsNone(entry["ai"])
+
+    def test_entry_carries_ai_declaration_verbatim(self):
+        # spec 001 FR-017: the optional `ai` object is projected verbatim.
+        with tempfile.TemporaryDirectory() as tmp:
+            contract = valid_contract()
+            contract["ai"] = {"model_backed": True, "models": ["minishlab/potion-base-32M"]}
+            write_contract(tmp, contract)
+
+            index = self._run_in(tmp, 0, "deadbeef")
+
+            self.assertEqual(index["capabilities"][0]["ai"], contract["ai"])
 
     def test_active_contract_missing_artifact_aborts_build(self):
         # Regression test for a real incident (registry#89/#90): an active

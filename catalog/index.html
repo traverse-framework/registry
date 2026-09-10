@@ -293,11 +293,29 @@
   // `node()` is a factory (a DOM node has one parent -- card and table each
   // build their own copy). Column order here == column order in the table
   // == badge order on the card.
+  // spec 001 FR-017: a capability whose contract declares `ai.model_backed:
+  // true` is an "agent". `models` is guaranteed non-empty by CI when true.
+  function isAgent(contract) {
+    return !!(contract && contract.ai && contract.ai.model_backed === true);
+  }
+  function agentModels(contract) {
+    return (contract && contract.ai && Array.isArray(contract.ai.models)) ? contract.ai.models : [];
+  }
+
   function capabilityFacts(group) {
     var contract = group.latest.contract;
     return [
       { label: "Namespace", node: function () { return el("span", { className: "badge badge-accent", textContent: contract.namespace }); } },
       { label: "Service type", node: function () { return serviceTypeNode(contract); } },
+      { label: "Agent", node: function () {
+          if (!isAgent(contract)) { return el("span", { className: "t-muted", textContent: "—" }); }
+          var models = agentModels(contract);
+          return el("span", {
+            className: "badge badge-agent",
+            title: models.length ? ("Model-backed capability — " + models.join(", ")) : "Model-backed capability",
+            textContent: "Agent",
+          });
+        } },
       { label: "Latest", node: function () { return el("span", { className: "badge t-mono", textContent: "v" + contract.version }); } },
       { label: "Coverage", node: function () {
           return group.latest.test_coverage
@@ -559,6 +577,11 @@
         ? el("a", { className: "badge", href: serviceTypeHash(contract.service_type), textContent: serviceTypeDef.name })
         : textNode(contract.service_type);
       appEl.appendChild(fieldRow("Service type", serviceTypeValue));
+    }
+    if (isAgent(contract)) {
+      appEl.appendChild(fieldRow("Agent", el("span", { className: "badge badge-agent", textContent: "model-backed" })));
+      var models = agentModels(contract);
+      if (models.length) { appEl.appendChild(fieldRow("Models", textNode(models.join(", ")))); }
     }
     appEl.appendChild(fieldRow("Permitted targets", textNode((contract.permitted_targets || []).join(", "))));
     appEl.appendChild(fieldRow("Owner", renderOwner(contract.owner)));

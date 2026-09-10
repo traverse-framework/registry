@@ -71,6 +71,53 @@ class ServiceTypeValidationTests(unittest.TestCase):
             self.assertNotIn("contract.invalid_service_type", codes)
 
 
+class AiObjectValidationTests(unittest.TestCase):
+    """spec 001 FR-017: optional `ai` object marking a model-backed capability."""
+
+    def _codes(self, ai):
+        with tempfile.TemporaryDirectory() as tmp:
+            contract = valid_contract()
+            contract["ai"] = ai
+            path = write_contract(tmp, contract)
+            errors: list = []
+            capability_validation.validate_contract(path, errors)
+            return [e["code"] for e in errors]
+
+    def test_absent_ai_is_not_flagged(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = write_contract(tmp, valid_contract())
+            errors: list = []
+            capability_validation.validate_contract(path, errors)
+            self.assertEqual(errors, [])
+
+    def test_model_backed_false_without_models_passes(self):
+        self.assertNotIn("contract.invalid_ai", self._codes({"model_backed": False}))
+
+    def test_model_backed_true_with_models_passes(self):
+        self.assertNotIn(
+            "contract.invalid_ai",
+            self._codes({"model_backed": True, "models": ["minishlab/potion-base-32M"]}),
+        )
+
+    def test_model_backed_true_without_models_is_rejected(self):
+        self.assertIn("contract.invalid_ai", self._codes({"model_backed": True}))
+
+    def test_model_backed_true_with_empty_models_is_rejected(self):
+        self.assertIn("contract.invalid_ai", self._codes({"model_backed": True, "models": []}))
+
+    def test_non_boolean_model_backed_is_rejected(self):
+        self.assertIn("contract.invalid_ai", self._codes({"model_backed": "yes"}))
+
+    def test_non_string_models_entry_is_rejected(self):
+        self.assertIn(
+            "contract.invalid_ai",
+            self._codes({"model_backed": True, "models": ["ok", 3]}),
+        )
+
+    def test_ai_not_an_object_is_rejected(self):
+        self.assertIn("contract.invalid_ai", self._codes(["model_backed"]))
+
+
 class CapabilityValidationSpec006Tests(unittest.TestCase):
     def test_valid_seed_shaped_contract_passes(self):
         with tempfile.TemporaryDirectory() as tmp:

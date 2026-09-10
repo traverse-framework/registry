@@ -122,6 +122,19 @@ def service_type_field_html(service_type: str, base_url: str) -> str:
     return field_row_html("Service type", f'<a class="badge" href="{esc(href)}">{esc(definition["name"])}</a>')
 
 
+def ai_field_html(ai) -> str:
+    """spec 001 FR-017: a contract with `ai.model_backed: true` is an "agent".
+    CI guarantees `models` is a non-empty string array when true, so this
+    renders unconditionally once model_backed is set."""
+    if not isinstance(ai, dict) or ai.get("model_backed") is not True:
+        return ""
+    models = [m for m in (ai.get("models") or []) if isinstance(m, str) and m.strip()]
+    rows = field_row_html("Agent", '<span class="badge badge-agent">model-backed</span>')
+    if models:
+        rows += field_row("Models", ", ".join(models))
+    return rows
+
+
 # Never render contract.owner.contact directly -- it is free-form optional
 # metadata (spec 006-public-scope-and-identity FR-003) and has held a
 # personal email address for every capability published so far. Map the
@@ -391,6 +404,7 @@ def render_capability_page(
     field_rows = "".join(
         [
             service_type_field_html(contract.get("service_type"), base_url),
+            ai_field_html(contract.get("ai")),
             field_row("Permitted targets", ", ".join(contract.get("permitted_targets") or [])),
             owner_html(contract.get("owner")),
         ]
