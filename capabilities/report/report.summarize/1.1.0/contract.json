@@ -1,0 +1,222 @@
+{
+  "kind": "capability_contract",
+  "schema_version": "1.0.0",
+  "id": "report.summarize",
+  "namespace": "report",
+  "name": "summarize",
+  "version": "1.1.0",
+  "lifecycle": "active",
+  "owner": {
+    "team": "traverse-core",
+    "contact": "enrico.piovesan10@gmail.com"
+  },
+  "summary": "Build a deterministic extractive operational summary, echoing structured_facts and a summary_or_translation alias for linear chain composition.",
+  "description": "Third node of the report.* chain. Splits source_fragments into sentences, scores each by keyword overlap with structured_facts tokens, keeps the top 3 in original order, and renders a fixed template including the project name (defaulting to 'The project') and validated insight count. 1.1.0 additionally echoes structured_facts verbatim and emits summary_or_translation (identical to summary on this English node; report.translate-fr replaces it with the French text) so the single downstream node -- report.format directly, or report.translate-fr then report.format -- can draw every input from this one predecessor under browserLocalPlan's linear chain search (registry#441). Pure, deterministic, memory-only; summarization logic unchanged from 1.0.0.",
+  "use_cases": [
+    {
+      "scenario": "As a rollout coordinator, I want browser and edge evidence folded into a named project summary while the structured facts and a language-agnostic summary_or_translation field are carried alongside, so that report.format (or report.translate-fr then report.format) can consume everything from this one node.",
+      "input_example": {
+        "source_fragments": [
+          "Browser adoption rose. Edge cache is warm."
+        ],
+        "structured_facts": [
+          "Fact: browser — Browser adoption rose",
+          "Fact: edge — Edge cache is warm"
+        ],
+        "project_name": "Acme Rollout"
+      },
+      "output_example": {
+        "structured_facts": [
+          "Fact: browser — Browser adoption rose",
+          "Fact: edge — Edge cache is warm"
+        ],
+        "summary": "Acme Rollout combines distributed browser, edge, and cloud evidence into a deterministic operational summary with 2 validated insights. Browser adoption rose. Edge cache is warm.",
+        "summary_or_translation": "Acme Rollout combines distributed browser, edge, and cloud evidence into a deterministic operational summary with 2 validated insights. Browser adoption rose. Edge cache is warm."
+      },
+      "happy": true,
+      "persona_ref": "rollout-coordinator"
+    },
+    {
+      "scenario": "As a rollout coordinator, I want a single validated insight to use singular wording when no project name is supplied, so that the default template still reads correctly.",
+      "input_example": {
+        "source_fragments": [
+          "Cloud latency improved."
+        ],
+        "structured_facts": [
+          "Fact: cloud — Cloud latency improved"
+        ]
+      },
+      "output_example": {
+        "structured_facts": [
+          "Fact: cloud — Cloud latency improved"
+        ],
+        "summary": "The project combines distributed browser, edge, and cloud evidence into a deterministic operational summary with 1 validated insight. Cloud latency improved.",
+        "summary_or_translation": "The project combines distributed browser, edge, and cloud evidence into a deterministic operational summary with 1 validated insight. Cloud latency improved."
+      },
+      "happy": true,
+      "persona_ref": "rollout-coordinator"
+    },
+    {
+      "scenario": "As a rollout coordinator, I want zero structured facts to still yield a header-only summary, so that an empty enrichment stage does not invent sentences.",
+      "input_example": {
+        "source_fragments": [
+          "Unrelated chatter here."
+        ],
+        "structured_facts": []
+      },
+      "output_example": {
+        "structured_facts": [],
+        "summary": "The project combines distributed browser, edge, and cloud evidence into a deterministic operational summary with 0 validated insights. Unrelated chatter here.",
+        "summary_or_translation": "The project combines distributed browser, edge, and cloud evidence into a deterministic operational summary with 0 validated insights. Unrelated chatter here."
+      },
+      "happy": false,
+      "persona_ref": "rollout-coordinator"
+    }
+  ],
+  "inputs": {
+    "schema": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source_fragments",
+        "structured_facts"
+      ],
+      "properties": {
+        "source_fragments": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "structured_facts": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "project_name": {
+          "type": "string"
+        }
+      }
+    }
+  },
+  "outputs": {
+    "schema": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "structured_facts",
+        "summary",
+        "summary_or_translation"
+      ],
+      "properties": {
+        "structured_facts": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "summary": {
+          "type": "string"
+        },
+        "summary_or_translation": {
+          "type": "string"
+        }
+      }
+    }
+  },
+  "preconditions": [
+    {
+      "id": "fragments-and-facts-provided",
+      "description": "Caller supplies source_fragments and structured_facts arrays (either may be empty)."
+    }
+  ],
+  "postconditions": [
+    {
+      "id": "deterministic-summary",
+      "description": "Identical input always yields an identical summary string. Sentence scoring and top-k selection use no randomness, clocks, or host state."
+    }
+  ],
+  "side_effects": [
+    {
+      "kind": "memory_only",
+      "description": "Produces one summary string in memory; does not log, persist, or transmit inputs."
+    }
+  ],
+  "emits": [],
+  "consumes": [],
+  "permissions": [
+    {
+      "id": "report.summarize"
+    }
+  ],
+  "execution": {
+    "binary_format": "wasm",
+    "entrypoint": {
+      "kind": "wasi-command",
+      "command": "run"
+    },
+    "preferred_targets": [
+      "local",
+      "browser",
+      "edge",
+      "device"
+    ],
+    "constraints": {
+      "filesystem_access": "none",
+      "host_api_access": "none",
+      "network_access": "forbidden"
+    }
+  },
+  "policies": [],
+  "dependencies": [],
+  "provenance": {
+    "source": "greenfield",
+    "author": "enricopiovesan",
+    "created_at": "2026-09-10T17:25:00Z",
+    "spec_ref": "registry#441 (browser chain linear pass-through) / registry#426 report chain port",
+    "adr_refs": [
+      "0001-rust-wasm-foundation"
+    ],
+    "exception_refs": []
+  },
+  "evidence": [],
+  "service_type": "stateless",
+  "permitted_targets": [
+    "local",
+    "browser",
+    "edge",
+    "device"
+  ],
+  "event_trigger": null,
+  "connector_requirements": [],
+  "state_schema": null,
+  "artifact_type": "native",
+  "artifact": {
+    "digest": "sha256:ceaf86acd0ca161d042b9661aa56cdeaeb031ad5279f6c184edc7bcc3e1077f9",
+    "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/report.summarize-1.1.0/summarize-agent.wasm"
+  },
+  "authoring": {
+    "method": "llm-assisted",
+    "source_revision": "publish/report-summarize-1.1.0",
+    "test_evidence": "capability-src/report-summarize: 13 #[test] cases covering top-k, zero facts, missing/empty project_name, tie-break determinism, plus the 1.1.0 structured_facts echo and summary_or_translation alias; cargo llvm-cov functions=100%, lines=99.52%, regions=98.91%.",
+    "review": {
+      "decision": "pending-qualified-review",
+      "reviewer": "traverse-registry-maintainer"
+    }
+  },
+  "risk": {
+    "effect_class": "pure_read",
+    "determinism_class": "deterministic",
+    "data_flow": {
+      "accepted_data_classifications": [],
+      "produced_data_classifications": [],
+      "egress_policy": "denied"
+    },
+    "reliability": {
+      "idempotency_required": false,
+      "retryable": true,
+      "compensation_available": true
+    }
+  }
+}
