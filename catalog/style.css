@@ -166,6 +166,36 @@ input[type="search"]::placeholder { color: var(--fg-subtle); }
 .card-summary { font-size: 0.875rem; color: var(--fg-muted); line-height: 1.55; }
 .card-bottom { display: flex; align-items: center; gap: 0.5rem; margin-top: 0.85rem; flex-wrap: wrap; }
 
+/* ─── View toggle (Table / Cards) ─────────────────────────────────────── */
+.view-toggle { display: inline-flex; margin-left: auto; border: 1px solid var(--border); border-radius: var(--radius-sm); overflow: hidden; }
+.view-toggle-btn {
+  font-family: var(--font-mono); font-size: 0.75rem; letter-spacing: 0.03em;
+  padding: 0.35rem 0.75rem; border: 0; background: var(--bg-elevated); color: var(--fg-muted);
+  cursor: pointer; transition: color 0.15s, background 0.15s;
+}
+.view-toggle-btn + .view-toggle-btn { border-left: 1px solid var(--border); }
+.view-toggle-btn:hover { color: var(--fg); }
+.view-toggle-btn.is-active { background: var(--accent-dim); color: var(--accent-hover); }
+@media (max-width: 640px) { .view-toggle { margin-left: 0; } }
+
+/* ─── Capability table ────────────────────────────────────────────────── */
+.table-wrap { width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; border: 1px solid var(--border); border-radius: var(--radius); }
+.cap-table { width: 100%; border-collapse: collapse; font-size: 0.875rem; }
+.cap-table th {
+  text-align: left; font-family: var(--font-mono); font-weight: 500; font-size: 0.7rem;
+  text-transform: uppercase; letter-spacing: 0.06em; color: var(--fg-subtle);
+  padding: 0.7rem 0.9rem; border-bottom: 1px solid var(--border); white-space: nowrap;
+  background: var(--bg-elevated); position: sticky; top: 0;
+}
+.cap-table td { padding: 0.65rem 0.9rem; border-bottom: 1px solid var(--border); vertical-align: middle; color: var(--fg-muted); }
+.cap-table tbody tr:last-child td { border-bottom: 0; }
+.cap-row { cursor: pointer; transition: background 0.12s; }
+.cap-row:hover { background: var(--accent-dim); }
+.cap-row:focus-within { background: var(--accent-dim); }
+.cap-row-id a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 2px; }
+.cap-row-id a { color: var(--fg); font-weight: 500; }
+.cap-row:hover .cap-row-id a { color: var(--accent-hover); }
+
 /* ─── Badges ──────────────────────────────────────────────────────────── */
 /* registry#130: font-size was 0.68rem (10.88px), below common
    minimum-readable-body-text guidance -- bumped to 0.75rem (12px). Colored
@@ -182,6 +212,13 @@ input[type="search"]::placeholder { color: var(--fg-subtle); }
 .badge-accent { border-color: rgba(255,122,26,0.3); color: var(--accent-hover); background: var(--accent-dim); }
 .badge-success { border-color: rgba(63,185,80,0.3); color: #4fc960; background: rgba(63,185,80,0.08); }
 .badge-danger { border-color: rgba(240,134,106,0.3); color: #f49a82; background: rgba(240,134,106,0.08); }
+/* AI-assisted marker -- violet, distinct from the orange accent and the
+   green/red status badges. Signals contract.authoring.method ==
+   "llm-assisted", not model execution. */
+.badge-ai { border-color: rgba(159,122,255,0.4); color: #c3abff; background: rgba(136,34,204,0.14); }
+.badge-ai::before { content: '\2726'; font-size: 0.8em; line-height: 1; }
+[data-theme="light"] .badge-ai,
+:root:not([data-theme="dark"]) .badge-ai { color: #6b3fd4; background: rgba(107,63,212,0.08); border-color: rgba(107,63,212,0.28); }
 
 /* ─── Detail page ─────────────────────────────────────────────────────── */
 .back-link { display: inline-flex; align-items: center; gap: 0.4rem; font-size: 0.85rem; color: var(--fg-muted); margin-bottom: 1.5rem; }
