@@ -4,6 +4,14 @@
 //! sentences from `source_fragments` by keyword overlap with
 //! `structured_facts`, keeps the top-k in original order, and renders a
 //! fixed template. No model, network, randomness, or host state.
+//!
+//! `1.1.0` (registry#441): the output also carries `structured_facts`
+//! (echoed verbatim) and `summary_or_translation` (identical to `summary`
+//! on this English node; `report.translate-fr` overwrites it with the
+//! French text). This lets the single downstream node -- `report.format`
+//! directly, or `report.translate-fr` then `report.format` -- draw all of
+//! its inputs from this one predecessor under `browserLocalPlan`'s linear
+//! chain search. Summarization logic is unchanged.
 
 #![cfg_attr(not(test), no_std)]
 #![cfg_attr(not(test), no_main)]
@@ -14,7 +22,7 @@ use alloc::format;
 use alloc::string::String;
 use alloc::vec::Vec;
 
-use wasi_capability_runtime::{object, Value};
+use wasi_capability_runtime::{array_of_strings, object, Value};
 
 /// Fixed number of sentences retained for the extractive body.
 const TOP_K: usize = 3;
@@ -144,7 +152,16 @@ fn summarize(input: Value) -> Value {
     let project_name = input.get("project_name").and_then(Value::as_str);
 
     let summary = build_summary(&source_fragments, &structured_facts, project_name);
-    object(alloc::vec![("summary", Value::String(summary))])
+    // `structured_facts` echoed verbatim and `summary_or_translation` aliased to
+    // `summary` so the one downstream node (`report.format`, or
+    // `report.translate-fr` then `report.format`) can take every input it needs
+    // from this single predecessor -- `browserLocalPlan` only extends a chain by
+    // one predecessor that covers the whole remaining gap (registry#441).
+    object(alloc::vec![
+        ("structured_facts", array_of_strings(&structured_facts)),
+        ("summary", Value::String(summary.clone())),
+        ("summary_or_translation", Value::String(summary)),
+    ])
 }
 
 #[cfg(not(test))]
@@ -164,6 +181,42 @@ mod tests {
 
     fn summary_of(out: &Value) -> &str {
         out.get("summary").unwrap().as_str().unwrap()
+    }
+
+    #[test]
+    fn echoes_structured_facts_verbatim() {
+        let out = call(
+            r#"{"source_fragments":["Browser up."],"structured_facts":["Fact: browser — Browser up","Fact: edge — noise",""]}"#,
+        );
+        assert_eq!(
+            out.get("structured_facts").unwrap().string_array(),
+            alloc::vec![
+                String::from("Fact: browser — Browser up"),
+                String::from("Fact: edge — noise"),
+                String::from(""),
+            ]
+        );
+    }
+
+    #[test]
+    fn summary_or_translation_aliases_summary() {
+        let out = call(
+            r#"{"source_fragments":["Cloud latency improved."],"structured_facts":["Fact: cloud — Cloud latency improved"],"project_name":"Acme"}"#,
+        );
+        assert_eq!(
+            out.get("summary_or_translation").unwrap().as_str().unwrap(),
+            summary_of(&out)
+        );
+    }
+
+    #[test]
+    fn echoes_empty_structured_facts() {
+        let out = call(r#"{"source_fragments":[],"structured_facts":[]}"#);
+        assert!(out
+            .get("structured_facts")
+            .unwrap()
+            .string_array()
+            .is_empty());
     }
 
     #[test]
