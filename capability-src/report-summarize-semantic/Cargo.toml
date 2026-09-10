@@ -1,0 +1,25 @@
+[workspace]
+
+[package]
+name = "report-summarize-semantic-agent"
+version = "0.1.0"
+edition = "2021"
+publish = false
+description = "Model2Vec-backed extractive summarizer for the report.* chain. See registry#432 / #426."
+
+[[bin]]
+name = "summarize-semantic-agent"
+path = "src/main.rs"
+
+[features]
+default = []
+# Embed the full potion-base-32M int8 table (required for release WASM builds).
+full-model = []
+
+[dependencies]
+wasi-capability-runtime = { path = "../wasi-capability-runtime" }
+
+[profile.release]
+opt-level = "s"
+lto = true
+panic = "abort"
