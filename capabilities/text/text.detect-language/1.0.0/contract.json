@@ -1,0 +1,180 @@
+{
+  "kind": "capability_contract",
+  "schema_version": "1.0.0",
+  "id": "text.detect-language",
+  "namespace": "text",
+  "name": "detect-language",
+  "version": "1.0.0",
+  "lifecycle": "active",
+  "owner": {
+    "team": "traverse-core",
+    "contact": "enrico.piovesan10@gmail.com"
+  },
+  "summary": "Identify the language of free text using a from-scratch character-trigram frequency classifier trained on 24 languages.",
+  "description": "Normalizes input text (collapse whitespace, lowercase, pad), extracts its own top-400 character trigrams by frequency, and scores each of 24 trained languages by the integer rank-distance between the text's trigrams and that language's top-300 trigram frequency profile (Cavnar & Trenkle 1994, 'N-Gram-Based Text Categorization') -- a trigram absent from a language's profile costs a fixed max penalty. Returns the lowest-distance language, an integer 0-100 confidence derived from the margin to the second-best language, and the top-3 candidate languages with their raw distances. Input with fewer than 5 distinct trigrams (very short or empty text) returns 'und' (undetermined) rather than a low-confidence guess. Trained on UDHR (Universal Declaration of Human Rights) translations across ar, bg, cs, da, de, el, en, es, fi, fr, he, hi, hu, id, it, ja, nl, pl, pt, ro, ru, sv, ta, uk. Not a port of CLD2 or any other existing language-ID library -- CLD2 was investigated and found impractical to port faithfully (see registry#469) -- this is an original implementation of a well-documented public technique. Does not detect languages outside the trained set, does not handle mixed-language text (scores the whole input as one language), and does not read storage, invoke connectors, or know an application or workflow.",
+  "use_cases": [
+    {
+      "scenario": "As a support-ticket router, I want the language of an incoming ticket identified, so that I can route it to the right glossary/locale before further processing.",
+      "input_example": {
+        "text": "Bonjour, je n'arrive pas à me connecter à mon compte depuis hier soir et j'ai besoin d'aide rapidement."
+      },
+      "output_example": {
+        "language": "fr",
+        "confidence": 81,
+        "candidates": [
+          { "language": "fr", "distance": 10797 },
+          { "language": "es", "distance": 19352 },
+          { "language": "pt", "distance": 19372 }
+        ]
+      },
+      "happy": true,
+      "persona_ref": "support-ticket-router"
+    },
+    {
+      "scenario": "As a support-ticket router, I want a clear 'undetermined' result rather than a false guess when there isn't enough text to classify responsibly, so that I don't misroute short or empty input.",
+      "input_example": {
+        "text": "ok"
+      },
+      "output_example": {
+        "language": "und",
+        "confidence": 0,
+        "candidates": []
+      },
+      "happy": true,
+      "persona_ref": "support-ticket-router"
+    }
+  ],
+  "inputs": {
+    "schema": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["text"],
+      "properties": {
+        "text": {
+          "type": "string",
+          "maxLength": 20000
+        }
+      }
+    }
+  },
+  "outputs": {
+    "schema": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["language", "confidence", "candidates"],
+      "properties": {
+        "language": {
+          "type": "string",
+          "description": "ISO 639-1 code of the detected language, or 'und' if undetermined."
+        },
+        "confidence": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100
+        },
+        "candidates": {
+          "type": "array",
+          "maxItems": 3,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["language", "distance"],
+            "properties": {
+              "language": { "type": "string" },
+              "distance": { "type": "integer", "minimum": 0 }
+            }
+          }
+        }
+      }
+    }
+  },
+  "preconditions": [
+    {
+      "id": "text-provided",
+      "description": "Caller supplies a text string (may be empty)."
+    }
+  ],
+  "postconditions": [
+    {
+      "id": "language-in-trained-set-or-und",
+      "description": "language is one of the 24 trained ISO 639-1 codes, or 'und' when the normalized input has fewer than 5 distinct character trigrams."
+    },
+    {
+      "id": "candidates-sorted-ascending",
+      "description": "candidates is sorted ascending by distance, ties broken by ascending language code, and its first entry (if present) matches language."
+    },
+    {
+      "id": "deterministic-per-call",
+      "description": "Identical input yields identical output. Every quantity in scoring is a non-negative integer (no floating-point arithmetic anywhere in the hot path), so this is byte-identical across build/host architectures, not just within one WASM instantiation -- see risk.determinism_class."
+    }
+  ],
+  "side_effects": [
+    {
+      "kind": "memory_only",
+      "description": "Produces a language classification in memory; does not log, persist, or transmit input text."
+    }
+  ],
+  "emits": [],
+  "consumes": [],
+  "permissions": [
+    { "id": "text.detect-language" }
+  ],
+  "execution": {
+    "binary_format": "wasm",
+    "entrypoint": {
+      "kind": "wasi-command",
+      "command": "run"
+    },
+    "preferred_targets": ["local", "browser", "edge", "device"],
+    "constraints": {
+      "filesystem_access": "none",
+      "host_api_access": "none",
+      "network_access": "forbidden"
+    }
+  },
+  "policies": [],
+  "dependencies": [],
+  "provenance": {
+    "source": "derived",
+    "author": "enricopiovesan",
+    "created_at": "2026-09-11T17:17:42Z",
+    "spec_ref": "registry#469, follow-up to #455/#460/#465 (fourth spec 001 FR-017 candidate -- but see the FR-017 determination note: this ships WITHOUT ai.model_backed). Originally proposed as a CLD2 (Compact Language Detector 2) port; CLD2's own primary source (CLD2Owners/cld2/internal/) was investigated and found impractical to port faithfully (~80+MB of hand-packed, undocumented-format C++ n-gram tables across a dozen+ generated files, multi-stage hashing algorithm, no included offline-generation pipeline). Pivoted, per owner direction, to a from-scratch classifier using the classic Cavnar & Trenkle 1994 character-trigram frequency technique, trained on UDHR translations (public-domain UN source text via the MIT-licensed uiuc-sst/udhr GitHub corpus).",
+    "adr_refs": ["0001-rust-wasm-foundation"],
+    "exception_refs": []
+  },
+  "evidence": [],
+  "service_type": "stateless",
+  "permitted_targets": ["local", "browser", "edge", "device"],
+  "event_trigger": null,
+  "connector_requirements": [],
+  "state_schema": null,
+  "artifact_type": "native",
+  "artifact": {
+    "digest": "sha256:d07e00440588288cf3895635cc0cc4331129a88cde8f372035c243eebe93bc29",
+    "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/text.detect-language-1.0.0/detect-language-agent.wasm"
+  },
+  "ai": null,
+  "authoring": {
+    "method": "llm-assisted",
+    "source_revision": "publish/text-detect-language-1.0.0",
+    "test_evidence": "capability-src/text-detect-language: 14 #[test] cases (LID1 table parse + sort invariants, whitespace-collapse/lowercase normalization, trigram frequency ranking and its count-desc/bytes-asc tie-break, clear-language classification for en/fr/de, short/empty-input -> 'und', missing-text-field default, candidate-list distance ordering, binary-search lookup hit/miss, cross-call determinism) against the real shipped trigram table (no separate fixture -- the table itself is small and fully committed); cargo llvm-cov functions=100%, lines=95.94%, regions=98.37%. Verified against a from-scratch Python reference implementation (scripts/model/prepare_langid_trigrams.py), not a port of CLD2 or any other existing language-ID library -- CLD2 was investigated against its own primary source and found impractical to port faithfully (~80+MB of hand-packed, undocumented C++ tables; see registry#469). Held-out accuracy (80/20 train/held-out split, classifying individual held-out sentences >=15 chars -- the realistic hard case): 98.4% (372/378) across the 24 trained languages; all recorded errors are close-language-pair confusions (cs/pl, da/sv, da/nl, pt/it, ru/bg) and all score confidence <=18/100. The compiled wasm32-unknown-unknown artifact was run under wasmtime (CLI, not the wasmtime-py bindings -- those hung/OOM'd in this environment for unrelated reasons) against the Python reference on English/French/German/Spanish sentences plus empty and 2-character inputs: outputs matched exactly, integer-for-integer, on language, confidence, and all three candidate distances. Every quantity in scoring is integer arithmetic (ranks, distances, the confidence margin transform) with no floating-point anywhere in the hot path, so risk.determinism_class is deterministic (byte-identical across build/host architectures), not model_derived.",
+    "review": {
+      "decision": "pending-qualified-review",
+      "reviewer": "traverse-registry-maintainer"
+    }
+  },
+  "risk": {
+    "effect_class": "pure_read",
+    "determinism_class": "deterministic",
+    "data_flow": {
+      "accepted_data_classifications": [],
+      "produced_data_classifications": [],
+      "egress_policy": "denied"
+    },
+    "reliability": {
+      "idempotency_required": false,
+      "retryable": true,
+      "compensation_available": true
+    }
+  }
+}
