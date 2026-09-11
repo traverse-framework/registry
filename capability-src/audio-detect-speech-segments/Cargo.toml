@@ -1,0 +1,26 @@
+[workspace]
+
+[package]
+name = "audio-detect-speech-segments-agent"
+version = "0.1.0"
+edition = "2021"
+publish = false
+description = "Silero VAD (16k) single-chunk speech-risk scorer for audio.detect-speech-segments. See registry#460."
+
+[[bin]]
+name = "detect-speech-segments-agent"
+path = "src/main.rs"
+
+[features]
+default = []
+# Embed the full Silero VAD float32 weight table (required for release WASM builds).
+full-model = []
+
+[dependencies]
+wasi-capability-runtime = { path = "../wasi-capability-runtime" }
+libm = { version = "0.2", default-features = false }
+
+[profile.release]
+opt-level = "s"
+lto = true
+panic = "abort"
