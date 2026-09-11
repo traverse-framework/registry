@@ -1,0 +1,219 @@
+{
+  "kind": "capability_contract",
+  "schema_version": "1.0.0",
+  "id": "report.translate-fr-semantic",
+  "namespace": "report",
+  "name": "translate-fr-semantic",
+  "version": "1.0.0",
+  "lifecycle": "active",
+  "owner": {
+    "team": "traverse-core",
+    "contact": "enrico.piovesan10@gmail.com"
+  },
+  "summary": "Translate an English operational summary and structured facts into French via real sentence-embedding similarity against a fixed template bank.",
+  "description": "Standalone sibling of report.translate-fr@1.0.0 -- same I/O shape, same ~15-entry EN/FR template bank and glossary -- but matches by cosine similarity of MiniLM-L3 sentence embeddings (threshold 0.72) instead of exact-string/substring matching, so a near-paraphrase of a known Fact line still renders the fixed French template instead of falling through to word-by-word glossary substitution. The embedding model is a hand-rolled #![no_std] BERT-mini forward pass (sentence-transformers/paraphrase-MiniLM-L3-v2, int8-quantized weights compiled into the artifact) -- a real model forward pass at execution time, not a static lookup table. No embeddings/model crate, network, filesystem, or host state; PROJECT/N placeholder filling still requires the literal anchor phrase (a paraphrase that clears the similarity threshold but doesn't carry it falls back to glossary substitution rather than guessing placeholders).",
+  "use_cases": [
+    {
+      "scenario": "As a rollout coordinator, I want an exact Fact line and a named-project summary translated with placeholders filled, so that French stakeholders see the same deterministic operational narrative as the non-semantic translator.",
+      "input_example": {
+        "summary": "Acme Rollout combines distributed browser, edge, and cloud evidence into a deterministic operational summary with 2 validated insights.",
+        "structured_facts": [
+          "Fact: An edge cache exposes regional rollout data with low latency."
+        ]
+      },
+      "output_example": {
+        "translated_summary": "Acme Rollout combine des preuves distribuees du navigateur, de l'edge et du cloud dans un resume operationnel deterministe avec 2 observation(s) validee(s).",
+        "translated_facts": [
+          "Fait : un cache edge expose les donnees de deploiement regional avec une faible latence."
+        ]
+      },
+      "happy": true,
+      "persona_ref": "rollout-coordinator"
+    },
+    {
+      "scenario": "As a rollout coordinator, I want a reworded Fact line that isn't an exact string match to still translate via the fixed French template, so that minor phrasing differences upstream don't degrade to broken word-substitution.",
+      "input_example": {
+        "summary": "",
+        "structured_facts": [
+          "An edge-side cache exposes regional rollout data with very low latency for nearby clients."
+        ]
+      },
+      "output_example": {
+        "translated_summary": "",
+        "translated_facts": [
+          "Fait : un cache edge expose les donnees de deploiement regional avec une faible latence."
+        ]
+      },
+      "happy": true,
+      "persona_ref": "rollout-coordinator"
+    },
+    {
+      "scenario": "As a rollout coordinator, I want text with no similar template and no glossary terms left untranslated rather than mistranslated, so that unrelated content never gets a false-confidence French rendering.",
+      "input_example": {
+        "summary": "The weather in Lisbon was unusually warm this autumn.",
+        "structured_facts": []
+      },
+      "output_example": {
+        "translated_summary": "The weather in Lisbon was unusually warm this autumn.",
+        "translated_facts": []
+      },
+      "happy": false,
+      "persona_ref": "rollout-coordinator"
+    },
+    {
+      "scenario": "As a rollout coordinator, I want an empty summary and zero facts to translate to empty output rather than inventing text, so that an empty upstream stage stays honestly empty end to end.",
+      "input_example": {
+        "summary": "",
+        "structured_facts": []
+      },
+      "output_example": {
+        "translated_summary": "",
+        "translated_facts": []
+      },
+      "happy": false,
+      "persona_ref": "rollout-coordinator"
+    }
+  ],
+  "inputs": {
+    "schema": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "summary",
+        "structured_facts"
+      ],
+      "properties": {
+        "summary": {
+          "type": "string"
+        },
+        "structured_facts": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  },
+  "outputs": {
+    "schema": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "translated_summary",
+        "translated_facts"
+      ],
+      "properties": {
+        "translated_summary": {
+          "type": "string"
+        },
+        "translated_facts": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  },
+  "preconditions": [
+    {
+      "id": "summary-and-facts-provided",
+      "description": "Caller supplies summary string and structured_facts array (either may be empty)."
+    }
+  ],
+  "postconditions": [
+    {
+      "id": "deterministic-per-instantiation",
+      "description": "Identical input yields identical output within one WASM instantiation (verified: 23 unit tests incl. an explicit repeat-call equality assertion). Cross-instantiation / cross-host-architecture byte-identity is NOT proven -- see risk.determinism_class and authoring.test_evidence."
+    }
+  ],
+  "side_effects": [
+    {
+      "kind": "memory_only",
+      "description": "Produces translated strings in memory; does not log, persist, or transmit inputs."
+    }
+  ],
+  "emits": [],
+  "consumes": [],
+  "permissions": [
+    {
+      "id": "report.translate-fr-semantic"
+    }
+  ],
+  "execution": {
+    "binary_format": "wasm",
+    "entrypoint": {
+      "kind": "wasi-command",
+      "command": "run"
+    },
+    "preferred_targets": [
+      "local",
+      "browser",
+      "edge",
+      "device"
+    ],
+    "constraints": {
+      "filesystem_access": "none",
+      "host_api_access": "none",
+      "network_access": "forbidden"
+    }
+  },
+  "policies": [],
+  "dependencies": [],
+  "provenance": {
+    "source": "derived",
+    "author": "enricopiovesan",
+    "created_at": "2026-09-11T02:15:00Z",
+    "spec_ref": "registry#455 (first spec 001 FR-017 agent) / UMA chapter-13-portable-mcp-runtime/translator-ai-wasi (enricopiovesan/UMA-code-examples) -- algorithm/template bank/glossary ported, tract-onnx model loading rewritten from scratch as #![no_std]",
+    "adr_refs": [
+      "0001-rust-wasm-foundation"
+    ],
+    "exception_refs": []
+  },
+  "evidence": [],
+  "service_type": "stateless",
+  "permitted_targets": [
+    "local",
+    "browser",
+    "edge",
+    "device"
+  ],
+  "event_trigger": null,
+  "connector_requirements": [],
+  "state_schema": null,
+  "artifact_type": "native",
+  "artifact": {
+    "digest": "sha256:d70164a8b8d458c49980f94a087cbf9ea3c1e2b9febf298ffd37885f0634989f",
+    "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/report.translate-fr-semantic-1.0.0/translate-fr-semantic-agent.wasm"
+  },
+  "ai": {
+    "model_backed": true,
+    "models": [
+      "sentence-transformers/paraphrase-MiniLM-L3-v2"
+    ]
+  },
+  "authoring": {
+    "method": "llm-assisted",
+    "source_revision": "publish/report-translate-fr-semantic-1.0.0",
+    "test_evidence": "capability-src/report-translate-fr-semantic: 23 #[test] cases (BRT1 header parse, WordPiece lookup/split/OOV/overlong-word/sequence-cap, embed shape/finiteness/determinism/differs-by-input, cosine self-similarity, LayerNorm zero-mean, GELU monotonicity, template-bank shape, PROJECT/N placeholder extraction incl. no-anchor fallback, glossary substitution, empty-input short-circuit, full translate() wiring) against a tiny synthetic fixture; cargo llvm-cov functions=100%, lines=98.03%, regions=96.66%. Separately verified end to end against the real published Xenova/paraphrase-MiniLM-L3-v2 ONNX graph (onnxruntime, dynamic int8 quantization): mean-pooled L2-normalized embedding cosine ~0.99 across report.* sentences using this capability's own int8 quantization scheme; template-vs-unrelated-sentence cosine ~0.12; identical-text cosine 1.0. Ran the built --features full-model artifact under wasmtime: an exact Fact-template match and a hand-written paraphrase of it (not an exact string) both correctly render the full French template (the deterministic report.translate-fr@1.0.0 falls through the paraphrase to broken half-translated glossary substitution on the same input); an unrelated sentence passes through untranslated rather than false-matching. Cross-arch (x86_64 vs aarch64) byte-identity was NOT verified -- no x86_64 host or emulator was available in the authoring environment -- hence risk.determinism_class: model_derived rather than deterministic (spec 024). License: sentence-transformers/paraphrase-MiniLM-L3-v2 and its Xenova/paraphrase-MiniLM-L3-v2 ONNX conversion are both Apache-2.0, redistribution-safe; recorded in capability-src/report-translate-fr-semantic/data/README.md.",
+    "review": {
+      "decision": "pending-qualified-review",
+      "reviewer": "traverse-registry-maintainer"
+    }
+  },
+  "risk": {
+    "effect_class": "pure_read",
+    "determinism_class": "model_derived",
+    "data_flow": {
+      "accepted_data_classifications": [],
+      "produced_data_classifications": [],
+      "egress_policy": "denied"
+    },
+    "reliability": {
+      "idempotency_required": false,
+      "retryable": true,
+      "compensation_available": true
+    }
+  }
+}

@@ -136,7 +136,7 @@
       ],
       "path": "capabilities/core/core.assign-ownership/1.2.0/contract.json",
       "classification": "governed-event-declared",
-      "evidence": "Ownership assignment is a domain fact independent consumers may observe. Capability contract 1.2.0 declares emits=[{event_id: core.action-item.ownership-assigned, version: 1.0.0}], service_type=subscribable, requires action_item_id, and the WASM guest calls traverse_host::emit_event on reason_code=ok with non-null owner_id (payload {action_item_id, owner_id, resolution_method}) \u2014 real emit, not declaration-only. Immutable prior versions: 1.0.0/1.1.0 empty emits[].",
+      "evidence": "Ownership assignment is a domain fact independent consumers may observe. Capability contract 1.2.0 declares emits=[{event_id: core.action-item.ownership-assigned, version: 1.0.0}], service_type=subscribable, requires action_item_id, and the WASM guest calls traverse_host::emit_event on reason_code=ok with non-null owner_id (payload {action_item_id, owner_id, resolution_method}) — real emit, not declaration-only. Immutable prior versions: 1.0.0/1.1.0 empty emits[].",
       "event_product": {
         "event_id": "core.action-item.ownership-assigned",
         "version": "1.0.0",
@@ -306,7 +306,7 @@
       ],
       "path": "capabilities/core/core.process-comment/1.2.0/contract.json",
       "classification": "governed-event-declared",
-      "evidence": "Comment allow decisions are domain facts independent consumers may observe. Capability contract 1.2.0 declares emits=[{event_id: core.comment.processed, version: 1.0.0}], service_type=subscribable, and the WASM guest calls traverse_host::emit_event on decision=allow (payload {action, actor_id, resource_type, resource_id, reason_code, comment_id}) \u2014 real emit, not declaration-only. Immutable prior versions: 1.0.0/1.0.1/1.1.0 empty emits[].",
+      "evidence": "Comment allow decisions are domain facts independent consumers may observe. Capability contract 1.2.0 declares emits=[{event_id: core.comment.processed, version: 1.0.0}], service_type=subscribable, and the WASM guest calls traverse_host::emit_event on decision=allow (payload {action, actor_id, resource_type, resource_id, reason_code, comment_id}) — real emit, not declaration-only. Immutable prior versions: 1.0.0/1.0.1/1.1.0 empty emits[].",
       "event_product": {
         "event_id": "core.comment.processed",
         "version": "1.0.0",
@@ -349,7 +349,7 @@
         "version": "1.0.0",
         "path": "events/core/core.status-transitioned/1.0.0/product.json"
       },
-      "evidence": "Status transitions are domain facts independent consumers may observe. registry#324: the previously governed event core.action-item.status-transitioned violated traverse-contracts' own EventContract identity invariant (id must equal namespace + \".\" + name) and is now deprecated (both 1.0.0/1.0.1); replaced by core.status-transitioned@1.0.0, publishers=[core.transition-action-status@1.4.0]. Capability contract 1.4.0 declares emits=[{event_id: core.status-transitioned, version: 1.0.0}], service_type=subscribable, requires action_item_id, and the WASM guest actually calls traverse_host::emit_event on accepted transitions (reason_code=ok) with payload {action_item_id, from_status, to_status, actor_id} \u2014 real emit, not declaration-only. Immutable prior versions: 1.0.0/1.1.0 empty emits[]; 1.2.0/1.3.0 now deprecated (emitted the identity-invariant-violating event id)."
+      "evidence": "Status transitions are domain facts independent consumers may observe. registry#324: the previously governed event core.action-item.status-transitioned violated traverse-contracts' own EventContract identity invariant (id must equal namespace + \".\" + name) and is now deprecated (both 1.0.0/1.0.1); replaced by core.status-transitioned@1.0.0, publishers=[core.transition-action-status@1.4.0]. Capability contract 1.4.0 declares emits=[{event_id: core.status-transitioned, version: 1.0.0}], service_type=subscribable, requires action_item_id, and the WASM guest actually calls traverse_host::emit_event on accepted transitions (reason_code=ok) with payload {action_item_id, from_status, to_status, actor_id} — real emit, not declaration-only. Immutable prior versions: 1.0.0/1.1.0 empty emits[]; 1.2.0/1.3.0 now deprecated (emitted the identity-invariant-violating event id)."
     },
     {
       "capability_id": "core.validate-action-item",
@@ -425,7 +425,7 @@
       ],
       "path": "capabilities/doc-approval/doc-approval.recommend/1.3.0/contract.json",
       "classification": "governed-event-declared",
-      "evidence": "Approval recommendations are domain facts independent consumers may observe. Capability contract 1.3.0 declares emits=[{event_id: doc-approval.recommendation-issued, version: 1.0.0}], service_type=subscribable, and the WASM guest calls traverse_host::emit_event on every recommendation (payload {docType, recommendation, confidence, rationale}) \u2014 real emit, not declaration-only. Immutable prior versions: 1.0.0\u20131.2.2 empty emits[].",
+      "evidence": "Approval recommendations are domain facts independent consumers may observe. Capability contract 1.3.0 declares emits=[{event_id: doc-approval.recommendation-issued, version: 1.0.0}], service_type=subscribable, and the WASM guest calls traverse_host::emit_event on every recommendation (payload {docType, recommendation, confidence, rationale}) — real emit, not declaration-only. Immutable prior versions: 1.0.0–1.2.2 empty emits[].",
       "event_product": {
         "event_id": "doc-approval.recommendation-issued",
         "version": "1.0.0",
@@ -556,7 +556,7 @@
       ],
       "path": "capabilities/platform/platform.decide-state-transition/1.3.0/contract.json",
       "classification": "governed-event-declared",
-      "evidence": "Allowed lifecycle transitions are domain facts independent consumers may observe. Capability contract 1.3.0 declares emits=[{event_id: platform.state-transition-decided, version: 1.0.0}], service_type=subscribable, and the WASM guest calls traverse_host::emit_event when decision=allowed (payload {entity_type, entity_id, current_state, proposed_state, decision, actor_id}) \u2014 real emit, not declaration-only. Immutable prior versions: 1.1.0/1.2.0 empty emits[].",
+      "evidence": "Allowed lifecycle transitions are domain facts independent consumers may observe. Capability contract 1.3.0 declares emits=[{event_id: platform.state-transition-decided, version: 1.0.0}], service_type=subscribable, and the WASM guest calls traverse_host::emit_event when decision=allowed (payload {entity_type, entity_id, current_state, proposed_state, decision, actor_id}) — real emit, not declaration-only. Immutable prior versions: 1.1.0/1.2.0 empty emits[].",
       "event_product": {
         "event_id": "platform.state-transition-decided",
         "version": "1.0.0",
@@ -618,7 +618,8 @@
       "evidence": "side_effects=[memory_only] on published version 1.0.0; empty emits/consumes; deterministic fixed-section markdown report returns directly to the caller with no asynchronous domain fact broadcast to independent consumers."
     },
     {
-      "capability_id": "retention.eligibility-classify",      "published_versions": [
+      "capability_id": "retention.eligibility-classify",
+      "published_versions": [
         "1.0.0"
       ],
       "path": "capabilities/retention/retention.eligibility-classify/1.0.0/contract.json",
@@ -817,6 +818,15 @@
       "path": "capabilities/visual/visual.parameter-map/1.0.0/contract.json",
       "classification": "no-event-required",
       "evidence": "side_effects=[memory_only] on published version 1.0.0; empty emits/consumes; deterministic visual parameter mapping returns directly to the caller with no asynchronous domain fact broadcast to independent consumers."
+    },
+    {
+      "capability_id": "report.translate-fr-semantic",
+      "published_versions": [
+        "1.0.0"
+      ],
+      "path": "capabilities/report/report.translate-fr-semantic/1.0.0/contract.json",
+      "classification": "no-event-required",
+      "evidence": "side_effects=[memory_only] on published version 1.0.0; empty emits/consumes; model-derived French translation returns directly to the caller with no asynchronous domain fact broadcast to independent consumers."
     }
   ]
 }
