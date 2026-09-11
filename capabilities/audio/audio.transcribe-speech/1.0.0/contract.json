@@ -17638,6 +17638,22 @@
       },
       "happy": true,
       "persona_ref": "meeting-organizer"
+    },
+    {
+      "scenario": "As a meeting organizer, I want an explicit model_unavailable status rather than a silent empty transcript when the artifact was built without its weight table, so that a misconfigured deployment fails loudly instead of quietly returning nothing.",
+      "input_example": {
+        "samples": [
+          0.1,
+          0.1,
+          0.1
+        ]
+      },
+      "output_example": {
+        "text": "",
+        "status": "model_unavailable"
+      },
+      "happy": false,
+      "persona_ref": "meeting-organizer"
     }
   ],
   "inputs": {
