@@ -9,3 +9,6 @@ capability-src/report-translate-fr-semantic/data/minilm-l3-fr-semantic-int8.bin
 
 # Local Silero VAD float32 weight table for audio.detect-speech-segments builds (hosted on GitHub Releases, not git)
 capability-src/audio-detect-speech-segments/data/silero-vad-16k-f32.bin
+
+# Local DistilBERT-NER int8 weight table for text.detect-entities builds (hosted on GitHub Releases, not git)
+capability-src/text-detect-entities/data/distilbert-ner-int8.bin
