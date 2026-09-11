@@ -16,7 +16,7 @@ ul { list-style: none; }
   --nav-bg: rgba(12,8,23,0.85);
   --font-display: 'Space Grotesk', sans-serif; --font-body: 'Inter', sans-serif; --font-mono: 'JetBrains Mono', monospace;
   --radius-sm: 8px; --radius: 12px; --radius-lg: 16px;
-  --max-w: 1100px; --nav-h: 60px;
+  --max-w: 1100px; --nav-h: 60px; --subnav-h: 44px;
   --ease: cubic-bezier(0.16, 1, 0.3, 1);
 }
 @media (prefers-color-scheme: light) {
@@ -39,24 +39,24 @@ body {
   line-height: 1.65; transition: background 0.3s, color 0.3s;
   overflow-x: hidden;
 }
-.container { width: 100%; max-width: var(--max-w); margin: 0 auto; padding: calc(var(--nav-h) + 2rem) 2rem 4rem; }
-@media (max-width: 640px) { .container { padding: calc(var(--nav-h) + 1.5rem) 1.25rem 3rem; } }
+.container { width: 100%; max-width: var(--max-w); margin: 0 auto; padding: calc(var(--nav-h) + var(--subnav-h) + 1.75rem) 2rem 4rem; }
+@media (max-width: 640px) { .container { padding: calc(var(--nav-h) + var(--subnav-h) + 1.25rem) 1.25rem 3rem; } }
 
-/* ─── Nav ─────────────────────────────────────────────────────────────── */
+/* ─── Nav (site-wide -- mirrors traverse-framework.com's own header, same
+   markup/link set, so moving from the marketing site into the registry
+   doesn't feel like leaving Traverse) ────────────────────────────────── */
 .nav {
-  position: fixed; top: 0; left: 0; right: 0; height: var(--nav-h); z-index: 100;
+  position: fixed; top: 0; left: 0; right: 0; height: var(--nav-h); z-index: 101;
   display: flex; align-items: center;
   background: var(--nav-bg); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
   border-bottom: 1px solid var(--border);
 }
 .nav-inner {
   display: flex; align-items: center; justify-content: space-between; width: 100%;
-  max-width: var(--max-w); margin: 0 auto; padding: 0 2rem;
+  max-width: var(--max-w); margin: 0 auto; padding: 0 2rem; gap: 1rem;
 }
-.nav-logo { display: flex; align-items: center; gap: 0.5rem; font-family: var(--font-display); font-size: 1rem; font-weight: 700; letter-spacing: -0.03em; text-decoration: none; color: var(--fg); }
+.nav-logo { display: flex; align-items: center; gap: 0.5rem; font-family: var(--font-display); font-size: 1rem; font-weight: 700; letter-spacing: -0.03em; text-decoration: none; color: var(--fg); flex-shrink: 0; }
 .nav-logo-dot { color: var(--accent); }
-.nav-label { font-family: var(--font-mono); font-size: 0.7rem; letter-spacing: 0.06em; color: var(--fg-muted); border-left: 1px solid var(--border); padding-left: 0.75rem; margin-left: 0.5rem; }
-@media (max-width: 640px) { .nav-label { display: none; } }
 /* Logo mark images -- same asset traverse-framework/website uses, dark/light
    variants swapped by theme so the mark's own background blends into the
    page rather than showing a mismatched edge (mirrors that site's rule). */
@@ -68,19 +68,87 @@ body {
   :root:not([data-theme="dark"]) .logo-mark-dark { display: none; }
   :root:not([data-theme="dark"]) .logo-mark-light { display: block; }
 }
-.nav-right { display: flex; align-items: center; gap: 0.6rem; }
+.nav-right { display: flex; align-items: center; gap: 0.6rem; flex-shrink: 0; }
 .btn-ghost-sm {
   font-family: var(--font-mono); font-size: 0.75rem; color: var(--fg-muted);
   border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 0.4rem 0.7rem;
-  text-decoration: none; transition: color 0.15s, border-color 0.15s;
+  text-decoration: none; transition: color 0.15s, border-color 0.15s; white-space: nowrap;
 }
 .btn-ghost-sm:hover { color: var(--fg); border-color: var(--border-hover); }
+.btn-primary-sm {
+  font-family: var(--font-body); font-size: 0.8125rem; font-weight: 500; color: #0c0817;
+  background: var(--accent); border-radius: var(--radius-sm); padding: 0.45rem 0.85rem;
+  text-decoration: none; white-space: nowrap; transition: background 0.15s;
+}
+.btn-primary-sm:hover { background: var(--accent-hover); }
 .nav-theme-btn {
   width: 32px; height: 32px; display: flex; align-items: center; justify-content: center;
   border-radius: var(--radius-sm); color: var(--fg-muted); border: 1px solid var(--border);
-  background: var(--bg-card); font-size: 0.9rem; transition: color 0.15s, background 0.15s;
+  background: var(--bg-card); font-size: 0.9rem; transition: color 0.15s, background 0.15s; flex-shrink: 0;
 }
 .nav-theme-btn:hover { color: var(--fg); background: var(--bg-input); }
+
+/* ─── Nav links + dropdowns (ported from traverse-framework.com's Nav.astro
+   -- same structure/behavior, absolute URLs since this is a different
+   subdomain) ──────────────────────────────────────────────────────────── */
+.nav-links { display: flex; align-items: center; gap: 0.25rem; list-style: none; margin: 0; padding: 0; flex: 1; min-width: 0; }
+.nav-item { position: relative; }
+.nav-link-btn, .nav-link {
+  display: flex; align-items: center; gap: 0.3rem; padding: 0.4rem 0.65rem; font-size: 0.8125rem;
+  color: var(--fg-muted); background: none; border: none; cursor: pointer; font-family: var(--font-body);
+  border-radius: var(--radius-sm); transition: color 0.15s, background 0.15s; text-decoration: none; white-space: nowrap;
+}
+.nav-link-btn:hover, .nav-link:hover { color: var(--fg); background: var(--bg-input); }
+.chevron { transition: transform 0.2s var(--ease); opacity: 0.6; }
+.nav-item.open .chevron { transform: rotate(180deg); }
+.dropdown {
+  display: none; position: absolute; top: calc(100% + 8px); left: 50%; transform: translateX(-50%);
+  min-width: 260px; background: var(--bg-elevated); border: 1px solid var(--border); border-radius: var(--radius);
+  padding: 0.75rem; box-shadow: 0 16px 48px rgba(0,0,0,0.35); z-index: 200;
+}
+.nav-item.open .dropdown { display: flex; flex-direction: row; gap: 0.25rem; }
+.nav-item.has-dropdown:last-of-type .dropdown { left: auto; right: 0; transform: none; }
+.dropdown-section { min-width: 200px; display: flex; flex-direction: column; gap: 0.1rem; }
+.dropdown-section + .dropdown-section { border-left: 1px solid var(--border); padding-left: 0.75rem; margin-left: 0.5rem; }
+.dropdown-label { font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--fg-subtle); padding: 0.3rem 0.5rem 0.5rem; }
+.dropdown-item { display: flex; align-items: flex-start; gap: 0.75rem; padding: 0.55rem 0.6rem; border-radius: var(--radius-sm); text-decoration: none; color: var(--fg); transition: background 0.12s; }
+.dropdown-item:hover { background: var(--accent-dim); }
+.dropdown-item:hover .dropdown-item-title { color: var(--accent-hover); }
+.dropdown-icon { font-size: 0.9rem; color: var(--accent); width: 18px; flex-shrink: 0; margin-top: 1px; }
+.dropdown-item-title { display: block; font-size: 0.8125rem; font-weight: 500; color: var(--fg); transition: color 0.12s; line-height: 1.3; }
+.dropdown-item-desc { display: block; font-size: 0.7375rem; color: var(--fg-muted); line-height: 1.3; margin-top: 1px; }
+
+.nav-mobile-btn { display: none; width: 32px; height: 32px; align-items: center; justify-content: center; color: var(--fg-muted); background: none; border: none; cursor: pointer; flex-shrink: 0; }
+.nav-mobile-menu {
+  display: none; position: fixed; top: calc(var(--nav-h) + var(--subnav-h)); left: 0; right: 0;
+  background: var(--bg-elevated); border-bottom: 1px solid var(--border); padding: 1.5rem;
+  flex-direction: column; gap: 0.5rem; z-index: 100; max-height: calc(100vh - var(--nav-h) - var(--subnav-h)); overflow-y: auto;
+}
+.nav-mobile-menu.open { display: flex; }
+.nav-mobile-menu a { font-size: 0.9rem; color: var(--fg-muted); text-decoration: none; padding: 0.4rem 0; transition: color 0.15s; }
+.nav-mobile-menu a:hover { color: var(--fg); }
+@media (max-width: 900px) {
+  .nav-links { display: none; }
+  .nav-mobile-btn { display: flex; }
+  .nav-right .btn-primary-sm { display: none; }
+}
+
+/* ─── Registry sub-nav (dedicated to this sub-site, sits under the shared
+   site header -- signals "you're in the registry" without repeating the
+   Traverse brand mark a second time) ──────────────────────────────────── */
+.registry-subnav {
+  position: fixed; top: var(--nav-h); left: 0; right: 0; height: var(--subnav-h); z-index: 100;
+  display: flex; align-items: center;
+  background: var(--bg-elevated); border-bottom: 1px solid var(--border);
+}
+.registry-subnav-inner {
+  display: flex; align-items: center; justify-content: space-between; width: 100%;
+  max-width: var(--max-w); margin: 0 auto; padding: 0 2rem;
+}
+.registry-subnav-brand { display: flex; align-items: baseline; gap: 0.6rem; text-decoration: none; color: var(--fg); }
+.registry-subnav-title { font-family: var(--font-display); font-size: 0.8125rem; font-weight: 700; letter-spacing: -0.01em; color: var(--accent-hover); }
+.registry-subnav-label { font-family: var(--font-mono); font-size: 0.68rem; letter-spacing: 0.08em; color: var(--fg-muted); }
+@media (max-width: 640px) { .registry-subnav-label { display: none; } }
 
 /* ─── Footer ──────────────────────────────────────────────────────────── */
 .site-footer { border-top: 1px solid var(--border); background: var(--bg-elevated); margin-top: 3rem; }
