@@ -162,6 +162,7 @@ input[type="search"]::placeholder { color: var(--fg-subtle); }
 }
 .card:hover { border-color: var(--border-hover); transform: translateY(-2px); }
 .card-top { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 0.6rem; }
+.card-id-row { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
 .card-id { display: block; font-family: var(--font-display); font-weight: 600; font-size: 1rem; letter-spacing: -0.01em; color: var(--fg); }
 .card:hover .card-id { color: var(--accent-hover); }
 .card-summary { font-size: 0.875rem; color: var(--fg-muted); line-height: 1.55; margin-top: 0.35rem; }
@@ -197,11 +198,15 @@ input[type="search"]::placeholder { color: var(--fg-subtle); }
 .cap-row { cursor: pointer; transition: background 0.12s; }
 .cap-row:hover { background: var(--accent-dim); }
 .cap-row:focus-within { background: var(--accent-dim); }
-.cap-row-id { min-width: 15rem; white-space: normal; }
+.cap-row-id { min-width: 13rem; white-space: normal; }
+.cap-row-id-line { display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap; }
 .cap-row-id a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 2px; }
 .cap-row-id a { color: var(--fg); font-weight: 500; }
 .cap-row:hover .cap-row-id a { color: var(--accent-hover); }
-.cap-row-summary { display: block; margin-top: 0.2rem; font-size: 0.8rem; font-weight: 300; line-height: 1.45; color: var(--fg-subtle); white-space: normal; max-width: 44ch; }
+.cap-row-summary { display: block; margin-top: 0.2rem; font-size: 0.8rem; font-weight: 300; line-height: 1.45; color: var(--fg-subtle); white-space: normal; max-width: 38ch; }
+/* Service type + Agent share one cell/column (owner feedback: a dedicated
+   Agent column was mostly "-"). */
+.fact-group { display: inline-flex; align-items: center; gap: 0.35rem; flex-wrap: wrap; }
 
 /* ─── Badges ──────────────────────────────────────────────────────────── */
 /* registry#130: font-size was 0.68rem (10.88px), below common

@@ -356,6 +356,7 @@ Traverse<span class="nav-logo-dot">.</span>
 <ul class="footer-links">
 <li><a href="/#/personas">Personas</a></li>
 <li><a href="/#/service-types">Service types</a></li>
+<li><a href="/#/ai-models">AI models</a></li>
 <li><a href="/#/events">Event products</a></li>
 </ul>
 </div>
@@ -519,6 +520,7 @@ Traverse<span class="nav-logo-dot">.</span>
 <ul class="footer-links">
 <li><a href="/#/personas">Personas</a></li>
 <li><a href="/#/service-types">Service types</a></li>
+<li><a href="/#/ai-models">AI models</a></li>
 <li><a href="/#/events">Event products</a></li>
 </ul>
 </div>
@@ -668,6 +670,7 @@ Traverse<span class="nav-logo-dot">.</span>
 <ul class="footer-links">
 <li><a href="/#/personas">Personas</a></li>
 <li><a href="/#/service-types">Service types</a></li>
+<li><a href="/#/ai-models">AI models</a></li>
 <li><a href="/#/events">Event products</a></li>
 </ul>
 </div>
@@ -692,6 +695,135 @@ Traverse<span class="nav-logo-dot">.</span>
 </body>
 </html>
 """
+
+
+def ai_model_page_path(model_id: str) -> str:
+    return f"ai-model/{model_id}/"
+
+
+AI_MODEL_PAGE_TEMPLATE = """<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{title}</title>
+<meta name="description" content="{meta_description}">
+<meta property="og:type" content="website">
+<meta property="og:title" content="{title}">
+<meta property="og:description" content="{meta_description}">
+<meta property="og:url" content="{canonical_url}">
+<link rel="canonical" href="{canonical_url}">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/style.css">
+<script defer src="/analytics.js"></script>
+</head>
+<body>
+<nav class="nav">
+  <div class="nav-inner">
+    <a href="/" class="nav-logo">
+      <img src="https://traverse-framework.com/assets/img/logo/traverse_mountain_dark_128.png" alt="" width="22" height="22" class="logo-mark logo-mark-dark">
+      <img src="https://traverse-framework.com/assets/img/logo/traverse_mountain_light_128.png" alt="" width="22" height="22" class="logo-mark logo-mark-light">
+      Traverse<span class="nav-logo-dot">.</span><span class="nav-label">UNIVERSAL CAPABILITY CATALOG</span>
+    </a>
+    <div class="nav-right">
+      <a href="https://github.com/traverse-framework/registry" target="_blank" rel="noopener" class="btn-ghost-sm">GitHub →</a>
+    </div>
+  </div>
+</nav>
+<div class="container">
+<a class="back-link" href="/#/ai-models">← Back to AI models</a>
+<div class="detail-header-badges"><span class="badge badge-agent">Agent model</span></div>
+<h1 class="t-h1 detail-title t-mono">{model_id}</h1>
+<p class="detail-summary">Capabilities whose contract declares ai.model_backed: true with this model in ai.models (spec 001 FR-017).</p>
+<h2 class="t-h2">Capabilities</h2>
+{capabilities_html}
+<p style="margin-top:2rem"><a href="/#/ai-model/{encoded_model_id}">Open in the interactive catalog →</a></p>
+</div>
+<footer class="site-footer">
+<div class="footer-inner">
+<div class="footer-brand">
+<a href="/" class="nav-logo">
+<img src="https://traverse-framework.com/assets/img/logo/traverse_mountain_dark_128.png" alt="" width="20" height="20" class="logo-mark logo-mark-dark">
+<img src="https://traverse-framework.com/assets/img/logo/traverse_mountain_light_128.png" alt="" width="20" height="20" class="logo-mark logo-mark-light">
+Traverse<span class="nav-logo-dot">.</span>
+</a>
+<p>Universal capability registry for the Traverse contract-driven WASM runtime.</p>
+</div>
+<div class="footer-col">
+<div class="footer-col-title">Explore</div>
+<ul class="footer-links">
+<li><a href="/#/personas">Personas</a></li>
+<li><a href="/#/service-types">Service types</a></li>
+<li><a href="/#/ai-models">AI models</a></li>
+<li><a href="/#/events">Event products</a></li>
+</ul>
+</div>
+<div class="footer-col">
+<div class="footer-col-title">Traverse</div>
+<ul class="footer-links">
+<li><a href="https://traverse-framework.com" target="_blank" rel="noopener">Main website</a></li>
+<li><a href="https://github.com/traverse-framework/registry" target="_blank" rel="noopener">GitHub</a></li>
+</ul>
+</div>
+<div class="footer-col">
+<div class="footer-col-title">More</div>
+<ul class="footer-links">
+<li><a href="https://universalmicroservices.com" target="_blank" rel="noopener">UMA / the book</a></li>
+</ul>
+</div>
+</div>
+<div class="footer-bottom">
+<span>© 2026 Enrico Piovesan · Traverse Framework</span>
+</div>
+</footer>
+</body>
+</html>
+"""
+
+
+def distinct_agent_models(capabilities: list) -> dict:
+    """Model id -> list of current capability entries declaring it in
+    contract.ai.models (spec 001 FR-017). Unlike SERVICE_TYPE_DEFINITIONS,
+    this is not a fixed enum -- discovered from whatever is actually
+    published, the same "membership, not a closed set" shape as personas."""
+    current = current_capabilities_by_group(capabilities)
+    by_model: dict = {}
+    for entry in current:
+        ai = entry["contract"].get("ai")
+        if not isinstance(ai, dict) or ai.get("model_backed") is not True:
+            continue
+        for model_id in ai.get("models") or []:
+            if not isinstance(model_id, str) or not model_id.strip():
+                continue
+            by_model.setdefault(model_id, []).append(entry)
+    return by_model
+
+
+def render_ai_model_page(base_url: str, model_id: str, matching: list) -> str:
+    rows = []
+    for entry in matching:
+        href = f"{base_url}/{capability_page_path(entry['contract'])}"
+        rows.append(
+            f'<a class="version-row" href="{esc(href)}"><div class="version-left">'
+            f'<span class="t-mono">{esc(entry["contract"]["id"])}</span></div>'
+            f'<span class="t-muted" style="font-size:0.8rem">view →</span></a>'
+        )
+    capabilities_html = "\n".join(rows) if rows else '<p class="empty">No published capability declares this model yet.</p>'
+
+    title = f"{model_id} · Traverse Registry Catalog"
+    summary = f"Capabilities backed by the {model_id} model in the Traverse registry."
+    canonical_url = f"{base_url}/{ai_model_page_path(model_id)}"
+
+    return AI_MODEL_PAGE_TEMPLATE.format(
+        title=esc(title),
+        meta_description=esc(summary),
+        canonical_url=esc(canonical_url),
+        model_id=esc(model_id),
+        capabilities_html=capabilities_html,
+        encoded_model_id=esc(model_id).replace("/", "%2F"),
+    )
 
 
 def current_capabilities_by_group(capabilities: list) -> list:
@@ -776,6 +908,13 @@ def generate(catalog_path: Path, base_url: str, output_dir: Path) -> list:
         page_path.parent.mkdir(parents=True, exist_ok=True)
         page_path.write_text(page_html)
         generated_paths.append(service_type_page_path(service_type_id))
+
+    for model_id, matching in distinct_agent_models(capabilities).items():
+        page_html = render_ai_model_page(base_url, model_id, matching)
+        page_path = output_dir / ai_model_page_path(model_id) / "index.html"
+        page_path.parent.mkdir(parents=True, exist_ok=True)
+        page_path.write_text(page_html)
+        generated_paths.append(ai_model_page_path(model_id))
 
     return generated_paths
 
