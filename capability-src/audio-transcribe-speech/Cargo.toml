@@ -1,0 +1,26 @@
+[workspace]
+
+[package]
+name = "audio-transcribe-speech-agent"
+version = "0.1.0"
+edition = "2021"
+publish = false
+description = "Whisper-tiny (greedy, English-forced) speech-to-text for audio.transcribe-speech. See registry#473."
+
+[[bin]]
+name = "transcribe-speech-agent"
+path = "src/main.rs"
+
+[features]
+default = []
+# Embed the full Whisper-tiny int8 weight table (required for release WASM builds).
+full-model = []
+
+[dependencies]
+wasi-capability-runtime = { path = "../wasi-capability-runtime" }
+libm = { version = "0.2", default-features = false }
+
+[profile.release]
+opt-level = "s"
+lto = true
+panic = "abort"

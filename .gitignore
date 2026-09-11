@@ -12,3 +12,6 @@ capability-src/audio-detect-speech-segments/data/silero-vad-16k-f32.bin
 
 # Local DistilBERT-NER int8 weight table for text.detect-entities builds (hosted on GitHub Releases, not git)
 capability-src/text-detect-entities/data/distilbert-ner-int8.bin
+
+# Local Whisper-tiny int8 weight table for audio.transcribe-speech builds (hosted on GitHub Releases, not git)
+capability-src/audio-transcribe-speech/data/whisper-tiny-int8.bin
