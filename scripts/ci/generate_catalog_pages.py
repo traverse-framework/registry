@@ -290,6 +290,158 @@ def version_history_block(base_url: str, group_versions: list, current_reference
     return "\n".join(rows)
 
 
+# Ported from traverse-framework.com's own Nav.astro -- same markup/behavior
+# (absolute URLs, since the registry is a different subdomain) -- so moving
+# between the marketing site and the registry doesn't feel like leaving
+# Traverse (owner feedback, registry catalog nav overhaul). Shared across all
+# four static templates below as one `.format()`-substituted VALUE, not
+# inlined into each template string, so its own `{`/`}` (CSS/JS) never has to
+# be escaped for `.format()`.
+SITE_NAV_HTML = """<nav class="nav" id="site-nav">
+  <div class="nav-inner">
+    <a href="https://traverse-framework.com/" class="nav-logo">
+      <img src="https://traverse-framework.com/assets/img/logo/traverse_mountain_dark_128.png" alt="" width="22" height="22" class="logo-mark logo-mark-dark">
+      <img src="https://traverse-framework.com/assets/img/logo/traverse_mountain_light_128.png" alt="" width="22" height="22" class="logo-mark logo-mark-light">
+      Traverse<span class="nav-logo-dot">.</span>
+    </a>
+    <ul class="nav-links">
+      <li class="nav-item has-dropdown">
+        <button class="nav-link-btn" aria-expanded="false" aria-haspopup="true">
+          Product
+          <svg class="chevron" width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 4l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+        <div class="dropdown" role="menu">
+          <div class="dropdown-section">
+            <div class="dropdown-label">Overview</div>
+            <a href="https://traverse-framework.com/questions/what-is-traverse.html" class="dropdown-item" role="menuitem"><span class="dropdown-icon">⬡</span><span><span class="dropdown-item-title">What is Traverse</span><span class="dropdown-item-desc">Contract-driven WASM runtime</span></span></a>
+            <a href="https://traverse-framework.com/docs/concepts.html" class="dropdown-item" role="menuitem"><span class="dropdown-icon">◈</span><span><span class="dropdown-item-title">How it works</span><span class="dropdown-item-desc">Capabilities, contracts, placement</span></span></a>
+            <a href="https://traverse-framework.com/system.html" class="dropdown-item" role="menuitem"><span class="dropdown-icon">▷</span><span><span class="dropdown-item-title">The System</span><span class="dropdown-item-desc">9 crates, 133 governing specs</span></span></a>
+          </div>
+          <div class="dropdown-section">
+            <div class="dropdown-label">Updates</div>
+            <a href="https://traverse-framework.com/roadmap.html" class="dropdown-item" role="menuitem"><span class="dropdown-icon">◎</span><span><span class="dropdown-item-title">Roadmap</span><span class="dropdown-item-desc">What's coming next</span></span></a>
+            <a href="https://traverse-framework.com/changelog.html" class="dropdown-item" role="menuitem"><span class="dropdown-icon">◷</span><span><span class="dropdown-item-title">Changelog</span><span class="dropdown-item-desc">Release notes</span></span></a>
+          </div>
+        </div>
+      </li>
+      <li class="nav-item"><a href="https://traverse-framework.com/platforms.html" class="nav-link">Platforms</a></li>
+      <li class="nav-item"><a href="https://traverse-framework.com/agents.html" class="nav-link">Agents</a></li>
+      <li class="nav-item"><a href="https://traverse-framework.com/registry.html" class="nav-link">Registry</a></li>
+      <li class="nav-item"><a href="https://traverse-framework.com/discover.html" class="nav-link">Discover</a></li>
+      <li class="nav-item has-dropdown">
+        <button class="nav-link-btn" aria-expanded="false" aria-haspopup="true">
+          Developers
+          <svg class="chevron" width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 4l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+        <div class="dropdown" role="menu">
+          <div class="dropdown-section">
+            <div class="dropdown-label">Documentation</div>
+            <a href="https://traverse-framework.com/docs/quickstart.html" class="dropdown-item" role="menuitem"><span class="dropdown-icon">▷</span><span><span class="dropdown-item-title">Quickstart</span><span class="dropdown-item-desc">Up in minutes</span></span></a>
+            <a href="https://traverse-framework.com/docs/concepts.html" class="dropdown-item" role="menuitem"><span class="dropdown-icon">◈</span><span><span class="dropdown-item-title">Concepts</span><span class="dropdown-item-desc">Core mental model</span></span></a>
+            <a href="https://traverse-framework.com/docs/cli-reference.html" class="dropdown-item" role="menuitem"><span class="dropdown-icon">⬡</span><span><span class="dropdown-item-title">CLI Reference</span><span class="dropdown-item-desc">traverse command docs</span></span></a>
+          </div>
+          <div class="dropdown-section">
+            <div class="dropdown-label">Resources</div>
+            <a href="https://traverse-framework.com/questions.html" class="dropdown-item" role="menuitem"><span class="dropdown-icon">◎</span><span><span class="dropdown-item-title">All Questions</span><span class="dropdown-item-desc">55 answered questions</span></span></a>
+            <a href="https://traverse-framework.com/examples.html" class="dropdown-item" role="menuitem"><span class="dropdown-icon">◷</span><span><span class="dropdown-item-title">Examples</span><span class="dropdown-item-desc">6 real, runnable domains</span></span></a>
+            <a href="https://traverse-framework.com/compare.html" class="dropdown-item" role="menuitem"><span class="dropdown-icon">⬡</span><span><span class="dropdown-item-title">Compare</span><span class="dropdown-item-desc">vs function calling, microservices, serverless</span></span></a>
+            <a href="https://traverse-framework.com/security-audit.html" class="dropdown-item" role="menuitem"><span class="dropdown-icon">◎</span><span><span class="dropdown-item-title">Security Audit</span><span class="dropdown-item-desc">Honest security &amp; permanence status</span></span></a>
+          </div>
+        </div>
+      </li>
+      <li class="nav-item"><a href="https://traverse-framework.com/blog.html" class="nav-link">Blog</a></li>
+    </ul>
+    <div class="nav-right">
+      <button class="nav-theme-btn" id="theme-toggle" title="Toggle light/dark" aria-label="Toggle light/dark">◐</button>
+      <a href="https://github.com/traverse-framework/traverse" target="_blank" rel="noopener" class="btn-ghost-sm">GitHub →</a>
+      <a href="https://traverse-framework.com/docs/quickstart.html" class="btn-primary-sm">Get started</a>
+      <button class="nav-mobile-btn" id="nav-mobile-btn" aria-label="Menu" aria-expanded="false">
+        <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5"><line x1="2" y1="5" x2="16" y2="5"/><line x1="2" y1="9" x2="16" y2="9"/><line x1="2" y1="13" x2="16" y2="13"/></svg>
+      </button>
+    </div>
+  </div>
+</nav>
+<div class="nav-mobile-menu" id="nav-mobile-menu">
+  <a href="https://traverse-framework.com/questions/what-is-traverse.html">What is Traverse</a>
+  <a href="https://traverse-framework.com/system.html">The System</a>
+  <a href="https://traverse-framework.com/platforms.html">Platforms</a>
+  <a href="https://traverse-framework.com/agents.html">Agents</a>
+  <a href="https://traverse-framework.com/registry.html">Registry</a>
+  <a href="https://traverse-framework.com/discover.html">Discover</a>
+  <a href="https://traverse-framework.com/docs/quickstart.html">Quickstart</a>
+  <a href="https://traverse-framework.com/questions.html">All Questions</a>
+  <a href="https://traverse-framework.com/examples.html">Examples</a>
+  <a href="https://traverse-framework.com/compare.html">Compare</a>
+  <a href="https://traverse-framework.com/security-audit.html">Security Audit</a>
+  <a href="https://traverse-framework.com/blog.html">Blog</a>
+  <a href="https://traverse-framework.com/roadmap.html">Roadmap</a>
+  <a href="https://traverse-framework.com/changelog.html">Changelog</a>
+  <a href="https://github.com/traverse-framework/traverse" target="_blank" rel="noopener">GitHub →</a>
+</div>"""
+
+# The registry's own sub-header, dedicated to this sub-site, sitting under
+# the shared SITE_NAV_HTML above -- brand link is root-relative `/` (these
+# are standalone documents, not the SPA, unlike catalog/index.html's `#`).
+REGISTRY_SUBNAV_HTML = """<nav class="registry-subnav">
+  <div class="registry-subnav-inner">
+    <a href="/" class="registry-subnav-brand">
+      <span class="registry-subnav-title">Registry</span>
+      <span class="registry-subnav-label">UNIVERSAL CAPABILITY CATALOG</span>
+    </a>
+    <a href="https://github.com/traverse-framework/registry" target="_blank" rel="noopener" class="btn-ghost-sm">GitHub →</a>
+  </div>
+</nav>"""
+
+# Dropdown/mobile-menu/theme-toggle behavior for SITE_NAV_HTML, identical
+# logic to catalog/index.html's own copy (these static pages have no shared
+# JS module with the SPA to import it from). Theme choice persists via the
+# same `catalog-theme` localStorage key, shared across this whole origin.
+NAV_SCRIPT_HTML = """<script>
+(function () {
+  var themeBtn = document.getElementById("theme-toggle");
+  var storedTheme = localStorage.getItem("catalog-theme");
+  if (storedTheme) { document.documentElement.setAttribute("data-theme", storedTheme); }
+  if (themeBtn) {
+    themeBtn.addEventListener("click", function () {
+      var current = document.documentElement.getAttribute("data-theme");
+      var next = current === "light" ? "dark" : "light";
+      document.documentElement.setAttribute("data-theme", next);
+      localStorage.setItem("catalog-theme", next);
+    });
+  }
+
+  document.querySelectorAll(".nav-item.has-dropdown").forEach(function (item) {
+    var btn = item.querySelector(".nav-link-btn");
+    if (!btn) { return; }
+    function close() { item.classList.remove("open"); btn.setAttribute("aria-expanded", "false"); }
+    function open() {
+      document.querySelectorAll(".nav-item.open").forEach(function (other) {
+        if (other !== item) {
+          other.classList.remove("open");
+          var otherBtn = other.querySelector(".nav-link-btn");
+          if (otherBtn) { otherBtn.setAttribute("aria-expanded", "false"); }
+        }
+      });
+      item.classList.add("open");
+      btn.setAttribute("aria-expanded", "true");
+    }
+    btn.addEventListener("click", function () { item.classList.contains("open") ? close() : open(); });
+    document.addEventListener("click", function (event) { if (!item.contains(event.target)) { close(); } });
+    document.addEventListener("keydown", function (event) { if (event.key === "Escape") { close(); } });
+  });
+
+  var mobileBtn = document.getElementById("nav-mobile-btn");
+  var mobileMenu = document.getElementById("nav-mobile-menu");
+  if (mobileBtn && mobileMenu) {
+    mobileBtn.addEventListener("click", function () {
+      var isOpen = mobileMenu.classList.toggle("open");
+      mobileBtn.setAttribute("aria-expanded", isOpen ? "true" : "false");
+    });
+  }
+})();
+</script>"""
+
+
 PAGE_TEMPLATE = """<!doctype html>
 <html lang="en">
 <head>
@@ -309,18 +461,8 @@ PAGE_TEMPLATE = """<!doctype html>
 <script defer src="/analytics.js"></script>
 </head>
 <body>
-<nav class="nav">
-  <div class="nav-inner">
-    <a href="/" class="nav-logo">
-      <img src="https://traverse-framework.com/assets/img/logo/traverse_mountain_dark_128.png" alt="" width="22" height="22" class="logo-mark logo-mark-dark">
-      <img src="https://traverse-framework.com/assets/img/logo/traverse_mountain_light_128.png" alt="" width="22" height="22" class="logo-mark logo-mark-light">
-      Traverse<span class="nav-logo-dot">.</span><span class="nav-label">UNIVERSAL CAPABILITY CATALOG</span>
-    </a>
-    <div class="nav-right">
-      <a href="https://github.com/traverse-framework/registry" target="_blank" rel="noopener" class="btn-ghost-sm">GitHub →</a>
-    </div>
-  </div>
-</nav>
+{site_nav}
+{registry_subnav}
 <div class="container">
 <a class="back-link" href="/">← Back to catalog</a>
 <div class="detail-header-badges">{header_badges}</div>
@@ -378,6 +520,7 @@ Traverse<span class="nav-logo-dot">.</span>
 <span>© 2026 Enrico Piovesan · Traverse Framework</span>
 </div>
 </footer>
+{nav_script}
 </body>
 </html>
 """
@@ -444,6 +587,9 @@ def render_capability_page(
     canonical_url = f"{base_url}/{capability_page_path(contract)}"
 
     return PAGE_TEMPLATE.format(
+        site_nav=SITE_NAV_HTML,
+        registry_subnav=REGISTRY_SUBNAV_HTML,
+        nav_script=NAV_SCRIPT_HTML,
         title=esc(title),
         description=esc(summary or contract["id"]),
         canonical_url=esc(canonical_url),
@@ -481,18 +627,8 @@ PERSONA_PAGE_TEMPLATE = """<!doctype html>
 <script defer src="/analytics.js"></script>
 </head>
 <body>
-<nav class="nav">
-  <div class="nav-inner">
-    <a href="/" class="nav-logo">
-      <img src="https://traverse-framework.com/assets/img/logo/traverse_mountain_dark_128.png" alt="" width="22" height="22" class="logo-mark logo-mark-dark">
-      <img src="https://traverse-framework.com/assets/img/logo/traverse_mountain_light_128.png" alt="" width="22" height="22" class="logo-mark logo-mark-light">
-      Traverse<span class="nav-logo-dot">.</span><span class="nav-label">UNIVERSAL CAPABILITY CATALOG</span>
-    </a>
-    <div class="nav-right">
-      <a href="https://github.com/traverse-framework/registry" target="_blank" rel="noopener" class="btn-ghost-sm">GitHub →</a>
-    </div>
-  </div>
-</nav>
+{site_nav}
+{registry_subnav}
 <div class="container">
 <a class="back-link" href="/#/personas">← Back to personas</a>
 <div class="detail-header-badges"><span class="badge">v{version}</span></div>
@@ -542,6 +678,7 @@ Traverse<span class="nav-logo-dot">.</span>
 <span>© 2026 Enrico Piovesan · Traverse Framework</span>
 </div>
 </footer>
+{nav_script}
 </body>
 </html>
 """
@@ -590,6 +727,9 @@ def render_persona_page(base_url: str, persona_entry: dict, personas_by_id: dict
     canonical_url = f"{base_url}/{persona_page_path(persona)}"
 
     return PERSONA_PAGE_TEMPLATE.format(
+        site_nav=SITE_NAV_HTML,
+        registry_subnav=REGISTRY_SUBNAV_HTML,
+        nav_script=NAV_SCRIPT_HTML,
         title=esc(title),
         description=esc(persona.get("summary") or persona["name"]),
         canonical_url=esc(canonical_url),
@@ -634,18 +774,8 @@ SERVICE_TYPE_PAGE_TEMPLATE = """<!doctype html>
 <script defer src="/analytics.js"></script>
 </head>
 <body>
-<nav class="nav">
-  <div class="nav-inner">
-    <a href="/" class="nav-logo">
-      <img src="https://traverse-framework.com/assets/img/logo/traverse_mountain_dark_128.png" alt="" width="22" height="22" class="logo-mark logo-mark-dark">
-      <img src="https://traverse-framework.com/assets/img/logo/traverse_mountain_light_128.png" alt="" width="22" height="22" class="logo-mark logo-mark-light">
-      Traverse<span class="nav-logo-dot">.</span><span class="nav-label">UNIVERSAL CAPABILITY CATALOG</span>
-    </a>
-    <div class="nav-right">
-      <a href="https://github.com/traverse-framework/registry" target="_blank" rel="noopener" class="btn-ghost-sm">GitHub →</a>
-    </div>
-  </div>
-</nav>
+{site_nav}
+{registry_subnav}
 <div class="container">
 <a class="back-link" href="/#/service-types">← Back to service types</a>
 <h1 class="t-h1 detail-title">{name}</h1>
@@ -692,6 +822,7 @@ Traverse<span class="nav-logo-dot">.</span>
 <span>© 2026 Enrico Piovesan · Traverse Framework</span>
 </div>
 </footer>
+{nav_script}
 </body>
 </html>
 """
@@ -720,20 +851,11 @@ AI_MODEL_PAGE_TEMPLATE = """<!doctype html>
 <script defer src="/analytics.js"></script>
 </head>
 <body>
-<nav class="nav">
-  <div class="nav-inner">
-    <a href="/" class="nav-logo">
-      <img src="https://traverse-framework.com/assets/img/logo/traverse_mountain_dark_128.png" alt="" width="22" height="22" class="logo-mark logo-mark-dark">
-      <img src="https://traverse-framework.com/assets/img/logo/traverse_mountain_light_128.png" alt="" width="22" height="22" class="logo-mark logo-mark-light">
-      Traverse<span class="nav-logo-dot">.</span><span class="nav-label">UNIVERSAL CAPABILITY CATALOG</span>
-    </a>
-    <div class="nav-right">
-      <a href="https://github.com/traverse-framework/registry" target="_blank" rel="noopener" class="btn-ghost-sm">GitHub →</a>
-    </div>
-  </div>
-</nav>
+{site_nav}
+{registry_subnav}
 <div class="container">
 <a class="back-link" href="/#/ai-models">← Back to AI models</a>
+<div class="section-label">AI MODELS</div>
 <div class="detail-header-badges"><span class="badge badge-agent">Agent model</span></div>
 <h1 class="t-h1 detail-title t-mono">{model_id}</h1>
 <p class="detail-summary">Capabilities whose contract declares ai.model_backed: true with this model in ai.models (spec 001 FR-017).</p>
@@ -778,6 +900,7 @@ Traverse<span class="nav-logo-dot">.</span>
 <span>© 2026 Enrico Piovesan · Traverse Framework</span>
 </div>
 </footer>
+{nav_script}
 </body>
 </html>
 """
@@ -817,6 +940,9 @@ def render_ai_model_page(base_url: str, model_id: str, matching: list) -> str:
     canonical_url = f"{base_url}/{ai_model_page_path(model_id)}"
 
     return AI_MODEL_PAGE_TEMPLATE.format(
+        site_nav=SITE_NAV_HTML,
+        registry_subnav=REGISTRY_SUBNAV_HTML,
+        nav_script=NAV_SCRIPT_HTML,
         title=esc(title),
         meta_description=esc(summary),
         canonical_url=esc(canonical_url),
@@ -861,6 +987,9 @@ def render_service_type_page(base_url: str, service_type_id: str, definition: di
     canonical_url = f"{base_url}/{service_type_page_path(service_type_id)}"
 
     return SERVICE_TYPE_PAGE_TEMPLATE.format(
+        site_nav=SITE_NAV_HTML,
+        registry_subnav=REGISTRY_SUBNAV_HTML,
+        nav_script=NAV_SCRIPT_HTML,
         title=esc(title),
         meta_description=esc(definition["summary"]),
         canonical_url=esc(canonical_url),
