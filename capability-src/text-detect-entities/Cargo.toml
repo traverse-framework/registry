@@ -1,0 +1,26 @@
+[workspace]
+
+[package]
+name = "text-detect-entities-agent"
+version = "0.1.0"
+edition = "2021"
+publish = false
+description = "DistilBERT-NER token-classification entity extractor for text.detect-entities. See registry#465."
+
+[[bin]]
+name = "detect-entities-agent"
+path = "src/main.rs"
+
+[features]
+default = []
+# Embed the full DistilBERT-NER int8 weight table (required for release WASM builds).
+full-model = []
+
+[dependencies]
+wasi-capability-runtime = { path = "../wasi-capability-runtime" }
+libm = { version = "0.2", default-features = false }
+
+[profile.release]
+opt-level = "s"
+lto = true
+panic = "abort"

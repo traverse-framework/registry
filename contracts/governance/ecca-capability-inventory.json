@@ -836,6 +836,15 @@
       "path": "capabilities/audio/audio.detect-speech-segments/1.0.0/contract.json",
       "classification": "no-event-required",
       "evidence": "side_effects=[memory_only] on published version 1.0.0; empty emits/consumes; model-derived speech-risk score plus updated streaming state returns directly to the caller with no asynchronous domain fact broadcast to independent consumers."
+    },
+    {
+      "capability_id": "text.detect-entities",
+      "published_versions": [
+        "1.0.0"
+      ],
+      "path": "capabilities/text/text.detect-entities/1.0.0/contract.json",
+      "classification": "no-event-required",
+      "evidence": "side_effects=[memory_only] on published version 1.0.0; empty emits/consumes; model-derived entity array returns directly to the caller with no asynchronous domain fact broadcast to independent consumers."
     }
   ]
 }
