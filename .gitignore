@@ -6,3 +6,6 @@ capability-src/report-summarize-semantic/data/potion-base-32M-int8.bin
 
 # Local MiniLM-L3 int8 weight table for report.translate-fr-semantic builds (hosted on GitHub Releases, not git)
 capability-src/report-translate-fr-semantic/data/minilm-l3-fr-semantic-int8.bin
+
+# Local Silero VAD float32 weight table for audio.detect-speech-segments builds (hosted on GitHub Releases, not git)
+capability-src/audio-detect-speech-segments/data/silero-vad-16k-f32.bin

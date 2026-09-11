@@ -827,6 +827,15 @@
       "path": "capabilities/report/report.translate-fr-semantic/1.0.0/contract.json",
       "classification": "no-event-required",
       "evidence": "side_effects=[memory_only] on published version 1.0.0; empty emits/consumes; model-derived French translation returns directly to the caller with no asynchronous domain fact broadcast to independent consumers."
+    },
+    {
+      "capability_id": "audio.detect-speech-segments",
+      "published_versions": [
+        "1.0.0"
+      ],
+      "path": "capabilities/audio/audio.detect-speech-segments/1.0.0/contract.json",
+      "classification": "no-event-required",
+      "evidence": "side_effects=[memory_only] on published version 1.0.0; empty emits/consumes; model-derived speech-risk score plus updated streaming state returns directly to the caller with no asynchronous domain fact broadcast to independent consumers."
     }
   ]
 }
