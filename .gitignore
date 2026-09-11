@@ -3,3 +3,6 @@ target/
 
 # Local Model2Vec int8 table for report.summarize-semantic builds (hosted on GitHub Releases, not git)
 capability-src/report-summarize-semantic/data/potion-base-32M-int8.bin
+
+# Local MiniLM-L3 int8 weight table for report.translate-fr-semantic builds (hosted on GitHub Releases, not git)
+capability-src/report-translate-fr-semantic/data/minilm-l3-fr-semantic-int8.bin

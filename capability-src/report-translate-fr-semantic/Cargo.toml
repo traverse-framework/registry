@@ -1,0 +1,26 @@
+[workspace]
+
+[package]
+name = "report-translate-fr-semantic-agent"
+version = "0.1.0"
+edition = "2021"
+publish = false
+description = "MiniLM-L3 sentence-embedding EN->FR translator for report.translate-fr-semantic. See registry#455."
+
+[[bin]]
+name = "translate-fr-semantic-agent"
+path = "src/main.rs"
+
+[features]
+default = []
+# Embed the full MiniLM-L3 int8 weight table (required for release WASM builds).
+full-model = []
+
+[dependencies]
+wasi-capability-runtime = { path = "../wasi-capability-runtime" }
+libm = { version = "0.2", default-features = false }
+
+[profile.release]
+opt-level = "s"
+lto = true
+panic = "abort"
