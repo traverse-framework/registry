@@ -864,6 +864,15 @@
       "path": "capabilities/audio/audio.transcribe-speech/1.0.0/contract.json",
       "classification": "no-event-required",
       "evidence": "side_effects=[memory_only] on published version 1.0.0; empty emits/consumes; model-derived transcript returns directly to the caller with no asynchronous domain fact broadcast to independent consumers. Unchanged in 1.1.0 (adds an internal VAD pre-check, still memory_only/no emits/consumes)."
+    },
+    {
+      "capability_id": "text.redact-entities",
+      "published_versions": [
+        "1.0.0"
+      ],
+      "path": "capabilities/text/text.redact-entities/1.0.0/contract.json",
+      "classification": "no-event-required",
+      "evidence": "side_effects=[memory_only] on published version 1.0.0; empty emits/consumes; model-derived redacted text returns directly to the caller with no asynchronous domain fact broadcast to independent consumers."
     }
   ]
 }

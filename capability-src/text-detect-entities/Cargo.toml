@@ -7,6 +7,10 @@ edition = "2021"
 publish = false
 description = "DistilBERT-NER token-classification entity extractor for text.detect-entities. See registry#465."
 
+[lib]
+crate-type = ["rlib"]
+path = "src/lib.rs"
+
 [[bin]]
 name = "detect-entities-agent"
 path = "src/main.rs"

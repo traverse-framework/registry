@@ -1,0 +1,17 @@
+{
+  "id": "privacy-export-reviewer",
+  "version": "1.0.0",
+  "name": "Privacy Export Reviewer",
+  "summary": "Redacts PII entity mentions from free text before it leaves a privacy boundary, such as a third-party export or a forwarded support ticket.",
+  "description": "Needs person, organization, and location mentions blanked out of free text before it is shared outside its original system -- a support ticket forwarded to a vendor, a document exported for a partner, a transcript shared with an auditor. Wants a deterministic-per-call redaction pass rather than raw entity spans, so the caller doesn't have to re-implement span-substitution logic on top of a generic entity extractor.",
+  "distinguished_from": [
+    {
+      "persona_id": "classification-consumer",
+      "how": "Needs entity spans blanked out of the text itself for export, rather than a governed per-item outcome state derived from scored evidence."
+    },
+    {
+      "persona_id": "retention-steward",
+      "how": "Redacts specific PII mentions within text that is still being kept, rather than deciding whether a whole asset must be preserved or is eligible for deletion."
+    }
+  ]
+}
