@@ -86,6 +86,8 @@ use alloc::vec::Vec;
 
 use wasi_capability_runtime::{object, Value};
 
+use audio_detect_speech_segments_agent as vad;
+
 #[cfg(feature = "full-model")]
 static FULL_MODEL_BIN: &[u8] = include_bytes!("../data/whisper-tiny-int8.bin");
 
@@ -1035,9 +1037,67 @@ fn read_samples(input: &Value) -> Vec<f32> {
     out
 }
 
+/// Below this max Silero-VAD speech probability across the whole clip,
+/// treat the audio as non-speech (music, tone, noise -- silence is already
+/// caught by the cheaper energy check above) and skip the Whisper forward
+/// pass entirely. 0.5 matches Silero's own common speech/non-speech
+/// convention; verified (registry#477) against real audio: real speech
+/// (openai/whisper's own `tests/jfk.flac`) scores well above this on every
+/// chunk, and the synthetic-tone case that used to produce a hallucinated
+/// `" [MUSIC PLAYING]"` transcript scores well below it throughout.
+const VAD_SPEECH_THRESHOLD: f32 = 0.5;
+
+#[cfg(all(feature = "full-model", not(test)))]
+fn vad_model() -> vad::Model {
+    vad::load_production_model()
+}
+
+#[cfg(not(all(feature = "full-model", not(test))))]
+fn vad_model() -> vad::Model {
+    vad::fixture_model()
+}
+
+/// Runs the Silero VAD engine over `samples` in its own fixed 512-sample
+/// chunks (zero-padding only the final partial chunk), threading its
+/// streaming context/LSTM state exactly as it expects, and returns the
+/// highest speech probability seen across the whole clip. A single high
+/// chunk is enough to call a clip "has speech" -- this is a presence
+/// check, not a duration/coverage measurement.
+fn max_speech_probability(model: &vad::Model, samples: &[f32]) -> f32 {
+    let mut context = alloc::vec![0.0f32; vad::CONTEXT];
+    let mut h = alloc::vec![0.0f32; vad::HIDDEN];
+    let mut c = alloc::vec![0.0f32; vad::HIDDEN];
+    let mut chunk = alloc::vec![0.0f32; vad::SAMPLES];
+    let mut max_prob = 0.0f32;
+
+    let mut i = 0usize;
+    while i < samples.len() {
+        let end = core::cmp::min(i + vad::SAMPLES, samples.len());
+        let len = end - i;
+        chunk[..len].copy_from_slice(&samples[i..end]);
+        for v in chunk[len..].iter_mut() {
+            *v = 0.0;
+        }
+        let (prob, new_context, new_h, new_c) = vad::score_chunk(model, &chunk, &context, &h, &c);
+        if prob.is_finite() && prob > max_prob {
+            max_prob = prob;
+        }
+        context = new_context;
+        h = new_h;
+        c = new_c;
+        i += vad::SAMPLES;
+    }
+    max_prob
+}
+
 fn transcribe(model: &Model, samples: &[f32]) -> String {
     let energy: f32 = samples.iter().map(|v| v * v).sum();
     if samples.is_empty() || energy < MIN_AUDIO_ENERGY * samples.len() as f32 {
+        return String::new();
+    }
+
+    let vad = vad_model();
+    if max_speech_probability(&vad, samples) < VAD_SPEECH_THRESHOLD {
         return String::new();
     }
 
@@ -1400,6 +1460,53 @@ mod tests {
         let input = object(alloc::vec![]);
         let samples = read_samples(&input);
         assert!(samples.is_empty());
+    }
+
+    // -----------------------------------------------------------------
+    // VAD speech-presence pre-check (registry#477). `vad::fixture_model()`
+    // is synthetic (not a real speech/non-speech classifier), so these
+    // tests check plumbing (bounds, determinism, chunk-boundary handling)
+    // rather than accuracy -- the actual speech-vs-tone discrimination is
+    // verified separately against the real weights on real audio (see
+    // data/README.md).
+    // -----------------------------------------------------------------
+
+    #[test]
+    fn max_speech_probability_is_finite_and_bounded() {
+        let m = vad::fixture_model();
+        let mut samples = alloc::vec![0.0f32; 4000]; // several chunks, incl. a partial one
+        for (i, v) in samples.iter_mut().enumerate() {
+            *v = 0.2 * libm::sinf(i as f32 * 0.05);
+        }
+        let p = max_speech_probability(&m, &samples);
+        assert!(p.is_finite());
+        assert!((0.0..=1.0).contains(&p));
+    }
+
+    #[test]
+    fn max_speech_probability_is_deterministic() {
+        let m = vad::fixture_model();
+        let mut samples = alloc::vec![0.0f32; 1500]; // shorter than one full chunk
+        for (i, v) in samples.iter_mut().enumerate() {
+            *v = 0.15 * libm::sinf(i as f32 * 0.11);
+        }
+        let a = max_speech_probability(&m, &samples);
+        let b = max_speech_probability(&m, &samples);
+        assert_eq!(a, b);
+    }
+
+    #[test]
+    fn max_speech_probability_of_empty_input_is_zero() {
+        let m = vad::fixture_model();
+        assert_eq!(max_speech_probability(&m, &[]), 0.0);
+    }
+
+    #[test]
+    fn max_speech_probability_handles_exact_multiple_of_chunk_size() {
+        let m = vad::fixture_model();
+        let samples = alloc::vec![0.05f32; vad::SAMPLES * 3]; // exactly 3 chunks, no partial
+        let p = max_speech_probability(&m, &samples);
+        assert!(p.is_finite());
     }
 
     /// Without the `full-model` feature (the default, and how `cargo test`

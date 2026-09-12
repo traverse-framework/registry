@@ -7,6 +7,10 @@ edition = "2021"
 publish = false
 description = "Silero VAD (16k) single-chunk speech-risk scorer for audio.detect-speech-segments. See registry#460."
 
+[lib]
+crate-type = ["rlib"]
+path = "src/lib.rs"
+
 [[bin]]
 name = "detect-speech-segments-agent"
 path = "src/main.rs"

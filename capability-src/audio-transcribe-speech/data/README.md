@@ -100,3 +100,36 @@ run under `wasmtime` (CLI) on the same real 11s JFK sample: output matched
 the quantized Python reference exactly, byte for byte —
 `" And so my fellow Americans ask not what your country can do for you, ask
 what you can do for your country."`
+
+## VAD speech-presence pre-check (v1.1.0, registry#477)
+
+`audio.transcribe-speech@1.1.0` reuses `audio.detect-speech-segments`'
+Silero VAD engine (registry#460 — `snakers4/silero-vad`, MIT, see that
+capability's own `data/README.md` for its own verification) as a
+speech-presence pre-check before running the Whisper encoder/decoder at
+all: `capability-src/audio-detect-speech-segments`'s weight table
+(`silero-vad-16k-f32.bin`, pinned sha256
+`0688f0fadaeba187dc827d90228ea7bb2eda887829e8d9524d0b9535557668fe`) must
+also be present (in that crate's own `data/` directory) for a
+`--features full-model` build of *this* capability, since Cargo pulls it
+in transitively via the `audio-detect-speech-segments-agent` path
+dependency's own `full-model` feature.
+
+**Why**: Whisper has no notion of "is this speech at all" and will
+confidently transcribe non-speech, non-silent audio as plausible-sounding
+text. Observed directly before this fix: a synthetic sine tone came back
+as `" [MUSIC PLAYING]"`. The existing crude energy-threshold silence check
+(`MIN_AUDIO_ENERGY`) only catches true silence, not a tone/music/noise
+with real energy but no speech content.
+
+**Verified empirically on real audio** (not assumed): the real 11s JFK
+clip and its 1s excerpt still transcribe identically to v1.0.0 (VAD
+correctly recognizes real speech on every chunk); the synthetic-tone case
+that used to produce `" [MUSIC PLAYING]"` now correctly returns
+`{"text": "", "status": "ok"}`; true silence still returns empty text
+(via the cheaper energy check, unchanged from v1.0.0). Threshold: max
+speech probability across all 512-sample VAD chunks in the clip must
+clear 0.5 (Silero's own common speech/non-speech convention) or the
+Whisper forward pass is skipped entirely — a presence check, not a
+duration/coverage measurement, so even a brief burst of real speech in an
+otherwise-quiet clip is enough to proceed.
