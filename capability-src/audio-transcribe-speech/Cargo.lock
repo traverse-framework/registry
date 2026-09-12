@@ -3,9 +3,18 @@
 version = 4
 
 [[package]]
+name = "audio-detect-speech-segments-agent"
+version = "0.1.0"
+dependencies = [
+ "libm",
+ "wasi-capability-runtime",
+]
+
+[[package]]
 name = "audio-transcribe-speech-agent"
 version = "0.1.0"
 dependencies = [
+ "audio-detect-speech-segments-agent",
  "libm",
  "wasi-capability-runtime",
 ]
