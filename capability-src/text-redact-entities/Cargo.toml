@@ -1,0 +1,30 @@
+[workspace]
+
+[package]
+name = "text-redact-entities-agent"
+version = "0.1.0"
+edition = "2021"
+publish = false
+description = "PII redaction over text.detect-entities' DistilBERT-NER engine for text.redact-entities. See registry#481."
+
+[[bin]]
+name = "redact-entities-agent"
+path = "src/main.rs"
+
+[features]
+default = []
+# Embed the full DistilBERT-NER int8 weight table (required for release WASM builds),
+# via text-detect-entities-agent's own full-model feature.
+full-model = ["text-detect-entities-agent/full-model"]
+
+[dependencies]
+wasi-capability-runtime = { path = "../wasi-capability-runtime" }
+libm = { version = "0.2", default-features = false }
+# Reuses text.detect-entities' DistilBERT-NER forward pass (registry#465)
+# directly rather than duplicating it -- see registry#481.
+text-detect-entities-agent = { path = "../text-detect-entities" }
+
+[profile.release]
+opt-level = "s"
+lto = true
+panic = "abort"
