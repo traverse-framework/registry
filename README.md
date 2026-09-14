@@ -34,4 +34,6 @@ scripts/ci/                                              # CI gate scripts (spec
 
 ## Governance
 
-This repo follows the shared governance model defined in [`traverse-framework/.github`](https://github.com/traverse-framework/.github). See `.specify/memory/constitution.md` for the pinned version this repo has adopted, and `CONTRIBUTING.md` before opening a PR.
+This repo follows the shared governance model defined in [`traverse-framework/.github`](https://github.com/traverse-framework/.github). See `.specify/memory/constitution.md` for the pinned version this repo has adopted, and [`CONTRIBUTING.md`](CONTRIBUTING.md) before opening a PR.
+
+**First time publishing?** Grab a [`help wanted` / `good first issue`](https://github.com/traverse-framework/registry/issues?q=is%3Aissue+is%3Aopen+label%3A%22help+wanted%22+label%3A%22good+first+issue%22) ticket (see [First contributions](CONTRIBUTING.md#first-contributions)) — one capability per PR, through the normal gates.

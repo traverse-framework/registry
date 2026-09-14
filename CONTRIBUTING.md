@@ -10,6 +10,16 @@ Please read:
 - [traverse-framework/.github](https://github.com/traverse-framework/.github) — constitution, quality standards, antipatterns, compatibility policy, exception process, CLA (this repo has adopted governance version 1.0.0)
 - [docs/decision-log.md](docs/decision-log.md) — why this repo's design is what it is
 
+## First contributions
+
+If you are new here, start from a labeled ticket rather than inventing a capability:
+
+1. Pick an open [`help wanted` + `good first issue`](https://github.com/traverse-framework/registry/issues?q=is%3Aissue+is%3Aopen+label%3A%22help+wanted%22+label%3A%22good+first+issue%22) issue (often also `no-spec-needed`).
+2. Comment to claim it — keep the PR to that one capability.
+3. Follow [Publishing a Capability](#publishing-a-capability) below and the publisher checklist in [`capabilities/README.md`](capabilities/README.md).
+
+Examples and consume paths live in the [`traverse`](https://github.com/traverse-framework/traverse) repo; graduating to a **published** registry capability is the on-ramp this repo owns. Batch context: [Discussion #1374](https://github.com/orgs/traverse-framework/discussions/1374).
+
 ## Publishing a Capability
 
 Use `traverse-cli capability publish` (from the `traverse` repo) rather than hand-crafting a PR — it validates your contract locally and opens the PR for you. See `specs/001-registry-foundation/spec.md`, User Story 1.
