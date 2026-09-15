@@ -954,6 +954,15 @@
       "path": "capabilities/retention/retention.action-plan-create/1.0.0/contract.json",
       "classification": "no-event-required",
       "evidence": "side_effects=[memory_only]; empty emits/consumes; deterministic retention plan is returned without deleting, archiving, scheduling, or mutating any asset."
+    },
+    {
+      "capability_id": "model.activation-plan-create",
+      "published_versions": [
+        "1.0.0"
+      ],
+      "path": "capabilities/model/model.activation-plan-create/1.0.0/contract.json",
+      "classification": "no-event-required",
+      "evidence": "side_effects=[memory_only]; empty emits/consumes; deterministic eligibility decision returns directly to the caller and does not fetch, cache, execute, or activate a model artifact."
     }
   ]
 }
