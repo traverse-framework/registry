@@ -1,0 +1,148 @@
+{
+  "kind": "capability_contract",
+  "schema_version": "1.0.0",
+  "id": "model.activation-plan-create",
+  "namespace": "model",
+  "name": "activation-plan-create",
+  "version": "1.0.0",
+  "lifecycle": "draft",
+  "owner": { "team": "generic-policy-capabilities", "contact": "https://github.com/enricopiovesan" },
+  "risk": { "effect_class": "pure_read", "determinism_class": "deterministic", "data_flow": { "accepted_data_classifications": [], "produced_data_classifications": [], "egress_policy": "denied" }, "reliability": { "idempotency_required": false, "retryable": true, "compensation_available": true } },
+  "authoring": {
+    "method": "llm-assisted",
+    "source_revision": "https://github.com/enricopiovesan/Callweave/commit/0f45473b5799edb88e5b4b506fecbc9bc7fd59b3",
+    "test_evidence": "Callweave CI run https://github.com/enricopiovesan/Callweave/actions/runs/34998036296; Registry source unit tests (10 passed) and llvm-cov (100% functions, 96.95% lines, 97.69% regions); WASI runtime smoke validated with wasmtime",
+    "review": { "decision": "pending-qualified-review", "reviewer": "qualified-rust-security-reviewer" }
+  },
+  "summary": "Create a model activation eligibility plan from verified evidence and configurable runtime policy.",
+  "description": "Pure model-neutral policy planning. Consumes trusted evidence labels from an authorized verifier and explicit target/runtime compatibility and memory facts. It neither verifies signatures or digests nor fetches, selects, downloads, caches, executes, or activates an artifact. Runtime remains responsible for independently enforcing activation authority.",
+  "use_cases": [
+    {
+      "scenario": "As a model-runtime policy consumer, I want a compatible artifact with verified provenance, accepted licence evidence, and sufficient memory to receive an activation plan so that runtime-specific activation can remain separate from portable policy.",
+      "input_example": { "model_ref": "model:sha256/abc123", "target": "wasm32-wasip2", "licence_ref": "Apache-2.0", "digest_evidence": "verified", "signature_evidence": "verified", "licence_evidence": "accepted", "runtime_compatibility": "verified", "memory_required_bytes": 67108864, "policy": { "version": "activation-1", "allowed_targets": ["wasm32-wasip2"], "maximum_memory_bytes": 134217728, "unknown_evidence_action": "review" } },
+      "output_example": { "model_ref": "model:sha256/abc123", "target": "wasm32-wasip2", "licence_ref": "Apache-2.0", "decision": "activation_planned", "reason": "policy_satisfied", "policy_version": "activation-1" },
+      "happy": true,
+      "persona_ref": "classifier-steward"
+    },
+    {
+      "scenario": "As a model-runtime policy consumer, I want target, memory, failed evidence, and unknown-evidence cases rejected or escalated according to explicit policy so that unsupported or unverifiable artifacts are not silently approved.",
+      "input_example": { "model_ref": "model:sha256/abc123", "target": "native", "licence_ref": "Apache-2.0", "digest_evidence": "unknown", "signature_evidence": "verified", "licence_evidence": "accepted", "runtime_compatibility": "verified", "memory_required_bytes": 67108864, "policy": { "version": "activation-1", "allowed_targets": ["wasm32-wasip2"], "maximum_memory_bytes": 134217728, "unknown_evidence_action": "review" } },
+      "output_example": { "model_ref": "model:sha256/abc123", "target": "native", "licence_ref": "Apache-2.0", "decision": "reject", "reason": "target_not_allowed", "policy_version": "activation-1" },
+      "happy": false,
+      "persona_ref": "classifier-steward"
+    },
+    {
+      "scenario": "As a model-runtime policy consumer, I want failed digest, signature, licence, or compatibility evidence to reject an activation plan so that every negative evidence state is explicit and testable.",
+      "input_example": {
+        "model_ref": "model:sha256/abc123",
+        "target": "wasm32-wasip2",
+        "licence_ref": "Apache-2.0",
+        "digest_evidence": "failed",
+        "signature_evidence": "failed",
+        "licence_evidence": "rejected",
+        "runtime_compatibility": "failed",
+        "memory_required_bytes": 67108864,
+        "policy": {
+          "version": "activation-1",
+          "allowed_targets": ["wasm32-wasip2"],
+          "maximum_memory_bytes": 134217728,
+          "unknown_evidence_action": "reject"
+        }
+      },
+      "output_example": {
+        "model_ref": "model:sha256/abc123",
+        "target": "wasm32-wasip2",
+        "licence_ref": "Apache-2.0",
+        "decision": "reject",
+        "reason": "digest_evidence_failed",
+        "policy_version": "activation-1"
+      },
+      "happy": false,
+      "persona_ref": "classifier-steward"
+    },
+    {
+      "scenario": "As a model-runtime policy consumer, I want unknown signature, licence, and compatibility evidence to follow the configured reject action so that incomplete verification cannot be mistaken for approval.",
+      "input_example": {
+        "model_ref": "model:sha256/abc123",
+        "target": "wasm32-wasip2",
+        "licence_ref": "Apache-2.0",
+        "digest_evidence": "verified",
+        "signature_evidence": "unknown",
+        "licence_evidence": "unknown",
+        "runtime_compatibility": "unknown",
+        "memory_required_bytes": 67108864,
+        "policy": {
+          "version": "activation-1",
+          "allowed_targets": ["wasm32-wasip2"],
+          "maximum_memory_bytes": 134217728,
+          "unknown_evidence_action": "reject"
+        }
+      },
+      "output_example": {
+        "model_ref": "model:sha256/abc123",
+        "target": "wasm32-wasip2",
+        "licence_ref": "Apache-2.0",
+        "decision": "reject",
+        "reason": "evidence_unknown_policy_reject",
+        "policy_version": "activation-1"
+      },
+      "happy": false,
+      "persona_ref": "classifier-steward"
+    }
+  ],
+  "inputs": { "schema": {
+    "type": "object",
+    "required": ["model_ref", "target", "licence_ref", "digest_evidence", "signature_evidence", "licence_evidence", "runtime_compatibility", "memory_required_bytes", "policy"],
+    "properties": {
+      "model_ref": { "type": "string", "minLength": 1, "maxLength": 256, "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/@+-]*$" },
+      "target": { "type": "string", "minLength": 1, "maxLength": 64, "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/@+-]*$" },
+      "licence_ref": { "type": "string", "minLength": 1, "maxLength": 256, "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/@+-]*$" },
+      "digest_evidence": { "enum": ["verified", "failed", "unknown"] },
+      "signature_evidence": { "enum": ["verified", "failed", "unknown"] },
+      "licence_evidence": { "enum": ["accepted", "rejected", "unknown"] },
+      "runtime_compatibility": { "enum": ["verified", "failed", "unknown"] },
+      "memory_required_bytes": { "type": "integer", "minimum": 0, "maximum": 18446744073709551615 },
+      "policy": {
+        "type": "object",
+        "required": ["version", "allowed_targets", "maximum_memory_bytes", "unknown_evidence_action"],
+        "properties": {
+          "version": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/@+-]*$" },
+          "allowed_targets": { "type": "array", "minItems": 1, "maxItems": 16, "items": { "type": "string", "minLength": 1, "maxLength": 64, "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/@+-]*$" } },
+          "maximum_memory_bytes": { "type": "integer", "minimum": 0, "maximum": 18446744073709551615 },
+          "unknown_evidence_action": { "enum": ["review", "reject"] }
+        },
+        "additionalProperties": false
+      }
+    },
+    "additionalProperties": false
+  } },
+  "outputs": { "schema": { "oneOf": [
+    { "type": "object", "required": ["model_ref", "target", "licence_ref", "decision", "reason", "policy_version"], "properties": {
+      "model_ref": { "type": "string" }, "target": { "type": "string" }, "licence_ref": { "type": "string" },
+      "decision": { "enum": ["activation_planned", "reject", "review_required"] },
+      "reason": { "enum": ["target_not_allowed", "memory_budget_exceeded", "digest_verification_failed", "signature_verification_failed", "licence_not_accepted", "runtime_incompatible", "verification_evidence_unknown", "policy_satisfied"] },
+      "policy_version": { "type": "string" }
+    }, "additionalProperties": false },
+    { "type": "object", "required": ["result_class"], "properties": { "result_class": { "enum": ["input_limit_exceeded", "invalid_request"] } }, "additionalProperties": false }
+  ] } },
+  "preconditions": [
+    { "id": "trusted-evidence", "description": "Evidence values are supplied by an authorized verifier/runtime; this pure evaluator does not establish their authenticity." },
+    { "id": "runtime-enforces", "description": "The host runtime independently enforces artifact verification, permissions, and activation. This output is a policy plan, not activation authority." }
+  ],
+  "postconditions": [
+    { "id": "ordered-denial", "description": "Target and memory constraints are checked before evidence; failed evidence rejects and unknown evidence follows explicit review/reject policy." },
+    { "id": "no-activation", "description": "No model artifact is fetched, selected, cached, executed, or activated." }
+  ],
+  "side_effects": [{ "kind": "memory_only", "description": "Pure bounded policy evaluation." }],
+  "emits": [], "consumes": [],
+  "permissions": [{ "id": "model.activation-plan-create.execute" }],
+  "execution": { "binary_format": "wasm", "entrypoint": { "kind": "wasi-command", "command": "run" }, "preferred_targets": ["local", "browser", "edge", "device"], "constraints": { "host_api_access": "none", "network_access": "forbidden", "filesystem_access": "none" } },
+  "policies": [{ "id": "configurable-model-activation-eligibility" }], "dependencies": [],
+  "provenance": { "source": "greenfield", "author": "Codex", "created_at": "2026-09-14T00:00:00Z", "spec_ref": "100-capability-package-authoring@1.0.0", "adr_refs": [], "exception_refs": [] },
+  "evidence": [], "state_schema": null, "service_type": "stateless", "permitted_targets": ["local", "browser", "edge", "device"],
+  "artifact_type": "native",
+  "artifact": {
+    "digest": "sha256:e99c052bb040167db853d6778b72c34966b81dfd9864246d02fc97f361eeb27b",
+    "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/model.activation-plan-create-1.0.0/activation-plan-create.wasm"
+  }
+}
