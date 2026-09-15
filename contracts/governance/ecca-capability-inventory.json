@@ -893,6 +893,15 @@
       "evidence": "side_effects=[memory_only]; empty emits/consumes; deterministic bounded PCM transformation returns directly to the caller without broadcasting an asynchronous domain fact."
     },
     {
+      "capability_id": "audio.pcm-window",
+      "published_versions": [
+        "1.0.0"
+      ],
+      "path": "capabilities/audio/audio.pcm-window/1.0.0/contract.json",
+      "classification": "no-event-required",
+      "evidence": "side_effects=[memory_only]; empty emits/consumes; deterministic bounded PCM window records return directly to the caller without broadcasting an asynchronous domain fact."
+    },
+    {
       "capability_id": "audio.wav-pcm16-decode",
       "published_versions": [
         "1.0.0"
@@ -909,6 +918,15 @@
       "path": "capabilities/candidate/candidate.policy-evaluate/1.0.0/contract.json",
       "classification": "no-event-required",
       "evidence": "side_effects=[memory_only]; empty emits/consumes; deterministic policy evaluation returns directly to the caller without broadcasting an asynchronous domain fact."
+    },
+    {
+      "capability_id": "event.append-plan-create",
+      "published_versions": [
+        "1.0.0"
+      ],
+      "path": "capabilities/event/event.append-plan-create/1.0.0/contract.json",
+      "classification": "no-event-required",
+      "evidence": "side_effects=[memory_only]; empty emits/consumes; deterministic append intent returns an immutable plan to the caller without causing an asynchronous domain event."
     }
   ]
 }
