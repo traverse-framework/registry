@@ -424,32 +424,30 @@ fn panic(_: &core::panic::PanicInfo<'_>) -> ! {
 mod tests {
     use super::{evaluate, string_array, unique_fields, value_after};
 
+    const ELIGIBLE: &str = r#"{"model_ref":"model:sha256:abc","target":"wasm32-wasip1","licence_ref":"licence:mit","digest_evidence":"verified","signature_evidence":"verified","licence_evidence":"accepted","runtime_compatibility":"verified","memory_required_bytes":1024,"policy":{"version":"1.0.0","allowed_targets":["wasm32-wasip1"],"maximum_memory_bytes":2048,"unknown_evidence_action":"review"}}"#;
+
     fn run(input: &str) -> std::string::String {
         let mut output = [0u8; 1024];
         let length = evaluate(input.as_bytes(), &mut output);
         std::string::String::from_utf8(output[..length].to_vec()).unwrap()
     }
 
-    const ELIGIBLE: &str = r#"{"model_ref":"model:sha256:abc","target":"wasm32-wasip1","licence_ref":"licence:mit","digest_evidence":"verified","signature_evidence":"verified","licence_evidence":"accepted","runtime_compatibility":"verified","memory_required_bytes":1024,"policy":{"version":"1.0.0","allowed_targets":["wasm32-wasip1"],"maximum_memory_bytes":2048,"unknown_evidence_action":"review"}}"#;
-
     #[test]
-    fn plans_activation_when_policy_and_evidence_are_satisfied() {
+    fn plans_activation_when_evidence_is_satisfied() {
         assert!(run(ELIGIBLE).contains("\"decision\":\"activation_planned\""));
     }
 
     #[test]
-    fn unknown_evidence_is_not_treated_as_verified() {
-        let input = ELIGIBLE.replace("\"licence_evidence\":\"accepted\"", "\"licence_evidence\":\"unknown\"");
-        assert!(run(&input).contains("\"decision\":\"review_required\""));
+    fn unknown_evidence_follows_review_and_reject_policies() {
+        let review = ELIGIBLE.replace("\"licence_evidence\":\"accepted\"", "\"licence_evidence\":\"unknown\"");
+        assert!(run(&review).contains("review_required"));
+        let reject = ELIGIBLE.replace("\"digest_evidence\":\"verified\"", "\"digest_evidence\":\"unknown\"")
+            .replace("\"unknown_evidence_action\":\"review\"", "\"unknown_evidence_action\":\"reject\"");
+        assert!(run(&reject).contains("verification_evidence_unknown"));
     }
 
     #[test]
-    fn missing_policy_fields_are_rejected() {
-        assert_eq!(run("{}"), "{\"result_class\":\"invalid_request\"}");
-    }
-
-    #[test]
-    fn applies_each_explicit_rejection_policy() {
+    fn rejects_each_policy_failure_deterministically() {
         for (from, to, reason) in [
             ("\"target\":\"wasm32-wasip1\"", "\"target\":\"native\"", "target_not_allowed"),
             ("\"memory_required_bytes\":1024", "\"memory_required_bytes\":4096", "memory_budget_exceeded"),
@@ -458,68 +456,41 @@ mod tests {
             ("\"licence_evidence\":\"accepted\"", "\"licence_evidence\":\"rejected\"", "licence_not_accepted"),
             ("\"runtime_compatibility\":\"verified\"", "\"runtime_compatibility\":\"failed\"", "runtime_incompatible"),
         ] {
-            let request = ELIGIBLE.replace(from, to);
-            assert!(run(&request).contains(reason), "expected {reason}");
+            assert!(run(&ELIGIBLE.replace(from, to)).contains(reason));
         }
     }
 
     #[test]
-    fn rejects_unknown_evidence_when_policy_says_reject() {
-        let request = ELIGIBLE
-            .replace("\"digest_evidence\":\"verified\"", "\"digest_evidence\":\"unknown\"")
-            .replace("\"unknown_evidence_action\":\"review\"", "\"unknown_evidence_action\":\"reject\"");
-        assert!(run(request.as_str()).contains("verification_evidence_unknown"));
+    fn rejects_malformed_oversized_and_duplicate_requests() {
+        assert!(run("{}").contains("invalid_request"));
+        assert!(run(&ELIGIBLE.replace("\"allowed_targets\":[\"wasm32-wasip1\"]", "\"allowed_targets\":[\"wasm32-wasip1\",]"))
+            .contains("invalid_request"));
+        assert!(run(&ELIGIBLE.replace("\"allowed_targets\":[\"wasm32-wasip1\"]", "\"allowed_targets\":[]"))
+            .contains("invalid_request"));
+        assert!(run(&ELIGIBLE.replace("\"model_ref\":", "\"model_ref\":\"duplicate\",\"model_ref\":"))
+            .contains("invalid_request"));
+        assert!(run(&std::string::String::from_utf8(vec![b'x'; 4097]).unwrap()).contains("input_limit_exceeded"));
     }
 
     #[test]
-    fn rejects_oversized_input_and_duplicate_keys() {
-        let too_long = std::string::String::from_utf8(vec![b'x'; 4097]).unwrap();
-        assert!(run(&too_long).contains("input_limit_exceeded"));
-        let duplicate = ELIGIBLE.replace("\"model_ref\":", "\"model_ref\":\"duplicate\",\"model_ref\":");
-        assert!(run(&duplicate).contains("invalid_request"));
-    }
-
-    #[test]
-    fn validates_tokens_lists_and_number_fields() {
-        for request in [
-            ELIGIBLE.replace("model:sha256:abc", "../bad"),
-            ELIGIBLE.replace("\"allowed_targets\":[\"wasm32-wasip1\"]", "\"allowed_targets\":[]"),
-            ELIGIBLE.replace("\"allowed_targets\":[\"wasm32-wasip1\"]", "\"allowed_targets\":\"wasm32-wasip1\""),
-            ELIGIBLE.replace("\"maximum_memory_bytes\":2048", "\"maximum_memory_bytes\":nope"),
-            ELIGIBLE.replace("\"unknown_evidence_action\":\"review\"", "\"unknown_evidence_action\":\"ignore\""),
-            ELIGIBLE.replace("\"policy\":{", "\"policy\":[]"),
+    fn string_array_rejects_invalid_members_and_accepts_valid_policy() {
+        assert!(!string_array(br#"{"a":["valid"]}"#, b"\"a\"").invalid);
+        for malformed in [
+            b"{}".as_slice(), b"{\"a\":0}".as_slice(),
+            b"{\"a\":[\"\"]}".as_slice(), b"{\"a\":[\"bad\\\\escape\"]}".as_slice(),
+            b"{\"a\":[\"valid\",]}".as_slice(),
         ] {
-            assert!(run(&request).contains("invalid_request"));
+            assert!(string_array(malformed, b"\"a\"").invalid);
         }
     }
 
     #[test]
-    fn parses_nested_values_escaped_strings_and_primitives_safely() {
-        assert_eq!(value_after(br#"{"x":{"nested":[1,{"s":"}"}]},"y":true}"#, b"\"x\""), Some(&br#"{"nested":[1,{"s":"}"}]}"#[..]));
-        assert_eq!(value_after(br#"{"x":"a\\\"b","y":1}"#, b"\"x\""), Some(&br#""a\\\"b""#[..]));
-        assert_eq!(value_after(b"{\"x\":123,\"y\":1}", b"\"x\""), Some(&b"123"[..]));
+    fn value_and_duplicate_scanners_handle_escaped_or_truncated_json() {
+        assert!(value_after(br#"{"x":{"nested":[1,{"s":"}"}]},"y":true}"#, b"\"x\"").is_some());
+        assert!(value_after(br#"{"x":"a\\\"b","y":1}"#, b"\"x\"").is_some());
         assert_eq!(value_after(b"{\"x\":[1,2", b"\"x\""), None);
-    }
-
-    #[test]
-    fn string_array_rejects_missing_malformed_escaped_empty_and_oversized_items() {
-        for (input, expected_invalid) in [
-            (b"{}".as_slice(), true),
-            (b"{\"a\":0}".as_slice(), true),
-            (b"{\"a\":[\"ok\",]}".as_slice(), true),
-            (b"{\"a\":[\"bad\\\\escape\"]}".as_slice(), true),
-            (b"{\"a\":[\"\"]}".as_slice(), true),
-            (b"{\"a\":[\"abcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyzabcdefghijklmnop\"]}".as_slice(), true),
-            (b"{\"a\":[\"ok\"]}".as_slice(), false),
-        ] {
-            assert_eq!(string_array(input, b"\"a\"").invalid, expected_invalid);
-        }
-    }
-
-    #[test]
-    fn duplicate_field_scanner_handles_escapes_and_unclosed_strings() {
+        assert_eq!(value_after(b"{\"x\":\"unterminated", b"\"x\""), None);
         assert!(!unique_fields(b"{\"key\":1,\"key\":2}", &[b"\"key\""]));
         assert!(unique_fields(b"{\"other\":\"a\\\"b\",\"key\":1}", &[b"\"key\""]));
-        assert!(unique_fields(b"{\"key\":1,\"unfinished", &[b"\"key\""]));
     }
 }

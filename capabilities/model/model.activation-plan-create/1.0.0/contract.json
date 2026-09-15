@@ -10,8 +10,8 @@
   "risk": { "effect_class": "pure_read", "determinism_class": "deterministic", "data_flow": { "accepted_data_classifications": [], "produced_data_classifications": [], "egress_policy": "denied" }, "reliability": { "idempotency_required": false, "retryable": true, "compensation_available": true } },
   "authoring": {
     "method": "llm-assisted",
-    "source_revision": "https://github.com/enricopiovesan/Callweave/commit/0f45473b5799edb88e5b4b506fecbc9bc7fd59b3",
-    "test_evidence": "Callweave CI run https://github.com/enricopiovesan/Callweave/actions/runs/34998036296; Registry source unit tests (10 passed) and llvm-cov (100% functions, 96.95% lines, 97.69% regions); WASI runtime smoke validated with wasmtime",
+    "source_revision": "https://github.com/enricopiovesan/Callweave/commit/d46eb9d",
+    "test_evidence": "Callweave baseline CI run https://github.com/enricopiovesan/Callweave/actions/runs/34998036296; parser-hardening branch smoke passes locally, with source PR CI pending; Registry source unit tests (6 passed) and llvm-cov (100% functions, 95.71% lines, 96.25% regions); WASI runtime smoke validated with wasmtime",
     "review": { "decision": "pending-qualified-review", "reviewer": "qualified-rust-security-reviewer" }
   },
   "summary": "Create a model activation eligibility plan from verified evidence and configurable runtime policy.",
@@ -142,7 +142,7 @@
   "evidence": [], "state_schema": null, "service_type": "stateless", "permitted_targets": ["local", "browser", "edge", "device"],
   "artifact_type": "native",
   "artifact": {
-    "digest": "sha256:e99c052bb040167db853d6778b72c34966b81dfd9864246d02fc97f361eeb27b",
+    "digest": "sha256:63f54ac5c527335251f554a6940d9a0aa4d01b672d2312b2be0f39b2b3e204a3",
     "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/model.activation-plan-create-1.0.0/activation-plan-create.wasm"
   }
 }
