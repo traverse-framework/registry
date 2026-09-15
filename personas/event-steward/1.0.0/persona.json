@@ -1,0 +1,13 @@
+{
+  "id": "event-steward",
+  "version": "1.0.0",
+  "name": "Event Steward",
+  "summary": "Defines and validates generic append-only event envelopes and causal references.",
+  "description": "Consumes domain-neutral event append plans with explicit identity, schema version, causation, and idempotency. Does not own event persistence, replay infrastructure, application workflow composition, or a particular event taxonomy.",
+  "distinguished_from": [
+    {
+      "persona_id": "record-operator",
+      "how": "Plans immutable causal event records rather than applying current-state transitions to versioned records."
+    }
+  ]
+}
