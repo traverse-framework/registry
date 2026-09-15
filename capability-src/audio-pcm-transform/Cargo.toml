@@ -1,0 +1,17 @@
+[workspace]
+
+[package]
+name = "audio-pcm-transform"
+version = "1.0.0"
+edition = "2021"
+publish = false
+description = "Bounded deterministic PCM rate and channel transformation."
+
+[[bin]]
+name = "audio-pcm-transform"
+path = "src/main.rs"
+
+[profile.release]
+opt-level = "s"
+lto = true
+panic = "abort"
