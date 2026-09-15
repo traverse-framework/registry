@@ -920,6 +920,15 @@
       "evidence": "side_effects=[memory_only]; empty emits/consumes; deterministic metadata-only shareability decisions return directly to the caller without an asynchronous domain fact."
     },
     {
+      "capability_id": "audio.wav-pcm16-decode",
+      "published_versions": [
+        "1.0.0"
+      ],
+      "path": "capabilities/audio/audio.wav-pcm16-decode/1.0.0/contract.json",
+      "classification": "no-event-required",
+      "evidence": "side_effects=[memory_only]; empty emits/consumes; deterministic bounded decoded PCM returns directly to the caller without broadcasting an asynchronous domain fact."
+    },
+    {
       "capability_id": "candidate.policy-evaluate",
       "published_versions": [
         "1.0.0"

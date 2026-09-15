@@ -1,0 +1,17 @@
+[workspace]
+
+[package]
+name = "audio-wav-pcm16-decode"
+version = "1.0.0"
+edition = "2021"
+publish = false
+description = "Bounded deterministic PCM16 WAV decoding."
+
+[[bin]]
+name = "audio-wav-pcm16-decode"
+path = "src/main.rs"
+
+[profile.release]
+opt-level = "s"
+lto = true
+panic = "abort"
