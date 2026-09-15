@@ -1,0 +1,114 @@
+{
+  "kind": "capability_contract",
+  "schema_version": "1.0.0",
+  "id": "event.append-plan-create",
+  "namespace": "event",
+  "name": "append-plan-create",
+  "version": "1.0.0",
+  "lifecycle": "draft",
+  "owner": { "team": "generic-event-capabilities", "contact": "https://github.com/enricopiovesan" },
+  "risk": { "effect_class": "pure_read", "determinism_class": "deterministic", "data_flow": { "accepted_data_classifications": [], "produced_data_classifications": [], "egress_policy": "denied" }, "reliability": { "idempotency_required": false, "retryable": true, "compensation_available": true } },
+  "authoring": {
+    "method": "llm-assisted",
+    "source_revision": "https://github.com/enricopiovesan/Callweave/commit/0f45473b5799edb88e5b4b506fecbc9bc7fd59b3",
+    "test_evidence": "Callweave CI run https://github.com/enricopiovesan/Callweave/actions/runs/34998036296; Registry Rust tests: 3 passed; cargo llvm-cov: 100% functions, 97.65% lines, 98.09% regions; Wasmtime/WASI smoke passed with only fd_read/fd_write imports; qualified review pending",
+    "review": { "decision": "pending-qualified-review", "reviewer": "qualified-rust-security-reviewer" }
+  },
+  "summary": "Create a bounded append request for an opaque immutable event.",
+  "description": "Pure event-envelope validation and append planning. It preserves the caller-supplied event payload reference, versioned type, aggregate reference, causal references, timestamp, and idempotency key. A generic event-store connector owns durable append, ordering, and replay behavior. This capability does not persist events or depend on any app/workflow/domain.",
+  "use_cases": [
+    {
+      "scenario": "As an event producer, I want a validated immutable event envelope shaped into an append request so that different applications can use the same event-store connector.",
+      "input_example": { "event_id": "event:42", "event_type": "record.transitioned", "schema_version": "1.0.0", "aggregate_ref": "record:17", "payload_ref": "artifact:sha256:abc", "occurred_at": "2026-09-14T12:00:00Z", "causation_refs": ["event:41"], "idempotency_key": "event:42" },
+      "output_example": { "connector_id": "traverse.event-store", "operation": "append", "event": { "event_id": "event:42", "event_type": "record.transitioned", "schema_version": "1.0.0", "aggregate_ref": "record:17", "payload_ref": "artifact:sha256:abc", "occurred_at": "2026-09-14T12:00:00Z", "causation_refs": ["event:41"] }, "idempotency_key": "event:42", "result_class": "planned" },
+      "happy": true,
+      "persona_ref": "record-operator"
+    },
+    {
+      "scenario": "As an event producer, I want missing identity fields, malformed causal references, and oversized requests rejected before requesting persistence so that the host receives only bounded envelopes.",
+      "input_example": { "event_id": "", "event_type": "record.transitioned", "schema_version": "1.0.0", "aggregate_ref": "record:17", "payload_ref": "artifact:sha256:abc", "occurred_at": "2026-09-14T12:00:00Z", "causation_refs": [], "idempotency_key": "event:42" },
+      "output_example": { "result_class": "invalid_request" },
+      "happy": false,
+      "persona_ref": "record-operator"
+    }
+  ],
+  "inputs": {
+    "schema": {
+      "type": "object",
+      "required": ["event_id", "event_type", "schema_version", "aggregate_ref", "payload_ref", "occurred_at", "causation_refs", "idempotency_key"],
+      "properties": {
+        "event_id": { "type": "string", "minLength": 1, "maxLength": 256 },
+        "event_type": { "type": "string", "minLength": 1, "maxLength": 256 },
+        "schema_version": { "type": "string", "minLength": 1, "maxLength": 64 },
+        "aggregate_ref": { "type": "string", "minLength": 1, "maxLength": 256 },
+        "payload_ref": { "type": "string", "minLength": 1, "maxLength": 256 },
+        "occurred_at": { "type": "string", "minLength": 1, "maxLength": 64 },
+        "causation_refs": { "type": "array", "maxItems": 16, "items": { "type": "string", "minLength": 1, "maxLength": 256 } },
+        "idempotency_key": { "type": "string", "minLength": 1, "maxLength": 256 }
+      },
+      "additionalProperties": false
+    }
+  },
+  "outputs": {
+    "schema": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["connector_id", "operation", "event", "idempotency_key", "result_class"],
+          "properties": {
+            "connector_id": { "const": "traverse.event-store" },
+            "operation": { "const": "append" },
+            "event": {
+              "type": "object",
+              "required": ["event_id", "event_type", "schema_version", "aggregate_ref", "payload_ref", "occurred_at", "causation_refs"],
+              "properties": {
+                "event_id": { "type": "string" },
+                "event_type": { "type": "string" },
+                "schema_version": { "type": "string" },
+                "aggregate_ref": { "type": "string" },
+                "payload_ref": { "type": "string" },
+                "occurred_at": { "type": "string" },
+                "causation_refs": { "type": "array", "items": { "type": "string" } }
+              },
+              "additionalProperties": false
+            },
+            "idempotency_key": { "type": "string" },
+            "result_class": { "const": "planned" }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": ["result_class"],
+          "properties": { "result_class": { "enum": ["input_limit_exceeded", "invalid_causation_refs", "invalid_request"] } },
+          "additionalProperties": false
+        }
+      ]
+    }
+  },
+  "preconditions": [
+    { "id": "event-envelope-identifiers", "description": "Event identity, event type/schema version, aggregate and payload references, occurrence time, and idempotency key are non-empty and bounded." },
+    { "id": "bounded-causality", "description": "The causal-reference array contains at most 16 non-empty opaque references." }
+  ],
+  "postconditions": [
+    { "id": "envelope-preserved", "description": "The planned append contains all supplied event identity, schema, aggregate, payload, occurrence, causality, and idempotency fields." },
+    { "id": "no-persistence-side-effect", "description": "Only an append request is prepared; durability, ordering, and replay are owned by the event-store connector." }
+  ],
+  "side_effects": [{ "kind": "memory_only", "description": "Pure bounded validation/planning; no host, network, filesystem, or persistent-state access." }],
+  "emits": [],
+  "consumes": [],
+  "permissions": [{ "id": "event.append-plan-create.execute" }],
+  "execution": { "binary_format": "wasm", "entrypoint": { "kind": "wasi-command", "command": "run" }, "preferred_targets": ["local", "browser", "edge", "device"], "constraints": { "host_api_access": "none", "network_access": "forbidden", "filesystem_access": "none" } },
+  "policies": [{ "id": "bounded-event-envelope" }],
+  "dependencies": [],
+  "provenance": { "source": "greenfield", "author": "Codex", "created_at": "2026-09-14T00:00:00Z", "spec_ref": "100-capability-package-authoring@1.0.0", "adr_refs": [], "exception_refs": [] },
+  "evidence": [],
+  "state_schema": null,
+  "service_type": "stateless",
+  "permitted_targets": ["local", "browser", "edge", "device"],
+  "artifact_type": "native",
+  "artifact": {
+    "digest": "sha256:d9fd9f6ebc4bb47db33903a2111684133bef91060a110758fb16c572f1f7eca0",
+    "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/event.append-plan-create-1.0.0/append-plan-create.wasm"
+  }
+}
