@@ -106,12 +106,9 @@
   "state_schema": null,
   "service_type": "stateless",
   "permitted_targets": ["local", "browser", "edge", "device"],
-  "artifacts": [
-    {
-      "type": "native",
-      "format": "wasm",
-      "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/event.append-plan-create-1.0.0/append-plan-create.wasm",
-      "sha256": "d9fd9f6ebc4bb47db33903a2111684133bef91060a110758fb16c572f1f7eca0"
-    }
-  ]
+  "artifact_type": "native",
+  "artifact": {
+    "digest": "sha256:d9fd9f6ebc4bb47db33903a2111684133bef91060a110758fb16c572f1f7eca0",
+    "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/event.append-plan-create-1.0.0/append-plan-create.wasm"
+  }
 }
