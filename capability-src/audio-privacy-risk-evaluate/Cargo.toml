@@ -1,0 +1,17 @@
+[workspace]
+
+[package]
+name = "audio-privacy-risk-evaluate"
+version = "1.0.0"
+edition = "2021"
+publish = false
+description = "Configurable bounded audio evidence risk evaluation."
+
+[[bin]]
+name = "audio-privacy-risk-evaluate"
+path = "src/main.rs"
+
+[profile.release]
+opt-level = "s"
+lto = true
+panic = "abort"
