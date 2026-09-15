@@ -927,6 +927,15 @@
       "path": "capabilities/event/event.append-plan-create/1.0.0/contract.json",
       "classification": "no-event-required",
       "evidence": "side_effects=[memory_only]; empty emits/consumes; deterministic append intent returns an immutable plan to the caller without causing an asynchronous domain event."
+    },
+    {
+      "capability_id": "retention.action-plan-create",
+      "published_versions": [
+        "1.0.0"
+      ],
+      "path": "capabilities/retention/retention.action-plan-create/1.0.0/contract.json",
+      "classification": "no-event-required",
+      "evidence": "side_effects=[memory_only]; empty emits/consumes; deterministic retention plan is returned without deleting, archiving, scheduling, or mutating any asset."
     }
   ]
 }
