@@ -25,7 +25,7 @@
       "persona_ref": "audio-processing-consumer"
     },
     {
-      "scenario": "As an audio-processing consumer, I want invalid base64 audio bytes rejected explicitly instead of being misdecoded.",
+      "scenario": "As an audio-processing consumer, I want invalid base64 audio bytes rejected explicitly so that malformed containers cannot be misclassified as decoded audio.",
       "input_example": { "wav_bytes_base64": "not-a-valid-wave-file" },
       "output_example": { "result_class": "invalid_audio_bytes" },
       "happy": false,
