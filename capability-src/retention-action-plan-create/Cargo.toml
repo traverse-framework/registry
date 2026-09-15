@@ -1,0 +1,17 @@
+[workspace]
+
+[package]
+name = "retention-action-plan-create"
+version = "1.0.0"
+edition = "2021"
+publish = false
+description = "Pure bounded retention action planning from caller-supplied state and policy."
+
+[[bin]]
+name = "retention-action-plan-create"
+path = "src/main.rs"
+
+[profile.release]
+opt-level = "s"
+lto = true
+panic = "abort"

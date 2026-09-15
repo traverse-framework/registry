@@ -1,0 +1,111 @@
+{
+  "kind": "capability_contract",
+  "schema_version": "1.0.0",
+  "id": "artifact.shareability-classify",
+  "namespace": "artifact",
+  "name": "shareability-classify",
+  "version": "1.0.0",
+  "lifecycle": "draft",
+  "owner": { "team": "generic-policy-capabilities", "contact": "https://github.com/enricopiovesan" },
+  "risk": { "effect_class": "pure_read", "determinism_class": "deterministic", "data_flow": { "accepted_data_classifications": [], "produced_data_classifications": [], "egress_policy": "denied" }, "reliability": { "idempotency_required": false, "retryable": true, "compensation_available": true } },
+  "authoring": {
+    "method": "llm-assisted",
+    "source_revision": "https://github.com/enricopiovesan/Callweave/commit/0f45473b5799edb88e5b4b506fecbc9bc7fd59b3",
+    "test_evidence": "Callweave CI run https://github.com/enricopiovesan/Callweave/actions/runs/34998036296 passed the wave-four WASM smoke suite; Registry cargo llvm-cov CI measures this source crate.",
+    "review": { "decision": "pending-qualified-review", "reviewer": "traverse-registry-repo-owner" }
+  },
+  "summary": "Classify artifact shareability from supplied audience, sensitivity, consent, and sanitization facts.",
+  "description": "Pure and domain-neutral shareability policy. It consumes artifact metadata and policy configuration only. It does not inspect or sanitize bytes, infer privacy facts, collect consent, export artifacts, contact a reviewer, or know an application, media domain, or destination service.",
+  "use_cases": [
+    {
+      "scenario": "As an artifact-policy consumer, I want an artifact to be shareable when its audience and sensitivity are allowed and required consent/sanitization are satisfied so that a host can enforce export policy consistently.",
+      "input_example": { "asset_ref": "artifact:42", "audience": "external-review", "sensitivity_class": "ordinary", "sanitized": true, "consent_granted": true, "policy": { "version": "share-1", "allowed_audiences": ["external-review"], "allowed_sensitivity_classes": ["ordinary"], "require_sanitized": true, "require_consent": true } },
+      "output_example": { "asset_ref": "artifact:42", "audience": "external-review", "sensitivity_class": "ordinary", "decision": "shareable", "reason": "policy_satisfied", "policy_version": "share-1" },
+      "happy": true,
+      "persona_ref": "review-consumer"
+    },
+    {
+      "scenario": "As an artifact-policy consumer, I want disallowed audiences, sensitivity classes, missing sanitization, or missing consent blocked or referred for review so that incomplete protection never silently authorizes sharing.",
+      "input_example": { "asset_ref": "artifact:42", "audience": "public", "sensitivity_class": "ordinary", "sanitized": true, "consent_granted": true, "policy": { "version": "share-1", "allowed_audiences": ["external-review"], "allowed_sensitivity_classes": ["ordinary"], "require_sanitized": true, "require_consent": true } },
+      "output_example": { "asset_ref": "artifact:42", "audience": "public", "sensitivity_class": "ordinary", "decision": "blocked", "reason": "audience_not_allowed", "policy_version": "share-1" },
+      "happy": false,
+      "persona_ref": "review-consumer"
+    }
+  ],
+  "inputs": {
+    "schema": {
+      "type": "object",
+      "required": ["asset_ref", "audience", "sensitivity_class", "sanitized", "consent_granted", "policy"],
+      "properties": {
+        "asset_ref": { "type": "string", "minLength": 1, "maxLength": 256, "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/@+-]*$" },
+        "audience": { "type": "string", "minLength": 1, "maxLength": 256, "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/@+-]*$" },
+        "sensitivity_class": { "type": "string", "minLength": 1, "maxLength": 256, "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/@+-]*$" },
+        "sanitized": { "type": "boolean" },
+        "consent_granted": { "type": "boolean" },
+        "policy": {
+          "type": "object",
+          "required": ["version", "allowed_audiences", "allowed_sensitivity_classes", "require_sanitized", "require_consent"],
+          "properties": {
+            "version": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/@+-]*$" },
+            "allowed_audiences": { "type": "array", "minItems": 1, "maxItems": 16, "items": { "type": "string", "minLength": 1, "maxLength": 256, "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/@+-]*$" } },
+            "allowed_sensitivity_classes": { "type": "array", "minItems": 1, "maxItems": 16, "items": { "type": "string", "minLength": 1, "maxLength": 256, "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/@+-]*$" } },
+            "require_sanitized": { "type": "boolean" },
+            "require_consent": { "type": "boolean" }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "outputs": {
+    "schema": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["asset_ref", "audience", "sensitivity_class", "decision", "reason", "policy_version"],
+          "properties": {
+            "asset_ref": { "type": "string" },
+            "audience": { "type": "string" },
+            "sensitivity_class": { "type": "string" },
+            "decision": { "enum": ["shareable", "blocked", "review_required"] },
+            "reason": { "enum": ["audience_not_allowed", "sensitivity_not_allowed", "sanitization_required", "consent_required", "policy_satisfied"] },
+            "policy_version": { "type": "string" }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": ["result_class"],
+          "properties": { "result_class": { "enum": ["input_limit_exceeded", "invalid_request"] } },
+          "additionalProperties": false
+        }
+      ]
+    }
+  },
+  "preconditions": [
+    { "id": "caller-supplied-facts", "description": "Audience, sensitivity, sanitization, and consent facts are explicitly provided; this capability does not infer or acquire them." },
+    { "id": "configurable-allowlists", "description": "The policy explicitly supplies bounded allowed audience and sensitivity sets." }
+  ],
+  "postconditions": [
+    { "id": "ordered-guards", "description": "Audience and sensitivity exclusions deny before sanitization and consent checks; required sanitization yields review_required; required missing consent blocks." },
+    { "id": "no-byte-access", "description": "No artifact content is inspected, changed, copied, or exported." }
+  ],
+  "side_effects": [{ "kind": "memory_only", "description": "Pure bounded policy evaluation; no host, network, filesystem, model, or persistent-state access." }],
+  "emits": [],
+  "consumes": [],
+  "permissions": [{ "id": "artifact.shareability-classify.execute" }],
+  "execution": { "binary_format": "wasm", "entrypoint": { "kind": "wasi-command", "command": "run" }, "preferred_targets": ["local", "browser", "edge", "device"], "constraints": { "host_api_access": "none", "network_access": "forbidden", "filesystem_access": "none" } },
+  "policies": [{ "id": "configurable-artifact-shareability" }],
+  "dependencies": [],
+  "provenance": { "source": "greenfield", "author": "Codex", "created_at": "2026-09-14T00:00:00Z", "spec_ref": "100-capability-package-authoring@1.0.0", "adr_refs": [], "exception_refs": [] },
+  "evidence": [],
+  "state_schema": null,
+  "service_type": "stateless",
+  "permitted_targets": ["local", "browser", "edge", "device"],
+  "artifact_type": "native",
+  "artifact": {
+    "digest": "sha256:f8879dc121e07eecc474e8833dd8a1bcd753787ba34b0307d6b64478e50fcef6",
+    "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/artifact.shareability-classify-1.0.0/shareability-classify.wasm"
+  }
+}
