@@ -12,7 +12,7 @@
     "method": "llm-assisted",
     "source_revision": "https://github.com/enricopiovesan/Callweave/commit/4bf8912ce187a9cd19857bfd76abd5b8a7763255",
     "test_evidence": "Callweave CI run https://github.com/enricopiovesan/Callweave/actions/runs/35000207865 passed all nine wave-four WASM smoke suites; Registry cargo llvm-cov CI measures this source crate.",
-    "review": { "decision": "pending-qualified-review", "reviewer": "traverse-registry-repo-owner" }
+    "review": { "decision": "pending-qualified-review", "pr": "https://github.com/traverse-framework/registry/pull/514", "reviewer": "traverse-registry-repo-owner" }
   },
   "summary": "Transform a bounded interleaved signed-16 PCM chunk deterministically.",
   "description": "Portable pure signal transformation over supplied PCM samples. Downsampling applies a bounded box-average low-pass before decimation; upsampling uses deterministic linear interpolation. This basic filter is not a studio-grade polyphase resampler and requires acoustic-corpus quality evaluation before recognition-quality claims. It converts one- or two-channel layouts and does not decode containers, read/write artifacts, capture devices, choose models, or know a location or application. Call once per bounded chunk; large recordings must be streamed by the Traverse runtime.",
