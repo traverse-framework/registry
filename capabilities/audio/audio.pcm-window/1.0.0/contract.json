@@ -1,0 +1,118 @@
+{
+  "kind": "capability_contract",
+  "schema_version": "1.0.0",
+  "id": "audio.pcm-window",
+  "namespace": "audio",
+  "name": "pcm-window",
+  "version": "1.0.0",
+  "lifecycle": "draft",
+  "owner": { "team": "audio-capabilities", "contact": "https://github.com/enricopiovesan" },
+  "risk": { "effect_class": "pure_read", "determinism_class": "deterministic", "data_flow": { "accepted_data_classifications": [], "produced_data_classifications": [], "egress_policy": "denied" }, "reliability": { "idempotency_required": false, "retryable": true, "compensation_available": true } },
+  "authoring": {
+    "method": "llm-assisted",
+    "source_revision": "https://github.com/enricopiovesan/Callweave/commit/0f45473b5799edb88e5b4b506fecbc9bc7fd59b3",
+    "test_evidence": "Callweave CI run https://github.com/enricopiovesan/Callweave/actions/runs/34998036296 passed the wave-four WASM smoke suite; Registry cargo llvm-cov CI measures this source crate.",
+    "review": { "decision": "pending-qualified-review", "pr": "https://github.com/traverse-framework/registry/pull/516", "reviewer": "traverse-registry-repo-owner" }
+  },
+  "summary": "Partition bounded signed-16 PCM chunks into deterministic overlapping windows.",
+  "description": "Pure window extraction over caller-supplied interleaved PCM samples. Emits zero-padded final windows and source-relative start times. Does not decode media containers, access artifacts/devices, or know an application, species, location, or model. The caller must provide a bounded chunk aligned to the desired window policy.",
+  "use_cases": [
+    {
+      "scenario": "As an audio-inference consumer, I want a PCM chunk split into overlapping fixed-duration windows so that a compatible model can evaluate each window independently.",
+      "input_example": { "sample_rate_hz": 8000, "channel_count": 1, "source_offset_ms": 1000, "window_duration_ms": 2, "hop_duration_ms": 1, "is_final_chunk": true, "samples_s16": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24] },
+      "output_example": { "result_class": "windowed", "source_offset_ms": 1000, "sample_rate_hz": 8000, "channel_count": 1, "window_duration_ms": 2, "hop_duration_ms": 1, "consumed_frames": 24, "windows": [{ "window_index": 0, "start_ms": 1000, "valid_frames": 16, "samples_s16": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16] }, { "window_index": 1, "start_ms": 1001, "valid_frames": 16, "samples_s16": [9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24] }] },
+      "happy": true,
+      "persona_ref": "audio-processing-consumer"
+    },
+    {
+      "scenario": "As an audio-inference consumer, I want invalid or unaligned duration policies, malformed PCM, and excessive window expansion rejected deterministically so that memory use stays bounded.",
+      "input_example": { "sample_rate_hz": 44100, "channel_count": 1, "source_offset_ms": 0, "window_duration_ms": 1, "hop_duration_ms": 1, "is_final_chunk": true, "samples_s16": [1, 2] },
+      "output_example": { "result_class": "unaligned_window_policy" },
+      "happy": false,
+      "persona_ref": "audio-processing-consumer"
+    }
+  ],
+  "inputs": {
+    "schema": {
+      "type": "object",
+      "required": ["sample_rate_hz", "channel_count", "source_offset_ms", "window_duration_ms", "hop_duration_ms", "is_final_chunk", "samples_s16"],
+      "properties": {
+        "sample_rate_hz": { "type": "integer", "minimum": 8000, "maximum": 192000 },
+        "channel_count": { "type": "integer", "minimum": 1, "maximum": 2 },
+        "source_offset_ms": { "type": "integer", "minimum": 0 },
+        "window_duration_ms": { "type": "integer", "minimum": 1 },
+        "hop_duration_ms": { "type": "integer", "minimum": 1 },
+        "is_final_chunk": { "type": "boolean" },
+        "samples_s16": { "type": "array", "minItems": 1, "maxItems": 480000, "items": { "type": "integer", "minimum": -32768, "maximum": 32767 } }
+      },
+      "additionalProperties": false
+    }
+  },
+  "outputs": {
+    "schema": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["result_class", "source_offset_ms", "sample_rate_hz", "channel_count", "window_duration_ms", "hop_duration_ms", "consumed_frames", "windows"],
+          "properties": {
+            "result_class": { "const": "windowed" },
+            "source_offset_ms": { "type": "integer", "minimum": 0 },
+            "sample_rate_hz": { "type": "integer", "minimum": 8000, "maximum": 192000 },
+            "channel_count": { "type": "integer", "enum": [1, 2] },
+            "window_duration_ms": { "type": "integer", "minimum": 1 },
+            "hop_duration_ms": { "type": "integer", "minimum": 1 },
+            "consumed_frames": { "type": "integer", "minimum": 0 },
+            "windows": {
+              "type": "array", "maxItems": 64,
+              "items": {
+                "type": "object",
+                "required": ["window_index", "start_ms", "valid_frames", "samples_s16"],
+                "properties": {
+                  "window_index": { "type": "integer", "minimum": 0 },
+                  "start_ms": { "type": "integer", "minimum": 0 },
+                  "valid_frames": { "type": "integer", "minimum": 1 },
+                  "samples_s16": { "type": "array", "minItems": 1, "maxItems": 480000, "items": { "type": "integer", "minimum": -32768, "maximum": 32767 } }
+                },
+                "additionalProperties": false
+              }
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": ["result_class"],
+          "properties": { "result_class": { "enum": ["input_limit_exceeded", "unsupported_sample_rate", "unsupported_channel_count", "invalid_window_policy", "unaligned_window_policy", "invalid_samples", "output_limit_exceeded"] } },
+          "additionalProperties": false
+        }
+      ]
+    }
+  },
+  "preconditions": [
+    { "id": "bounded-pcm", "description": "Interleaved signed-16 samples fit the 480,000-sample input limit and sample count is divisible by channel count." },
+    { "id": "aligned-duration", "description": "Window and hop durations resolve to an exact positive integer number of frames at the supplied sample rate." }
+  ],
+  "postconditions": [
+    { "id": "ordered-windows", "description": "Windows are ordered, have strictly increasing start offsets, and use the configured hop duration." },
+    { "id": "streaming-carry", "description": "A non-final chunk emits only complete windows and consumed_frames tells the caller how many leading frames can be released; remaining frames must be carried forward." },
+    { "id": "padded-tail", "description": "Only a final chunk may emit a partial zero-padded window; valid_frames reports source frames before padding." },
+    { "id": "bounded-expansion", "description": "The output contains at most 64 windows and 480,000 PCM samples total." }
+  ],
+  "side_effects": [{ "kind": "memory_only", "description": "Pure bounded computation; no host, network, filesystem, model, or persistent-state access." }],
+  "emits": [],
+  "consumes": [],
+  "permissions": [{ "id": "audio.pcm-window.execute" }],
+  "execution": { "binary_format": "wasm", "entrypoint": { "kind": "wasi-command", "command": "run" }, "preferred_targets": ["local", "browser", "edge", "device"], "constraints": { "host_api_access": "none", "network_access": "forbidden", "filesystem_access": "none" } },
+  "policies": [{ "id": "bounded-pcm-windowing" }],
+  "dependencies": [],
+  "provenance": { "source": "greenfield", "author": "Codex", "created_at": "2026-09-14T00:00:00Z", "spec_ref": "100-capability-package-authoring@1.0.0", "adr_refs": [], "exception_refs": [] },
+  "evidence": [],
+  "state_schema": null,
+  "service_type": "stateless",
+  "permitted_targets": ["local", "browser", "edge", "device"],
+  "artifact_type": "native",
+  "artifact": {
+    "digest": "sha256:d0270d83f491ba8540fc4bef84445ac1dc39d3068a283aac72be1adb5b9cdbfd",
+    "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/audio.pcm-window-1.0.0/pcm-window.wasm"
+  }
+}
