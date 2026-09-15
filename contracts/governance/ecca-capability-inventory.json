@@ -902,6 +902,15 @@
       "evidence": "side_effects=[memory_only]; empty emits/consumes; deterministic policy evaluation returns directly to the caller without broadcasting an asynchronous domain fact."
     },
     {
+      "capability_id": "audio.pcm-window",
+      "published_versions": [
+        "1.0.0"
+      ],
+      "path": "capabilities/audio/audio.pcm-window/1.0.0/contract.json",
+      "classification": "no-event-required",
+      "evidence": "side_effects=[memory_only]; empty emits/consumes; deterministic bounded PCM window records return directly to the caller without broadcasting an asynchronous domain fact."
+    },
+    {
       "capability_id": "candidate.policy-evaluate",
       "published_versions": [
         "1.0.0"
