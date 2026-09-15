@@ -1,0 +1,17 @@
+[workspace]
+
+[package]
+name = "candidate-policy-evaluate"
+version = "1.0.0"
+edition = "2021"
+publish = false
+description = "Configurable candidate status policy evaluation."
+
+[[bin]]
+name = "candidate-policy-evaluate"
+path = "src/main.rs"
+
+[profile.release]
+opt-level = "s"
+lto = true
+panic = "abort"
