@@ -965,11 +965,12 @@
     {
       "capability_id": "model.activation-plan-create",
       "published_versions": [
-        "1.0.0"
+        "1.0.0",
+        "1.1.0"
       ],
-      "path": "capabilities/model/model.activation-plan-create/1.0.0/contract.json",
+      "path": "capabilities/model/model.activation-plan-create/1.1.0/contract.json",
       "classification": "no-event-required",
-      "evidence": "side_effects=[memory_only]; empty emits/consumes; deterministic eligibility decision returns directly to the caller and does not fetch, cache, execute, or activate a model artifact."
+      "evidence": "side_effects=[memory_only] on latest published version; deterministic bounded result returns directly to caller."
     }
   ]
 }
