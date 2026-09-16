@@ -208,6 +208,23 @@ def build_index(previous_index_version: int, source_commit: str, repo_slug: str 
                 "ai": contract.get("ai"),
             }
 
+            # specs/025-capability-licensing-metadata FR-009: normalized rights
+            # for index filters. Missing block → unknown (never allowed).
+            licensing = contract.get("licensing")
+            if isinstance(licensing, dict):
+                entry["license_expression"] = licensing.get("spdx_expression")
+                entry["commercial_use"] = licensing.get("commercial_use") or "unknown"
+                entry["redistribution"] = licensing.get("redistribution") or "unknown"
+                verification = licensing.get("verification")
+                if isinstance(verification, dict):
+                    entry["verification_status"] = verification.get("status") or "unknown"
+                else:
+                    entry["verification_status"] = "unknown"
+            else:
+                entry["commercial_use"] = "unknown"
+                entry["redistribution"] = "unknown"
+                entry["verification_status"] = "unknown"
+
             # specs/024-capability-risk-classification-adoption FR-003: same
             # projection catalog.json carries, computed once via traverse-contracts.
             reference = f"{contract.get('namespace')}/{contract.get('id')}@{contract.get('version')}"

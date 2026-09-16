@@ -122,8 +122,14 @@ import re
 import subprocess
 import sys
 import urllib.error
+import urllib.parse
 import urllib.request
 from pathlib import Path
+
+try:
+    from license_expression import get_spdx_licensing
+except ImportError:  # pragma: no cover - CI installs the pinned dep
+    get_spdx_licensing = None
 
 SEMVER_RE = re.compile(
     r"^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)"
@@ -154,6 +160,26 @@ KNOWN_SERVICE_TYPES = {"stateless", "subscribable", "stateful"}
 # spec 023-authoring-assurance FR-001/FR-003
 AUTHORING_METHODS = {"human", "llm-assisted"}
 LLM_ASSISTED_AUDIT_FIELDS = ("source_revision", "test_evidence", "review")
+
+# specs/025-capability-licensing-metadata — pinned PyPA SPDX parser (FR-003).
+# Keep in lockstep with `.github/workflows/ci.yml` `pip install`.
+LICENSE_EXPRESSION_PIN = "30.4.4"
+LICENSING_RIGHTS_VALUES = {"allowed", "forbidden", "conditional", "unknown"}
+LICENSING_VERIFICATION_STATUSES_V1 = {"maintainer-declared"}
+# Reserved until a real review process exists (spec 025 Q8 / decision-log 116).
+LICENSING_VERIFICATION_STATUSES_RESERVED = {
+    "registry-reviewed",
+    "verified-with-evidence",
+}
+# Tiny hard-contradiction table (FR-006): markers that MUST NOT pair with
+# redistribution: "allowed". Deliberately small — not a legal oracle.
+LICENSING_NON_REDISTRIBUTABLE_MARKERS = frozenset(
+    {
+        "UNLICENSED",
+        "NONE",
+        "LicenseRef-Proprietary",
+    }
+)
 
 # spec 024-capability-risk-classification-adoption FR-001/FR-002: the vocab
 # `traverse` Spec 109 FR-005 defines and `traverse-contracts::RiskMetadata`
@@ -189,6 +215,230 @@ def is_user_story_scenario(scenario) -> bool:
         return False
     so_that_index = lowered.find("so that", i_want_index)
     return so_that_index != -1
+
+
+def is_safe_https_url(url: str) -> bool:
+    """Reject non-HTTPS, credentialed, empty-host, or filesystem-looking URLs."""
+    if not isinstance(url, str) or not url.strip():
+        return False
+    if url.startswith("/") or url.startswith("file:") or url.startswith("~"):
+        return False
+    try:
+        parsed = urllib.parse.urlparse(url)
+    except ValueError:
+        return False
+    if parsed.scheme != "https":
+        return False
+    if parsed.username is not None or parsed.password is not None:
+        return False
+    if not parsed.netloc or "@" in parsed.netloc:
+        return False
+    return True
+
+
+def _spdx_tokens(expression: str) -> set:
+    """Rough identifier tokens from an SPDX expression (for contradiction table)."""
+    return {tok for tok in re.split(r"[^A-Za-z0-9.+-]+", expression) if tok}
+
+
+def validate_spdx_expression(expression: str, errors: list, path: Path) -> None:
+    if get_spdx_licensing is None:
+        fail(
+            errors,
+            "contract.licensing_spdx_unavailable",
+            str(path),
+            f"license-expression=={LICENSE_EXPRESSION_PIN} is required to validate "
+            "licensing.spdx_expression (spec 025 FR-003); install the pinned dep",
+        )
+        return
+    licensing = get_spdx_licensing()
+    try:
+        # validate=False so LicenseRef-* / UNLICENSED / NONE are not rejected as
+        # unknown catalog keys; syntax is still checked. Unknown keys other than
+        # LicenseRef-* and the hard-contradiction markers are rejected below.
+        parsed = licensing.parse(expression, validate=False, strict=True)
+    except Exception as exc:
+        fail(
+            errors,
+            "contract.invalid_licensing_spdx",
+            str(path),
+            f"licensing.spdx_expression is not a valid SPDX expression "
+            f"(license-expression=={LICENSE_EXPRESSION_PIN}): {exc}",
+        )
+        return
+    if parsed is None:
+        fail(
+            errors,
+            "contract.invalid_licensing_spdx",
+            str(path),
+            "licensing.spdx_expression must not be empty (spec 025 FR-002)",
+        )
+        return
+    allowed_unknown = LICENSING_NON_REDISTRIBUTABLE_MARKERS
+    for key in licensing.unknown_license_keys(parsed):
+        if key.startswith("LicenseRef-") or key in allowed_unknown:
+            continue
+        fail(
+            errors,
+            "contract.invalid_licensing_spdx",
+            str(path),
+            f"licensing.spdx_expression contains unknown SPDX key {key!r}; "
+            "use a listed SPDX id or LicenseRef-* (spec 025 FR-003)",
+        )
+
+
+def validate_licensing(path: Path, contract: dict, errors: list) -> None:
+    """specs/025-capability-licensing-metadata FR-001–FR-006 (optional block)."""
+    licensing = contract.get("licensing")
+    if licensing is None:
+        return
+    if not isinstance(licensing, dict):
+        fail(
+            errors,
+            "contract.invalid_licensing",
+            str(path),
+            "licensing must be an object (spec 025)",
+        )
+        return
+
+    spdx = licensing.get("spdx_expression")
+    commercial = licensing.get("commercial_use")
+    redistribution = licensing.get("redistribution")
+    attribution = licensing.get("attribution_required")
+    verification = licensing.get("verification")
+
+    if not isinstance(spdx, str) or not spdx.strip():
+        fail(
+            errors,
+            "contract.invalid_licensing",
+            str(path),
+            "licensing.spdx_expression must be a non-empty string (spec 025 FR-002)",
+        )
+    else:
+        validate_spdx_expression(spdx.strip(), errors, path)
+
+    if commercial not in LICENSING_RIGHTS_VALUES:
+        fail(
+            errors,
+            "contract.invalid_licensing",
+            str(path),
+            f"licensing.commercial_use must be one of {sorted(LICENSING_RIGHTS_VALUES)} "
+            f"(spec 025 FR-004), got {commercial!r}",
+        )
+    if redistribution not in LICENSING_RIGHTS_VALUES:
+        fail(
+            errors,
+            "contract.invalid_licensing",
+            str(path),
+            f"licensing.redistribution must be one of {sorted(LICENSING_RIGHTS_VALUES)} "
+            f"(spec 025 FR-004), got {redistribution!r}",
+        )
+    if not isinstance(attribution, bool):
+        fail(
+            errors,
+            "contract.invalid_licensing",
+            str(path),
+            "licensing.attribution_required must be a boolean (spec 025 FR-002)",
+        )
+
+    if not isinstance(verification, dict):
+        fail(
+            errors,
+            "contract.invalid_licensing",
+            str(path),
+            "licensing.verification must be an object (spec 025 FR-002)",
+        )
+    else:
+        status = verification.get("status")
+        if status in LICENSING_VERIFICATION_STATUSES_RESERVED:
+            fail(
+                errors,
+                "contract.invalid_licensing_verification",
+                str(path),
+                f"licensing.verification.status {status!r} is reserved until a review "
+                "process exists; use 'maintainer-declared' (spec 025)",
+            )
+        elif status not in LICENSING_VERIFICATION_STATUSES_V1:
+            fail(
+                errors,
+                "contract.invalid_licensing_verification",
+                str(path),
+                "licensing.verification.status must be 'maintainer-declared' (spec 025)",
+            )
+        evidence_url = verification.get("evidence_url")
+        if evidence_url is not None and not is_safe_https_url(evidence_url):
+            fail(
+                errors,
+                "contract.invalid_licensing_url",
+                str(path),
+                "licensing.verification.evidence_url must be an https URL without "
+                "credentials or filesystem paths (spec 025 FR-005)",
+            )
+        reviewed_at = verification.get("reviewed_at")
+        if reviewed_at is not None and not isinstance(reviewed_at, str):
+            fail(
+                errors,
+                "contract.invalid_licensing",
+                str(path),
+                "licensing.verification.reviewed_at must be a string when present",
+            )
+
+    license_files = licensing.get("license_files")
+    if license_files is not None:
+        if not (
+            isinstance(license_files, list)
+            and all(isinstance(f, str) and f.strip() for f in license_files)
+        ):
+            fail(
+                errors,
+                "contract.invalid_licensing",
+                str(path),
+                "licensing.license_files must be an array of non-empty strings",
+            )
+
+    source_url = licensing.get("source_url")
+    if source_url is not None and not is_safe_https_url(source_url):
+        fail(
+            errors,
+            "contract.invalid_licensing_url",
+            str(path),
+            "licensing.source_url must be an https URL without credentials or "
+            "filesystem paths (spec 025 FR-005)",
+        )
+
+    # LicenseRef-* requires evidence (FR-003).
+    if isinstance(spdx, str) and "LicenseRef-" in spdx:
+        has_evidence_url = (
+            isinstance(verification, dict)
+            and isinstance(verification.get("evidence_url"), str)
+            and is_safe_https_url(verification["evidence_url"])
+        )
+        has_files = (
+            isinstance(license_files, list)
+            and len(license_files) > 0
+            and all(isinstance(f, str) and f.strip() for f in license_files)
+        )
+        if not (has_evidence_url or has_files):
+            fail(
+                errors,
+                "contract.licensing_licenseref_needs_evidence",
+                str(path),
+                "LicenseRef-* spdx_expression requires verification.evidence_url or "
+                "non-empty license_files (spec 025 FR-003)",
+            )
+
+    # Hard contradictions (FR-006) — redistribution:allowed only.
+    if isinstance(spdx, str) and redistribution == "allowed":
+        tokens = _spdx_tokens(spdx)
+        hits = tokens & LICENSING_NON_REDISTRIBUTABLE_MARKERS
+        if hits:
+            fail(
+                errors,
+                "contract.licensing_contradiction",
+                str(path),
+                f"licensing.redistribution is 'allowed' but spdx_expression contains "
+                f"non-redistributable marker(s) {sorted(hits)} (spec 025 FR-006)",
+            )
 
 
 def validate_contract(path: Path, errors: list) -> None:
@@ -305,6 +555,11 @@ def validate_contract(path: Path, errors: list) -> None:
                     str(path),
                     "ai.model_backed: true requires a non-empty ai.models array (spec 001 FR-017)",
                 )
+
+    # specs/025-capability-licensing-metadata: optional `licensing` object.
+    # Whole-tree when present (like `ai`); required-on-new-versions is a
+    # separate activation gate (FR-010 / registry#558).
+    validate_licensing(path, contract, errors)
 
     if contract.get("id") and contract.get("id") != id_seg:
         fail(
