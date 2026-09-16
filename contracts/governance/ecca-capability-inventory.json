@@ -946,11 +946,12 @@
     {
       "capability_id": "event.append-plan-create",
       "published_versions": [
-        "1.0.0"
+        "1.0.0",
+        "1.1.0"
       ],
-      "path": "capabilities/event/event.append-plan-create/1.0.0/contract.json",
+      "path": "capabilities/event/event.append-plan-create/1.1.0/contract.json",
       "classification": "no-event-required",
-      "evidence": "side_effects=[memory_only]; empty emits/consumes; deterministic append intent returns an immutable plan to the caller without causing an asynchronous domain event."
+      "evidence": "side_effects=[memory_only] on latest published version; deterministic bounded result returns directly to caller."
     },
     {
       "capability_id": "retention.action-plan-create",
