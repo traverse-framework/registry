@@ -58,10 +58,13 @@ jobs:
       # rules stay single-sourced in traverse-registry). llvm-tools-preview /
       # cargo-llvm-cov added for specs/018-capability-test-coverage's new
       # per-capability coverage gate (mirrors build-catalog's existing recipe).
+      # wasm32-unknown-unknown target added for registry#509's wasm32
+      # execution gate (check_new_contracts_have_wasm32_execution).
       - name: Set up Rust
         uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: "1.94.0"
+          targets: wasm32-unknown-unknown
           components: llvm-tools-preview
 
       - name: Cache cargo
@@ -69,6 +72,14 @@ jobs:
 
       - name: Install cargo-llvm-cov
         uses: taiki-e/install-action@cargo-llvm-cov
+
+      # registry#509: check_new_contracts_have_wasm32_execution runs the
+      # newly-published capability's actual wasm32 artifact, same recipe
+      # build-catalog already uses to run catalog-builder.wasm.
+      - name: Install wasmtime
+        run: |
+          curl https://wasmtime.dev/install.sh -sSf | bash
+          echo "$HOME/.wasmtime/bin" >> "$GITHUB_PATH"
 
       - name: Build event-product validator
         run: cargo build --locked -p traverse-registry --bin validate_event_products

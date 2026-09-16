@@ -93,6 +93,17 @@ contract.json is ADDED by the PR under test is exempt (FR-007 binds only
 main, not on a PR) -- it is reported as an advisory worklist for the
 post-merge signer, never as a merge blocker. Pre-existing unsigned
 versions still hard-fail, as the drift / self-healing net.
+
+Also enforces registry#509 (decision-log entry 113): a newly-ADDED
+contract.json's capability-src/ crate must be built for
+--target wasm32-unknown-unknown and actually executed under wasmtime
+against fixtures derived from the contract -- every happy-path
+use_cases[] example, plus a 0 and an oversized (> u32::MAX) variant of
+every unbounded integer "budget" field the input schema declares. Host
+`cargo llvm-cov` alone cannot see wasm32-specific bugs (32-bit usize);
+see OVERSIZED_INTEGER_VALUE's comment for the text.truncate@1.0.0 (#487)
+incident that motivated this. Diff-based, same reason as every other
+new-contract check above.
 """
 
 import json
@@ -1155,6 +1166,250 @@ def check_new_contracts_have_test_coverage(base_sha: str, head_sha: str, errors:
             check_new_contract_test_coverage(Path(path), errors)
 
 
+# registry#509 / decision-log entry 113: host-only `cargo llvm-cov` cannot see
+# wasm32-specific bugs -- `usize` is 32-bit there, not 64-bit, so arithmetic a
+# host build accepts silently misbehaves on wasm32. `text.truncate@1.0.0`
+# (#487) measured 100% host coverage and still wiped its output on a
+# schema-legal max_length like 1e10, because `non_negative_integer` rejects
+# `value > usize::MAX as f64` and the caller's `unwrap_or(0)` turned that
+# rejection into a silent 0. 1.0.0 is immutable; this gate exists so the next
+# capability with an unbounded integer "budget" field cannot ship the same
+# bug undetected.
+OVERSIZED_INTEGER_VALUE = 2**32  # > u32::MAX; still a schema-legal JSON integer
+BUDGET_FIELD_NAME_RE = re.compile(r"(length|count|limit|size|budget)", re.IGNORECASE)
+
+
+def _budget_integer_fields(input_schema: dict) -> list:
+    """Top-level integer properties that look like an unbounded count/length
+    budget: type integer, minimum 0 (or unset), no declared maximum, and a
+    length/count-ish name. Conservative by design -- a field this misses
+    just means fewer synthesized fixtures, not a missed check, since the
+    happy-path fixtures below always run regardless."""
+    properties = input_schema.get("properties")
+    if not isinstance(properties, dict):
+        return []
+    fields = []
+    for name, schema in properties.items():
+        if not isinstance(schema, dict) or schema.get("type") != "integer":
+            continue
+        if "maximum" in schema or schema.get("minimum", 0) != 0:
+            continue
+        if BUDGET_FIELD_NAME_RE.search(name):
+            fields.append(name)
+    return fields
+
+
+def _happy_path_fixtures(contract: dict) -> list:
+    fixtures = []
+    for use_case in contract.get("use_cases") or []:
+        if not isinstance(use_case, dict) or not use_case.get("happy"):
+            continue
+        example = use_case.get("input_example")
+        if isinstance(example, dict):
+            fixtures.append(example)
+    return fixtures
+
+
+def _run_wasm32_fixture(wasm_path: Path, fixture: dict):
+    """Runs one JSON fixture through wasmtime (stdin in, stdout out -- the
+    wasi-capability-runtime ABI every capability-src/ crate shares). Returns
+    (returncode, stdout, stderr); returncode is None if wasmtime itself
+    could not be invoked."""
+    try:
+        result = subprocess.run(
+            ["wasmtime", "run", str(wasm_path)],
+            input=json.dumps(fixture),
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+    except Exception as exc:
+        return None, "", str(exc)
+    return result.returncode, result.stdout, result.stderr
+
+
+def check_new_contract_wasm32_execution(path: Path, errors: list) -> None:
+    """registry#509: build the newly-published capability's actual wasm32
+    artifact and run it under wasmtime -- not just the host `cargo test`
+    suite `check_new_contract_test_coverage` already requires. See the
+    OVERSIZED_INTEGER_VALUE comment above for the #487 incident this closes.
+    Deliberately does not re-report a missing capability-src/ crate --
+    check_new_contract_test_coverage already does, and this check runs after
+    it in main()."""
+    try:
+        contract = json.loads(path.read_text())
+    except Exception:
+        return
+    capability_id = contract.get("id")
+    if not isinstance(capability_id, str) or not capability_id.strip():
+        return
+
+    crate_dir = Path("capability-src") / expected_capability_src_crate(capability_id)
+    manifest_path = crate_dir / "Cargo.toml"
+    if not manifest_path.is_file():
+        return
+
+    input_schema = (contract.get("inputs") or {}).get("schema") or {}
+    happy_fixtures = _happy_path_fixtures(contract)
+    if not happy_fixtures:
+        # No happy-path use case to execute -- nothing for this gate to run,
+        # and no need to pay for a wasm32 build. check_new_use_cases_...
+        # already requires a non-empty use_cases array elsewhere; not this
+        # check's job to duplicate that.
+        return
+
+    try:
+        build = subprocess.run(
+            [
+                "cargo",
+                "build",
+                "--release",
+                "--target",
+                "wasm32-unknown-unknown",
+                "--manifest-path",
+                str(manifest_path),
+                "--message-format=json",
+            ],
+            capture_output=True,
+            text=True,
+            timeout=300,
+        )
+    except Exception as exc:
+        fail(
+            errors,
+            "capability.wasm32_build_failed",
+            str(path),
+            f"unable to run 'cargo build --target wasm32-unknown-unknown' "
+            f"for '{capability_id}': {exc}",
+        )
+        return
+
+    if build.returncode != 0:
+        fail(
+            errors,
+            "capability.wasm32_build_failed",
+            str(path),
+            f"cargo build --target wasm32-unknown-unknown failed for "
+            f"'{capability_id}' ({manifest_path}): {build.stderr.strip()[-2000:]}",
+        )
+        return
+
+    wasm_path = None
+    for line in build.stdout.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            message = json.loads(line)
+        except Exception:
+            continue
+        if message.get("reason") != "compiler-artifact":
+            continue
+        if "bin" not in ((message.get("target") or {}).get("kind") or []):
+            continue
+        for filename in message.get("filenames") or []:
+            if filename.endswith(".wasm"):
+                wasm_path = Path(filename)
+    if wasm_path is None or not wasm_path.is_file():
+        fail(
+            errors,
+            "capability.wasm32_artifact_not_found",
+            str(path),
+            f"cargo build succeeded but produced no .wasm bin artifact for "
+            f"'{capability_id}' ({manifest_path})",
+        )
+        return
+
+    fixtures = [("happy", f) for f in happy_fixtures]
+    for field in _budget_integer_fields(input_schema):
+        base = next((f for f in happy_fixtures if field in f), None)
+        if base is None:
+            continue
+        zero_fixture = dict(base)
+        zero_fixture[field] = 0
+        fixtures.append((f"{field}=0", zero_fixture))
+
+        oversized_fixture = dict(base)
+        oversized_fixture[field] = OVERSIZED_INTEGER_VALUE
+        fixtures.append((f"{field}=oversized:{id(base)}", oversized_fixture))
+
+    baseline_outputs = {}
+    for label, fixture in fixtures:
+        returncode, stdout, stderr = _run_wasm32_fixture(wasm_path, fixture)
+        if returncode is None:
+            fail(
+                errors,
+                "capability.wasm32_execution_failed",
+                str(path),
+                f"unable to run wasmtime for '{capability_id}' fixture "
+                f"'{label}': {stderr}",
+            )
+            continue
+        if returncode != 0:
+            fail(
+                errors,
+                "capability.wasm32_execution_failed",
+                str(path),
+                f"wasm32 execution of '{capability_id}' panicked or exited "
+                f"non-zero (code {returncode}) on fixture '{label}' "
+                f"({json.dumps(fixture)}): {stderr.strip()[-2000:]}",
+            )
+            continue
+        try:
+            output = json.loads(stdout)
+        except Exception as exc:
+            fail(
+                errors,
+                "capability.wasm32_output_unparseable",
+                str(path),
+                f"wasm32 execution of '{capability_id}' produced non-JSON "
+                f"stdout on fixture '{label}': {exc}",
+            )
+            continue
+
+        if label == "happy":
+            baseline_outputs[id(fixture)] = output
+            continue
+
+        if not label.split(":")[0].endswith("=oversized"):
+            continue
+        field = label.split("=")[0]
+        base = next((f for f in happy_fixtures if field in f), None)
+        baseline = baseline_outputs.get(id(base)) if base is not None else None
+        if not (isinstance(baseline, dict) and isinstance(output, dict)):
+            continue
+        for key, value in baseline.items():
+            if isinstance(value, str) and value != "" and output.get(key) == "":
+                fail(
+                    errors,
+                    "capability.wasm32_budget_wipe_regression",
+                    str(path),
+                    f"'{capability_id}' field '{field}' set to an "
+                    f"oversized-but-schema-legal integer "
+                    f"({OVERSIZED_INTEGER_VALUE}) emptied output field "
+                    f"'{key}', which was non-empty for the same input at "
+                    f"the happy-path value -- this is the registry#487 "
+                    f"failure mode (an out-of-range fallback silently "
+                    f"zeroing a budget on wasm32, where usize is 32-bit)",
+                )
+
+
+def check_new_contracts_have_wasm32_execution(base_sha: str, head_sha: str, errors: list) -> None:
+    """Only validates newly-ADDED contract.json files in this PR's diff --
+    see check_new_contract_wasm32_execution's docstring for why."""
+    diff = subprocess.check_output(
+        ["git", "diff", "--name-status", f"{base_sha}...{head_sha}", "--", "capabilities/"],
+        text=True,
+    )
+    for line in diff.splitlines():
+        if not line.strip():
+            continue
+        parts = line.split("\t")
+        status, path = parts[0], parts[-1]
+        if status == "A" and path.endswith("contract.json"):
+            check_new_contract_wasm32_execution(Path(path), errors)
+
+
 def real_workflow_paths(workflows_dir: Path):
     """Real, published workflow.json files only -- excludes
     workflows/examples/, which holds demo/fixture content
@@ -1816,6 +2071,10 @@ def main() -> int:
             fail(errors, "git.diff_failed", "capabilities/", f"Unable to compute diff: {exc}")
         try:
             check_new_contracts_have_test_coverage(base_sha, head_sha, errors)
+        except subprocess.CalledProcessError as exc:
+            fail(errors, "git.diff_failed", "capabilities/", f"Unable to compute diff: {exc}")
+        try:
+            check_new_contracts_have_wasm32_execution(base_sha, head_sha, errors)
         except subprocess.CalledProcessError as exc:
             fail(errors, "git.diff_failed", "capabilities/", f"Unable to compute diff: {exc}")
 
