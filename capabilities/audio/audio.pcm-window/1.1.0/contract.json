@@ -5,7 +5,7 @@
   "namespace": "audio",
   "name": "pcm-window",
   "version": "1.1.0",
-  "lifecycle": "experimental",
+  "lifecycle": "draft",
   "owner": {
     "team": "audio-capabilities",
     "contact": "https://github.com/enricopiovesan"
@@ -404,4 +404,4 @@
     "digest": "sha256:d0270d83f491ba8540fc4bef84445ac1dc39d3068a283aac72be1adb5b9cdbfd",
     "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/audio.pcm-window-1.0.0/pcm-window.wasm"
   }
-}\n
+}
