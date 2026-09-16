@@ -1,0 +1,17 @@
+{
+  "id": "audio-processing-consumer",
+  "version": "1.0.0",
+  "name": "Audio Processing Consumer",
+  "summary": "Consumes bounded audio representations and portable processing outputs across supported runtime targets.",
+  "description": "Uses generic audio decoding, PCM transformation, and windowing capabilities with explicit format, rate, channel, and resource constraints. Does not own microphone access, capture scheduling, a location catalog, species policy, model selection, or a user interface.",
+  "distinguished_from": [
+    {
+      "persona_id": "classifier-steward",
+      "how": "Consumes signal-processing outputs without selecting, licensing, or releasing a classifier model."
+    },
+    {
+      "persona_id": "review-consumer",
+      "how": "Consumes portable signal-processing outputs rather than preparing evidence bundles for a human review decision."
+    }
+  ]
+}

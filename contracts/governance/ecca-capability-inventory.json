@@ -3,7 +3,7 @@
   "schema_version": "1.0.0",
   "governing_spec": "534-ecca-event-products@1.0.0",
   "governing_issue": "traverse-framework/registry#170",
-  "generated_at": "2026-09-08",
+  "generated_at": "2026-09-16",
   "scope_note": "Covers this repository's own real published capabilities (capabilities/*/*/*/contract.json). traverse-framework/traverse#899's own inventory (contracts/governance/ecca-capability-inventory.json in that repo) covers a different, unrelated set of artifacts under that repo's contracts/examples/ and contracts/inference/ trees -- despite some capability_id values coincidentally matching, they are not the same content and #899 does not satisfy Spec 534 FR-020 for this repository's catalog. Regenerated 2026-08-10 for registry#253 so every published capability ID is classified; CI now fails if inventory coverage drifts.",
   "capabilities": [
     {
@@ -836,6 +836,151 @@
       "path": "capabilities/audio/audio.detect-speech-segments/1.0.0/contract.json",
       "classification": "no-event-required",
       "evidence": "side_effects=[memory_only] on published version 1.0.0; empty emits/consumes; model-derived speech-risk score plus updated streaming state returns directly to the caller with no asynchronous domain fact broadcast to independent consumers."
+    },
+    {
+      "capability_id": "text.detect-entities",
+      "published_versions": [
+        "1.0.0"
+      ],
+      "path": "capabilities/text/text.detect-entities/1.0.0/contract.json",
+      "classification": "no-event-required",
+      "evidence": "side_effects=[memory_only] on published version 1.0.0; empty emits/consumes; model-derived entity array returns directly to the caller with no asynchronous domain fact broadcast to independent consumers."
+    },
+    {
+      "capability_id": "text.detect-language",
+      "published_versions": [
+        "1.0.0"
+      ],
+      "path": "capabilities/text/text.detect-language/1.0.0/contract.json",
+      "classification": "no-event-required",
+      "evidence": "side_effects=[memory_only] on published version 1.0.0; empty emits/consumes; deterministic language classification returns directly to the caller with no asynchronous domain fact broadcast to independent consumers."
+    },
+    {
+      "capability_id": "audio.transcribe-speech",
+      "published_versions": [
+        "1.0.0",
+        "1.1.0"
+      ],
+      "path": "capabilities/audio/audio.transcribe-speech/1.0.0/contract.json",
+      "classification": "no-event-required",
+      "evidence": "side_effects=[memory_only] on published version 1.0.0; empty emits/consumes; model-derived transcript returns directly to the caller with no asynchronous domain fact broadcast to independent consumers. Unchanged in 1.1.0 (adds an internal VAD pre-check, still memory_only/no emits/consumes)."
+    },
+    {
+      "capability_id": "text.redact-entities",
+      "published_versions": [
+        "1.0.0"
+      ],
+      "path": "capabilities/text/text.redact-entities/1.0.0/contract.json",
+      "classification": "no-event-required",
+      "evidence": "side_effects=[memory_only] on published version 1.0.0; empty emits/consumes; model-derived redacted text returns directly to the caller with no asynchronous domain fact broadcast to independent consumers."
+    },
+    {
+      "capability_id": "text.truncate",
+      "published_versions": [
+        "1.0.0"
+      ],
+      "path": "capabilities/text/text.truncate/1.0.0/contract.json",
+      "classification": "no-event-required",
+      "evidence": "side_effects=[memory_only] on published version 1.0.0; empty emits/consumes; deterministic truncated text returns directly to the caller with no asynchronous domain fact broadcast to independent consumers."
+    },
+    {
+      "capability_id": "audio.pcm-transform",
+      "published_versions": [
+        "1.0.0",
+        "1.1.0",
+        "1.1.1"
+      ],
+      "path": "capabilities/audio/audio.pcm-transform/1.1.1/contract.json",
+      "classification": "no-event-required",
+      "evidence": "active immutable successor; artifact byte-identical to signed 1.1.0 and digest-verified."
+    },
+    {
+      "capability_id": "audio.privacy-risk-evaluate",
+      "published_versions": [
+        "1.0.0",
+        "1.1.0",
+        "1.1.1"
+      ],
+      "path": "capabilities/audio/audio.privacy-risk-evaluate/1.1.1/contract.json",
+      "classification": "no-event-required",
+      "evidence": "active immutable successor; artifact byte-identical to signed 1.1.0 and digest-verified."
+    },
+    {
+      "capability_id": "audio.pcm-window",
+      "published_versions": [
+        "1.0.0",
+        "1.1.0",
+        "1.1.1"
+      ],
+      "path": "capabilities/audio/audio.pcm-window/1.1.1/contract.json",
+      "classification": "no-event-required",
+      "evidence": "active immutable successor; artifact byte-identical to signed 1.1.0 and digest-verified."
+    },
+    {
+      "capability_id": "artifact.shareability-classify",
+      "published_versions": [
+        "1.0.0",
+        "1.1.0",
+        "1.1.1"
+      ],
+      "path": "capabilities/artifact/artifact.shareability-classify/1.1.1/contract.json",
+      "classification": "no-event-required",
+      "evidence": "active immutable successor; artifact byte-identical to signed 1.1.0 and digest-verified."
+    },
+    {
+      "capability_id": "audio.wav-pcm16-decode",
+      "published_versions": [
+        "1.0.0",
+        "1.1.0",
+        "1.1.1"
+      ],
+      "path": "capabilities/audio/audio.wav-pcm16-decode/1.1.1/contract.json",
+      "classification": "no-event-required",
+      "evidence": "active immutable successor; artifact byte-identical to signed 1.1.0 and digest-verified."
+    },
+    {
+      "capability_id": "candidate.policy-evaluate",
+      "published_versions": [
+        "1.0.0",
+        "1.1.0",
+        "1.1.1"
+      ],
+      "path": "capabilities/candidate/candidate.policy-evaluate/1.1.1/contract.json",
+      "classification": "no-event-required",
+      "evidence": "active immutable successor; artifact byte-identical to signed 1.1.0 and digest-verified."
+    },
+    {
+      "capability_id": "event.append-plan-create",
+      "published_versions": [
+        "1.0.0",
+        "1.1.0",
+        "1.1.1"
+      ],
+      "path": "capabilities/event/event.append-plan-create/1.1.1/contract.json",
+      "classification": "no-event-required",
+      "evidence": "active immutable successor; artifact byte-identical to signed 1.1.0 and digest-verified."
+    },
+    {
+      "capability_id": "retention.action-plan-create",
+      "published_versions": [
+        "1.0.0",
+        "1.1.0",
+        "1.1.1"
+      ],
+      "path": "capabilities/retention/retention.action-plan-create/1.1.1/contract.json",
+      "classification": "no-event-required",
+      "evidence": "active immutable successor; artifact byte-identical to signed 1.1.0 and digest-verified."
+    },
+    {
+      "capability_id": "model.activation-plan-create",
+      "published_versions": [
+        "1.0.0",
+        "1.1.0",
+        "1.1.1"
+      ],
+      "path": "capabilities/model/model.activation-plan-create/1.1.1/contract.json",
+      "classification": "no-event-required",
+      "evidence": "active immutable successor; artifact byte-identical to signed 1.1.0 and digest-verified."
     }
   ]
 }

@@ -25,23 +25,34 @@ mod allocator {
     use core::alloc::{GlobalAlloc, Layout};
     use core::cell::UnsafeCell;
 
-    // 64 MiB. Was 1 MiB ("generous for one small JSON request/response") until
-    // the catalog-builder build-tool capability (registry#105) needed to hold
-    // the entire capabilities/ tree's contracts (input parse tree + a
-    // full-contract-cloning output tree + the final serialized JSON, none of
-    // it ever freed by this bump allocator) in memory at once -- a
+    // 192 MiB. Was 1 MiB ("generous for one small JSON request/response")
+    // until the catalog-builder build-tool capability (registry#105) needed
+    // to hold the entire capabilities/ tree's contracts (input parse tree +
+    // a full-contract-cloning output tree + the final serialized JSON, none
+    // of it ever freed by this bump allocator) in memory at once -- a
     // fundamentally different workload from the small, fixed-shape
     // request/response every other capability here processes. Raised 16 -> 64
     // MiB (registry#384): the per-capability spec-024 risk projection (`risk`
     // object + `is_automatic_eligible` + `risk_source`) is carried on every
     // one of the ~136 entries in both the input tree and the cloned output
     // tree, which tipped the 16 MiB peak over into a bump-allocator OOM (the
-    // guest panic -> `wasi::exit(2)` seen in the build-catalog job). Zero-
-    // initialized static data costs nothing in the compiled .wasm (no
-    // data-segment bytes for zeros) and a declared-but-unwritten linear
-    // memory reservation is cheap at instantiation, so this headroom is free
-    // for every capability that doesn't need it.
-    const HEAP_SIZE: usize = 64 * (1 << 20);
+    // guest panic -> `wasi::exit(2)` seen in the build-catalog job). Raised
+    // 64 -> 192 MiB (registry#473): audio.transcribe-speech accepts up to 30s
+    // of 16kHz audio as a JSON float array (up to 480,000 numbers) -- for a
+    // real 11s clip (176,000 samples) alone, this genuinely OOM'd at 64 MiB
+    // (verified via wasmtime: exit(2), the same guest-panic path as the
+    // #384 incident), not because of that capability's own ~41 MiB of
+    // audio/attention scratch buffers, but because the JSON parser's
+    // `Vec<Value>` for a long array is grown by repeated reallocation
+    // (doesn't know the final length up front) -- and every abandoned
+    // smaller buffer from each doubling stays allocated forever in a bump
+    // allocator that never frees, multiplying the effective cost of a large
+    // parsed array well beyond its final size. Zero-initialized static data
+    // costs nothing in the compiled .wasm (no data-segment bytes for zeros)
+    // and a declared-but-unwritten linear memory reservation is cheap at
+    // instantiation, so this headroom is free for every capability that
+    // doesn't need it.
+    const HEAP_SIZE: usize = 192 * (1 << 20);
 
     #[repr(align(16))]
     struct AlignedHeap(UnsafeCell<[u8; HEAP_SIZE]>);

@@ -1,0 +1,32 @@
+[workspace]
+
+[package]
+name = "audio-transcribe-speech-agent"
+version = "0.1.0"
+edition = "2021"
+publish = false
+description = "Whisper-tiny (greedy, English-forced) speech-to-text for audio.transcribe-speech. See registry#473."
+
+[[bin]]
+name = "transcribe-speech-agent"
+path = "src/main.rs"
+
+[features]
+default = []
+# Embed the full Whisper-tiny int8 weight table AND (via the dependency's own
+# full-model feature) the Silero VAD float32 weight table used for the
+# speech-presence pre-check. Required for release WASM builds.
+full-model = ["audio-detect-speech-segments-agent/full-model"]
+
+[dependencies]
+wasi-capability-runtime = { path = "../wasi-capability-runtime" }
+libm = { version = "0.2", default-features = false }
+# Reuses audio.detect-speech-segments' Silero VAD scoring engine (registry#460)
+# as a speech-presence pre-check, so this capability never pays for a full
+# Whisper forward pass on silence or non-speech audio -- see registry#477.
+audio-detect-speech-segments-agent = { path = "../audio-detect-speech-segments" }
+
+[profile.release]
+opt-level = "s"
+lto = true
+panic = "abort"

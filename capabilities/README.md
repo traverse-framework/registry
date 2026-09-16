@@ -25,6 +25,11 @@ Copy-paste sequence for a new capability version (manual path today; `traverse-c
 3. **Set `artifact.digest` / `artifact.url` on the contract** pointing at
    `https://github.com/traverse-framework/registry/releases/download/artifacts/<tag>/<asset>`.
    Newly added contracts missing either field fail CI (`contract.missing_artifact_reference`).
+   CI also fetches `artifact.url` and hashes the response before merge
+   (`contract.artifact_url_unreachable` / `contract.artifact_digest_mismatch`) — if you
+   cannot upload to this repo's Releases yourself (a first-contributor / fork PR), the
+   URL must still resolve *before this PR can go green*: ping a maintainer to mirror
+   your artifact here first (see [CONTRIBUTING.md](../CONTRIBUTING.md#publishing-a-capability)).
 4. **Declare `authoring.method` on the contract** — `"human"` or `"llm-assisted"`
    (`specs/023-authoring-assurance/spec.md` FR-001). A newly added/changed contract
    missing it fails CI (`contract.missing_authoring_method`). If `"llm-assisted"`, also

@@ -1,0 +1,221 @@
+{
+  "kind": "capability_contract",
+  "schema_version": "1.0.0",
+  "id": "text.truncate",
+  "namespace": "text",
+  "name": "truncate",
+  "version": "1.0.0",
+  "lifecycle": "active",
+  "owner": {
+    "team": "traverse-core",
+    "contact": "enrico.piovesan10@gmail.com"
+  },
+  "summary": "Truncate free text to a caller-supplied Unicode-scalar length budget, with an optional ellipsis included inside that budget.",
+  "description": "Counts Rust char values (Unicode scalar values), not UTF-8 bytes or grapheme clusters. If text already fits within max_length, returns it unchanged with truncated=false. Otherwise, returns at most max_length Unicode scalars with truncated=true: by default a single Unicode ellipsis (…); when a custom ellipsis is supplied, the ellipsis is included inside the same total budget. If the ellipsis itself is longer than max_length it is clipped to the budget, and max_length=0 returns an empty string. This capability is deterministic, memory-only, and does not interpret HTML, display width, or grapheme clusters.",
+  "use_cases": [
+    {
+      "scenario": "As a note-taking app developer, I want long note text shortened to a fixed preview budget with the default ellipsis included in that budget, so that list rows stay bounded without exceeding the UI limit.",
+      "input_example": {
+        "text": "hello world",
+        "max_length": 6
+      },
+      "output_example": {
+        "text": "hello…",
+        "truncated": true
+      },
+      "happy": true,
+      "persona_ref": "note-taking-app-developer"
+    },
+    {
+      "scenario": "As a note-taking app developer, I want text that already fits the preview budget returned byte-for-byte unchanged, so that short notes are never modified just because the truncation capability ran.",
+      "input_example": {
+        "text": "hello",
+        "max_length": 5
+      },
+      "output_example": {
+        "text": "hello",
+        "truncated": false
+      },
+      "happy": true,
+      "persona_ref": "note-taking-app-developer"
+    },
+    {
+      "scenario": "As a note-taking app developer, I want to choose an ASCII ellipsis while keeping it inside the same total length budget, so that clients with a house style can request three dots without overflowing their preview limit.",
+      "input_example": {
+        "text": "abcdefgh",
+        "max_length": 5,
+        "ellipsis": "..."
+      },
+      "output_example": {
+        "text": "ab...",
+        "truncated": true
+      },
+      "happy": true,
+      "persona_ref": "note-taking-app-developer"
+    },
+    {
+      "scenario": "As a note-taking app developer, I want a zero-length budget to return an empty preview and report that truncation occurred, so that a disabled preview slot has explicit deterministic behavior.",
+      "input_example": {
+        "text": "hello",
+        "max_length": 0
+      },
+      "output_example": {
+        "text": "",
+        "truncated": true
+      },
+      "happy": true,
+      "persona_ref": "note-taking-app-developer"
+    }
+  ],
+  "inputs": {
+    "schema": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "text",
+        "max_length"
+      ],
+      "properties": {
+        "text": {
+          "type": "string",
+          "maxLength": 20000
+        },
+        "max_length": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "ellipsis": {
+          "type": "string",
+          "default": "…",
+          "description": "Suffix used when truncation occurs; included inside max_length and clipped if longer than the entire budget."
+        }
+      }
+    }
+  },
+  "outputs": {
+    "schema": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "text",
+        "truncated"
+      ],
+      "properties": {
+        "text": {
+          "type": "string",
+          "description": "Original text when it fits; otherwise a prefix plus the requested ellipsis, with total Unicode-scalar length no greater than max_length."
+        },
+        "truncated": {
+          "type": "boolean",
+          "description": "True exactly when the input text exceeded max_length."
+        }
+      }
+    }
+  },
+  "preconditions": [
+    {
+      "id": "text-and-budget-provided",
+      "description": "Caller supplies a text string and a non-negative integer max_length; ellipsis is optional and defaults to …."
+    }
+  ],
+  "postconditions": [
+    {
+      "id": "bounded-unicode-scalar-length",
+      "description": "Output text contains at most max_length Rust char / Unicode scalar values; max_length=0 yields an empty string."
+    },
+    {
+      "id": "short-input-preserved",
+      "description": "When the input text contains at most max_length Unicode scalars, output text equals the input exactly and truncated is false."
+    },
+    {
+      "id": "ellipsis-inside-budget",
+      "description": "When truncation occurs, the selected ellipsis is counted inside max_length; if the ellipsis itself exceeds the budget, only its first max_length Unicode scalars are returned."
+    },
+    {
+      "id": "deterministic-per-call",
+      "description": "Identical input yields identical output using only Unicode-scalar counting and deterministic string slicing; see risk.determinism_class."
+    }
+  ],
+  "side_effects": [
+    {
+      "kind": "memory_only",
+      "description": "Produces a bounded string in memory; does not log, persist, or transmit input text."
+    }
+  ],
+  "emits": [],
+  "consumes": [],
+  "permissions": [
+    {
+      "id": "text.truncate"
+    }
+  ],
+  "execution": {
+    "binary_format": "wasm",
+    "entrypoint": {
+      "kind": "wasi-command",
+      "command": "run"
+    },
+    "preferred_targets": [
+      "local",
+      "browser",
+      "edge",
+      "device"
+    ],
+    "constraints": {
+      "filesystem_access": "none",
+      "host_api_access": "none",
+      "network_access": "forbidden"
+    }
+  },
+  "policies": [],
+  "dependencies": [],
+  "provenance": {
+    "source": "greenfield",
+    "author": "Rayan-and-beyond",
+    "created_at": "2026-09-14T22:57:23Z",
+    "spec_ref": "registry#486 — first-contributor publication of text.truncate@1.0.0 using Rust char / Unicode-scalar length semantics and default … ellipsis.",
+    "adr_refs": [
+      "0001-rust-wasm-foundation"
+    ],
+    "exception_refs": []
+  },
+  "evidence": [],
+  "service_type": "stateless",
+  "permitted_targets": [
+    "local",
+    "browser",
+    "edge",
+    "device"
+  ],
+  "event_trigger": null,
+  "connector_requirements": [],
+  "state_schema": null,
+  "artifact_type": "native",
+  "artifact": {
+    "digest": "sha256:388ca69a5ceb9bf68d9ba205b6a9192b79d2ed4f75783a373bcbe6cd3919054a",
+    "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/text.truncate-1.0.0/text-truncate-agent.wasm"
+  },
+  "authoring": {
+    "method": "llm-assisted",
+    "source_revision": "publish/text-truncate-1.0.0",
+    "test_evidence": "capability-src/text-truncate: 9 #[test] cases covering unchanged short input, default ellipsis, max_length=0, custom ellipsis budget accounting, over-budget ellipsis clipping, empty ellipsis, Unicode-scalar rather than UTF-8-byte counting, invalid/non-integer length parsing, and deterministic missing-field fallbacks; cargo test --locked: 9 passed; cargo clippy --locked --tests -- -D warnings: clean; cargo llvm-cov functions=100%, lines=100%, regions=100%; cargo build --locked --release --target wasm32-unknown-unknown: clean; artifact sha256:388ca69a5ceb9bf68d9ba205b6a9192b79d2ed4f75783a373bcbe6cd3919054a.",
+    "review": {
+      "decision": "pending-qualified-review",
+      "reviewer": "traverse-registry-maintainer"
+    }
+  },
+  "risk": {
+    "effect_class": "pure_read",
+    "determinism_class": "deterministic",
+    "data_flow": {
+      "accepted_data_classifications": [],
+      "produced_data_classifications": [],
+      "egress_policy": "denied"
+    },
+    "reliability": {
+      "idempotency_required": false,
+      "retryable": true,
+      "compensation_available": true
+    }
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "id": "support-ticket-router",
+  "version": "1.0.0",
+  "name": "Support Ticket Router",
+  "summary": "Routes incoming free-text support tickets to the right locale/glossary/downstream process based on detected language.",
+  "description": "Receives free text of unknown origin (support tickets, contact-form submissions, chat transcripts) and needs a language classification before further processing -- selecting a glossary, locale-specific templates, or a language-appropriate downstream model. Needs a clear 'undetermined' signal rather than a low-confidence guess when there isn't enough text to classify responsibly, so short or empty submissions don't get silently misrouted.",
+  "distinguished_from": [
+    {
+      "persona_id": "classification-consumer",
+      "how": "Needs a language code for one free-text item to pick a routing path, rather than a governed per-item outcome state (provisional/surprising/unknown/rejected) derived from scored evidence and policy thresholds."
+    },
+    {
+      "persona_id": "content-moderation-specialist",
+      "how": "Routes text by detected language for downstream processing, rather than configuring blocklists or quarantine obligations for unsafe content."
+    }
+  ]
+}

@@ -1,0 +1,243 @@
+{
+  "kind": "capability_contract",
+  "schema_version": "1.0.0",
+  "id": "audio.wav-pcm16-decode",
+  "namespace": "audio",
+  "name": "wav-pcm16-decode",
+  "version": "1.1.1",
+  "lifecycle": "active",
+  "owner": {
+    "team": "audio-capabilities",
+    "contact": "https://github.com/enricopiovesan"
+  },
+  "risk": {
+    "effect_class": "pure_read",
+    "determinism_class": "deterministic",
+    "data_flow": {
+      "accepted_data_classifications": [],
+      "produced_data_classifications": [],
+      "egress_policy": "denied"
+    },
+    "reliability": {
+      "idempotency_required": false,
+      "retryable": true,
+      "compensation_available": true
+    }
+  },
+  "authoring": {
+    "method": "llm-assisted",
+    "source_revision": "https://github.com/enricopiovesan/Callweave/commit/2d9f5e4309585b2a201f52b5d27f6ab592d4d8",
+    "test_evidence": "Callweave immutable evidence revision 2d9f5e4; all nine WASM smoke suites passed locally; Registry CI validates the signed artifact.",
+    "review": {
+      "decision": "pending-qualified-review",
+      "reviewer": "traverse-registry-repo-owner"
+    }
+  },
+  "summary": "Decode bounded RIFF/WAVE integer PCM16 into interleaved samples.",
+  "description": "Parses RIFF/WAVE chunks and decodes uncompressed PCM16 mono or stereo data into signed-16 sample arrays. Supports bounded chunks with legal metadata chunks and padding. Does not access the filesystem, fetch artifacts, decode other codec/bit-depth profiles, resample, capture audio, invoke models, or know any application, location, or species.",
+  "use_cases": [
+    {
+      "scenario": "As an audio-processing consumer, I want a bounded WAV PCM16 artifact decoded into typed samples and source-profile metadata so that portable signal-processing capabilities can run on the same sample representation.",
+      "input_example": {
+        "wav_bytes_base64": "UklGRigAAABXQVZFZm10IBAAAAABAAEAQB8AAIA+AAACABAAZGF0YQQAAAAAANAH"
+      },
+      "output_example": {
+        "result_class": "decoded",
+        "sample_format": "s16le",
+        "sample_rate_hz": 8000,
+        "channel_count": 1,
+        "frame_count": 2,
+        "samples_s16": [
+          0,
+          2000
+        ]
+      },
+      "happy": true,
+      "persona_ref": "audio-processing-consumer"
+    },
+    {
+      "scenario": "As an audio-processing consumer, I want invalid base64 audio bytes rejected explicitly so that malformed containers cannot be misclassified as decoded audio.",
+      "input_example": {
+        "wav_bytes_base64": "not-a-valid-wave-file"
+      },
+      "output_example": {
+        "result_class": "invalid_audio_bytes"
+      },
+      "happy": false,
+      "persona_ref": "audio-processing-consumer"
+    }
+  ],
+  "inputs": {
+    "schema": {
+      "type": "object",
+      "required": [
+        "wav_bytes_base64"
+      ],
+      "properties": {
+        "wav_bytes_base64": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2666668,
+          "contentEncoding": "base64"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "outputs": {
+    "schema": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": [
+            "result_class",
+            "sample_format",
+            "sample_rate_hz",
+            "channel_count",
+            "frame_count",
+            "samples_s16"
+          ],
+          "properties": {
+            "result_class": {
+              "const": "decoded"
+            },
+            "sample_format": {
+              "const": "s16le"
+            },
+            "sample_rate_hz": {
+              "type": "integer",
+              "minimum": 8000,
+              "maximum": 192000
+            },
+            "channel_count": {
+              "type": "integer",
+              "enum": [
+                1,
+                2
+              ]
+            },
+            "frame_count": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "samples_s16": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 480000,
+              "items": {
+                "type": "integer",
+                "minimum": -32768,
+                "maximum": 32767
+              }
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": [
+            "result_class"
+          ],
+          "properties": {
+            "result_class": {
+              "enum": [
+                "input_limit_exceeded",
+                "invalid_audio_bytes",
+                "invalid_container",
+                "unsupported_format",
+                "unsupported_sample_rate",
+                "unsupported_channel_count",
+                "invalid_pcm_frames",
+                "output_limit_exceeded"
+              ]
+            }
+          },
+          "additionalProperties": false
+        }
+      ]
+    }
+  },
+  "preconditions": [
+    {
+      "id": "bounded-wave",
+      "description": "The base64 WAV request is at most 4,000,000 JSON bytes, the decoded RIFF/WAVE artifact at most 2,000,000 bytes, and output at most 480,000 samples."
+    },
+    {
+      "id": "supported-profile",
+      "description": "The input is uncompressed RIFF/WAVE format-tag 1 PCM16, mono or stereo, with a sample rate from 8,000 to 192,000 Hz."
+    }
+  ],
+  "postconditions": [
+    {
+      "id": "lossless-sample-decode",
+      "description": "Every output sample equals the corresponding signed little-endian 16-bit sample in the WAV data chunk; no resampling or channel conversion occurs."
+    },
+    {
+      "id": "frame-integrity",
+      "description": "frame_count times channel_count equals samples_s16 length."
+    },
+    {
+      "id": "deterministic-rejection",
+      "description": "Unsupported or malformed input is rejected with a stable result_class and is never partially decoded."
+    }
+  ],
+  "side_effects": [
+    {
+      "kind": "memory_only",
+      "description": "Pure bounded computation; no host, network, filesystem, model, or persistent-state access."
+    }
+  ],
+  "emits": [],
+  "consumes": [],
+  "permissions": [
+    {
+      "id": "audio.wav-pcm16-decode.execute"
+    }
+  ],
+  "execution": {
+    "binary_format": "wasm",
+    "entrypoint": {
+      "kind": "wasi-command",
+      "command": "run"
+    },
+    "preferred_targets": [
+      "local",
+      "browser",
+      "edge",
+      "device"
+    ],
+    "constraints": {
+      "host_api_access": "none",
+      "network_access": "forbidden",
+      "filesystem_access": "none"
+    }
+  },
+  "policies": [
+    {
+      "id": "bounded-wave-pcm16-decode"
+    }
+  ],
+  "dependencies": [],
+  "provenance": {
+    "source": "greenfield",
+    "author": "Codex",
+    "created_at": "2026-09-14T00:00:00Z",
+    "spec_ref": "100-capability-package-authoring@1.0.0",
+    "adr_refs": [],
+    "exception_refs": []
+  },
+  "evidence": [],
+  "state_schema": null,
+  "service_type": "stateless",
+  "permitted_targets": [
+    "local",
+    "browser",
+    "edge",
+    "device"
+  ],
+  "artifact_type": "native",
+  "artifact": {
+    "digest": "sha256:11c30f48f91265e439d05b8e29697cdaf03bdc7dfbf6ea56ab0fc4d9597c5c0e",
+    "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/audio.wav-pcm16-decode-1.0.0/wav-pcm16-decode.wasm"
+  }
+}

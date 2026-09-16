@@ -6,7 +6,7 @@
 **Input**: Decided via `/brainstorm` with the repo owner (machine-readable
 licensing and usage rights for published capabilities). Full reasoning, all
 thirteen questions with options and rationale: `docs/decision-log.md`
-entry 108. That decision-log entry is also the ADR-class record for this
+entry 116. That decision-log entry is also the ADR-class record for this
 work — this repo keeps ADR rationale in the decision log
 (`docs/decision-log.md` entry 75); it has no separate `docs/adr/`.
 

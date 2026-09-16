@@ -10,6 +10,16 @@ Please read:
 - [traverse-framework/.github](https://github.com/traverse-framework/.github) — constitution, quality standards, antipatterns, compatibility policy, exception process, CLA (this repo has adopted governance version 1.0.0)
 - [docs/decision-log.md](docs/decision-log.md) — why this repo's design is what it is
 
+## First contributions
+
+If you are new here, start from a labeled ticket rather than inventing a capability:
+
+1. Pick an open [`help wanted` + `good first issue`](https://github.com/traverse-framework/registry/issues?q=is%3Aissue+is%3Aopen+label%3A%22help+wanted%22+label%3A%22good+first+issue%22) issue (often also `no-spec-needed`).
+2. Comment to claim it — keep the PR to that one capability.
+3. Follow [Publishing a Capability](#publishing-a-capability) below and the publisher checklist in [`capabilities/README.md`](capabilities/README.md).
+
+Examples and consume paths live in the [`traverse`](https://github.com/traverse-framework/traverse) repo; graduating to a **published** registry capability is the on-ramp this repo owns. Batch context: [Discussion #1374](https://github.com/orgs/traverse-framework/discussions/1374).
+
 ## Publishing a Capability
 
 Use `traverse-cli capability publish` (from the `traverse` repo) rather than hand-crafting a PR — it validates your contract locally and opens the PR for you. See `specs/001-registry-foundation/spec.md`, User Story 1.
@@ -30,6 +40,22 @@ The file you pass must contain your draft PR description, including its
 If you're adding a new `personas/<id>/<version>/persona.json`, scaffold it with
 `scripts/scaffold/new-persona.sh` rather than hand-writing it — it prompts for every
 required field (including `distinguished_from`) and self-validates before you commit.
+
+### Mirror-before-green: `artifact.url` must resolve from this repo
+
+A newly-added `contract.json`'s `artifact.url` must point at a GitHub Release
+asset under *this* repo (`https://github.com/traverse-framework/registry/releases/download/...`)
+— `capability_validation.py` fetches that exact URL and verifies its sha256 against
+`artifact.digest` as part of the required `capability-validation` check
+(`contract.artifact_url_unreachable` on a 404 or network failure,
+`contract.artifact_digest_mismatch` on a hash mismatch). If you can create releases in
+this repo yourself, step 2 of the [publisher checklist](capabilities/README.md#publisher-checklist)
+covers it. **If you cannot** (a first-contributor or fork-based PR), your PR cannot go
+green until a maintainer mirrors your built artifact to a Release here — ping one after
+opening the PR, and expect the `capability-validation` check to stay red until that
+mirror exists. This is a deliberate one-PR-publish tradeoff, not a bug: rewriting
+`artifact.url` to a fork release after merge would break contract immutability, so the
+mirror has to happen before merge instead.
 
 ### Test coverage is mandatory, for every publisher
 

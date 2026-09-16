@@ -1,0 +1,20 @@
+[workspace]
+
+[package]
+name = "text-truncate-agent"
+version = "0.1.0"
+edition = "2021"
+publish = false
+description = "Deterministic Unicode-scalar truncation for text.truncate."
+
+[[bin]]
+name = "text-truncate-agent"
+path = "src/main.rs"
+
+[dependencies]
+wasi-capability-runtime = { path = "../wasi-capability-runtime" }
+
+[profile.release]
+opt-level = "s"
+lto = true
+panic = "abort"

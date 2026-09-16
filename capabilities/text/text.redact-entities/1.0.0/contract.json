@@ -1,0 +1,183 @@
+{
+  "kind": "capability_contract",
+  "schema_version": "1.0.0",
+  "id": "text.redact-entities",
+  "namespace": "text",
+  "name": "redact-entities",
+  "version": "1.0.0",
+  "lifecycle": "active",
+  "owner": {
+    "team": "traverse-core",
+    "contact": "enrico.piovesan10@gmail.com"
+  },
+  "summary": "Redact person, organization, and location mentions from free text using text.detect-entities' real DistilBERT-NER forward pass.",
+  "description": "Runs the exact same tokenize -> DistilBERT-NER forward pass -> BIO-decode pipeline as text.detect-entities (registry#465, dslim/distilbert-NER, Apache-2.0), reused directly via a source-level dependency rather than duplicated, then substitutes a bracketed placeholder (\"[PER]\", \"[ORG]\", \"[LOC]\", \"[MISC]\") for each detected entity span instead of returning raw entity data -- copying everything else through unchanged. A real model forward pass at execution time, not a keyword list or regex-based masking. Second pick (after audio.transcribe-speech@1.1.0's VAD gate, registry#477) from a post-#473 downstream-capability review of this session's shipped model engines: no new model, no new license/verification burden -- same weight table, same license record as text.detect-entities. A new capability id, not a version of text.detect-entities, since \"redact\" is a genuinely different action from \"detect\" for a caller (different intent, different output shape), not a refinement of the same one. Inherits text.detect-entities' documented model limitation faithfully: this compact model sometimes tags an interior WordPiece of a multi-piece entity with a fresh B- tag instead of a continuing I-, which the shared BIO merge (correctly) reports as separate adjacent spans -- so a name like 'Acme Corp' can come back partially redacted as '[ORG][ORG][ORG]' rather than one '[ORG]', verified directly against the real model rather than assumed. Does not detect speech, translate, resolve entities against a knowledge base, read storage, invoke connectors, or know an application or workflow.",
+  "use_cases": [
+    {
+      "scenario": "As a privacy export reviewer, I want person, organization, and location mentions blanked out of a document before it leaves a privacy boundary, so that a forwarded support ticket or shared transcript doesn't carry PII a vendor or auditor shouldn't see.",
+      "input_example": {
+        "text": "Sarah Chen from Acme Corp will follow up with the Berlin team next week."
+      },
+      "output_example": {
+        "redacted_text": "[PER] from [ORG][ORG][ORG] will follow up with the [LOC] team next week."
+      },
+      "happy": true,
+      "persona_ref": "privacy-export-reviewer"
+    },
+    {
+      "scenario": "As a privacy export reviewer, I want a well-known person and organization consistently redacted even when the model tags them as several adjacent spans, so that no fragment of a detected entity leaks through unredacted.",
+      "input_example": {
+        "text": "Elon Musk founded SpaceX in California."
+      },
+      "output_example": {
+        "redacted_text": "[PER][PER] founded [ORG][ORG] in [LOC]."
+      },
+      "happy": true,
+      "persona_ref": "privacy-export-reviewer"
+    },
+    {
+      "scenario": "As a privacy export reviewer, I want text with no detected entities returned completely unchanged, so that redaction never alters content that doesn't need it.",
+      "input_example": {
+        "text": "The quarterly report is due next Friday."
+      },
+      "output_example": {
+        "redacted_text": "The quarterly report is due next Friday."
+      },
+      "happy": true,
+      "persona_ref": "privacy-export-reviewer"
+    }
+  ],
+  "inputs": {
+    "schema": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "text"
+      ],
+      "properties": {
+        "text": {
+          "type": "string",
+          "maxLength": 20000
+        }
+      }
+    }
+  },
+  "outputs": {
+    "schema": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "redacted_text"
+      ],
+      "properties": {
+        "redacted_text": {
+          "type": "string"
+        }
+      }
+    }
+  },
+  "preconditions": [
+    {
+      "id": "text-provided",
+      "description": "Caller supplies a text string (may be empty)."
+    }
+  ],
+  "postconditions": [
+    {
+      "id": "non-entity-text-preserved-verbatim",
+      "description": "Every byte of the input not covered by a detected entity span appears unchanged, in order, in redacted_text; each detected span is replaced by exactly one bracketed placeholder ([PER]/[ORG]/[LOC]/[MISC])."
+    },
+    {
+      "id": "deterministic-per-call",
+      "description": "Identical input yields identical output within one WASM instantiation. Cross-instantiation / cross-host-architecture byte-identity is NOT proven -- see risk.determinism_class."
+    }
+  ],
+  "side_effects": [
+    {
+      "kind": "memory_only",
+      "description": "Produces a redacted string in memory; does not log, persist, or transmit input text."
+    }
+  ],
+  "emits": [],
+  "consumes": [],
+  "permissions": [
+    {
+      "id": "text.redact-entities"
+    }
+  ],
+  "execution": {
+    "binary_format": "wasm",
+    "entrypoint": {
+      "kind": "wasi-command",
+      "command": "run"
+    },
+    "preferred_targets": [
+      "local",
+      "browser",
+      "edge",
+      "device"
+    ],
+    "constraints": {
+      "filesystem_access": "none",
+      "host_api_access": "none",
+      "network_access": "forbidden"
+    }
+  },
+  "policies": [],
+  "dependencies": [],
+  "provenance": {
+    "source": "derived",
+    "author": "enricopiovesan",
+    "created_at": "2026-09-12T02:57:07Z",
+    "spec_ref": "registry#481, second pick from the post-#473 'Five Engines, What Next' downstream-capability review, after audio.transcribe-speech@1.1.0's VAD gate (#477). Reuses text.detect-entities' (#465) DistilBERT-NER engine directly via a source-level path dependency on that crate's new lib.rs (split out of its single main.rs the same way audio-detect-speech-segments was split for #477) -- no new model, no new verification burden.",
+    "adr_refs": [
+      "0001-rust-wasm-foundation"
+    ],
+    "exception_refs": []
+  },
+  "evidence": [],
+  "service_type": "stateless",
+  "permitted_targets": [
+    "local",
+    "browser",
+    "edge",
+    "device"
+  ],
+  "event_trigger": null,
+  "connector_requirements": [],
+  "state_schema": null,
+  "artifact_type": "native",
+  "artifact": {
+    "digest": "sha256:cd6dc3d592c3f82e0e1887c6988868d3e5be202139d6af8ac66f2b6c44a1066f",
+    "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/text.redact-entities-1.0.0/redact-entities-agent.wasm"
+  },
+  "ai": {
+    "model_backed": true,
+    "models": [
+      "dslim/distilbert-NER"
+    ]
+  },
+  "authoring": {
+    "method": "llm-assisted",
+    "source_revision": "publish/text-redact-entities-1.0.0",
+    "test_evidence": "capability-src/text-redact-entities: 10 #[test] cases (placeholder label mapping, single-span and multiple-non-overlapping-span substitution, no-entities passthrough, defensive handling of an out-of-order/invalid span, full-pipeline determinism and empty-input handling, well-formed output shape, missing-text-field default) against text.detect-entities' own exposed fixture_model() (that crate's own main.rs was split into a lib.rs + thin bin the same way audio-detect-speech-segments was for registry#477, so this capability reuses its engine directly rather than duplicating it -- text.detect-entities@1.0.0's published contract/artifact is untouched by that source-only refactor, verified by re-running all 19 of its pre-existing tests unchanged); cargo llvm-cov functions=100%, lines=100%, regions=100%. Verified against the real published model via the compiled wasm32-unknown-unknown --features full-model artifact under wasmtime on real sentences: 'Sarah Chen from Acme Corp will follow up with the Berlin team next week.' redacts to '[PER] from [ORG][ORG][ORG] will follow up with the [LOC] team next week.', and 'Elon Musk founded SpaceX in California.' redacts to '[PER][PER] founded [ORG][ORG] in [LOC].' -- both correctly reproducing text.detect-entities' own documented BIO-fragmentation behavior on these exact sentences (verified directly against the real model, not assumed to carry over). License: same as text.detect-entities -- dslim/distilbert-NER is Apache-2.0, verified directly against the model's Hugging Face API metadata.",
+    "review": {
+      "decision": "pending-qualified-review",
+      "reviewer": "traverse-registry-maintainer"
+    }
+  },
+  "risk": {
+    "effect_class": "pure_read",
+    "determinism_class": "model_derived",
+    "data_flow": {
+      "accepted_data_classifications": [],
+      "produced_data_classifications": [],
+      "egress_policy": "denied"
+    },
+    "reliability": {
+      "idempotency_required": false,
+      "retryable": true,
+      "compensation_available": true
+    }
+  }
+}

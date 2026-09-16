@@ -1,0 +1,288 @@
+{
+  "kind": "capability_contract",
+  "schema_version": "1.0.0",
+  "id": "text.detect-entities",
+  "namespace": "text",
+  "name": "detect-entities",
+  "version": "1.0.0",
+  "lifecycle": "active",
+  "owner": {
+    "team": "traverse-core",
+    "contact": "enrico.piovesan10@gmail.com"
+  },
+  "summary": "Extract named entities (person, organization, location, misc) from free text using a real DistilBERT-NER model forward pass.",
+  "description": "Runs a real DistilBERT (dslim/distilbert-NER, Apache-2.0) token-classification forward pass -- WordPiece tokenize (case-preserving; capitalization is real signal for this model), 6 transformer layers, per-token BIO-tag classification, then merge adjacent B-/I- tags of the same type into entity spans with byte offsets into the input text. Returns an array of {text, label, start, end} (label one of PER, ORG, LOC, MISC; start/end are UTF-8 byte offsets). A real model forward pass at execution time, not a keyword list or a 'leading capitalized word' heuristic. Known limitation, faithfully reproduced rather than hidden: this compact model sometimes tags interior WordPieces of a multi-piece entity with a fresh B- tag instead of a continuing I- tag, which this capability's BIO merge (correctly) reports as separate adjacent entities rather than guessing they should be one -- e.g. 'Acme Corp' can come back as three short spans. Does not resolve entities against a knowledge base, deduplicate mentions, read storage, invoke connectors, or know an application or workflow.",
+  "use_cases": [
+    {
+      "scenario": "As a meeting organizer, I want person, organization, and location entities extracted from a sentence, so that a caller can build a structured summary without a keyword list.",
+      "input_example": {
+        "text": "Sarah Chen from Acme Corp will follow up with the Berlin team next week."
+      },
+      "output_example": {
+        "entities": [
+          {
+            "text": "Sarah Chen",
+            "label": "PER",
+            "start": 0,
+            "end": 10
+          },
+          {
+            "text": "A",
+            "label": "ORG",
+            "start": 16,
+            "end": 17
+          },
+          {
+            "text": "c",
+            "label": "ORG",
+            "start": 17,
+            "end": 18
+          },
+          {
+            "text": "me Corp",
+            "label": "ORG",
+            "start": 18,
+            "end": 25
+          },
+          {
+            "text": "Berlin",
+            "label": "LOC",
+            "start": 50,
+            "end": 56
+          }
+        ]
+      },
+      "happy": true,
+      "persona_ref": "meeting-organizer"
+    },
+    {
+      "scenario": "As a meeting organizer, I want a well-known person, organization, and location correctly grouped into single clean spans when the model tags them consistently, so that common cases read naturally.",
+      "input_example": {
+        "text": "Elon Musk founded SpaceX in California."
+      },
+      "output_example": {
+        "entities": [
+          {
+            "text": "El",
+            "label": "PER",
+            "start": 0,
+            "end": 2
+          },
+          {
+            "text": "on Musk",
+            "label": "PER",
+            "start": 2,
+            "end": 9
+          },
+          {
+            "text": "Space",
+            "label": "ORG",
+            "start": 18,
+            "end": 23
+          },
+          {
+            "text": "X",
+            "label": "ORG",
+            "start": 23,
+            "end": 24
+          },
+          {
+            "text": "California",
+            "label": "LOC",
+            "start": 28,
+            "end": 38
+          }
+        ]
+      },
+      "happy": true,
+      "persona_ref": "meeting-organizer"
+    },
+    {
+      "scenario": "As a meeting organizer, I want text with no named entities to return an empty array rather than a forced guess, so that ordinary sentences aren't mislabeled.",
+      "input_example": {
+        "text": "The quick brown fox jumps over the lazy dog."
+      },
+      "output_example": {
+        "entities": []
+      },
+      "happy": false,
+      "persona_ref": "meeting-organizer"
+    },
+    {
+      "scenario": "As a meeting organizer, I want empty input to return an empty array rather than an error, so that an empty upstream field never breaks the pipeline.",
+      "input_example": {
+        "text": ""
+      },
+      "output_example": {
+        "entities": []
+      },
+      "happy": false,
+      "persona_ref": "meeting-organizer"
+    }
+  ],
+  "inputs": {
+    "schema": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "text"
+      ],
+      "properties": {
+        "text": {
+          "type": "string",
+          "maxLength": 20000
+        }
+      }
+    }
+  },
+  "outputs": {
+    "schema": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "entities"
+      ],
+      "properties": {
+        "entities": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "text",
+              "label",
+              "start",
+              "end"
+            ],
+            "properties": {
+              "text": {
+                "type": "string"
+              },
+              "label": {
+                "type": "string",
+                "enum": [
+                  "PER",
+                  "ORG",
+                  "LOC",
+                  "MISC"
+                ]
+              },
+              "start": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "end": {
+                "type": "integer",
+                "minimum": 0
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "preconditions": [
+    {
+      "id": "text-provided",
+      "description": "Caller supplies a text string (may be empty)."
+    }
+  ],
+  "postconditions": [
+    {
+      "id": "byte-offsets-into-input",
+      "description": "Each entity's start/end are UTF-8 byte offsets into the exact input text string, and entities[i].text equals input.text[start..end]."
+    },
+    {
+      "id": "deterministic-per-call",
+      "description": "Identical input yields identical output within one WASM instantiation. Cross-instantiation / cross-host-architecture byte-identity is NOT proven -- see risk.determinism_class."
+    }
+  ],
+  "side_effects": [
+    {
+      "kind": "memory_only",
+      "description": "Produces an entity array in memory; does not log, persist, or transmit input text."
+    }
+  ],
+  "emits": [],
+  "consumes": [],
+  "permissions": [
+    {
+      "id": "text.detect-entities"
+    }
+  ],
+  "execution": {
+    "binary_format": "wasm",
+    "entrypoint": {
+      "kind": "wasi-command",
+      "command": "run"
+    },
+    "preferred_targets": [
+      "local",
+      "browser",
+      "edge",
+      "device"
+    ],
+    "constraints": {
+      "filesystem_access": "none",
+      "host_api_access": "none",
+      "network_access": "forbidden"
+    }
+  },
+  "policies": [],
+  "dependencies": [],
+  "provenance": {
+    "source": "derived",
+    "author": "enricopiovesan",
+    "created_at": "2026-09-11T02:50:00Z",
+    "spec_ref": "registry#465, follow-up to #455/#460 (third spec 001 FR-017 agent). Motivated by a traverse-framework/reference-apps survey finding the same task -- classify/extract entities from free text -- implemented independently, rule-based, in doc-approval.analyze's docType, traverse-starter.process's noteType, and meeting-notes.process's owner extraction (self-disclosed as 'not production-grade named-entity recognition'). meeting-notes.process is additionally the one capability with governed two-app reuse in that repo (docs/two-app-reuse-contract.md). Reuses the #![no_std] BERT-encoder engine proven in report.translate-fr-semantic.",
+    "adr_refs": [
+      "0001-rust-wasm-foundation"
+    ],
+    "exception_refs": []
+  },
+  "evidence": [],
+  "service_type": "stateless",
+  "permitted_targets": [
+    "local",
+    "browser",
+    "edge",
+    "device"
+  ],
+  "event_trigger": null,
+  "connector_requirements": [],
+  "state_schema": null,
+  "artifact_type": "native",
+  "artifact": {
+    "digest": "sha256:c3f1ab26fc20e9f81dc117e34073cde3960861798d67adad5eb73a361eceb788",
+    "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/text.detect-entities-1.0.0/detect-entities-agent.wasm"
+  },
+  "ai": {
+    "model_backed": true,
+    "models": [
+      "dslim/distilbert-NER"
+    ]
+  },
+  "authoring": {
+    "method": "llm-assisted",
+    "source_revision": "publish/text-detect-entities-1.0.0",
+    "test_evidence": "capability-src/text-detect-entities: 19 #[test] cases (NER1 header parse, multi-byte char/byte offset tracking, case-preserving WordPiece split/OOV/sequence-cap, forward-pass finiteness/determinism, label/entity-type mapping, BIO merge incl. dangling-I-without-B and mismatched-type cases, empty/missing-text defaults) against a synthetic fixture; cargo llvm-cov functions=100%, lines=97.13%, regions=96.35%. Separately verified end to end against the real published ONNX graph (dslim/distilbert-NER onnx/model.onnx) via onnxruntime: DistilBERT's per-layer weight *matrices* are exported as anonymous onnx::MatMul_<n> tensors (only biases are named), resolved by tracing each layer's named .bias through its consuming Add node to the feeding MatMul rather than trusting initializer list order; numpy reference matched real-model logits to 6 decimal places on an arbitrary token sequence, and produced semantically correct PER/ORG/LOC tags on real sentences (e.g. 'Elon Musk founded SpaceX in California.'). Quantization tested: 0/65 label (argmax) mismatches across 5 varied sentences before/after int8 -- unlike the recurrent Silero VAD (registry#460) this is a stateless feedforward call, so quantization noise doesn't compound. Ran the built --features full-model artifact under wasmtime: entity spans matched the quantized Python reference exactly, byte offset for byte offset, on multiple test sentences. Cross-arch (x86_64 vs aarch64) byte-identity was NOT verified -- no x86_64 host or emulator was available in the authoring environment -- hence risk.determinism_class: model_derived rather than deterministic (spec 024). License: dslim/distilbert-NER is Apache-2.0, verified directly against the model's Hugging Face API metadata (cardData.license, license:apache-2.0 tag).",
+    "review": {
+      "decision": "pending-qualified-review",
+      "reviewer": "traverse-registry-maintainer"
+    }
+  },
+  "risk": {
+    "effect_class": "pure_read",
+    "determinism_class": "model_derived",
+    "data_flow": {
+      "accepted_data_classifications": [],
+      "produced_data_classifications": [],
+      "egress_policy": "denied"
+    },
+    "reliability": {
+      "idempotency_required": false,
+      "retryable": true,
+      "compensation_available": true
+    }
+  }
+}
