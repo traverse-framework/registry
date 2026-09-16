@@ -825,3 +825,38 @@ Deprecate `commerce.cart@1.0.0` / `commerce.pricing-config@1.0.0` (`lines_json` 
 - **Catalog verified live**: loaded `https://registry.traverse-framework.com/#/capability/audio%2Faudio.detect-speech-segments%401.0.0` post-merge and confirmed the Agent badge, `snakers4/silero-vad` model id, coverage figures, and all four use-case examples (including both fail-closed cases) render correctly.
 - **Publish mechanics**: PR #461 (contract + crate + `scripts/model/prepare_silero_vad_f32.py` + FR-020 inventory row), signature backfill #462. `cargo llvm-cov`: functions=100%, lines=98.22%, regions=97.48%. Artifact digest `sha256:9acfc67c…155b86`; model binary digest `sha256:0688f0fa…7668fe`. New index carries the entry (post-#462 build).
 - **Explicitly out of scope** (Callweave-repo work, not this registry): resampling Callweave's 48kHz masters to 16kHz, chunking a real recording, the actual redaction/export logic, and `callweave.privacy-protect` itself.
+
+108. **Machine-readable capability licensing/usage rights designed via `/brainstorm` — new spec `025-capability-licensing-metadata`, optional→required activation, capability-only non-inheritance (2026-09-16, live owner brainstorm)**: an app-dev request highlighted that consumers cannot reliably discover from the capability index whether an entry may be used or redistributed commercially, and that conflating capability-code license with model/dataset/artifact dependency terms creates unsafe reuse decisions. No top-level contract `licensing` surface exists today (only nested I/O `license` fields on a few capabilities). Twelve questions, decided one at a time; the owner took the recommended option on every one.
+
+- **Q1 — pursue now?** → **Yes.** Spec + implementation tickets. Rejected: defer until third-party publishing (unlike catalog tiers / security advisories, a consumer is already blocked on a missing index signal) and reject top-level contract licensing (leaves the gap unaddressable by machines).
+- **Q2 — legacy / backfill?** → **New versions only after activation; existing immutable contracts stay as-is and index as `unknown`.** No mass republish. Optional later catalog backfill via new versions is a separate ticket if wanted — not part of v1 DoD.
+- **Q3 — first delivery scope?** → **Registry: governing spec + schema + CI validation + index normalized fields.** Traverse CLI search/inspect filters are a cross-repo follow-up, not blocking.
+- **Q4 — capability vs model/data rights?** → **Capability-only `licensing` block + explicit non-inheritance.** Model/dataset/dependency rights never inherit from the capability declaration; they stay on their own manifest/surface. Rejected: requiring model licensing refs in the same change, and a single merged “effective rights” field (hides the ambiguity).
+- **Q5 — schema richness?** → **Flat lean object**, not the request’s nested `code`/`artifact` split. Fields: `spdx_expression`, `commercial_use`, `redistribution`, `attribution_required`, optional `license_files` / `source_url`, and `verification`. Nest code≠artifact later only if a real divergent case appears. Rejected: SPDX-only with no rights enums.
+- **Q6 — governance home?** → **New dedicated spec `025-capability-licensing-metadata`.** `governs` should cover contract schema paths, `scripts/ci/capability_validation.py`, and `scripts/ci/build_index.py` (exact prefixes set when the spec is written). Rejected: amending `001`/`002`, and decision-log-only without a spec.
+- **Q7 — CI contradiction checking?** → **Structure validation always + a documented tiny hard-contradiction table** (e.g. `UNLICENSED` / clearly non-redistributable markers vs `redistribution: allowed`). No general SPDX→rights legal inference. Human review remains responsible for disputed claims.
+- **Q8 — `verification.status`?** → **v1 accepts only `maintainer-declared`.** `registry-reviewed` and `verified-with-evidence` are reserved and rejected until a real review process exists. Metadata remains advisory signed publisher input, not legal certification.
+- **Q9 — when required?** → **Optional on merge of the first implementation; required for newly published versions only after an explicit later activation date/PR.** Matches the request’s activation-date language; gives publish docs/examples time to catch up.
+- **Q10 — rights enums?** → **`allowed` | `forbidden` | `conditional` | `unknown`** for both `commercial_use` and `redistribution`. Policy engines MUST NOT treat `conditional` or `unknown` as permission. Missing legacy metadata indexes as `unknown`, never `allowed`.
+- **Q11 — SPDX validation?** → **Pinned `license-expression` (PyPA) in CI.** Accept SPDX expressions; `LicenseRef-*` requires `evidence_url` or `license_files`. Pin version recorded in the spec.
+- **Q12 — required subfields when `licensing` is present?** → **`spdx_expression`, `commercial_use`, `redistribution`, `attribution_required`, `verification.status` required; `license_files`, `source_url`, `verification.evidence_url`, `verification.reviewed_at` optional** (except the LicenseRef evidence rule above).
+- **Q13 — ticketing?** → **Three Registry tickets + one Traverse follow-up:** (1) spec `025` + schema + CI + index with optional `licensing`; (2) activation flip to require on new versions; (3) optional later voluntary catalog backfill; plus Traverse CLI `--commercial-use` / `--redistribution` / inspect licenses. Bulk backfill is not required for closing the governance gap.
+
+- **Canonical v1 shape (illustrative):**
+  ```json
+  "licensing": {
+    "spdx_expression": "MIT",
+    "commercial_use": "allowed",
+    "redistribution": "allowed",
+    "attribution_required": true,
+    "license_files": ["LICENSE"],
+    "source_url": "https://github.com/example/project",
+    "verification": {
+      "status": "maintainer-declared",
+      "evidence_url": "https://github.com/example/project/blob/main/LICENSE"
+    }
+  }
+  ```
+- **Index MUST expose** (names illustrative, finalize in spec): `license_expression`, `commercial_use`, `redistribution`, `verification_status` — absent/`unknown` when the contract omits `licensing`.
+- **Out of scope / deferred:** nested code vs artifact licenses; registry-reviewed verification process; Traverse CLI filters (ticket only); model-package licensing schema (related gap, not this DoD); rewriting immutable legacy contracts; CI legal determination from SPDX alone.
+- **Execution boundary of this entry:** the decision log above plus (same session, owner “go”): approved `specs/025-capability-licensing-metadata/spec.md` v1.0.0 registered in both `approved-specs.json` copies, and the four follow-through tickets filed. Schema/CI/index *implementation* remains the first ticket’s PR — not this entry’s code.
