@@ -1,32 +1,42 @@
-#![no_std]
-#![no_main]
+#![cfg_attr(not(test), no_std)]
+#![cfg_attr(not(test), no_main)]
+#[cfg(test)]
+extern crate std;
 
 const MAX_INPUT_BYTES: usize = 4_000_000;
 const MAX_OUTPUT_BYTES: usize = 4_000_000;
 const MAX_SAMPLES: usize = 480_000;
 
 #[repr(C)]
+#[cfg(target_arch = "wasm32")]
 struct Iovec {
     buffer: *const u8,
     length: usize,
 }
 #[repr(C)]
+#[cfg(target_arch = "wasm32")]
 struct IovecMut {
     buffer: *mut u8,
     length: usize,
 }
 
 #[link(wasm_import_module = "wasi_snapshot_preview1")]
+#[cfg(target_arch = "wasm32")]
 unsafe extern "C" {
     fn fd_read(fd: u32, vectors: *const IovecMut, count: usize, read: *mut usize) -> u32;
     fn fd_write(fd: u32, vectors: *const Iovec, count: usize, written: *mut usize) -> u32;
 }
 
+#[cfg(target_arch = "wasm32")]
 static mut INPUT: [u8; MAX_INPUT_BYTES + 1] = [0; MAX_INPUT_BYTES + 1];
+#[cfg(target_arch = "wasm32")]
 static mut OUTPUT: [u8; MAX_OUTPUT_BYTES] = [0; MAX_OUTPUT_BYTES];
+#[cfg(target_arch = "wasm32")]
 static mut SOURCE: [i16; MAX_SAMPLES] = [0; MAX_SAMPLES];
+#[cfg(target_arch = "wasm32")]
 static mut TARGET: [i16; MAX_SAMPLES] = [0; MAX_SAMPLES];
 
+#[cfg(target_arch = "wasm32")]
 #[unsafe(no_mangle)]
 pub extern "C" fn _start() {
     unsafe {
@@ -241,7 +251,13 @@ fn sample_array(input: &[u8], samples: &mut [i16]) -> Option<usize> {
         index = next;
         skip_space(input, &mut index);
         match input.get(index) {
-            Some(b',') => index += 1,
+            Some(b',') => {
+                index += 1;
+                skip_space(input, &mut index);
+                if input.get(index) == Some(&b']') {
+                    return None;
+                }
+            }
             Some(b']') => return Some(count),
             _ => return None,
         }
@@ -262,15 +278,28 @@ fn signed_integer(input: &[u8], mut index: usize) -> Option<(i32, usize)> {
         index += 1;
     }
     let start = index;
-    let mut value = 0i32;
+    let mut value = 0u32;
+    let limit = i32::MAX as u32 + u32::from(negative);
     while let Some(byte @ b'0'..=b'9') = input.get(index).copied() {
-        value = value.checked_mul(10)?.checked_add((byte - b'0') as i32)?;
+        value = value.checked_mul(10)?.checked_add((byte - b'0') as u32)?;
+        if value > limit {
+            return None;
+        }
         index += 1;
     }
     if index == start {
         return None;
     }
-    Some((if negative { -value } else { value }, index))
+    let signed = if negative {
+        if value == i32::MAX as u32 + 1 {
+            i32::MIN
+        } else {
+            -(value as i32)
+        }
+    } else {
+        value as i32
+    };
+    Some((signed, index))
 }
 
 fn skip_space(input: &[u8], index: &mut usize) {
@@ -373,7 +402,147 @@ impl Writer<'_> {
     }
 }
 
+#[cfg(target_arch = "wasm32")]
 #[panic_handler]
 fn panic(_: &core::panic::PanicInfo<'_>) -> ! {
     loop {}
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{
+        downsample_box_average, integer, sample_array, signed_integer, skip_space, transform,
+        Writer, MAX_OUTPUT_BYTES, MAX_SAMPLES,
+    };
+    use std::format;
+    use std::string::String;
+    use std::vec;
+
+    fn run(input: &[u8]) -> String {
+        let mut output = vec![0u8; MAX_OUTPUT_BYTES];
+        let mut source = vec![0i16; MAX_SAMPLES];
+        let mut target = vec![0i16; MAX_SAMPLES];
+        let count = transform(input, &mut output, &mut source, &mut target);
+        String::from_utf8(output[..count].to_vec()).expect("valid JSON output")
+    }
+
+    #[test]
+    fn transforms_upsampled_mono_fixture() {
+        assert_eq!(
+            run(br#"{"input_sample_rate_hz":8000,"input_channel_count":1,"target_sample_rate_hz":16000,"target_channel_count":1,"samples_s16":[0,2000]}"#),
+            r#"{"result_class":"transformed","sample_format":"s16le","input_sample_rate_hz":8000,"input_channel_count":1,"sample_rate_hz":16000,"channel_count":1,"frame_count":4,"samples_s16":[0,1000,2000,2000]}"#
+        );
+    }
+
+    #[test]
+    fn rejects_malformed_and_unsupported_profiles() {
+        assert_eq!(run(b"{}"), r#"{"result_class":"unsupported_sample_rate"}"#);
+        assert_eq!(
+            run(br#"{"input_sample_rate_hz":7000,"input_channel_count":1,"target_sample_rate_hz":16000,"target_channel_count":1,"samples_s16":[0]}"#),
+            r#"{"result_class":"unsupported_sample_rate"}"#
+        );
+        assert_eq!(
+            run(br#"{"input_sample_rate_hz":8000,"input_channel_count":3,"target_sample_rate_hz":16000,"target_channel_count":1,"samples_s16":[0]}"#),
+            r#"{"result_class":"unsupported_channel_count"}"#
+        );
+    }
+
+    #[test]
+    fn exercises_downsampling_channel_layouts_and_equal_rates() {
+        let mut output = vec![0u8; MAX_OUTPUT_BYTES];
+        let mut source = vec![0i16; MAX_SAMPLES];
+        let mut target = vec![0i16; MAX_SAMPLES];
+        let stereo = br#"{"input_sample_rate_hz":16000,"input_channel_count":2,"target_sample_rate_hz":8000,"target_channel_count":1,"samples_s16":[1000,3000,5000,7000]}"#;
+        let count = transform(stereo, &mut output, &mut source, &mut target);
+        assert!(core::str::from_utf8(&output[..count])
+            .unwrap()
+            .contains("\"result_class\":\"transformed\""));
+        assert_eq!(target[0], 4000);
+
+        let mono_to_stereo = br#"{"input_sample_rate_hz":8000,"input_channel_count":1,"target_sample_rate_hz":8000,"target_channel_count":2,"samples_s16":[-32768,32767]}"#;
+        let count = transform(mono_to_stereo, &mut output, &mut source, &mut target);
+        assert!(core::str::from_utf8(&output[..count])
+            .unwrap()
+            .contains("\"channel_count\":2"));
+        assert_eq!(&target[..4], &[-32768, -32768, 32767, 32767]);
+
+        let downsample_box = downsample_box_average(&[10, 20], 1, 2, 0, 0, 1, 16_000, 8_000);
+        assert_eq!(downsample_box, 15);
+        assert_eq!(
+            downsample_box_average(&[5], 1, 1, 4, 0, 1, 16_000, 8_000),
+            0
+        );
+    }
+
+    #[test]
+    fn rejects_invalid_arrays_input_limits_and_overflowing_profiles() {
+        let mut output = vec![0u8; MAX_OUTPUT_BYTES];
+        let mut source = vec![0i16; MAX_SAMPLES];
+        let mut target = vec![0i16; MAX_SAMPLES];
+        for (samples, expected) in [
+            ("[]", "invalid_samples"),
+            ("[32768]", "invalid_samples"),
+            ("[1,]", "invalid_samples"),
+            ("null", "invalid_samples"),
+            ("[2147483648]", "invalid_samples"),
+        ] {
+            let input = format!("{{\"input_sample_rate_hz\":8000,\"input_channel_count\":1,\"target_sample_rate_hz\":8000,\"target_channel_count\":1,\"samples_s16\":{samples}}}");
+            let count = transform(input.as_bytes(), &mut output, &mut source, &mut target);
+            assert!(
+                core::str::from_utf8(&output[..count])
+                    .unwrap()
+                    .contains(expected),
+                "samples {samples}: {}",
+                core::str::from_utf8(&output[..count]).unwrap()
+            );
+        }
+        let oversized = vec![b' '; 4_000_001];
+        let count = transform(&oversized, &mut output, &mut source, &mut target);
+        assert!(core::str::from_utf8(&output[..count])
+            .unwrap()
+            .contains("input_limit_exceeded"));
+        let samples = "0,".repeat(20_000) + "0";
+        let too_many = format!("{{\"input_sample_rate_hz\":8000,\"input_channel_count\":1,\"target_sample_rate_hz\":192000,\"target_channel_count\":1,\"samples_s16\":[{samples}]}}");
+        let count = transform(too_many.as_bytes(), &mut output, &mut source, &mut target);
+        assert!(core::str::from_utf8(&output[..count])
+            .unwrap()
+            .contains("output_limit_exceeded"));
+        let mut short_output = [0u8; 1];
+        assert_eq!(super::error(&mut short_output, "anything"), 0);
+    }
+
+    #[test]
+    fn covers_numeric_parsing_spacing_and_output_writer_edges() {
+        assert_eq!(integer(br#"{"n": -12}"#, b"\"n\""), Some(-12));
+        assert_eq!(integer(b"{\"n\":x}", b"\"n\""), None);
+        assert_eq!(integer(b"{}", b"\"n\""), None);
+        assert_eq!(signed_integer(b"-", 0), None);
+        assert_eq!(signed_integer(b"2147483648", 0), None);
+        assert_eq!(signed_integer(b"-2147483648", 0), Some((i32::MIN, 11)));
+        let mut cursor = 0;
+        skip_space(b" \n\r\tx", &mut cursor);
+        assert_eq!(cursor, 4);
+
+        let mut samples = [0i16; 1];
+        assert_eq!(sample_array(b"{}", &mut samples), None);
+        assert_eq!(sample_array(br#"{"samples_s16":1}"#, &mut samples), None);
+        assert_eq!(
+            sample_array(br#"{"samples_s16":[0]"#, &mut samples),
+            Some(1)
+        );
+        assert_eq!(
+            sample_array(br#"{"samples_s16":[0 1]}"#, &mut samples),
+            None
+        );
+
+        let mut bytes = [0u8; 2];
+        let mut writer = Writer {
+            bytes: &mut bytes,
+            position: 0,
+        };
+        writer.bytes(b"abcd");
+        assert_eq!(writer.position, 0);
+        writer.number(i64::MIN);
+        assert_eq!(writer.position, 2);
+    }
 }
