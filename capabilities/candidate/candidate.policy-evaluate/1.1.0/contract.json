@@ -5,7 +5,7 @@
   "namespace": "candidate",
   "name": "policy-evaluate",
   "version": "1.1.0",
-  "lifecycle": "experimental",
+  "lifecycle": "draft",
   "owner": {
     "team": "generic-policy-capabilities",
     "contact": "https://github.com/enricopiovesan"
@@ -347,4 +347,4 @@
     "digest": "sha256:1979703915575498a8079792d4d9fc5abc65bdac705dd89255cd02810b1997f7",
     "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/candidate.policy-evaluate-1.0.0/policy-evaluate.wasm"
   }
-}\n
+}
