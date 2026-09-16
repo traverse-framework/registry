@@ -5,7 +5,7 @@
   "namespace": "model",
   "name": "activation-plan-create",
   "version": "1.1.0",
-  "lifecycle": "experimental",
+  "lifecycle": "draft",
   "owner": {
     "team": "generic-policy-capabilities",
     "contact": "https://github.com/enricopiovesan"
@@ -416,4 +416,4 @@
     "digest": "sha256:63f54ac5c527335251f554a6940d9a0aa4d01b672d2312b2be0f39b2b3e204a3",
     "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/model.activation-plan-create-1.0.0/activation-plan-create.wasm"
   }
-}\n
+}

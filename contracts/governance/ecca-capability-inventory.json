@@ -966,4 +966,4 @@
       "evidence": "side_effects=[memory_only] on latest published version; deterministic bounded result returns directly to caller."
     }
   ]
-}\n
+}
