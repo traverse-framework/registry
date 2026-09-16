@@ -5,6 +5,7 @@ in scripts/ci/capability_validation.py (registry issue #22).
 Run with: python3 -m unittest scripts/ci/tests/test_capability_validation.py
 """
 
+import hashlib
 import importlib.util
 import json
 import os
@@ -916,6 +917,106 @@ class CheckNewContractArtifactReferenceTests(unittest.TestCase):
             capability_validation.check_new_contract_artifact_reference(path, errors)
             codes = [e["code"] for e in errors]
             self.assertIn("contract.invalid_artifact_url", codes)
+
+
+class _FakeArtifactResponse:
+    """Minimal stand-in for the object urllib.request.urlopen's context
+    manager yields, supporting the chunked .read(n) loop
+    check_new_contract_artifact_fetchable uses."""
+
+    def __init__(self, body: bytes):
+        self._body = body
+        self._pos = 0
+
+    def read(self, n=-1):
+        if n is None or n < 0:
+            chunk = self._body[self._pos :]
+            self._pos = len(self._body)
+            return chunk
+        chunk = self._body[self._pos : self._pos + n]
+        self._pos += len(chunk)
+        return chunk
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc_info):
+        return False
+
+
+class CheckNewContractArtifactFetchableTests(unittest.TestCase):
+    """registry#510: a newly-ADDED contract.json's artifact.url must actually
+    resolve, and its bytes must match artifact.digest, before merge."""
+
+    VALID_URL = (
+        "https://github.com/traverse-framework/registry/releases/download/"
+        "artifacts/example-capability-1.0.0/example-capability.wasm"
+    )
+
+    def _digest_for(self, body: bytes) -> str:
+        return "sha256:" + hashlib.sha256(body).hexdigest()
+
+    def test_no_artifact_is_skipped(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = write_artifact_contract(tmp, None)
+            errors: list = []
+            with patch("capability_validation.urllib.request.urlopen") as mock_open:
+                capability_validation.check_new_contract_artifact_fetchable(path, errors)
+            mock_open.assert_not_called()
+            self.assertEqual(errors, [])
+
+    def test_malformed_digest_is_skipped(self):
+        # check_new_contract_artifact_reference already rejects this shape;
+        # this check has nothing well-formed to fetch/compare against.
+        with tempfile.TemporaryDirectory() as tmp:
+            path = write_artifact_contract(tmp, {"digest": "md5:deadbeef", "url": self.VALID_URL})
+            errors: list = []
+            with patch("capability_validation.urllib.request.urlopen") as mock_open:
+                capability_validation.check_new_contract_artifact_fetchable(path, errors)
+            mock_open.assert_not_called()
+            self.assertEqual(errors, [])
+
+    def test_matching_digest_passes(self):
+        body = b"fake wasm bytes"
+        with tempfile.TemporaryDirectory() as tmp:
+            path = write_artifact_contract(
+                tmp, {"digest": self._digest_for(body), "url": self.VALID_URL}
+            )
+            errors: list = []
+            with patch(
+                "capability_validation.urllib.request.urlopen",
+                return_value=_FakeArtifactResponse(body),
+            ):
+                capability_validation.check_new_contract_artifact_fetchable(path, errors)
+            self.assertEqual(errors, [])
+
+    def test_digest_mismatch_is_rejected(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = write_artifact_contract(
+                tmp, {"digest": "sha256:" + ("a" * 64), "url": self.VALID_URL}
+            )
+            errors: list = []
+            with patch(
+                "capability_validation.urllib.request.urlopen",
+                return_value=_FakeArtifactResponse(b"fake wasm bytes"),
+            ):
+                capability_validation.check_new_contract_artifact_fetchable(path, errors)
+            codes = [e["code"] for e in errors]
+            self.assertIn("contract.artifact_digest_mismatch", codes)
+
+    def test_unreachable_url_is_rejected(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = write_artifact_contract(
+                tmp, {"digest": "sha256:" + ("a" * 64), "url": self.VALID_URL}
+            )
+            errors: list = []
+            with patch(
+                "capability_validation.urllib.request.urlopen",
+                side_effect=capability_validation.urllib.error.URLError("404"),
+            ):
+                capability_validation.check_new_contract_artifact_fetchable(path, errors)
+            codes = [e["code"] for e in errors]
+            self.assertIn("contract.artifact_url_unreachable", codes)
 
 
 class CheckNewContractAuthoringMethodTests(unittest.TestCase):

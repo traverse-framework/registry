@@ -104,13 +104,25 @@ every unbounded integer "budget" field the input schema declares. Host
 see OVERSIZED_INTEGER_VALUE's comment for the text.truncate@1.0.0 (#487)
 incident that motivated this. Diff-based, same reason as every other
 new-contract check above.
+
+Also enforces registry#510 (decision-log entry 113 Q5): a newly-ADDED
+contract.json's artifact.url must actually be fetchable and its bytes must
+match artifact.digest, not just have the right shape (which
+check_new_contract_artifact_reference already checks). First-contributor
+publishes point artifact.url at a fork release the contributor cannot
+upload to; CONTRIBUTING.md's maintainer-mirror-before-green handoff is
+advisory until this gate makes a 404 or a digest mismatch a hard merge
+blocker. Diff-based, same reason as every other new-contract check above.
 """
 
+import hashlib
 import json
 import os
 import re
 import subprocess
 import sys
+import urllib.error
+import urllib.request
 from pathlib import Path
 
 SEMVER_RE = re.compile(
@@ -856,6 +868,83 @@ def check_new_contracts_have_artifact_reference(base_sha: str, head_sha: str, er
         status, path = parts[0], parts[-1]
         if status == "A" and path.endswith("contract.json"):
             check_new_contract_artifact_reference(Path(path), errors)
+
+
+# registry#510 / decision-log entry 113 Q5: check_new_contract_artifact_reference
+# above only validates artifact.digest/url *shape*. First-contributor publishes
+# point artifact.url at a fork release the contributor cannot upload to; the
+# handoff (CONTRIBUTING.md) is for a maintainer to mirror the real bytes to
+# this repo's own Release before merge. If they forget, the published contract
+# 404s. This gate makes that forgettable step a hard merge blocker instead.
+ARTIFACT_FETCH_TIMEOUT_SECONDS = 30
+
+
+def check_new_contract_artifact_fetchable(path: Path, errors: list) -> None:
+    """registry#510: a newly-ADDED contract.json's artifact.url must actually
+    resolve, and its bytes must match artifact.digest, before merge. Does not
+    re-validate shape (check_new_contract_artifact_reference's job, and this
+    check needs a well-formed 'sha256:...' digest and non-empty url to have
+    anything to fetch/compare) -- if either is missing or malformed, this
+    check simply has nothing to do and defers entirely to that one. Diff-based
+    for the same immutability reason as every other new-contract check: an
+    already-merged, immutable contract was already checked when it merged."""
+    try:
+        contract = json.loads(path.read_text())
+    except Exception:
+        return
+    artifact = contract.get("artifact")
+    if not isinstance(artifact, dict):
+        return
+    digest = artifact.get("digest")
+    url = artifact.get("url")
+    if not digest or not url or not str(digest).startswith("sha256:"):
+        return
+
+    request = urllib.request.Request(str(url), headers={"User-Agent": "traverse-registry-ci"})
+    try:
+        with urllib.request.urlopen(request, timeout=ARTIFACT_FETCH_TIMEOUT_SECONDS) as response:
+            hasher = hashlib.sha256()
+            while True:
+                chunk = response.read(65536)
+                if not chunk:
+                    break
+                hasher.update(chunk)
+    except (urllib.error.URLError, OSError, ValueError) as exc:
+        fail(
+            errors,
+            "contract.artifact_url_unreachable",
+            str(path),
+            f"unable to fetch artifact.url '{url}': {exc} -- per CONTRIBUTING.md, "
+            "a maintainer must mirror the artifact to a GitHub Release under "
+            "this repo before this PR can go green",
+        )
+        return
+
+    actual_digest = f"sha256:{hasher.hexdigest()}"
+    if actual_digest != str(digest):
+        fail(
+            errors,
+            "contract.artifact_digest_mismatch",
+            str(path),
+            f"artifact fetched from '{url}' hashes to {actual_digest}, but "
+            f"the contract declares artifact.digest={digest}",
+        )
+
+
+def check_new_contracts_have_fetchable_artifacts(base_sha: str, head_sha: str, errors: list) -> None:
+    """Only validates newly-ADDED contract.json files in this PR's diff --
+    see check_new_contract_artifact_fetchable's docstring for why."""
+    diff = subprocess.check_output(
+        ["git", "diff", "--name-status", f"{base_sha}...{head_sha}", "--", "capabilities/"],
+        text=True,
+    )
+    for line in diff.splitlines():
+        if not line.strip():
+            continue
+        parts = line.split("\t")
+        status, path = parts[0], parts[-1]
+        if status == "A" and path.endswith("contract.json"):
+            check_new_contract_artifact_fetchable(Path(path), errors)
 
 
 def check_new_contract_authoring_method(path: Path, errors: list) -> None:
@@ -2059,6 +2148,10 @@ def main() -> int:
             fail(errors, "git.diff_failed", "capabilities/", f"Unable to compute diff: {exc}")
         try:
             check_new_contracts_have_artifact_reference(base_sha, head_sha, errors)
+        except subprocess.CalledProcessError as exc:
+            fail(errors, "git.diff_failed", "capabilities/", f"Unable to compute diff: {exc}")
+        try:
+            check_new_contracts_have_fetchable_artifacts(base_sha, head_sha, errors)
         except subprocess.CalledProcessError as exc:
             fail(errors, "git.diff_failed", "capabilities/", f"Unable to compute diff: {exc}")
         try:

@@ -41,6 +41,22 @@ If you're adding a new `personas/<id>/<version>/persona.json`, scaffold it with
 `scripts/scaffold/new-persona.sh` rather than hand-writing it — it prompts for every
 required field (including `distinguished_from`) and self-validates before you commit.
 
+### Mirror-before-green: `artifact.url` must resolve from this repo
+
+A newly-added `contract.json`'s `artifact.url` must point at a GitHub Release
+asset under *this* repo (`https://github.com/traverse-framework/registry/releases/download/...`)
+— `capability_validation.py` fetches that exact URL and verifies its sha256 against
+`artifact.digest` as part of the required `capability-validation` check
+(`contract.artifact_url_unreachable` on a 404 or network failure,
+`contract.artifact_digest_mismatch` on a hash mismatch). If you can create releases in
+this repo yourself, step 2 of the [publisher checklist](capabilities/README.md#publisher-checklist)
+covers it. **If you cannot** (a first-contributor or fork-based PR), your PR cannot go
+green until a maintainer mirrors your built artifact to a Release here — ping one after
+opening the PR, and expect the `capability-validation` check to stay red until that
+mirror exists. This is a deliberate one-PR-publish tradeoff, not a bug: rewriting
+`artifact.url` to a fork release after merge would break contract immutability, so the
+mirror has to happen before merge instead.
+
 ### Test coverage is mandatory, for every publisher
 
 Every new capability — whether you work in this repo's usual group or are an outside
