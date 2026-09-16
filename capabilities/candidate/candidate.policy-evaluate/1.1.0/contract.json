@@ -1,0 +1,350 @@
+{
+  "kind": "capability_contract",
+  "schema_version": "1.0.0",
+  "id": "candidate.policy-evaluate",
+  "namespace": "candidate",
+  "name": "policy-evaluate",
+  "version": "1.1.0",
+  "lifecycle": "experimental",
+  "owner": {
+    "team": "generic-policy-capabilities",
+    "contact": "https://github.com/enricopiovesan"
+  },
+  "risk": {
+    "effect_class": "pure_read",
+    "determinism_class": "deterministic",
+    "data_flow": {
+      "accepted_data_classifications": [],
+      "produced_data_classifications": [],
+      "egress_policy": "denied"
+    },
+    "reliability": {
+      "idempotency_required": false,
+      "retryable": true,
+      "compensation_available": true
+    }
+  },
+  "authoring": {
+    "method": "llm-assisted",
+    "source_revision": "https://github.com/enricopiovesan/Callweave/commit/2d9f5e4309585b2a201f52b5d27f6ab592d4d8",
+    "test_evidence": "Callweave immutable evidence revision 2d9f5e4; all nine WASM smoke suites passed locally; Registry CI validates the signed artifact.",
+    "review": {
+      "decision": "pending-qualified-review",
+      "reviewer": "traverse-registry-repo-owner"
+    }
+  },
+  "summary": "Evaluate a generic candidate status against configurable accepted and excluded status sets.",
+  "description": "Taxonomy-neutral and location-neutral eligibility decision over an opaque candidate reference and status. All status meanings and the unlisted-status fallback are supplied by configuration. It does not discover candidates, know a species/location, query a catalog, rank candidates, or persist a decision.",
+  "use_cases": [
+    {
+      "scenario": "As a candidate-policy consumer, I want a status included in the configured accepted set to be eligible so that candidate catalogs can share one generic policy evaluator.",
+      "input_example": {
+        "candidate_id": "item:42",
+        "candidate_status": "available",
+        "policy": {
+          "version": "policy-1",
+          "accepted_statuses": [
+            "available",
+            "expected"
+          ],
+          "excluded_statuses": [
+            "blocked"
+          ],
+          "unlisted_status_action": "review"
+        }
+      },
+      "output_example": {
+        "candidate_id": "item:42",
+        "candidate_status": "available",
+        "decision": "eligible",
+        "reason": "status_explicitly_accepted",
+        "policy_version": "policy-1"
+      },
+      "happy": true,
+      "persona_ref": "classification-consumer"
+    },
+    {
+      "scenario": "As a candidate-policy consumer, I want explicit exclusions to override acceptance and unlisted statuses to follow a configurable fallback so that policy decisions are deterministic and fail closed when desired.",
+      "input_example": {
+        "candidate_id": "item:42",
+        "candidate_status": "blocked",
+        "policy": {
+          "version": "policy-1",
+          "accepted_statuses": [
+            "blocked"
+          ],
+          "excluded_statuses": [
+            "blocked"
+          ],
+          "unlisted_status_action": "review"
+        }
+      },
+      "output_example": {
+        "candidate_id": "item:42",
+        "candidate_status": "blocked",
+        "decision": "excluded",
+        "reason": "status_explicitly_excluded",
+        "policy_version": "policy-1"
+      },
+      "happy": false,
+      "persona_ref": "classification-consumer"
+    },
+    {
+      "scenario": "As a candidate-policy consumer, I want an unlisted status to be eligible when the configured fallback says eligible so that catalogs can opt into permissive handling explicitly.",
+      "input_example": {
+        "candidate_id": "item:43",
+        "candidate_status": "new-status",
+        "policy": {
+          "version": "policy-1",
+          "accepted_statuses": [
+            "available"
+          ],
+          "excluded_statuses": [
+            "blocked"
+          ],
+          "unlisted_status_action": "eligible"
+        }
+      },
+      "output_example": {
+        "candidate_id": "item:43",
+        "candidate_status": "new-status",
+        "decision": "eligible",
+        "reason": "status_unlisted_policy_eligible",
+        "policy_version": "policy-1"
+      },
+      "happy": true,
+      "persona_ref": "classification-consumer"
+    },
+    {
+      "scenario": "As a candidate-policy consumer, I want an unlisted status to be excluded when the configured fallback says excluded so that a restrictive catalog policy can be expressed without application-specific logic.",
+      "input_example": {
+        "candidate_id": "item:44",
+        "candidate_status": "new-status",
+        "policy": {
+          "version": "policy-1",
+          "accepted_statuses": [
+            "available"
+          ],
+          "excluded_statuses": [
+            "blocked"
+          ],
+          "unlisted_status_action": "excluded"
+        }
+      },
+      "output_example": {
+        "candidate_id": "item:44",
+        "candidate_status": "new-status",
+        "decision": "excluded",
+        "reason": "status_unlisted_policy_excluded",
+        "policy_version": "policy-1"
+      },
+      "happy": false,
+      "persona_ref": "classification-consumer"
+    }
+  ],
+  "inputs": {
+    "schema": {
+      "type": "object",
+      "required": [
+        "candidate_id",
+        "candidate_status",
+        "policy"
+      ],
+      "properties": {
+        "candidate_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "candidate_status": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "policy": {
+          "type": "object",
+          "required": [
+            "version",
+            "accepted_statuses",
+            "excluded_statuses",
+            "unlisted_status_action"
+          ],
+          "properties": {
+            "version": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "accepted_statuses": {
+              "type": "array",
+              "maxItems": 16,
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 256
+              }
+            },
+            "excluded_statuses": {
+              "type": "array",
+              "maxItems": 16,
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 256
+              }
+            },
+            "unlisted_status_action": {
+              "enum": [
+                "eligible",
+                "excluded",
+                "review"
+              ]
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "outputs": {
+    "schema": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": [
+            "candidate_id",
+            "candidate_status",
+            "decision",
+            "reason",
+            "policy_version"
+          ],
+          "properties": {
+            "candidate_id": {
+              "type": "string"
+            },
+            "candidate_status": {
+              "type": "string"
+            },
+            "decision": {
+              "enum": [
+                "eligible",
+                "excluded",
+                "review"
+              ]
+            },
+            "reason": {
+              "enum": [
+                "status_explicitly_accepted",
+                "status_explicitly_excluded",
+                "status_not_configured"
+              ]
+            },
+            "policy_version": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": [
+            "result_class"
+          ],
+          "properties": {
+            "result_class": {
+              "enum": [
+                "input_limit_exceeded",
+                "invalid_request"
+              ]
+            }
+          },
+          "additionalProperties": false
+        }
+      ]
+    }
+  },
+  "preconditions": [
+    {
+      "id": "opaque-candidate",
+      "description": "Non-empty candidate identity and status are supplied by the caller."
+    },
+    {
+      "id": "bounded-config",
+      "description": "Accepted and excluded status lists each contain at most 16 non-empty values."
+    }
+  ],
+  "postconditions": [
+    {
+      "id": "exclude-overrides-accept",
+      "description": "If a status appears in both lists, explicit exclusion wins."
+    },
+    {
+      "id": "configured-fallback",
+      "description": "An unlisted status receives exactly the policy's configured eligible, excluded, or review decision."
+    },
+    {
+      "id": "no-domain-assumption",
+      "description": "No candidate meaning is hard-coded; output includes the supplied policy version."
+    }
+  ],
+  "side_effects": [
+    {
+      "kind": "memory_only",
+      "description": "Pure bounded policy evaluation; no host, network, filesystem, model, or persistent-state access."
+    }
+  ],
+  "emits": [],
+  "consumes": [],
+  "permissions": [
+    {
+      "id": "candidate.policy-evaluate.execute"
+    }
+  ],
+  "execution": {
+    "binary_format": "wasm",
+    "entrypoint": {
+      "kind": "wasi-command",
+      "command": "run"
+    },
+    "preferred_targets": [
+      "local",
+      "browser",
+      "edge",
+      "device"
+    ],
+    "constraints": {
+      "host_api_access": "none",
+      "network_access": "forbidden",
+      "filesystem_access": "none"
+    }
+  },
+  "policies": [
+    {
+      "id": "configurable-candidate-eligibility"
+    }
+  ],
+  "dependencies": [],
+  "provenance": {
+    "source": "greenfield",
+    "author": "Codex",
+    "created_at": "2026-09-14T00:00:00Z",
+    "spec_ref": "100-capability-package-authoring@1.0.0",
+    "adr_refs": [],
+    "exception_refs": []
+  },
+  "evidence": [],
+  "state_schema": null,
+  "service_type": "stateless",
+  "permitted_targets": [
+    "local",
+    "browser",
+    "edge",
+    "device"
+  ],
+  "artifact_type": "native",
+  "artifact": {
+    "digest": "sha256:1979703915575498a8079792d4d9fc5abc65bdac705dd89255cd02810b1997f7",
+    "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/candidate.policy-evaluate-1.0.0/policy-evaluate.wasm"
+  }
+}\n
