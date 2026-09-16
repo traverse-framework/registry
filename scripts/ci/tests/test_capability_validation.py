@@ -1223,6 +1223,200 @@ class CheckNewContractTestCoverageTests(unittest.TestCase):
             self.assertEqual(errors, [])
 
 
+class CheckNewContractWasm32ExecutionTests(unittest.TestCase):
+    """registry#509: run the newly-published capability's actual wasm32
+    artifact under wasmtime, using fixtures derived from the contract."""
+
+    def _write_contract(self, tmp: Path, capability_id: str, use_cases=None, properties=None) -> Path:
+        path = Path(tmp) / "capabilities" / "example" / capability_id / "1.0.0" / "contract.json"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        contract = {
+            "id": capability_id,
+            "use_cases": use_cases or [],
+            "inputs": {"schema": {"type": "object", "properties": properties or {}}},
+        }
+        path.write_text(json.dumps(contract))
+        return path
+
+    def _write_crate(self, tmp: Path, crate_name: str) -> None:
+        crate_dir = Path(tmp) / "capability-src" / crate_name
+        crate_dir.mkdir(parents=True, exist_ok=True)
+        (crate_dir / "Cargo.toml").write_text("[package]\nname = \"x\"\n")
+
+    def _build_result(self, wasm_path: Path, returncode=0, stderr=""):
+        message = json.dumps(
+            {
+                "reason": "compiler-artifact",
+                "target": {"kind": ["bin"]},
+                "filenames": [str(wasm_path)],
+            }
+        )
+        return type(
+            "Result", (), {"returncode": returncode, "stdout": message, "stderr": stderr}
+        )()
+
+    def _wasmtime_result(self, stdout="{}", returncode=0, stderr=""):
+        return type(
+            "Result", (), {"returncode": returncode, "stdout": stdout, "stderr": stderr}
+        )()
+
+    def test_missing_crate_directory_is_skipped(self):
+        # check_new_contract_test_coverage already reports this; this check
+        # must not double-report it.
+        with tempfile.TemporaryDirectory() as tmp:
+            path = self._write_contract(tmp, "example.new-capability")
+            errors: list = []
+            cwd = os.getcwd()
+            try:
+                os.chdir(tmp)
+                capability_validation.check_new_contract_wasm32_execution(path, errors)
+            finally:
+                os.chdir(cwd)
+            self.assertEqual(errors, [])
+
+    def test_no_happy_use_cases_runs_nothing(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = self._write_contract(tmp, "example.new-capability")
+            self._write_crate(tmp, "example-new-capability")
+            errors: list = []
+            cwd = os.getcwd()
+            try:
+                os.chdir(tmp)
+                with patch("capability_validation.subprocess.run") as mock_run:
+                    capability_validation.check_new_contract_wasm32_execution(path, errors)
+                mock_run.assert_not_called()
+            finally:
+                os.chdir(cwd)
+            self.assertEqual(errors, [])
+
+    def test_build_failure_is_rejected(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            use_cases = [{"happy": True, "input_example": {"text": "hi"}}]
+            path = self._write_contract(tmp, "example.new-capability", use_cases=use_cases)
+            self._write_crate(tmp, "example-new-capability")
+            errors: list = []
+            cwd = os.getcwd()
+            try:
+                os.chdir(tmp)
+                result = type("Result", (), {"returncode": 1, "stdout": "", "stderr": "error"})()
+                with patch("capability_validation.subprocess.run", return_value=result):
+                    capability_validation.check_new_contract_wasm32_execution(path, errors)
+            finally:
+                os.chdir(cwd)
+            codes = [e["code"] for e in errors]
+            self.assertIn("capability.wasm32_build_failed", codes)
+
+    def test_happy_path_execution_passes(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            use_cases = [{"happy": True, "input_example": {"text": "hi"}}]
+            path = self._write_contract(tmp, "example.new-capability", use_cases=use_cases)
+            self._write_crate(tmp, "example-new-capability")
+            wasm_path = Path(tmp) / "out.wasm"
+            wasm_path.write_bytes(b"\0asm")
+            errors: list = []
+            cwd = os.getcwd()
+            try:
+                os.chdir(tmp)
+                build_result = self._build_result(wasm_path)
+                run_result = self._wasmtime_result(stdout=json.dumps({"text": "hi"}))
+                with patch(
+                    "capability_validation.subprocess.run",
+                    side_effect=[build_result, run_result],
+                ):
+                    capability_validation.check_new_contract_wasm32_execution(path, errors)
+            finally:
+                os.chdir(cwd)
+            self.assertEqual(errors, [])
+
+    def test_wasm32_panic_is_rejected(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            use_cases = [{"happy": True, "input_example": {"text": "hi"}}]
+            path = self._write_contract(tmp, "example.new-capability", use_cases=use_cases)
+            self._write_crate(tmp, "example-new-capability")
+            wasm_path = Path(tmp) / "out.wasm"
+            wasm_path.write_bytes(b"\0asm")
+            errors: list = []
+            cwd = os.getcwd()
+            try:
+                os.chdir(tmp)
+                build_result = self._build_result(wasm_path)
+                run_result = self._wasmtime_result(returncode=1, stderr="panicked")
+                with patch(
+                    "capability_validation.subprocess.run",
+                    side_effect=[build_result, run_result],
+                ):
+                    capability_validation.check_new_contract_wasm32_execution(path, errors)
+            finally:
+                os.chdir(cwd)
+            codes = [e["code"] for e in errors]
+            self.assertIn("capability.wasm32_execution_failed", codes)
+
+    def test_budget_wipe_regression_is_rejected(self):
+        # Reproduces registry#487: an oversized-but-schema-legal max_length
+        # silently wipes output text that a normal max_length preserved.
+        with tempfile.TemporaryDirectory() as tmp:
+            use_cases = [{"happy": True, "input_example": {"text": "hello world", "max_length": 6}}]
+            properties = {
+                "text": {"type": "string"},
+                "max_length": {"type": "integer", "minimum": 0},
+            }
+            path = self._write_contract(
+                tmp, "example.new-capability", use_cases=use_cases, properties=properties
+            )
+            self._write_crate(tmp, "example-new-capability")
+            wasm_path = Path(tmp) / "out.wasm"
+            wasm_path.write_bytes(b"\0asm")
+            errors: list = []
+            cwd = os.getcwd()
+            try:
+                os.chdir(tmp)
+                build_result = self._build_result(wasm_path)
+                happy_run = self._wasmtime_result(stdout=json.dumps({"text": "hello…", "truncated": True}))
+                zero_run = self._wasmtime_result(stdout=json.dumps({"text": "", "truncated": True}))
+                oversized_run = self._wasmtime_result(stdout=json.dumps({"text": "", "truncated": True}))
+                with patch(
+                    "capability_validation.subprocess.run",
+                    side_effect=[build_result, happy_run, zero_run, oversized_run],
+                ):
+                    capability_validation.check_new_contract_wasm32_execution(path, errors)
+            finally:
+                os.chdir(cwd)
+            codes = [e["code"] for e in errors]
+            self.assertIn("capability.wasm32_budget_wipe_regression", codes)
+
+    def test_well_behaved_oversized_budget_passes(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            use_cases = [{"happy": True, "input_example": {"text": "hello world", "max_length": 6}}]
+            properties = {
+                "text": {"type": "string"},
+                "max_length": {"type": "integer", "minimum": 0},
+            }
+            path = self._write_contract(
+                tmp, "example.new-capability", use_cases=use_cases, properties=properties
+            )
+            self._write_crate(tmp, "example-new-capability")
+            wasm_path = Path(tmp) / "out.wasm"
+            wasm_path.write_bytes(b"\0asm")
+            errors: list = []
+            cwd = os.getcwd()
+            try:
+                os.chdir(tmp)
+                build_result = self._build_result(wasm_path)
+                happy_run = self._wasmtime_result(stdout=json.dumps({"text": "hello…", "truncated": True}))
+                zero_run = self._wasmtime_result(stdout=json.dumps({"text": "", "truncated": True}))
+                oversized_run = self._wasmtime_result(
+                    stdout=json.dumps({"text": "hello world", "truncated": False})
+                )
+                with patch(
+                    "capability_validation.subprocess.run",
+                    side_effect=[build_result, happy_run, zero_run, oversized_run],
+                ):
+                    capability_validation.check_new_contract_wasm32_execution(path, errors)
+            finally:
+                os.chdir(cwd)
+            self.assertEqual(errors, [])
+
+
 class CheckEccaCapabilityInventoryCoverageTests(unittest.TestCase):
     """Spec 534 FR-020 / registry#253: inventory must cover every published capability."""
 
