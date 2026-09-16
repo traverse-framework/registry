@@ -5,7 +5,7 @@
   "namespace": "audio",
   "name": "privacy-risk-evaluate",
   "version": "1.1.0",
-  "lifecycle": "experimental",
+  "lifecycle": "draft",
   "owner": {
     "team": "generic-policy-capabilities",
     "contact": "https://github.com/enricopiovesan"
@@ -338,4 +338,4 @@
     "digest": "sha256:73354780a23443a42e6ff78e3e44c02f1d0d0726b739704aa97cecbe056208e0",
     "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/audio.privacy-risk-evaluate-1.0.0/privacy-risk-evaluate.wasm"
   }
-}\n
+}
