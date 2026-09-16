@@ -956,11 +956,12 @@
     {
       "capability_id": "retention.action-plan-create",
       "published_versions": [
-        "1.0.0"
+        "1.0.0",
+        "1.1.0"
       ],
-      "path": "capabilities/retention/retention.action-plan-create/1.0.0/contract.json",
+      "path": "capabilities/retention/retention.action-plan-create/1.1.0/contract.json",
       "classification": "no-event-required",
-      "evidence": "side_effects=[memory_only]; empty emits/consumes; deterministic retention plan is returned without deleting, archiving, scheduling, or mutating any asset."
+      "evidence": "side_effects=[memory_only] on latest published version; deterministic bounded result returns directly to caller."
     },
     {
       "capability_id": "model.activation-plan-create",

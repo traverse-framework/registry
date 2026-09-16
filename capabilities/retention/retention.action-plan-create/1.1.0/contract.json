@@ -1,0 +1,372 @@
+{
+  "kind": "capability_contract",
+  "schema_version": "1.0.0",
+  "id": "retention.action-plan-create",
+  "namespace": "retention",
+  "name": "action-plan-create",
+  "version": "1.1.0",
+  "lifecycle": "draft",
+  "owner": {
+    "team": "generic-policy-capabilities",
+    "contact": "https://github.com/enricopiovesan"
+  },
+  "risk": {
+    "effect_class": "pure_read",
+    "determinism_class": "deterministic",
+    "data_flow": {
+      "accepted_data_classifications": [],
+      "produced_data_classifications": [],
+      "egress_policy": "denied"
+    },
+    "reliability": {
+      "idempotency_required": false,
+      "retryable": true,
+      "compensation_available": true
+    }
+  },
+  "authoring": {
+    "method": "llm-assisted",
+    "source_revision": "https://github.com/enricopiovesan/Callweave/commit/2d9f5e4309585b2a201f52b5d27f6ab592d4d8",
+    "test_evidence": "Callweave immutable evidence revision 2d9f5e4; all nine WASM smoke suites passed locally; Registry CI validates the signed artifact.",
+    "review": {
+      "decision": "pending-qualified-review",
+      "reviewer": "qualified-rust-security-reviewer"
+    }
+  },
+  "summary": "Create a delayed, approval-aware retention action plan without executing it.",
+  "description": "Pure generic policy planner. Converts an eligibility classification into no action or a configured archive/delete plan with explicit grace period and approval state. It never deletes, archives, reads, or writes assets. The host must re-check holds and references at execution time, require approval when specified, and invoke the separately authorized storage connector.",
+  "use_cases": [
+    {
+      "scenario": "As a retention steward, I want an eligible asset to receive a delayed archive or deletion plan according to policy so that retention actions are auditable and not immediate side effects.",
+      "input_example": {
+        "asset_ref": "artifact:42",
+        "request_id": "retention-plan-42",
+        "retention_state": "eligible",
+        "evaluation_time_epoch_seconds": 1000,
+        "policy": {
+          "version": "retain-1",
+          "eligible_action": "archive",
+          "grace_period_seconds": 86400,
+          "approval_required": true
+        }
+      },
+      "output_example": {
+        "asset_ref": "artifact:42",
+        "request_id": "retention-plan-42",
+        "plan_state": "planned",
+        "action": "archive",
+        "approval_state": "required",
+        "execute_after_epoch_seconds": 87400,
+        "reason": "eligible_after_grace",
+        "policy_version": "retain-1"
+      },
+      "happy": true,
+      "persona_ref": "retention-steward"
+    },
+    {
+      "scenario": "As a retention steward, I want held or retained assets to produce no action, and eligible plans to fail on time overflow, so that protected data is not scheduled for removal.",
+      "input_example": {
+        "asset_ref": "artifact:42",
+        "request_id": "retention-plan-42",
+        "retention_state": "held",
+        "evaluation_time_epoch_seconds": 1000,
+        "policy": {
+          "version": "retain-1",
+          "eligible_action": "delete",
+          "grace_period_seconds": 0,
+          "approval_required": false
+        }
+      },
+      "output_example": {
+        "asset_ref": "artifact:42",
+        "request_id": "retention-plan-42",
+        "plan_state": "no_action",
+        "action": "none",
+        "reason": "not_eligible",
+        "policy_version": "retain-1"
+      },
+      "happy": false,
+      "persona_ref": "retention-steward"
+    },
+    {
+      "scenario": "As a retention steward, I want an asset already retained under policy to produce no archive or delete plan so that retained data is not actioned a second time.",
+      "input_example": {
+        "asset_ref": "artifact:43",
+        "request_id": "retention-plan-43",
+        "retention_state": "retained",
+        "evaluation_time_epoch_seconds": 1000,
+        "policy": {
+          "version": "retain-1",
+          "eligible_action": "delete",
+          "grace_period_seconds": 0,
+          "approval_required": false
+        }
+      },
+      "output_example": {
+        "asset_ref": "artifact:43",
+        "request_id": "retention-plan-43",
+        "plan_state": "no_action",
+        "action": "none",
+        "reason": "not_eligible",
+        "policy_version": "retain-1"
+      },
+      "happy": false,
+      "persona_ref": "retention-steward"
+    }
+  ],
+  "inputs": {
+    "schema": {
+      "type": "object",
+      "required": [
+        "asset_ref",
+        "request_id",
+        "retention_state",
+        "evaluation_time_epoch_seconds",
+        "policy"
+      ],
+      "properties": {
+        "asset_ref": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/@+-]*$"
+        },
+        "request_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/@+-]*$"
+        },
+        "retention_state": {
+          "enum": [
+            "held",
+            "retained",
+            "eligible"
+          ]
+        },
+        "evaluation_time_epoch_seconds": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 18446744073709552000
+        },
+        "policy": {
+          "type": "object",
+          "required": [
+            "version",
+            "eligible_action",
+            "grace_period_seconds",
+            "approval_required"
+          ],
+          "properties": {
+            "version": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/@+-]*$"
+            },
+            "eligible_action": {
+              "enum": [
+                "archive",
+                "delete"
+              ]
+            },
+            "grace_period_seconds": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 31536000
+            },
+            "approval_required": {
+              "type": "boolean"
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "outputs": {
+    "schema": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": [
+            "asset_ref",
+            "request_id",
+            "plan_state",
+            "action",
+            "reason",
+            "policy_version"
+          ],
+          "properties": {
+            "asset_ref": {
+              "type": "string"
+            },
+            "request_id": {
+              "type": "string"
+            },
+            "plan_state": {
+              "const": "no_action"
+            },
+            "action": {
+              "const": "none"
+            },
+            "reason": {
+              "const": "not_eligible"
+            },
+            "policy_version": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": [
+            "asset_ref",
+            "request_id",
+            "plan_state",
+            "action",
+            "approval_state",
+            "execute_after_epoch_seconds",
+            "reason",
+            "policy_version"
+          ],
+          "properties": {
+            "asset_ref": {
+              "type": "string"
+            },
+            "request_id": {
+              "type": "string"
+            },
+            "plan_state": {
+              "const": "planned"
+            },
+            "action": {
+              "enum": [
+                "archive",
+                "delete"
+              ]
+            },
+            "approval_state": {
+              "enum": [
+                "required",
+                "not_required"
+              ]
+            },
+            "execute_after_epoch_seconds": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "reason": {
+              "const": "eligible_after_grace"
+            },
+            "policy_version": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": [
+            "result_class"
+          ],
+          "properties": {
+            "result_class": {
+              "enum": [
+                "input_limit_exceeded",
+                "invalid_request",
+                "time_overflow"
+              ]
+            }
+          },
+          "additionalProperties": false
+        }
+      ]
+    }
+  },
+  "preconditions": [
+    {
+      "id": "eligibility-supplied",
+      "description": "retention_state is supplied from a current eligibility evaluation; this capability does not query dependency or hold state."
+    },
+    {
+      "id": "caller-clock",
+      "description": "Evaluation time is an explicit Unix epoch value supplied by the caller; no ambient wall clock is read."
+    }
+  ],
+  "postconditions": [
+    {
+      "id": "no-action-for-protected",
+      "description": "Held and retained states produce no action regardless of configured eligible_action."
+    },
+    {
+      "id": "bounded-delay",
+      "description": "Eligible plans execute no earlier than evaluation_time plus a grace period of at most one year; overflow is rejected."
+    },
+    {
+      "id": "plan-only",
+      "description": "No storage operation occurs; the host must revalidate eligibility/holds and enforce approval before executing the plan."
+    }
+  ],
+  "side_effects": [
+    {
+      "kind": "memory_only",
+      "description": "Pure bounded policy planning."
+    }
+  ],
+  "emits": [],
+  "consumes": [],
+  "permissions": [
+    {
+      "id": "retention.action-plan-create.execute"
+    }
+  ],
+  "execution": {
+    "binary_format": "wasm",
+    "entrypoint": {
+      "kind": "wasi-command",
+      "command": "run"
+    },
+    "preferred_targets": [
+      "local",
+      "browser",
+      "edge",
+      "device"
+    ],
+    "constraints": {
+      "host_api_access": "none",
+      "network_access": "forbidden",
+      "filesystem_access": "none"
+    }
+  },
+  "policies": [
+    {
+      "id": "delayed-retention-action-plan"
+    }
+  ],
+  "dependencies": [],
+  "provenance": {
+    "source": "greenfield",
+    "author": "Codex",
+    "created_at": "2026-09-14T00:00:00Z",
+    "spec_ref": "100-capability-package-authoring@1.0.0",
+    "adr_refs": [],
+    "exception_refs": []
+  },
+  "evidence": [],
+  "state_schema": null,
+  "service_type": "stateless",
+  "permitted_targets": [
+    "local",
+    "browser",
+    "edge",
+    "device"
+  ],
+  "artifact_type": "native",
+  "artifact": {
+    "digest": "sha256:2b7bb94b4206bc7b58435d405bdf1245358507f04aeb969867f9a2fb72818241",
+    "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/retention.action-plan-create-1.0.0/action-plan-create.wasm"
+  }
+}
