@@ -5,7 +5,7 @@
   "namespace": "audio",
   "name": "pcm-transform",
   "version": "1.1.0",
-  "lifecycle": "experimental",
+  "lifecycle": "draft",
   "owner": {
     "team": "audio-capabilities",
     "contact": "https://github.com/enricopiovesan"
