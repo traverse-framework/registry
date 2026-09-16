@@ -119,6 +119,165 @@ class AiObjectValidationTests(unittest.TestCase):
         self.assertIn("contract.invalid_ai", self._codes(["model_backed"]))
 
 
+def valid_licensing(**overrides):
+    base = {
+        "spdx_expression": "MIT",
+        "commercial_use": "allowed",
+        "redistribution": "allowed",
+        "attribution_required": True,
+        "verification": {"status": "maintainer-declared"},
+    }
+    base.update(overrides)
+    return base
+
+
+class LicensingValidationTests(unittest.TestCase):
+    """specs/025-capability-licensing-metadata — optional licensing block."""
+
+    def _codes(self, licensing):
+        with tempfile.TemporaryDirectory() as tmp:
+            contract = valid_contract()
+            if licensing is not None:
+                contract["licensing"] = licensing
+            path = write_contract(tmp, contract)
+            errors: list = []
+            capability_validation.validate_contract(path, errors)
+            return [e["code"] for e in errors]
+
+    def test_absent_licensing_passes(self):
+        self.assertEqual(self._codes(None), [])
+
+    def test_valid_mit_passes(self):
+        self.assertEqual(self._codes(valid_licensing()), [])
+
+    def test_spdx_expression_or_passes(self):
+        self.assertEqual(
+            self._codes(valid_licensing(spdx_expression="MIT OR Apache-2.0")),
+            [],
+        )
+
+    def test_forbidden_conditional_unknown_pass(self):
+        for rights in ("forbidden", "conditional", "unknown"):
+            codes = self._codes(
+                valid_licensing(commercial_use=rights, redistribution=rights)
+            )
+            self.assertEqual(codes, [], msg=rights)
+
+    def test_invalid_rights_enum_rejected(self):
+        self.assertIn(
+            "contract.invalid_licensing",
+            self._codes(valid_licensing(commercial_use="yes")),
+        )
+
+    def test_missing_required_subfields_rejected(self):
+        self.assertIn(
+            "contract.invalid_licensing",
+            self._codes({"spdx_expression": "MIT"}),
+        )
+
+    def test_reserved_verification_status_rejected(self):
+        self.assertIn(
+            "contract.invalid_licensing_verification",
+            self._codes(
+                valid_licensing(verification={"status": "registry-reviewed"})
+            ),
+        )
+
+    def test_bad_source_url_rejected(self):
+        self.assertIn(
+            "contract.invalid_licensing_url",
+            self._codes(valid_licensing(source_url="http://example.com/LICENSE")),
+        )
+        self.assertIn(
+            "contract.invalid_licensing_url",
+            self._codes(valid_licensing(source_url="/etc/passwd")),
+        )
+        self.assertIn(
+            "contract.invalid_licensing_url",
+            self._codes(
+                valid_licensing(source_url="https://user:pass@example.com/LICENSE")
+            ),
+        )
+
+    def test_licenseref_without_evidence_rejected(self):
+        self.assertIn(
+            "contract.licensing_licenseref_needs_evidence",
+            self._codes(valid_licensing(spdx_expression="LicenseRef-Custom")),
+        )
+
+    def test_licenseref_with_evidence_url_passes(self):
+        self.assertEqual(
+            self._codes(
+                valid_licensing(
+                    spdx_expression="LicenseRef-Custom",
+                    verification={
+                        "status": "maintainer-declared",
+                        "evidence_url": "https://example.com/LICENSE",
+                    },
+                )
+            ),
+            [],
+        )
+
+    def test_licenseref_with_license_files_passes(self):
+        self.assertEqual(
+            self._codes(
+                valid_licensing(
+                    spdx_expression="LicenseRef-Custom",
+                    license_files=["LICENSE"],
+                )
+            ),
+            [],
+        )
+
+    def test_unlicensed_with_redistribution_allowed_contradiction(self):
+        self.assertIn(
+            "contract.licensing_contradiction",
+            self._codes(
+                valid_licensing(
+                    spdx_expression="UNLICENSED",
+                    redistribution="allowed",
+                )
+            ),
+        )
+
+    def test_proprietary_with_redistribution_allowed_contradiction(self):
+        self.assertIn(
+            "contract.licensing_contradiction",
+            self._codes(
+                valid_licensing(
+                    spdx_expression="LicenseRef-Proprietary",
+                    redistribution="allowed",
+                    license_files=["LICENSE"],
+                )
+            ),
+        )
+
+    def test_unlicensed_with_redistribution_forbidden_passes(self):
+        self.assertEqual(
+            self._codes(
+                valid_licensing(
+                    spdx_expression="UNLICENSED",
+                    commercial_use="forbidden",
+                    redistribution="forbidden",
+                )
+            ),
+            [],
+        )
+
+    def test_malformed_spdx_rejected(self):
+        self.assertIn(
+            "contract.invalid_licensing_spdx",
+            self._codes(valid_licensing(spdx_expression="MIT AND AND Apache-2.0")),
+        )
+
+    def test_unknown_non_licenseref_key_rejected(self):
+        self.assertIn(
+            "contract.invalid_licensing_spdx",
+            self._codes(valid_licensing(spdx_expression="NotARealLicense-1.0")),
+        )
+
+
 class CapabilityValidationSpec006Tests(unittest.TestCase):
     def test_valid_seed_shaped_contract_passes(self):
         with tempfile.TemporaryDirectory() as tmp:

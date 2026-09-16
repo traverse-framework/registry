@@ -15,3 +15,4 @@ capability-src/text-detect-entities/data/distilbert-ner-int8.bin
 
 # Local Whisper-tiny int8 weight table for audio.transcribe-speech builds (hosted on GitHub Releases, not git)
 capability-src/audio-transcribe-speech/data/whisper-tiny-int8.bin
+.tmp-venv/

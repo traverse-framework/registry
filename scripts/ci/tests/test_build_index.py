@@ -177,6 +177,46 @@ class BuildIndexContractMetadataTests(unittest.TestCase):
             self.assertEqual(entry["description"], "")
             self.assertEqual(entry["use_cases"], [])
 
+    def test_licensing_absent_indexes_as_unknown(self):
+        """specs/025-capability-licensing-metadata FR-009."""
+        import unittest.mock as _mock
+
+        with tempfile.TemporaryDirectory() as tmp:
+            write_contract(tmp, valid_contract())
+            with _mock.patch.object(
+                build_index_module, "resolve_capability_risk", return_value={}
+            ):
+                index = self._run_in(tmp, 0, "deadbeef")
+            entry = index["capabilities"][0]
+            self.assertNotIn("license_expression", entry)
+            self.assertEqual(entry["commercial_use"], "unknown")
+            self.assertEqual(entry["redistribution"], "unknown")
+            self.assertEqual(entry["verification_status"], "unknown")
+
+    def test_licensing_present_projects_normalized_fields(self):
+        """specs/025-capability-licensing-metadata FR-009."""
+        import unittest.mock as _mock
+
+        with tempfile.TemporaryDirectory() as tmp:
+            contract = valid_contract()
+            contract["licensing"] = {
+                "spdx_expression": "MIT",
+                "commercial_use": "allowed",
+                "redistribution": "forbidden",
+                "attribution_required": True,
+                "verification": {"status": "maintainer-declared"},
+            }
+            write_contract(tmp, contract)
+            with _mock.patch.object(
+                build_index_module, "resolve_capability_risk", return_value={}
+            ):
+                index = self._run_in(tmp, 0, "deadbeef")
+            entry = index["capabilities"][0]
+            self.assertEqual(entry["license_expression"], "MIT")
+            self.assertEqual(entry["commercial_use"], "allowed")
+            self.assertEqual(entry["redistribution"], "forbidden")
+            self.assertEqual(entry["verification_status"], "maintainer-declared")
+
     def test_entry_carries_search_projection_fields(self):
         # specs/019-public-metadata-sync-extension amendment FR-006/FR-007
         # (registry#318): service_type/permitted_targets/lifecycle copied

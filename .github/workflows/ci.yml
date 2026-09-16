@@ -84,6 +84,9 @@ jobs:
       - name: Build event-product validator
         run: cargo build --locked -p traverse-registry --bin validate_event_products
 
+      - name: Install SPDX license-expression pin
+        run: pip install "license-expression==30.4.4"
+
       - name: Run capability validation unit tests
         run: python3 -m unittest scripts/ci/tests/test_capability_validation.py -v
 

@@ -46,6 +46,8 @@ Copy-paste sequence for a new capability version (manual path today; `traverse-c
 
 **Optional — declare `ai` if the capability is model-backed (an "agent").** `specs/001-registry-foundation/spec.md` FR-017: add `"ai": { "model_backed": true, "models": ["<id>", …] }` when the capability runs model inference at execution time (a forward pass / model call). Static lookup tables, quantized weights, or embeddings compiled into the WASM and used only for deterministic arithmetic do **not** count — omit `ai` for those. `models` must be a non-empty string array whenever `model_backed` is `true` (CI: `contract.invalid_ai`). The field flows through to the public index and the catalog's "Agent" badge. No published capability declares it today.
 
+**Optional — declare `licensing` for machine-readable reuse rights.** `specs/025-capability-licensing-metadata/spec.md`: add a flat `"licensing"` object with `spdx_expression`, `commercial_use` / `redistribution` (`allowed` | `forbidden` | `conditional` | `unknown`), `attribution_required`, and `verification.status: "maintainer-declared"`. This is **publisher-declared metadata**, signed with the contract — not a legal certification. It describes the capability implementation/artifact only and does **not** inherit to models, datasets, or other dependencies. Legacy contracts without the field index as `unknown`. `LicenseRef-*` requires `verification.evidence_url` or `license_files`. SPDX parsing uses pinned `license-expression==30.4.4`.
+
 Never edit an already-merged `contract.json`; yank via `deprecated.json` and publish a new version instead.
 
 **Optional — contribute a publication-lifecycle measurement record.** After your
