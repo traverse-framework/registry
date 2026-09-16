@@ -960,3 +960,10 @@ This is the second of the downstream ideas from entry 110's "Five Engines, What 
 - **Index MUST expose** (names illustrative, finalize in spec): `license_expression`, `commercial_use`, `redistribution`, `verification_status` — absent/`unknown` when the contract omits `licensing`.
 - **Out of scope / deferred:** nested code vs artifact licenses; registry-reviewed verification process; Traverse CLI filters (ticket only); model-package licensing schema (related gap, not this DoD); rewriting immutable legacy contracts; CI legal determination from SPDX alone.
 - **Execution boundary of this entry:** the decision log above plus (same session, owner “go”): approved `specs/025-capability-licensing-metadata/spec.md` v1.0.0 registered in both `approved-specs.json` copies, and the four follow-through tickets filed. Schema/CI/index *implementation* remains the first ticket’s PR — not this entry’s code.
+
+117. **Spec 025 FR-010 activated: newly ADDED capability versions must declare `licensing` (2026-09-16, closes registry#558)**: entry 116 / #557 shipped optional `licensing` validation + index projection. This entry flips the forward-only required gate.
+
+- **Effective date**: 2026-09-16 (merge of the activation PR).
+- **Gate**: `check_new_contracts_declare_licensing` — newly-`A`-status `capabilities/**/contract.json` missing `licensing` fails as `contract.missing_licensing`. Shape/SPDX/contradiction checks remain in `validate_licensing`.
+- **Legacy**: already-published contracts without `licensing` stay valid and continue to index as `unknown` for rights fields.
+- **Not in scope**: catalog backfill (#559, Deferred); Traverse CLI filters (traverse#1450).

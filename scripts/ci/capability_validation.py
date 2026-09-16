@@ -1264,6 +1264,41 @@ def check_new_contracts_declare_authoring_method(base_sha: str, head_sha: str, e
             check_new_contract_authoring_method(Path(path), errors)
 
 
+def check_new_contract_licensing(path: Path, errors: list) -> None:
+    """specs/025-capability-licensing-metadata FR-010 (activated): a newly
+    ADDED contract.json MUST include a `licensing` object. Shape validation
+    remains in validate_licensing / validate_contract. Diff-based ADD-only so
+    already-published versions without the field stay valid forever."""
+    try:
+        contract = json.loads(path.read_text())
+    except Exception:
+        return
+    if "licensing" not in contract:
+        fail(
+            errors,
+            "contract.missing_licensing",
+            str(path),
+            "newly added contract.json must declare a licensing object "
+            "(spec 025-capability-licensing-metadata FR-010; activated "
+            "2026-09-16, decision-log entry 117)",
+        )
+
+
+def check_new_contracts_declare_licensing(base_sha: str, head_sha: str, errors: list) -> None:
+    """Only validates newly-ADDED contract.json files (FR-010 activation)."""
+    diff = subprocess.check_output(
+        ["git", "diff", "--name-status", f"{base_sha}...{head_sha}", "--", "capabilities/"],
+        text=True,
+    )
+    for line in diff.splitlines():
+        if not line.strip():
+            continue
+        parts = line.split("\t")
+        status, path = parts[0], parts[-1]
+        if status == "A" and path.endswith("contract.json"):
+            check_new_contract_licensing(Path(path), errors)
+
+
 def _risk_shape_error(risk):
     """Return a human-readable reason `risk` is not a valid
     `traverse-contracts::RiskMetadata` shape, or None if it is well-formed.
@@ -2411,6 +2446,10 @@ def main() -> int:
             fail(errors, "git.diff_failed", "capabilities/", f"Unable to compute diff: {exc}")
         try:
             check_new_contracts_declare_authoring_method(base_sha, head_sha, errors)
+        except subprocess.CalledProcessError as exc:
+            fail(errors, "git.diff_failed", "capabilities/", f"Unable to compute diff: {exc}")
+        try:
+            check_new_contracts_declare_licensing(base_sha, head_sha, errors)
         except subprocess.CalledProcessError as exc:
             fail(errors, "git.diff_failed", "capabilities/", f"Unable to compute diff: {exc}")
         try:

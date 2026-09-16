@@ -1260,6 +1260,26 @@ class CheckNewContractAuthoringMethodTests(unittest.TestCase):
             )
 
 
+class CheckNewContractLicensingTests(unittest.TestCase):
+    """check_new_contract_licensing implements spec 025 FR-010 activation."""
+
+    def test_present_licensing_passes(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            contract = valid_contract()
+            contract["licensing"] = valid_licensing()
+            path = write_contract(tmp, contract)
+            errors: list = []
+            capability_validation.check_new_contract_licensing(path, errors)
+            self.assertEqual(errors, [])
+
+    def test_missing_licensing_is_rejected(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = write_contract(tmp, valid_contract())
+            errors: list = []
+            capability_validation.check_new_contract_licensing(path, errors)
+            self.assertIn("contract.missing_licensing", [e["code"] for e in errors])
+
+
 class CheckNewContractRiskMetadataTests(unittest.TestCase):
     """check_new_contract_risk_metadata implements spec
     024-capability-risk-classification-adoption FR-001/FR-002 for newly ADDED
