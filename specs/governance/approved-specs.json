@@ -371,6 +371,19 @@
       ]
     },
     {
+      "id": "025-capability-licensing-metadata",
+      "version": "1.0.0",
+      "status": "approved",
+      "immutable": true,
+      "path": "specs/025-capability-licensing-metadata/spec.md",
+      "governs": [
+        "capabilities/",
+        "scripts/ci/capability_validation.py",
+        "scripts/ci/build_index.py",
+        "specs/025-capability-licensing-metadata/"
+      ]
+    },
+    {
       "id": "997-application-selected-preparation",
       "version": "1.1.0",
       "status": "approved",
