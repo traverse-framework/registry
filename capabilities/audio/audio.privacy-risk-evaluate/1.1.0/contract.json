@@ -1,0 +1,341 @@
+{
+  "kind": "capability_contract",
+  "schema_version": "1.0.0",
+  "id": "audio.privacy-risk-evaluate",
+  "namespace": "audio",
+  "name": "privacy-risk-evaluate",
+  "version": "1.1.0",
+  "lifecycle": "experimental",
+  "owner": {
+    "team": "generic-policy-capabilities",
+    "contact": "https://github.com/enricopiovesan"
+  },
+  "risk": {
+    "effect_class": "pure_read",
+    "determinism_class": "deterministic",
+    "data_flow": {
+      "accepted_data_classifications": [],
+      "produced_data_classifications": [],
+      "egress_policy": "denied"
+    },
+    "reliability": {
+      "idempotency_required": false,
+      "retryable": true,
+      "compensation_available": true
+    }
+  },
+  "authoring": {
+    "method": "llm-assisted",
+    "source_revision": "https://github.com/enricopiovesan/Callweave/commit/2d9f5e4309585b2a201f52b5d27f6ab592d4d8",
+    "test_evidence": "Callweave immutable evidence revision 2d9f5e4; all nine WASM smoke suites passed locally; Registry CI validates the signed artifact.",
+    "review": {
+      "decision": "pending-qualified-review",
+      "reviewer": "traverse-registry-repo-owner"
+    }
+  },
+  "summary": "Evaluate supplied bounded privacy-risk evidence against configurable policy.",
+  "description": "A detector- and domain-neutral privacy policy capability. It evaluates a caller-supplied bounded integer risk score and evidence-completeness fact; a VAD/speech model or human reviewer supplies those facts separately. Policy controls the action for incomplete evidence and elevated risk. This capability does not analyze audio, run a detector, sanitize media, export assets, or know an application/jurisdiction.",
+  "use_cases": [
+    {
+      "scenario": "As a privacy-policy consumer, I want complete evidence below the configured risk threshold permitted so that safe processing may proceed without embedding a specific detector in the policy.",
+      "input_example": {
+        "subject_ref": "artifact:audio-42",
+        "risk_score_millis": 120,
+        "evidence_complete": true,
+        "policy": {
+          "version": "privacy-1",
+          "maximum_risk_score_millis": 300,
+          "incomplete_evidence_action": "review_required",
+          "elevated_risk_action": "deny"
+        }
+      },
+      "output_example": {
+        "subject_ref": "artifact:audio-42",
+        "risk_score_millis": 120,
+        "evidence_complete": true,
+        "decision": "allow",
+        "reason": "risk_within_threshold",
+        "policy_version": "privacy-1"
+      },
+      "happy": true,
+      "persona_ref": "review-consumer"
+    },
+    {
+      "scenario": "As a privacy-policy consumer, I want incomplete evidence or elevated risk to follow an explicit configured deny/review action so that missing detector coverage cannot be silently treated as safe.",
+      "input_example": {
+        "subject_ref": "artifact:audio-43",
+        "risk_score_millis": 0,
+        "evidence_complete": false,
+        "policy": {
+          "version": "privacy-1",
+          "maximum_risk_score_millis": 300,
+          "incomplete_evidence_action": "review_required",
+          "elevated_risk_action": "deny"
+        }
+      },
+      "output_example": {
+        "subject_ref": "artifact:audio-43",
+        "risk_score_millis": 0,
+        "evidence_complete": false,
+        "decision": "review_required",
+        "reason": "evidence_incomplete",
+        "policy_version": "privacy-1"
+      },
+      "happy": false,
+      "persona_ref": "review-consumer"
+    },
+    {
+      "scenario": "As a privacy-policy consumer, I want incomplete evidence and elevated risk to follow explicitly configured allow actions when a policy owner chooses them so that this evaluator applies policy without silently inventing defaults.",
+      "input_example": {
+        "subject_ref": "artifact:audio-44",
+        "risk_score_millis": 500,
+        "evidence_complete": false,
+        "policy": {
+          "version": "privacy-1",
+          "maximum_risk_score_millis": 300,
+          "incomplete_evidence_action": "allow",
+          "elevated_risk_action": "allow"
+        }
+      },
+      "output_example": {
+        "subject_ref": "artifact:audio-44",
+        "risk_score_millis": 500,
+        "evidence_complete": false,
+        "decision": "allow",
+        "reason": "configured_incomplete_evidence_action",
+        "policy_version": "privacy-1"
+      },
+      "happy": true,
+      "persona_ref": "review-consumer"
+    },
+    {
+      "scenario": "As a privacy-policy consumer, I want incomplete evidence and elevated risk to follow explicit deny and review actions so that each configured fallback is discoverable and testable.",
+      "input_example": {
+        "subject_ref": "artifact:audio-45",
+        "risk_score_millis": 500,
+        "evidence_complete": false,
+        "policy": {
+          "version": "privacy-1",
+          "maximum_risk_score_millis": 300,
+          "incomplete_evidence_action": "deny",
+          "elevated_risk_action": "review_required"
+        }
+      },
+      "output_example": {
+        "subject_ref": "artifact:audio-45",
+        "risk_score_millis": 500,
+        "evidence_complete": false,
+        "decision": "deny",
+        "reason": "configured_incomplete_evidence_action",
+        "policy_version": "privacy-1"
+      },
+      "happy": false,
+      "persona_ref": "review-consumer"
+    }
+  ],
+  "inputs": {
+    "schema": {
+      "type": "object",
+      "required": [
+        "subject_ref",
+        "risk_score_millis",
+        "evidence_complete",
+        "policy"
+      ],
+      "properties": {
+        "subject_ref": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "risk_score_millis": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000
+        },
+        "evidence_complete": {
+          "type": "boolean"
+        },
+        "policy": {
+          "type": "object",
+          "required": [
+            "version",
+            "maximum_risk_score_millis",
+            "incomplete_evidence_action",
+            "elevated_risk_action"
+          ],
+          "properties": {
+            "version": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "maximum_risk_score_millis": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 1000
+            },
+            "incomplete_evidence_action": {
+              "enum": [
+                "allow",
+                "deny",
+                "review_required"
+              ]
+            },
+            "elevated_risk_action": {
+              "enum": [
+                "allow",
+                "deny",
+                "review_required"
+              ]
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "outputs": {
+    "schema": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": [
+            "subject_ref",
+            "risk_score_millis",
+            "evidence_complete",
+            "decision",
+            "reason",
+            "policy_version"
+          ],
+          "properties": {
+            "subject_ref": {
+              "type": "string"
+            },
+            "risk_score_millis": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 1000
+            },
+            "evidence_complete": {
+              "type": "boolean"
+            },
+            "decision": {
+              "enum": [
+                "allow",
+                "deny",
+                "review_required"
+              ]
+            },
+            "reason": {
+              "enum": [
+                "risk_within_threshold",
+                "evidence_incomplete",
+                "risk_exceeds_threshold"
+              ]
+            },
+            "policy_version": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": [
+            "result_class"
+          ],
+          "properties": {
+            "result_class": {
+              "enum": [
+                "input_limit_exceeded",
+                "invalid_request"
+              ]
+            }
+          },
+          "additionalProperties": false
+        }
+      ]
+    }
+  },
+  "preconditions": [
+    {
+      "id": "risk-evidence-supplied",
+      "description": "The caller supplies a 0..1000 risk score and an explicit evidence-complete fact; neither is inferred by this capability."
+    },
+    {
+      "id": "fallback-actions-configured",
+      "description": "The configuration explicitly chooses allow, deny, or review_required for both incomplete and over-threshold cases."
+    }
+  ],
+  "postconditions": [
+    {
+      "id": "policy-applied",
+      "description": "Incomplete evidence takes precedence; otherwise the configured maximum risk score is applied."
+    },
+    {
+      "id": "detector-neutral",
+      "description": "The decision is independent of the model/detector that produced input evidence."
+    }
+  ],
+  "side_effects": [
+    {
+      "kind": "memory_only",
+      "description": "Pure bounded policy evaluation; no host, network, filesystem, model, or persistent-state access."
+    }
+  ],
+  "emits": [],
+  "consumes": [],
+  "permissions": [
+    {
+      "id": "audio.privacy-risk-evaluate.execute"
+    }
+  ],
+  "execution": {
+    "binary_format": "wasm",
+    "entrypoint": {
+      "kind": "wasi-command",
+      "command": "run"
+    },
+    "preferred_targets": [
+      "local",
+      "browser",
+      "edge",
+      "device"
+    ],
+    "constraints": {
+      "host_api_access": "none",
+      "network_access": "forbidden",
+      "filesystem_access": "none"
+    }
+  },
+  "policies": [
+    {
+      "id": "configurable-privacy-risk-threshold"
+    }
+  ],
+  "dependencies": [],
+  "provenance": {
+    "source": "greenfield",
+    "author": "Codex",
+    "created_at": "2026-09-14T00:00:00Z",
+    "spec_ref": "100-capability-package-authoring@1.0.0",
+    "adr_refs": [],
+    "exception_refs": []
+  },
+  "evidence": [],
+  "state_schema": null,
+  "service_type": "stateless",
+  "permitted_targets": [
+    "local",
+    "browser",
+    "edge",
+    "device"
+  ],
+  "artifact_type": "native",
+  "artifact": {
+    "digest": "sha256:73354780a23443a42e6ff78e3e44c02f1d0d0726b739704aa97cecbe056208e0",
+    "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/audio.privacy-risk-evaluate-1.0.0/privacy-risk-evaluate.wasm"
+  }
+}\n
