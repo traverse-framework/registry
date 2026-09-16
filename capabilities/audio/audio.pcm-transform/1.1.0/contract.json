@@ -1,0 +1,293 @@
+{
+  "kind": "capability_contract",
+  "schema_version": "1.0.0",
+  "id": "audio.pcm-transform",
+  "namespace": "audio",
+  "name": "pcm-transform",
+  "version": "1.1.0",
+  "lifecycle": "experimental",
+  "owner": {
+    "team": "audio-capabilities",
+    "contact": "https://github.com/enricopiovesan"
+  },
+  "risk": {
+    "effect_class": "pure_read",
+    "determinism_class": "deterministic",
+    "data_flow": {
+      "accepted_data_classifications": [],
+      "produced_data_classifications": [],
+      "egress_policy": "denied"
+    },
+    "reliability": {
+      "idempotency_required": false,
+      "retryable": true,
+      "compensation_available": true
+    }
+  },
+  "authoring": {
+    "method": "llm-assisted",
+    "source_revision": "https://github.com/enricopiovesan/Callweave/commit/2d9f5e4309585b2a201f52b5d27f6ab592d4d8ca",
+    "test_evidence": "Callweave immutable evidence revision 2d9f5e4; all nine WASM smoke suites passed locally; Registry CI validates the published source crate.",
+    "review": {
+      "decision": "pending-qualified-review",
+      "pr": "https://github.com/traverse-framework/registry/pull/514",
+      "reviewer": "traverse-registry-repo-owner"
+    }
+  },
+  "summary": "Transform a bounded interleaved signed-16 PCM chunk deterministically.",
+  "description": "Portable pure signal transformation over supplied PCM samples. Downsampling applies a bounded box-average low-pass before decimation; upsampling uses deterministic linear interpolation. This basic filter is not a studio-grade polyphase resampler and requires acoustic-corpus quality evaluation before recognition-quality claims. It converts one- or two-channel layouts and does not decode containers, read/write artifacts, capture devices, choose models, or know a location or application. Call once per bounded chunk; large recordings must be streamed by the Traverse runtime.",
+  "use_cases": [
+    {
+      "scenario": "As an audio-processing capability consumer, I want PCM resampled and downmixed to a model profile so that inference receives consistent bounded chunks.",
+      "input_example": {
+        "input_sample_rate_hz": 8000,
+        "input_channel_count": 1,
+        "target_sample_rate_hz": 16000,
+        "target_channel_count": 1,
+        "samples_s16": [
+          0,
+          2000
+        ]
+      },
+      "output_example": {
+        "result_class": "transformed",
+        "sample_format": "s16le",
+        "input_sample_rate_hz": 8000,
+        "input_channel_count": 1,
+        "sample_rate_hz": 16000,
+        "channel_count": 1,
+        "frame_count": 4,
+        "samples_s16": [
+          0,
+          1000,
+          2000,
+          2000
+        ]
+      },
+      "happy": true,
+      "persona_ref": "audio-processing-consumer"
+    },
+    {
+      "scenario": "As an audio-processing capability consumer, I want unsupported rates, channel layouts, malformed samples, and resource-exceeding outputs rejected so that the module fails deterministically within its memory budget.",
+      "input_example": {
+        "input_sample_rate_hz": 44100,
+        "input_channel_count": 3,
+        "target_sample_rate_hz": 32000,
+        "target_channel_count": 1,
+        "samples_s16": [
+          0,
+          1,
+          2
+        ]
+      },
+      "output_example": {
+        "result_class": "unsupported_channel_count"
+      },
+      "happy": false,
+      "persona_ref": "audio-processing-consumer"
+    }
+  ],
+  "inputs": {
+    "schema": {
+      "type": "object",
+      "required": [
+        "input_sample_rate_hz",
+        "input_channel_count",
+        "target_sample_rate_hz",
+        "target_channel_count",
+        "samples_s16"
+      ],
+      "properties": {
+        "input_sample_rate_hz": {
+          "type": "integer",
+          "minimum": 8000,
+          "maximum": 192000
+        },
+        "input_channel_count": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 2
+        },
+        "target_sample_rate_hz": {
+          "type": "integer",
+          "minimum": 8000,
+          "maximum": 192000
+        },
+        "target_channel_count": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 2
+        },
+        "samples_s16": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 480000,
+          "items": {
+            "type": "integer",
+            "minimum": -32768,
+            "maximum": 32767
+          }
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "outputs": {
+    "schema": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": [
+            "result_class",
+            "sample_format",
+            "input_sample_rate_hz",
+            "input_channel_count",
+            "sample_rate_hz",
+            "channel_count",
+            "frame_count",
+            "samples_s16"
+          ],
+          "properties": {
+            "result_class": {
+              "const": "transformed"
+            },
+            "sample_format": {
+              "const": "s16le"
+            },
+            "input_sample_rate_hz": {
+              "type": "integer"
+            },
+            "input_channel_count": {
+              "type": "integer"
+            },
+            "sample_rate_hz": {
+              "type": "integer"
+            },
+            "channel_count": {
+              "type": "integer"
+            },
+            "frame_count": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "samples_s16": {
+              "type": "array",
+              "maxItems": 480000,
+              "items": {
+                "type": "integer",
+                "minimum": -32768,
+                "maximum": 32767
+              }
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": [
+            "result_class"
+          ],
+          "properties": {
+            "result_class": {
+              "enum": [
+                "input_limit_exceeded",
+                "unsupported_sample_rate",
+                "unsupported_channel_count",
+                "invalid_samples",
+                "output_limit_exceeded"
+              ]
+            }
+          },
+          "additionalProperties": false
+        }
+      ]
+    }
+  },
+  "preconditions": [
+    {
+      "id": "bounded-pcm",
+      "description": "Interleaved signed-16 samples fit the package's 480,000-sample bound and sample count is divisible by input channel count."
+    },
+    {
+      "id": "supported-profile",
+      "description": "Input and target rates are in 8,000..192,000 Hz and channel counts are one or two."
+    }
+  ],
+  "postconditions": [
+    {
+      "id": "deterministic-samples",
+      "description": "The same input yields identical output sample values, frame count, rate, and channel count on every supported target."
+    },
+    {
+      "id": "downsample-low-pass",
+      "description": "Downsampling averages the bounded source interval for each output frame before reducing sample rate; this mitigates aliasing but is not a high-quality polyphase filter."
+    },
+    {
+      "id": "bounded-output",
+      "description": "The output contains no more than 480,000 PCM samples."
+    },
+    {
+      "id": "no-clipping-expansion",
+      "description": "All output samples remain within signed-16 range."
+    }
+  ],
+  "side_effects": [
+    {
+      "kind": "memory_only",
+      "description": "Pure bounded computation; no host, network, filesystem, model, or persistent-state access."
+    }
+  ],
+  "emits": [],
+  "consumes": [],
+  "permissions": [
+    {
+      "id": "audio.pcm-transform.execute"
+    }
+  ],
+  "execution": {
+    "binary_format": "wasm",
+    "entrypoint": {
+      "kind": "wasi-command",
+      "command": "run"
+    },
+    "preferred_targets": [
+      "local",
+      "browser",
+      "edge",
+      "device"
+    ],
+    "constraints": {
+      "host_api_access": "none",
+      "network_access": "forbidden",
+      "filesystem_access": "none"
+    }
+  },
+  "policies": [
+    {
+      "id": "bounded-pcm-transform"
+    }
+  ],
+  "dependencies": [],
+  "provenance": {
+    "source": "greenfield",
+    "author": "Codex",
+    "created_at": "2026-09-14T00:00:00Z",
+    "spec_ref": "100-capability-package-authoring@1.0.0",
+    "adr_refs": [],
+    "exception_refs": []
+  },
+  "evidence": [],
+  "state_schema": null,
+  "service_type": "stateless",
+  "permitted_targets": [
+    "local",
+    "browser",
+    "edge",
+    "device"
+  ],
+  "artifact_type": "native",
+  "artifact": {
+    "digest": "sha256:6fb671992373f11707eae67903bf3de259d6cd8fffce5e6bb78408a6a5c7a8a0",
+    "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/audio.pcm-transform-1.0.0/pcm-transform.wasm"
+  }
+}
