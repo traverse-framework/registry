@@ -56,6 +56,22 @@ pub struct PublicRegistryCapabilityRecord {
     /// see spec 019's amendment for why no sub-field redaction is needed.
     #[serde(default)]
     pub provenance: Option<Value>,
+    /// specs/025-capability-licensing-metadata FR-009: normalized rights from
+    /// the published index. `#[serde(default = "unknown_licensing_value")]`
+    /// so pre-025 index.json rows still deserialize as explicit `unknown`
+    /// (never treated as allowed).
+    #[serde(default = "unknown_licensing_value")]
+    pub commercial_use: String,
+    #[serde(default = "unknown_licensing_value")]
+    pub redistribution: String,
+    #[serde(default = "unknown_licensing_value")]
+    pub verification_status: String,
+    #[serde(default)]
+    pub license_expression: Option<String>,
+}
+
+fn unknown_licensing_value() -> String {
+    "unknown".to_string()
 }
 
 /// Sanitized use-case projection: `scenario` text only. Never carries
@@ -536,7 +552,11 @@ fn capability_json_value(record: &PublicRegistryCapabilityRecord) -> Value {
         "service_type": record.service_type,
         "permitted_targets": record.permitted_targets,
         "lifecycle": record.lifecycle,
-        "provenance": record.provenance
+        "provenance": record.provenance,
+        "commercial_use": record.commercial_use,
+        "redistribution": record.redistribution,
+        "verification_status": record.verification_status,
+        "license_expression": record.license_expression,
     })
 }
 
@@ -774,6 +794,56 @@ mod tests {
         assert!(record.permitted_targets.is_empty());
         assert_eq!(record.lifecycle, "");
         assert!(record.provenance.is_none());
+    }
+
+    #[test]
+    fn capability_record_deserializes_pre_025_licensing_as_unknown() {
+        // specs/025 FR-009: older index rows without licensing fields must
+        // deserialize with rights defaulting to "unknown", never allowed.
+        let raw = serde_json::json!({
+            "namespace": "traverse-starter",
+            "id": "traverse-starter.process",
+            "version": "1.0.0",
+            "digest": "sha256:5647",
+            "artifact_url": "https://example.invalid/artifact.wasm",
+            "contract_digest": "sha256:5647",
+            "contract_url": "https://example.invalid/contract.json",
+            "deprecated": false
+        });
+
+        let record: PublicRegistryCapabilityRecord =
+            serde_json::from_value(raw).expect("pre-025 record should deserialize");
+
+        assert_eq!(record.commercial_use, "unknown");
+        assert_eq!(record.redistribution, "unknown");
+        assert_eq!(record.verification_status, "unknown");
+        assert!(record.license_expression.is_none());
+    }
+
+    #[test]
+    fn capability_record_deserializes_licensing_projection() {
+        let raw = serde_json::json!({
+            "namespace": "core",
+            "id": "example",
+            "version": "1.0.0",
+            "digest": "sha256:abc",
+            "artifact_url": "https://example.invalid/a.wasm",
+            "contract_digest": "sha256:abc",
+            "contract_url": "https://example.invalid/c.json",
+            "deprecated": false,
+            "license_expression": "MIT",
+            "commercial_use": "allowed",
+            "redistribution": "allowed",
+            "verification_status": "maintainer-declared"
+        });
+
+        let record: PublicRegistryCapabilityRecord =
+            serde_json::from_value(raw).expect("025 licensing projection should deserialize");
+
+        assert_eq!(record.license_expression.as_deref(), Some("MIT"));
+        assert_eq!(record.commercial_use, "allowed");
+        assert_eq!(record.redistribution, "allowed");
+        assert_eq!(record.verification_status, "maintainer-declared");
     }
 
     #[test]
@@ -1141,6 +1211,10 @@ mod tests {
                     "adr_refs": ["0001-rust-wasm-foundation"],
                     "exception_refs": []
                 })),
+                commercial_use: "unknown".to_string(),
+                redistribution: "unknown".to_string(),
+                verification_status: "unknown".to_string(),
+                license_expression: None,
             }],
             events: Vec::new(),
         }
