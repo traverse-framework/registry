@@ -966,4 +966,4 @@
       "evidence": "side_effects=[memory_only]; empty emits/consumes; deterministic eligibility decision returns directly to the caller and does not fetch, cache, execute, or activate a model artifact."
     }
   ]
-}\n
+}

@@ -5,7 +5,7 @@
   "namespace": "retention",
   "name": "action-plan-create",
   "version": "1.1.0",
-  "lifecycle": "experimental",
+  "lifecycle": "draft",
   "owner": {
     "team": "generic-policy-capabilities",
     "contact": "https://github.com/enricopiovesan"
@@ -369,4 +369,4 @@
     "digest": "sha256:2b7bb94b4206bc7b58435d405bdf1245358507f04aeb969867f9a2fb72818241",
     "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/retention.action-plan-create-1.0.0/action-plan-create.wasm"
   }
-}\n
+}
