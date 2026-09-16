@@ -3,7 +3,7 @@
   "schema_version": "1.0.0",
   "governing_spec": "534-ecca-event-products@1.0.0",
   "governing_issue": "traverse-framework/registry#170",
-  "generated_at": "2026-09-08",
+  "generated_at": "2026-09-16",
   "scope_note": "Covers this repository's own real published capabilities (capabilities/*/*/*/contract.json). traverse-framework/traverse#899's own inventory (contracts/governance/ecca-capability-inventory.json in that repo) covers a different, unrelated set of artifacts under that repo's contracts/examples/ and contracts/inference/ trees -- despite some capability_id values coincidentally matching, they are not the same content and #899 does not satisfy Spec 534 FR-020 for this repository's catalog. Regenerated 2026-08-10 for registry#253 so every published capability ID is classified; CI now fails if inventory coverage drifts.",
   "capabilities": [
     {
@@ -904,11 +904,12 @@
     {
       "capability_id": "audio.pcm-window",
       "published_versions": [
-        "1.0.0"
+        "1.0.0",
+        "1.1.0"
       ],
-      "path": "capabilities/audio/audio.pcm-window/1.0.0/contract.json",
+      "path": "capabilities/audio/audio.pcm-window/1.1.0/contract.json",
       "classification": "no-event-required",
-      "evidence": "side_effects=[memory_only]; empty emits/consumes; deterministic bounded PCM window records return directly to the caller without broadcasting an asynchronous domain fact."
+      "evidence": "side_effects=[memory_only] on latest published version; deterministic bounded result returns directly to caller."
     },
     {
       "capability_id": "artifact.shareability-classify",
@@ -965,4 +966,4 @@
       "evidence": "side_effects=[memory_only]; empty emits/consumes; deterministic eligibility decision returns directly to the caller and does not fetch, cache, execute, or activate a model artifact."
     }
   ]
-}
+}\n
