@@ -5,7 +5,7 @@
   "namespace": "event",
   "name": "append-plan-create",
   "version": "1.1.0",
-  "lifecycle": "experimental",
+  "lifecycle": "draft",
   "owner": {
     "team": "generic-event-capabilities",
     "contact": "https://github.com/enricopiovesan"
@@ -316,4 +316,4 @@
     "digest": "sha256:d9fd9f6ebc4bb47db33903a2111684133bef91060a110758fb16c572f1f7eca0",
     "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/event.append-plan-create-1.0.0/append-plan-create.wasm"
   }
-}\n
+}
