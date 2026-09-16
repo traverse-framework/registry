@@ -5,7 +5,7 @@
   "namespace": "audio",
   "name": "wav-pcm16-decode",
   "version": "1.1.0",
-  "lifecycle": "experimental",
+  "lifecycle": "draft",
   "owner": {
     "team": "audio-capabilities",
     "contact": "https://github.com/enricopiovesan"
@@ -240,4 +240,4 @@
     "digest": "sha256:11c30f48f91265e439d05b8e29697cdaf03bdc7dfbf6ea56ab0fc4d9597c5c0e",
     "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/audio.wav-pcm16-decode-1.0.0/wav-pcm16-decode.wasm"
   }
-}\n
+}
