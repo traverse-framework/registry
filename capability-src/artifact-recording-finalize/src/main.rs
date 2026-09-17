@@ -147,6 +147,8 @@ mod tests {
         assert_eq!(unsafe { connector_invoke(0, 0, 0, 0) }, 0);
         let n = finalize(br#"{"content_ref":"c","media_type":"audio/wav","retention_class":"daily","idempotency_key":"k"}"#, &mut request, &mut response, &mut output);
         assert!(core::str::from_utf8(&output[..n]).unwrap().contains("\"asset_ref\":\"a\""));
+        let mut tiny_output = [0u8; 1];
+        assert_eq!(finalize(br#"{"content_ref":"c","media_type":"audio/wav","retention_class":"daily","idempotency_key":"k"}"#, &mut request, &mut response, &mut tiny_output), 0);
     }
 
     #[test]
