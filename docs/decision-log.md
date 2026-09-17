@@ -992,4 +992,6 @@ This is the second of the downstream ideas from entry 110's "Five Engines, What 
 
 **Out of scope here:** deleting Release weight blobs; registry-reviewed legal certification; required live HF in CI.
 
+125. **HF / NVIDIA momentum tracked as a parallel GTM effort (2026-09-16, registry#577)**: owner clarified interest is not only technical Hub integration (#575) but **momentum with Hugging Face’s recent success and NVIDIA’s announced acquisition** (~$12.9B, Sep 2026). Strategy: complement, don’t compete — pitch Hub model → pinned, signed, **client-first** Traverse capability (UMA placement defers to cloud/edge when needed); do **not** pitch a Transformers.js replacement. Parallel tracks on #577: narrative, one sharp demo, Hub-native surface (after #571), trust wedge, relationship; engineering (#571 / traverse#1459 / placement) runs alongside. #575 remains Deferred technical export; #577 owns sequencing.
+
 
