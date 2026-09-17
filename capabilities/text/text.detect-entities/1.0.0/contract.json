@@ -252,6 +252,19 @@
   "connector_requirements": [],
   "state_schema": null,
   "artifact_type": "native",
+  "licensing": {
+    "spdx_expression": "Apache-2.0",
+    "commercial_use": "allowed",
+    "redistribution": "allowed",
+    "attribution_required": true,
+    "verification": {
+      "status": "maintainer-declared"
+    },
+    "license_files": [
+      "LICENSE"
+    ],
+    "source_url": "https://github.com/traverse-framework/registry/blob/main/LICENSE"
+  },
   "artifact": {
     "digest": "sha256:c3f1ab26fc20e9f81dc117e34073cde3960861798d67adad5eb73a361eceb788",
     "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/text.detect-entities-1.0.0/detect-entities-agent.wasm"

@@ -3403,6 +3403,19 @@
   "connector_requirements": [],
   "state_schema": null,
   "artifact_type": "native",
+  "licensing": {
+    "spdx_expression": "Apache-2.0",
+    "commercial_use": "allowed",
+    "redistribution": "allowed",
+    "attribution_required": true,
+    "verification": {
+      "status": "maintainer-declared"
+    },
+    "license_files": [
+      "LICENSE"
+    ],
+    "source_url": "https://github.com/traverse-framework/registry/blob/main/LICENSE"
+  },
   "artifact": {
     "digest": "sha256:9acfc67c0052014ce8be7a383a2f9022a2ae3e9f3c4244e89d7ec9c8ca155b86",
     "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/audio.detect-speech-segments-1.0.0/detect-speech-segments-agent.wasm"
