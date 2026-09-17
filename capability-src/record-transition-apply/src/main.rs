@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // Copyright (c) 2026 Callweave contributors
 
-#![no_std]
-#![no_main]
+#![cfg_attr(not(test), no_std)]
+#![cfg_attr(not(test), no_main)]
 
 #[repr(C)]
 struct IoVec {
@@ -22,9 +22,16 @@ unsafe extern "C" {
     fn fd_write(fd: u32, vectors: *const IoVec, count: usize, written: *mut usize) -> u32;
 }
 
+#[cfg(not(test))]
 #[link(wasm_import_module = "traverse_host")]
 unsafe extern "C" {
     fn connector_invoke(request_ptr: i32, request_len: i32, response_ptr: i32, response_capacity: i32) -> i32;
+}
+
+#[cfg(test)]
+#[no_mangle]
+unsafe extern "C" fn connector_invoke(_: i32, _: i32, _: i32, _: i32) -> i32 {
+    0
 }
 
 static mut INPUT: [u8; 8192] = [0; 8192];
@@ -37,6 +44,7 @@ const RESPONSE_CAPACITY: usize = 4096;
 const OUTPUT_CAPACITY: usize = 4096;
 
 #[unsafe(no_mangle)]
+#[cfg(not(test))]
 pub extern "C" fn _start() {
     unsafe {
         let input_ptr: *mut [u8; INPUT_CAPACITY] = &raw mut INPUT;
@@ -82,6 +90,20 @@ pub extern "C" fn _start() {
             length: output_length,
         };
         let _ = fd_write(1, &vector, 1, &mut written);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::apply_transition;
+
+    #[test]
+    fn rejects_missing_required_fields() {
+        let mut request = [0u8; 8192];
+        let mut response = [0u8; 4096];
+        let mut output = [0u8; 4096];
+        let length = apply_transition(b"{}", &mut request, &mut response, &mut output);
+        assert_eq!(&output[..length], b"{\"result_class\":\"invalid_request\"}");
     }
 }
 
@@ -339,6 +361,7 @@ fn append_i32(output: &mut [u8], at: &mut usize, mut value: i32) -> bool {
     true
 }
 
+#[cfg(not(test))]
 #[panic_handler]
 fn panic(_: &core::panic::PanicInfo<'_>) -> ! {
     loop {}
