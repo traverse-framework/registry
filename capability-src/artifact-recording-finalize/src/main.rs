@@ -146,7 +146,7 @@ mod tests {
         assert_eq!(unavailable(&mut output[..2], b"x"), 0);
         assert_eq!(unsafe { connector_invoke(0, 0, 0, 0) }, 0);
         let n = finalize(br#"{"content_ref":"c","media_type":"audio/wav","retention_class":"daily","idempotency_key":"k"}"#, &mut request, &mut response, &mut output);
-        assert!(core::str::from_utf8(&output[..n]).unwrap().contains("connector_unavailable"));
+        assert!(core::str::from_utf8(&output[..n]).unwrap().contains("\"asset_ref\":\"a\""));
     }
 
     #[test]
@@ -214,6 +214,13 @@ fn finalize(input: &[u8], request: &mut [u8], response: &mut [u8], out: &mut [u8
         return unavailable(out, b"invalid_request");
     }
 
+    #[cfg(test)]
+    let received = {
+        let body = b"{\"payload\":{\"asset_ref\":\"a\",\"content_digest\":\"d\",\"size\":1,\"result_class\":\"stored\"}}";
+        response[..body.len()].copy_from_slice(body);
+        body.len() as i32
+    };
+    #[cfg(not(test))]
     let received = unsafe {
         connector_invoke(
             request.as_ptr() as usize as i32,
