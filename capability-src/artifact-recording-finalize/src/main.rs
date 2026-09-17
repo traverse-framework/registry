@@ -106,7 +106,7 @@ pub extern "C" fn _start() {
 
 #[cfg(test)]
 mod tests {
-    use super::finalize;
+    use super::*;
 
     #[test]
     fn rejects_missing_required_fields() {
@@ -115,6 +115,29 @@ mod tests {
         let mut output = [0u8; 4096];
         let length = finalize(b"{}", &mut request, &mut response, &mut output);
         assert_eq!(&output[..length], b"{\"asset_ref\":\"\",\"content_digest\":\"\",\"size\":0,\"result_class\":\"invalid_request\"}");
+    }
+
+    #[test]
+    fn exercises_json_scanner_and_bounds() {
+        let mut request = [0u8; 4096];
+        let mut response = [0u8; 4096];
+        let mut output = [0u8; 4096];
+        assert!(string_token_after(br#" {"x":"a\"b"} "#, b"x").is_some());
+        assert!(string_token_after(br#"{"x":1}"#, b"x").is_none());
+        assert!(string_end(b"\"unterminated").is_none());
+        assert!(string_end(b"\"bad\n\"").is_none());
+        assert_eq!(skip_whitespace(b" \n\t x"), b"x");
+        assert!(object_field(b"[]", b"x").is_none());
+        assert!(object_field(br#"{"x":1,"x":2}"#, b"x").is_none());
+        assert!(object_field(br#"{"x":1}tail"#, b"x").is_none());
+        assert_eq!(json_value_end(b"123 "), Some(3));
+        assert!(balanced_end(b"{\"x\": [1]}").is_some());
+        assert!(balanced_end(b"{").is_none());
+        assert!(copy(&mut output[..2], 0, b"abc").is_none());
+        assert_eq!(copy(&mut output, 0, b"ok"), Some(2));
+        assert!(unavailable(&mut output, b"x") > 0);
+        let n = finalize(br#"{"content_ref":"c","media_type":"audio/wav","retention_class":"daily","idempotency_key":"k"}"#, &mut request, &mut response, &mut output);
+        assert!(core::str::from_utf8(&output[..n]).unwrap().contains("connector_unavailable"));
     }
 }
 
