@@ -980,4 +980,16 @@ This is the second of the downstream ideas from entry 110's "Five Engines, What 
 
 123. **Catalog-wide Spec 025 licensing backfill + License card label fix (2026-09-16)**: owner confirmed Option A after seeing catalog sidebars still `unknown` for non-agent capabilities. One-time immutability exception expanded beyond entry 119's five AI agents: every published `contract.json` missing `licensing` receives the same maintainer-declared Apache-2.0 block (repo `LICENSE`; `commercial_use`/`redistribution: allowed`; `attribution_required: true`). `check_immutability` now allows any pure top-level `licensing` addition when previously absent (replaces the closed 5-path allowlist); other contract edits remain forbidden. Diff-based CHANGED-contract gates (risk / authoring / use-cases surface) also skip licensing-only modifications so legacy contracts are not forced to grow pre-dating fields. Catalog License card no longer duplicates the "License" label (card title + SPDX lead value). Closes the practical gap #559 tracked via new versions — in-place backfill chosen instead because all current publishes live under this repo's Apache-2.0 LICENSE. Model/dataset rights still do not inherit (Spec 025).
 
+124. **Agent model refs: keep embedded weights; pin HF/provenance attribution on the contract (2026-09-16, `/brainstorm`)**: owner asked whether AI-WASM agents should reference Hugging Face instead of duplicating things. Decisions, one at a time:
+
+- **What not to duplicate** → Keep shipping quantized weights inside the capability/Release path (deterministic, offline WASM). Stop duplicating **license/attribution metadata** by referencing upstream (HF or other) from the contract. Rejected: runtime fetch of weights from HF (breaks no-network ABI / determinism); HF-only bytes with no Release blob.
+- **Where the official ref lives** → On the capability contract’s `ai` block (not catalog-only). Catalog may display it; catalog is not the source of truth.
+- **CI posture** → **Pin, don’t live-fetch** in required CI. Maintainer-declared SPDX/attribution + pinned revision/`source_url`. Optional advisory HF drift check later. Rejected: required online HF on every merge.
+- **`ai.models` shape** → Amend Spec **001 FR-017**: `models` becomes an **array of objects** (not `string[]`) for newly ADDED `model_backed` contracts. Example fields: `id`, `spdx_expression`, `attribution_required`, and either `huggingface_id`+`revision` **or** `source_url` (Silero/GitHub). Optional `copyright` / notes.
+- **Legacy agents** → **Grandfather** existing string `ai.models` on already-published versions. New ADDs must use objects (FR-010-style forward gate).
+- **`catalog/model-attribution.json`** → Keep as **legacy fallback** for string-only contracts; when models are objects, catalog **prefers the contract**.
+- **Rollout** → Registry: FR-017 amend + CI + catalog preference. Traverse follow-up: `capability publish` fail-fast if `model_backed` without object models. Spec 025 stays capability-artifact-only (non-inheritance unchanged).
+
+**Out of scope here:** deleting Release weight blobs; registry-reviewed legal certification; required live HF in CI.
+
 
