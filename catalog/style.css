@@ -311,13 +311,20 @@ input[type="search"]::placeholder { color: var(--fg-subtle); }
 .field-value a { color: var(--accent); overflow-wrap: anywhere; }
 
 /* npm-inspired package layout: readable main column + sticky facts sidebar
-   (registry#563 / Spec 025 licensing). Stacks below 900px. */
+   (registry#563 / Spec 025 licensing). Stacks below 900px.
+   min-width:0 on both columns is required so wide use-case JSON / code
+   blocks cannot overflow the main track and paint over the sidebar. */
 .detail-layout {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(15.5rem, 18.5rem);
-  gap: 2rem 2.25rem;
+  grid-template-columns: minmax(0, 1fr) minmax(14rem, 17.5rem);
+  gap: 2rem 1.75rem;
   align-items: start;
   margin-top: 1.25rem;
+  width: 100%;
+}
+.detail-main {
+  min-width: 0;
+  max-width: 100%;
 }
 .detail-main > .t-h2:first-child { margin-top: 0; }
 .detail-main .t-h2 {
@@ -333,6 +340,9 @@ input[type="search"]::placeholder { color: var(--fg-subtle); }
   display: flex;
   flex-direction: column;
   gap: 0.85rem;
+  min-width: 0;
+  max-width: 17.5rem;
+  z-index: 1;
 }
 .sidebar-card {
   background: var(--bg-card);
@@ -384,9 +394,18 @@ input[type="search"]::placeholder { color: var(--fg-subtle); }
   background: rgba(255, 196, 87, 0.14);
   border-color: rgba(138, 90, 0, 0.28);
 }
+/* Inside the narrower main column, stack Input/Output so code blocks cannot
+   force the grid track wider than its allocation and overlap the sidebar. */
+.detail-main .use-case-io {
+  grid-template-columns: 1fr;
+}
+.detail-main .code-block,
+.detail-main .code-block pre {
+  max-width: 100%;
+}
 @media (max-width: 900px) {
   .detail-layout { grid-template-columns: 1fr; gap: 1.5rem; }
-  .detail-sidebar { position: static; order: -1; }
+  .detail-sidebar { position: static; order: -1; max-width: none; }
 }
 
 /* ─── Coverage stats ──────────────────────────────────────────────────── */

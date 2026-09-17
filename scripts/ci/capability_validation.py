@@ -171,6 +171,20 @@ LICENSING_VERIFICATION_STATUSES_RESERVED = {
     "registry-reviewed",
     "verified-with-evidence",
 }
+# One-time owner-authorized immutability exception (registry#565 / decision-log
+# entry 119): allow adding Spec 025 `licensing` to these already-published
+# AI-agent contract.json paths, and nothing else. Closed set — do not extend
+# without a new decision-log entry and owner approval.
+LICENSING_BACKFILL_IMMUTABILITY_EXCEPTIONS = frozenset(
+    {
+        "capabilities/text/text.detect-entities/1.0.0/contract.json",
+        "capabilities/text/text.redact-entities/1.0.0/contract.json",
+        "capabilities/audio/audio.detect-speech-segments/1.0.0/contract.json",
+        "capabilities/audio/audio.transcribe-speech/1.1.0/contract.json",
+        "capabilities/report/report.translate-fr-semantic/1.0.0/contract.json",
+    }
+)
+
 # Tiny hard-contradiction table (FR-006): markers that MUST NOT pair with
 # redistribution: "allowed". Deliberately small — not a legal oracle.
 LICENSING_NON_REDISTRIBUTABLE_MARKERS = frozenset(
@@ -2015,13 +2029,41 @@ def check_workflow_capability_references(errors: list) -> None:
                 )
 
 
+def _licensing_only_addition(base_sha: str, head_sha: str, path: str) -> bool:
+    """True iff the only contract.json change vs base is adding a top-level
+    `licensing` object (registry#565 one-time backfill)."""
+    try:
+        before = subprocess.check_output(
+            ["git", "show", f"{base_sha}:{path}"], text=True
+        )
+        after = subprocess.check_output(
+            ["git", "show", f"{head_sha}:{path}"], text=True
+        )
+        prev = json.loads(before)
+        curr = json.loads(after)
+    except Exception:
+        return False
+    if "licensing" in prev or "licensing" not in curr:
+        return False
+    if set(curr.keys()) - set(prev.keys()) != {"licensing"}:
+        return False
+    for key in prev:
+        if prev[key] != curr[key]:
+            return False
+    return True
+
+
 def check_immutability(base_sha: str, head_sha: str, errors: list) -> None:
     """FR: no PR may modify an existing contract.json/workflow.json/product.json
     once published (specs/001 FR-002/FR-013/FR-016, specs/005 FR-002). Also
     covers signature.json: once written (post-merge, by CI) it is immutable
     under the same rule (specs/007-artifact-hosting Amendment FR-012) -- a bad
     signature is corrected by key rotation + re-backfill, not an in-place edit.
-    Additions (status "A") are always allowed."""
+    Additions (status "A") are always allowed.
+
+    Exception: LICENSING_BACKFILL_IMMUTABILITY_EXCEPTIONS (decision-log 119)
+    may modify listed contract.json paths when the diff is a pure `licensing`
+    addition."""
     for governed_dir, filename, error_code in (
         ("capabilities/", "contract.json", "capabilities.contract_modified"),
         ("capabilities/", "signature.json", "capabilities.signature_modified"),
@@ -2039,6 +2081,12 @@ def check_immutability(base_sha: str, head_sha: str, errors: list) -> None:
             status = parts[0]
             path = parts[-1]
             if path.endswith(filename) and status != "A":
+                if (
+                    filename == "contract.json"
+                    and path in LICENSING_BACKFILL_IMMUTABILITY_EXCEPTIONS
+                    and _licensing_only_addition(base_sha, head_sha, path)
+                ):
+                    continue
                 fail(
                     errors,
                     error_code,

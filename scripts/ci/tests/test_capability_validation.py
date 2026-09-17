@@ -1923,5 +1923,109 @@ class SignatureCompletenessTests(unittest.TestCase):
             )
 
 
+class LicensingBackfillImmutabilityExceptionTests(unittest.TestCase):
+    """registry#565 / decision-log 119: closed allowlist may add only
+    `licensing` to listed contracts; any other edit still fails."""
+
+    EXCEPTION_PATH = (
+        "capabilities/text/text.detect-entities/1.0.0/contract.json"
+    )
+
+    def test_allowlist_contains_exactly_five_ai_agent_paths(self):
+        self.assertEqual(
+            len(capability_validation.LICENSING_BACKFILL_IMMUTABILITY_EXCEPTIONS),
+            5,
+        )
+        self.assertIn(
+            self.EXCEPTION_PATH,
+            capability_validation.LICENSING_BACKFILL_IMMUTABILITY_EXCEPTIONS,
+        )
+
+    def test_licensing_only_addition_helper_accepts_pure_add(self):
+        before = {"id": "x", "version": "1.0.0"}
+        after = {
+            "id": "x",
+            "version": "1.0.0",
+            "licensing": {"spdx_expression": "Apache-2.0"},
+        }
+
+        def fake_show(cmd, text=True):
+            ref = cmd[2]
+            if ref.startswith("base:"):
+                return json.dumps(before)
+            return json.dumps(after)
+
+        with patch("subprocess.check_output", side_effect=fake_show):
+            self.assertTrue(
+                capability_validation._licensing_only_addition(
+                    "base", "head", self.EXCEPTION_PATH
+                )
+            )
+
+    def test_licensing_only_addition_rejects_other_edits(self):
+        before = {"id": "x", "version": "1.0.0"}
+        after = {
+            "id": "x",
+            "version": "1.0.1",
+            "licensing": {"spdx_expression": "Apache-2.0"},
+        }
+
+        def fake_show(cmd, text=True):
+            ref = cmd[2]
+            if ref.startswith("base:"):
+                return json.dumps(before)
+            return json.dumps(after)
+
+        with patch("subprocess.check_output", side_effect=fake_show):
+            self.assertFalse(
+                capability_validation._licensing_only_addition(
+                    "base", "head", self.EXCEPTION_PATH
+                )
+            )
+
+    def test_check_immutability_allows_listed_licensing_only_edit(self):
+        def fake_check_output(cmd, text=True):
+            if cmd[1] == "diff":
+                return f"M\t{self.EXCEPTION_PATH}\n"
+            # git show base:path / head:path
+            ref = cmd[2]
+            sha, _, path = ref.partition(":")
+            before = {"id": "text.detect-entities", "version": "1.0.0"}
+            after = {
+                **before,
+                "licensing": {
+                    "spdx_expression": "Apache-2.0",
+                    "commercial_use": "allowed",
+                    "redistribution": "allowed",
+                    "attribution_required": True,
+                    "verification": {"status": "maintainer-declared"},
+                },
+            }
+            if sha == "BASE":
+                return json.dumps(before)
+            return json.dumps(after)
+
+        errors: list = []
+        with patch("subprocess.check_output", side_effect=fake_check_output):
+            capability_validation.check_immutability("BASE", "HEAD", errors)
+        self.assertEqual(errors, [])
+
+    def test_check_immutability_still_rejects_unlisted_contract_edit(self):
+        other = "capabilities/core/core.authorize/1.0.0/contract.json"
+
+        def fake_check_output(cmd, text=True):
+            if cmd[1] == "diff":
+                return f"M\t{other}\n"
+            return "{}"
+
+        errors: list = []
+        with patch("subprocess.check_output", side_effect=fake_check_output):
+            capability_validation.check_immutability("BASE", "HEAD", errors)
+        self.assertEqual(
+            [e["code"] for e in errors],
+            ["capabilities.contract_modified"],
+        )
+
+
 if __name__ == "__main__":
     unittest.main()
