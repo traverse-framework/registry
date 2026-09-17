@@ -29,6 +29,12 @@ unsafe extern "C" {
 }
 
 #[cfg(test)]
+use std::sync::atomic::{AtomicU8, Ordering};
+
+#[cfg(test)]
+static TEST_CONNECTOR_MODE: AtomicU8 = AtomicU8::new(0);
+
+#[cfg(test)]
 #[no_mangle]
 unsafe extern "C" fn connector_invoke(_: i32, _: i32, response_ptr: i32, response_capacity: i32) -> i32 {
     let _ = (response_ptr, response_capacity);
@@ -144,6 +150,13 @@ mod tests {
         let input = br#"{"record_refs":[],"transition":{},"idempotency_key":"k","expected_version":12}"#;
         let n = apply_transition(input, &mut request, &mut response, &mut output);
         assert!(core::str::from_utf8(&output[..n]).unwrap().contains("\"result_ref\":\"r\""));
+        TEST_CONNECTOR_MODE.store(1, Ordering::Relaxed);
+        let n = apply_transition(input, &mut request, &mut response, &mut output);
+        assert!(core::str::from_utf8(&output[..n]).unwrap().contains("connector_unavailable"));
+        TEST_CONNECTOR_MODE.store(2, Ordering::Relaxed);
+        let n = apply_transition(input, &mut request, &mut response, &mut output);
+        assert!(core::str::from_utf8(&output[..n]).unwrap().contains("connector_unavailable"));
+        TEST_CONNECTOR_MODE.store(0, Ordering::Relaxed);
         for invalid in [br#"{"record_refs":[]}"# as &[u8], br#"{"record_refs":[],"transition":{}}"#, br#"{"record_refs":{},"transition":{},"idempotency_key":"k"}"#, br#"{"record_refs":[],"transition":{},"idempotency_key":1}"#] {
             let n = apply_transition(invalid, &mut request, &mut response, &mut output);
             assert!(core::str::from_utf8(&output[..n]).unwrap().contains("invalid_request"));
@@ -195,9 +208,14 @@ fn apply_transition(input: &[u8], request: &mut [u8], response: &mut [u8], outpu
 
     #[cfg(test)]
     let received = {
-        let body = b"{\"payload\":{\"result_ref\":\"r\",\"version\":1,\"replay\":false}}";
-        response[..body.len()].copy_from_slice(body);
-        body.len() as i32
+        let mode = TEST_CONNECTOR_MODE.load(Ordering::Relaxed);
+        if mode == 2 {
+            0
+        } else {
+            let body = if mode == 1 { b"{}" as &[u8] } else { b"{\"payload\":{\"result_ref\":\"r\",\"version\":1,\"replay\":false}}" };
+            response[..body.len()].copy_from_slice(body);
+            body.len() as i32
+        }
     };
     #[cfg(not(test))]
     let received = unsafe {
