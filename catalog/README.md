@@ -22,9 +22,11 @@ It fetches `./catalog.json` at page-load time and renders:
   and test count -- see below), **interface**, **events**, **version
   history**, and a collapsible raw `contract.json`; sticky sidebar with
   Spec 025 **License** (SPDX, commercial use, redistribution, verification
-  -- missing block shows `unknown` / deny-by-default, never as allowed)
-  plus package facts (version, namespace, service type, owner, artifact,
-  permalink).
+  -- missing block shows `unknown` / deny-by-default, never as allowed),
+  a separate **Model licenses** card when the capability embeds third-party
+  weights (`catalog/model-attribution.json` + `THIRD_PARTY_NOTICES.md`; Spec
+  025 non-inheritance), plus package facts (version, namespace, service type,
+  owner, artifact, permalink).
 
 Client-side routing was chosen for this interactive experience because the
 WASM ABI only allows a single output stream (`fd_write`) per invocation --

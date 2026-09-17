@@ -1,0 +1,72 @@
+{
+  "schema_version": 1,
+  "description": "Maintainer-declared third-party model attribution for catalog display (Spec 025 non-inheritance). Not a substitute for reading each upstream LICENSE. commercial_use/redistribution 'allowed' means the upstream license is permissive for typical product use when attribution/notice conditions are met.",
+  "models": {
+    "openai/whisper-tiny": {
+      "display_name": "OpenAI Whisper tiny",
+      "spdx_expression": "MIT OR Apache-2.0",
+      "copyright": "Copyright (c) 2022 OpenAI",
+      "commercial_use": "allowed",
+      "redistribution": "allowed",
+      "attribution_required": true,
+      "source_urls": [
+        "https://github.com/openai/whisper/blob/main/LICENSE",
+        "https://huggingface.co/openai/whisper-tiny"
+      ],
+      "notes": "openai/whisper GitHub LICENSE is MIT; Hugging Face openai/whisper-tiny card metadata says Apache-2.0. Both primary sources; both permissive. Retain copyright + permission notice on redistribution. Weights packaged via Xenova/whisper-tiny ONNX (same checkpoint lineage)."
+    },
+    "snakers4/silero-vad": {
+      "display_name": "Silero VAD",
+      "spdx_expression": "MIT",
+      "copyright": "Copyright (c) Silero Team",
+      "commercial_use": "allowed",
+      "redistribution": "allowed",
+      "attribution_required": true,
+      "source_urls": [
+        "https://github.com/snakers4/silero-vad/blob/master/LICENSE"
+      ],
+      "notes": "MIT — verified against the repository LICENSE. Also embedded as the speech-presence pre-check inside audio.transcribe-speech@1.1.0."
+    },
+    "dslim/distilbert-NER": {
+      "display_name": "DistilBERT NER (dslim)",
+      "spdx_expression": "Apache-2.0",
+      "copyright": "Copyright holders of dslim/distilbert-NER (Apache-2.0)",
+      "commercial_use": "allowed",
+      "redistribution": "allowed",
+      "attribution_required": true,
+      "source_urls": [
+        "https://huggingface.co/dslim/distilbert-NER"
+      ],
+      "notes": "Apache-2.0 verified against Hugging Face cardData.license / license tag. Used by text.detect-entities and text.redact-entities."
+    },
+    "sentence-transformers/paraphrase-MiniLM-L3-v2": {
+      "display_name": "paraphrase-MiniLM-L3-v2",
+      "spdx_expression": "Apache-2.0",
+      "copyright": "Copyright holders of sentence-transformers/paraphrase-MiniLM-L3-v2 (Apache-2.0)",
+      "commercial_use": "allowed",
+      "redistribution": "allowed",
+      "attribution_required": true,
+      "source_urls": [
+        "https://huggingface.co/sentence-transformers/paraphrase-MiniLM-L3-v2",
+        "https://huggingface.co/Xenova/paraphrase-MiniLM-L3-v2"
+      ],
+      "notes": "Apache-2.0. Xenova ONNX conversion is also Apache-2.0 and references this base model."
+    },
+    "minishlab/potion-base-32M": {
+      "display_name": "Model2Vec potion-base-32M",
+      "spdx_expression": "MIT",
+      "copyright": "Copyright holders of minishlab/potion-base-32M (MIT)",
+      "commercial_use": "allowed",
+      "redistribution": "allowed",
+      "attribution_required": true,
+      "source_urls": [
+        "https://huggingface.co/minishlab/potion-base-32M"
+      ],
+      "notes": "MIT. Embedded by report.summarize-semantic (weights in-artifact; teacher BAAI/bge-base-en-v1.5 also MIT per publish evidence)."
+    }
+  },
+  "capability_extra_models": {
+    "audio/audio.transcribe-speech": ["snakers4/silero-vad"],
+    "report/report.summarize-semantic": ["minishlab/potion-base-32M"]
+  }
+}

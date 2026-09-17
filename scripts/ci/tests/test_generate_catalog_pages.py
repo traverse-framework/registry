@@ -120,5 +120,53 @@ class LicensingSidebarTests(unittest.TestCase):
         self.assertIn("deny-by-default", html)
 
 
+
+class ModelAttributionSidebarTests(unittest.TestCase):
+    """Catalog model-attribution surface (Spec 025 non-inheritance)."""
+
+    def setUp(self):
+        self.mod = load_module()
+        self.mod._MODEL_ATTRIBUTION_CACHE = None
+
+    def test_whisper_capability_includes_silero_extra(self):
+        html = self.mod.model_attribution_sidebar_html(
+            {
+                "namespace": "audio",
+                "id": "audio.transcribe-speech",
+                "version": "1.1.0",
+                "ai": {"model_backed": True, "models": ["openai/whisper-tiny"]},
+            }
+        )
+        self.assertIn("Model licenses", html)
+        self.assertIn("openai/whisper-tiny", html)
+        self.assertIn("snakers4/silero-vad", html)
+        self.assertIn("MIT OR Apache-2.0", html)
+        self.assertIn("allowed", html)
+        self.assertIn("Attribution", html)
+        self.assertIn("THIRD_PARTY_NOTICES", html)
+
+    def test_detect_entities_shows_distilbert(self):
+        html = self.mod.model_attribution_sidebar_html(
+            {
+                "namespace": "text",
+                "id": "text.detect-entities",
+                "ai": {"model_backed": True, "models": ["dslim/distilbert-NER"]},
+            }
+        )
+        self.assertIn("dslim/distilbert-NER", html)
+        self.assertIn("Apache-2.0", html)
+
+    def test_non_agent_renders_empty(self):
+        self.assertEqual(
+            self.mod.model_attribution_sidebar_html({"id": "core.authorize"}),
+            "",
+        )
+
+    def test_single_model_page_block(self):
+        html = self.mod.single_model_attribution_html("openai/whisper-tiny")
+        self.assertIn("Model license", html)
+        self.assertIn("Copyright (c) 2022 OpenAI", html)
+
+
 if __name__ == "__main__":
     unittest.main()
