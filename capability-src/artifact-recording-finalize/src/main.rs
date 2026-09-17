@@ -155,6 +155,16 @@ mod tests {
         for size in 0..256 {
             let _ = finalize(br#"{"content_ref":"c","media_type":"audio/wav","retention_class":"daily","idempotency_key":"k"}"#, &mut request[..size], &mut response, &mut output);
         }
+        for input in [
+            br#"{"content_ref":"","media_type":"x","retention_class":"d","idempotency_key":"k"}"# as &[u8],
+            br#"{"content_ref":"c","media_type":"","retention_class":"d","idempotency_key":"k"}"#,
+            br#"{"content_ref":"c","media_type":"x","retention_class":"","idempotency_key":"k"}"#,
+            br#"{"content_ref":"c","media_type":"x","retention_class":"d","idempotency_key":""}"#,
+            br#"{"content_ref":"c","media_type":"x","retention_class":"d","idempotency_key":"k",}"#,
+        ] {
+            let n = finalize(input, &mut request, &mut response, &mut output);
+            assert!(n > 0);
+        }
     }
 
     #[test]
