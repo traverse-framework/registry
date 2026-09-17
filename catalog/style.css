@@ -304,30 +304,38 @@ input[type="search"]::placeholder { color: var(--fg-subtle); }
 .detail-header-badges { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 0.75rem; }
 .detail-title { font-family: var(--font-mono); font-size: clamp(1.35rem, 2.4vw, 1.75rem); letter-spacing: -0.02em; line-height: 1.25; }
 .detail-summary { font-size: 1.125rem; color: var(--fg); margin: 0.85rem 0 0.65rem; line-height: 1.55; font-weight: 400; }
-.detail-description { font-size: 0.9375rem; color: var(--fg-muted); line-height: 1.75; margin-bottom: 0.25rem; max-width: 62ch; }
+.detail-description { font-size: 0.9375rem; color: var(--fg-muted); line-height: 1.75; margin-bottom: 0; }
 .field-row { display: flex; gap: 0.5rem; font-size: 0.875rem; margin: 0.35rem 0; }
 .field-label { color: var(--fg-subtle); min-width: 9rem; flex-shrink: 0; }
 .field-value { color: var(--fg-muted); min-width: 0; overflow-wrap: anywhere; }
 .field-value a { color: var(--accent); overflow-wrap: anywhere; }
 
-/* npm-inspired package layout: readable main column + sticky facts sidebar
-   (registry#563 / Spec 025 licensing). Stacks below 900px.
-   min-width:0 on both columns is required so wide use-case JSON / code
-   blocks cannot overflow the main track and paint over the sidebar. */
+/* Top row: summary/description + sticky License/Package sidebar.
+   Bottom row: use cases and schemas span full width so coding boxes
+   are not squeezed beside the sidebar. */
 .detail-layout {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(14rem, 17.5rem);
-  gap: 2rem 1.75rem;
+  grid-template-areas:
+    "intro sidebar"
+    "body body";
+  gap: 1.75rem 1.75rem;
   align-items: start;
   margin-top: 1.25rem;
   width: 100%;
 }
-.detail-main {
+.detail-intro {
+  grid-area: intro;
+  min-width: 0;
+}
+.detail-intro .detail-summary { margin-top: 0; }
+.detail-body {
+  grid-area: body;
   min-width: 0;
   max-width: 100%;
 }
-.detail-main > .t-h2:first-child { margin-top: 0; }
-.detail-main .t-h2 {
+.detail-body > .t-h2:first-child { margin-top: 0; }
+.detail-body .t-h2 {
   margin-top: 2rem;
   margin-bottom: 0.85rem;
   padding-bottom: 0.45rem;
@@ -335,6 +343,7 @@ input[type="search"]::placeholder { color: var(--fg-subtle); }
   font-size: 1.05rem;
 }
 .detail-sidebar {
+  grid-area: sidebar;
   position: sticky;
   top: calc(var(--nav-h) + var(--subnav-h) + 1rem);
   display: flex;
@@ -394,18 +403,22 @@ input[type="search"]::placeholder { color: var(--fg-subtle); }
   background: rgba(255, 196, 87, 0.14);
   border-color: rgba(138, 90, 0, 0.28);
 }
-/* Inside the narrower main column, stack Input/Output so code blocks cannot
-   force the grid track wider than its allocation and overlap the sidebar. */
-.detail-main .use-case-io {
-  grid-template-columns: 1fr;
-}
-.detail-main .code-block,
-.detail-main .code-block pre {
+/* Prefer side-by-side IO in the full-width body; stack only on narrow screens. */
+.detail-body .code-block,
+.detail-body .code-block pre {
   max-width: 100%;
+  overflow-x: auto;
 }
 @media (max-width: 900px) {
-  .detail-layout { grid-template-columns: 1fr; gap: 1.5rem; }
-  .detail-sidebar { position: static; order: -1; max-width: none; }
+  .detail-layout {
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      "sidebar"
+      "intro"
+      "body";
+    gap: 1.5rem;
+  }
+  .detail-sidebar { position: static; max-width: none; }
 }
 
 /* ─── Coverage stats ──────────────────────────────────────────────────── */

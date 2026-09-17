@@ -870,54 +870,59 @@
     if (contract.lifecycle) { headerBadges.push(el("span", { className: "badge", textContent: contract.lifecycle })); }
     if (cap.deprecated) { headerBadges.push(el("span", { className: "badge badge-danger", textContent: "deprecated" })); }
     appEl.appendChild(el("div", { className: "detail-header-badges" }, headerBadges));
-
     appEl.appendChild(el("h1", { className: "t-h1 detail-title", textContent: contract.id }));
-    if (contract.summary) { appEl.appendChild(el("p", { className: "detail-summary", textContent: contract.summary })); }
-    if (contract.description) { appEl.appendChild(el("p", { className: "detail-description", textContent: contract.description })); }
 
-    var main = el("div", { className: "detail-main" });
-    main.appendChild(el("h2", { className: "t-h2", textContent: "Use cases" }));
+    var intro = el("div", { className: "detail-intro" });
+    if (contract.summary) { intro.appendChild(el("p", { className: "detail-summary", textContent: contract.summary })); }
+    if (contract.description) { intro.appendChild(el("p", { className: "detail-description", textContent: contract.description })); }
+
+    var body = el("div", { className: "detail-body" });
+    body.appendChild(el("h2", { className: "t-h2", textContent: "Use cases" }));
     if (Array.isArray(contract.use_cases) && contract.use_cases.length > 0) {
-      contract.use_cases.forEach(function (useCase) { main.appendChild(renderUseCase(useCase)); });
+      contract.use_cases.forEach(function (useCase) { body.appendChild(renderUseCase(useCase)); });
     } else {
-      main.appendChild(el("p", { className: "empty", textContent: "No use cases published for this version yet." }));
+      body.appendChild(el("p", { className: "empty", textContent: "No use cases published for this version yet." }));
     }
 
-    main.appendChild(el("h2", { className: "t-h2", textContent: "Test coverage" }));
-    main.appendChild(renderCoverage(cap.test_coverage));
+    body.appendChild(el("h2", { className: "t-h2", textContent: "Test coverage" }));
+    body.appendChild(renderCoverage(cap.test_coverage));
 
-    main.appendChild(el("h2", { className: "t-h2", textContent: "Interface" }));
+    body.appendChild(el("h2", { className: "t-h2", textContent: "Interface" }));
     if (contract.inputs && contract.inputs.schema) {
-      main.appendChild(el("div", { className: "io-label", textContent: "Input schema" }));
-      main.appendChild(jsonBlock(contract.inputs.schema));
+      body.appendChild(el("div", { className: "io-label", textContent: "Input schema" }));
+      body.appendChild(jsonBlock(contract.inputs.schema));
     }
     if (contract.outputs && contract.outputs.schema) {
-      main.appendChild(el("div", { className: "io-label", style: "margin-top:0.75rem", textContent: "Output schema" }));
-      main.appendChild(jsonBlock(contract.outputs.schema));
+      body.appendChild(el("div", { className: "io-label", style: "margin-top:0.75rem", textContent: "Output schema" }));
+      body.appendChild(jsonBlock(contract.outputs.schema));
     }
     if (contract.execution && contract.execution.constraints) {
       var c = contract.execution.constraints;
-      main.appendChild(fieldRow("Host API access", textNode(c.host_api_access)));
-      main.appendChild(fieldRow("Network access", textNode(c.network_access)));
-      main.appendChild(fieldRow("Filesystem access", textNode(c.filesystem_access)));
+      body.appendChild(fieldRow("Host API access", textNode(c.host_api_access)));
+      body.appendChild(fieldRow("Network access", textNode(c.network_access)));
+      body.appendChild(fieldRow("Filesystem access", textNode(c.filesystem_access)));
     }
     if (Array.isArray(contract.permissions) && contract.permissions.length > 0) {
-      main.appendChild(fieldRow("Permissions", textNode(contract.permissions.map(function (p) { return p.id; }).join(", "))));
+      body.appendChild(fieldRow("Permissions", textNode(contract.permissions.map(function (p) { return p.id; }).join(", "))));
     }
 
-    main.appendChild(el("h2", { className: "t-h2", textContent: "Events" }));
-    main.appendChild(renderEvents(contract));
+    body.appendChild(el("h2", { className: "t-h2", textContent: "Events" }));
+    body.appendChild(renderEvents(contract));
 
-    main.appendChild(el("h2", { className: "t-h2", textContent: "Version history" }));
-    main.appendChild(renderVersionHistory(reference));
+    body.appendChild(el("h2", { className: "t-h2", textContent: "Version history" }));
+    body.appendChild(renderVersionHistory(reference));
 
     var redactedContract = Object.assign({}, contract);
     if (redactedContract.owner && redactedContract.owner.contact) {
       redactedContract.owner = Object.assign({}, redactedContract.owner, { contact: "[redacted -- see Owner field above]" });
     }
-    main.appendChild(el("details", {}, [el("summary", { textContent: "Full contract.json" }), jsonBlock(redactedContract)]));
+    body.appendChild(el("details", {}, [el("summary", { textContent: "Full contract.json" }), jsonBlock(redactedContract)]));
 
-    appEl.appendChild(el("div", { className: "detail-layout" }, [main, renderPackageSidebar(cap)]));
+    appEl.appendChild(el("div", { className: "detail-layout" }, [
+      intro,
+      renderPackageSidebar(cap),
+      body,
+    ]));
   }
 
   // One entry per distinct persona id, pointing at its highest version --

@@ -725,10 +725,13 @@ PAGE_TEMPLATE = """<!doctype html>
 <a class="back-link" href="/">← Back to catalog</a>
 <div class="detail-header-badges">{header_badges}</div>
 <h1 class="t-h1 detail-title">{id}</h1>
+<div class="detail-layout">
+<div class="detail-intro">
 {summary_html}
 {description_html}
-<div class="detail-layout">
-<div class="detail-main">
+</div>
+<aside class="detail-sidebar">{sidebar_html}</aside>
+<div class="detail-body">
 <h2 class="t-h2">Use cases</h2>
 {use_cases_html}
 <h2 class="t-h2">Test coverage</h2>
@@ -742,7 +745,6 @@ PAGE_TEMPLATE = """<!doctype html>
 <details><summary>Full contract.json</summary>{raw_contract_block}</details>
 <p style="margin-top:2rem"><a href="/#/capability/{encoded_reference}">Open in the interactive catalog →</a></p>
 </div>
-<aside class="detail-sidebar">{sidebar_html}</aside>
 </div>
 </div>
 <footer class="site-footer">

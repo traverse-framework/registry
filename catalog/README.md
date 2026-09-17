@@ -16,17 +16,12 @@ It fetches `./catalog.json` at page-load time and renders:
   `search_index`.
 - A hash-routed (`#/capability/<namespace>/<id>@<version>`, shareable)
   **detail view** per capability version in an npm-inspired two-column
-  layout (registry#563): hero title/summary/description; main column with
-  **use cases** (color-coded happy/unhappy, real input/output JSON),
-  **test coverage** (real `cargo llvm-cov` line/function/region percentages
-  and test count -- see below), **interface**, **events**, **version
-  history**, and a collapsible raw `contract.json`; sticky sidebar with
-  Spec 025 **License** (SPDX, commercial use, redistribution, verification
-  -- missing block shows `unknown` / deny-by-default, never as allowed),
-  a separate **Model licenses** card when the capability embeds third-party
-  weights (`catalog/model-attribution.json` + `THIRD_PARTY_NOTICES.md`; Spec
-  025 non-inheritance), plus package facts (version, namespace, service type,
-  owner, artifact, permalink).
+  layout (registry#563): hero title; top row with summary/description beside
+  sticky sidebar (**License**, **Model licenses**, package facts); full-width
+  body below for **use cases** (color-coded happy/unhappy, real input/output
+  JSON), **test coverage**, **interface**, **events**, **version history**,
+  and a collapsible raw `contract.json`. Spec 025 License missing block shows
+  `unknown` / deny-by-default, never as allowed.
 
 Client-side routing was chosen for this interactive experience because the
 WASM ABI only allows a single output stream (`fd_write`) per invocation --
