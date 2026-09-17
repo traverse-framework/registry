@@ -144,8 +144,24 @@ mod tests {
         assert_eq!(copy(&mut output, 0, b"ok"), Some(2));
         assert!(unavailable(&mut output, b"x") > 0);
         assert_eq!(unavailable(&mut output[..2], b"x"), 0);
+        assert_eq!(unsafe { connector_invoke(0, 0, 0, 0) }, 0);
         let n = finalize(br#"{"content_ref":"c","media_type":"audio/wav","retention_class":"daily","idempotency_key":"k"}"#, &mut request, &mut response, &mut output);
         assert!(core::str::from_utf8(&output[..n]).unwrap().contains("connector_unavailable"));
+    }
+
+    #[test]
+    fn rejects_oversized_and_partial_requests() {
+        let mut request = [0u8; 4096];
+        let mut response = [0u8; 4096];
+        let mut output = [0u8; 4096];
+        let mut oversized = [b'a'; 4097];
+        let n = finalize(&oversized, &mut request, &mut response, &mut output);
+        assert!(core::str::from_utf8(&output[..n]).unwrap().contains("invalid_request"));
+        oversized[0] = b'{';
+        for input in [br#"{"content_ref":"c"}"# as &[u8], br#"{"content_ref":"c","media_type":"x"}"#, br#"{"content_ref":"c","media_type":"x","retention_class":"d"}"#] {
+            let n = finalize(input, &mut request, &mut response, &mut output);
+            assert!(n > 0);
+        }
     }
 }
 
