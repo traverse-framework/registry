@@ -981,6 +981,13 @@
       "path": "capabilities/model/model.activation-plan-create/1.1.1/contract.json",
       "classification": "no-event-required",
       "evidence": "active immutable successor; artifact byte-identical to signed 1.1.0 and digest-verified."
+    },
+    {
+      "capability_id": "record.transition-apply",
+      "published_versions": ["1.0.1"],
+      "path": "capabilities/record/record.transition-apply/1.0.1/contract.json",
+      "classification": "no-event-required",
+      "evidence": "direct idempotent transition result; no asynchronous domain event is emitted or consumed."
     }
   ]
 }
