@@ -419,6 +419,19 @@
     "cloud"
   ],
   "artifact_type": "native",
+  "licensing": {
+    "spdx_expression": "Apache-2.0",
+    "commercial_use": "allowed",
+    "redistribution": "allowed",
+    "attribution_required": true,
+    "verification": {
+      "status": "maintainer-declared"
+    },
+    "license_files": [
+      "LICENSE"
+    ],
+    "source_url": "https://github.com/traverse-framework/registry/blob/main/LICENSE"
+  },
   "artifact": {
     "digest": "sha256:9ee79682f266ab8c971bd9a5697cc0fdb46c43547b41ff46398b2ce13a054614",
     "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/core.assign-ownership-1.2.0/core-assign-ownership.wasm"

@@ -719,10 +719,14 @@
 
   function renderLicensingSidebarCard(contract) {
     var info = normalizeLicensing(contract);
+    // Card title is already "License" — show SPDX as the lead value, not a
+    // second "License" row label (that duplicated the heading).
     var rows = [
-      sidebarRow("License", info.spdx
-        ? el("span", { className: "t-mono", textContent: info.spdx })
-        : el("span", { className: "badge", textContent: "unknown" })),
+      el("div", { className: "sidebar-spdx" }, [
+        info.spdx
+          ? el("span", { className: "t-mono", textContent: info.spdx })
+          : el("span", { className: "badge", textContent: "unknown" }),
+      ]),
       sidebarRow("Commercial use", el("span", { className: rightsBadgeClass(info.commercial_use), textContent: info.commercial_use })),
       sidebarRow("Redistribution", el("span", { className: rightsBadgeClass(info.redistribution), textContent: info.redistribution })),
       sidebarRow("Verification", el("span", { className: "badge", textContent: info.verification_status })),

@@ -124,6 +124,19 @@
   "connector_requirements": [],
   "state_schema": null,
   "artifact_type": "native",
+  "licensing": {
+    "spdx_expression": "Apache-2.0",
+    "commercial_use": "allowed",
+    "redistribution": "allowed",
+    "attribution_required": true,
+    "verification": {
+      "status": "maintainer-declared"
+    },
+    "license_files": [
+      "LICENSE"
+    ],
+    "source_url": "https://github.com/traverse-framework/registry/blob/main/LICENSE"
+  },
   "artifact": {
     "digest": "sha256:b0a46a0682fa866f96305e830cc8eef2d114249507700b6d4e42121585c02340",
     "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/validation.score-password-strength-1.0.0/score-password-strength-agent.wasm"

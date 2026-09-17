@@ -135,6 +135,19 @@
     "local"
   ],
   "artifact_type": "native",
+  "licensing": {
+    "spdx_expression": "Apache-2.0",
+    "commercial_use": "allowed",
+    "redistribution": "allowed",
+    "attribution_required": true,
+    "verification": {
+      "status": "maintainer-declared"
+    },
+    "license_files": [
+      "LICENSE"
+    ],
+    "source_url": "https://github.com/traverse-framework/registry/blob/main/LICENSE"
+  },
   "artifact": {
     "digest": "sha256:bdbb0e500120c40dc385088d5a3a9c1fd60f146cd73b4833b13e7abbad9147f2",
     "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/validation.normalize-phone-number-1.0.0/normalize-phone-number-agent.wasm"

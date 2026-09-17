@@ -171,19 +171,12 @@ LICENSING_VERIFICATION_STATUSES_RESERVED = {
     "registry-reviewed",
     "verified-with-evidence",
 }
-# One-time owner-authorized immutability exception (registry#565 / decision-log
-# entry 119): allow adding Spec 025 `licensing` to these already-published
-# AI-agent contract.json paths, and nothing else. Closed set — do not extend
+# One-time Spec 025 licensing backfill (decision-log 119 for five AI agents;
+# decision-log 123 for catalog-wide first-party Apache-2.0). A published
+# contract.json may be modified iff the only change is adding a top-level
+# `licensing` object that was previously absent (`_licensing_only_addition`).
+# Other edits remain forbidden. Do not broaden beyond pure licensing adds
 # without a new decision-log entry and owner approval.
-LICENSING_BACKFILL_IMMUTABILITY_EXCEPTIONS = frozenset(
-    {
-        "capabilities/text/text.detect-entities/1.0.0/contract.json",
-        "capabilities/text/text.redact-entities/1.0.0/contract.json",
-        "capabilities/audio/audio.detect-speech-segments/1.0.0/contract.json",
-        "capabilities/audio/audio.transcribe-speech/1.1.0/contract.json",
-        "capabilities/report/report.translate-fr-semantic/1.0.0/contract.json",
-    }
-)
 
 # Tiny hard-contradiction table (FR-006): markers that MUST NOT pair with
 # redistribution: "allowed". Deliberately small — not a legal oracle.
@@ -2031,7 +2024,7 @@ def check_workflow_capability_references(errors: list) -> None:
 
 def _licensing_only_addition(base_sha: str, head_sha: str, path: str) -> bool:
     """True iff the only contract.json change vs base is adding a top-level
-    `licensing` object (registry#565 one-time backfill)."""
+    `licensing` object (decision-log 119 / 123 licensing backfill)."""
     try:
         before = subprocess.check_output(
             ["git", "show", f"{base_sha}:{path}"], text=True
@@ -2061,9 +2054,8 @@ def check_immutability(base_sha: str, head_sha: str, errors: list) -> None:
     signature is corrected by key rotation + re-backfill, not an in-place edit.
     Additions (status "A") are always allowed.
 
-    Exception: LICENSING_BACKFILL_IMMUTABILITY_EXCEPTIONS (decision-log 119)
-    may modify listed contract.json paths when the diff is a pure `licensing`
-    addition."""
+    Exception (decision-log 119 / 123): a published contract.json may gain a
+    pure top-level `licensing` addition when that key was previously absent."""
     for governed_dir, filename, error_code in (
         ("capabilities/", "contract.json", "capabilities.contract_modified"),
         ("capabilities/", "signature.json", "capabilities.signature_modified"),
@@ -2081,10 +2073,8 @@ def check_immutability(base_sha: str, head_sha: str, errors: list) -> None:
             status = parts[0]
             path = parts[-1]
             if path.endswith(filename) and status != "A":
-                if (
-                    filename == "contract.json"
-                    and path in LICENSING_BACKFILL_IMMUTABILITY_EXCEPTIONS
-                    and _licensing_only_addition(base_sha, head_sha, path)
+                if filename == "contract.json" and _licensing_only_addition(
+                    base_sha, head_sha, path
                 ):
                     continue
                 fail(

@@ -103,6 +103,19 @@
     "adr_refs": [],
     "exception_refs": []
   },
+  "licensing": {
+    "spdx_expression": "Apache-2.0",
+    "commercial_use": "allowed",
+    "redistribution": "allowed",
+    "attribution_required": true,
+    "verification": {
+      "status": "maintainer-declared"
+    },
+    "license_files": [
+      "LICENSE"
+    ],
+    "source_url": "https://github.com/traverse-framework/registry/blob/main/LICENSE"
+  },
   "artifact": {
     "digest": "sha256:5451557b0ed0767b1e98a2af38b0d059446f454fa76554d1c10b46b4bba91f92",
     "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/support.ticket-status-changed-1.0.0/support-ticket-status-changed.wasm"

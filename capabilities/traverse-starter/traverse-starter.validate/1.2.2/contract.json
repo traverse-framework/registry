@@ -137,6 +137,19 @@
     "local"
   ],
   "artifact_type": "native",
+  "licensing": {
+    "spdx_expression": "Apache-2.0",
+    "commercial_use": "allowed",
+    "redistribution": "allowed",
+    "attribution_required": true,
+    "verification": {
+      "status": "maintainer-declared"
+    },
+    "license_files": [
+      "LICENSE"
+    ],
+    "source_url": "https://github.com/traverse-framework/registry/blob/main/LICENSE"
+  },
   "artifact": {
     "digest": "sha256:7b7f4e7cff89190f965ddfab8611c1a872c9636196a863884dee28d2335b7858",
     "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/traverse-starter.validate-1.1.0/validate-agent.wasm"

@@ -240,6 +240,19 @@
     "device"
   ],
   "artifact_type": "native",
+  "licensing": {
+    "spdx_expression": "Apache-2.0",
+    "commercial_use": "allowed",
+    "redistribution": "allowed",
+    "attribution_required": true,
+    "verification": {
+      "status": "maintainer-declared"
+    },
+    "license_files": [
+      "LICENSE"
+    ],
+    "source_url": "https://github.com/traverse-framework/registry/blob/main/LICENSE"
+  },
   "artifact": {
     "digest": "sha256:10fcd7c6e53d0f16cf396b2601864c85436d686e79dee4ae8ffec50b083a6baf",
     "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/core.create-audio-capture-request-plan-1.0.0/core-create-audio-capture-request-plan.wasm"

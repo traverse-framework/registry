@@ -1,4 +1,17 @@
 {
+  "licensing": {
+    "spdx_expression": "Apache-2.0",
+    "commercial_use": "allowed",
+    "redistribution": "allowed",
+    "attribution_required": true,
+    "verification": {
+      "status": "maintainer-declared"
+    },
+    "license_files": [
+      "LICENSE"
+    ],
+    "source_url": "https://github.com/traverse-framework/registry/blob/main/LICENSE"
+  },
   "artifact": {
     "digest": "sha256:a3d2c6d6c203975ebee32bfd31f6353ba60dc1d2524df66caa87019fdbb54b42",
     "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/classification.outcome-resolve-1.0.0/outcome-resolve.wasm"

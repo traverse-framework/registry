@@ -334,6 +334,19 @@
     "device"
   ],
   "artifact_type": "native",
+  "licensing": {
+    "spdx_expression": "Apache-2.0",
+    "commercial_use": "allowed",
+    "redistribution": "allowed",
+    "attribution_required": true,
+    "verification": {
+      "status": "maintainer-declared"
+    },
+    "license_files": [
+      "LICENSE"
+    ],
+    "source_url": "https://github.com/traverse-framework/registry/blob/main/LICENSE"
+  },
   "artifact": {
     "digest": "sha256:73354780a23443a42e6ff78e3e44c02f1d0d0726b739704aa97cecbe056208e0",
     "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/audio.privacy-risk-evaluate-1.0.0/privacy-risk-evaluate.wasm"

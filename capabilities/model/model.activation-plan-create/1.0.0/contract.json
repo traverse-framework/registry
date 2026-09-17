@@ -141,6 +141,19 @@
   "provenance": { "source": "greenfield", "author": "Codex", "created_at": "2026-09-14T00:00:00Z", "spec_ref": "100-capability-package-authoring@1.0.0", "adr_refs": [], "exception_refs": [] },
   "evidence": [], "state_schema": null, "service_type": "stateless", "permitted_targets": ["local", "browser", "edge", "device"],
   "artifact_type": "native",
+  "licensing": {
+    "spdx_expression": "Apache-2.0",
+    "commercial_use": "allowed",
+    "redistribution": "allowed",
+    "attribution_required": true,
+    "verification": {
+      "status": "maintainer-declared"
+    },
+    "license_files": [
+      "LICENSE"
+    ],
+    "source_url": "https://github.com/traverse-framework/registry/blob/main/LICENSE"
+  },
   "artifact": {
     "digest": "sha256:63f54ac5c527335251f554a6940d9a0aa4d01b672d2312b2be0f39b2b3e204a3",
     "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/model.activation-plan-create-1.0.0/activation-plan-create.wasm"

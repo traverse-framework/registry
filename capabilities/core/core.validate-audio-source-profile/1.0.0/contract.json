@@ -167,6 +167,19 @@
   "service_type": "stateless",
   "permitted_targets": ["local", "edge", "device"],
   "artifact_type": "native",
+  "licensing": {
+    "spdx_expression": "Apache-2.0",
+    "commercial_use": "allowed",
+    "redistribution": "allowed",
+    "attribution_required": true,
+    "verification": {
+      "status": "maintainer-declared"
+    },
+    "license_files": [
+      "LICENSE"
+    ],
+    "source_url": "https://github.com/traverse-framework/registry/blob/main/LICENSE"
+  },
   "artifact": {
     "digest": "sha256:ad440e4782bc9418c59d422e4a34d3524130978a4bef049212a2ad346cd8775d",
     "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/core.validate-audio-source-profile-1.0.0/core-validate-audio-source-profile.wasm"

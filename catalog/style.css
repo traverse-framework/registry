@@ -358,6 +358,12 @@ input[type="search"]::placeholder { color: var(--fg-subtle); }
   color: var(--fg-subtle);
   margin-bottom: 0.75rem;
 }
+.sidebar-spdx {
+  font-size: 0.9375rem;
+  color: var(--fg);
+  line-height: 1.4;
+  margin-bottom: 0.15rem;
+}
 .sidebar-row {
   display: flex;
   flex-direction: column;

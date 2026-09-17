@@ -137,6 +137,19 @@
     "adr_refs": [],
     "exception_refs": []
   },
+  "licensing": {
+    "spdx_expression": "Apache-2.0",
+    "commercial_use": "allowed",
+    "redistribution": "allowed",
+    "attribution_required": true,
+    "verification": {
+      "status": "maintainer-declared"
+    },
+    "license_files": [
+      "LICENSE"
+    ],
+    "source_url": "https://github.com/traverse-framework/registry/blob/main/LICENSE"
+  },
   "artifact": {
     "digest": "sha256:005e2272aef30fd183bdc8bd9b7f556eca7b0544c21639d08e3d152a2f615ba5",
     "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/support.ticket-workspace-1.0.0/support-ticket-workspace.wasm"

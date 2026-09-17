@@ -211,6 +211,19 @@
     "cloud"
   ],
   "artifact_type": "native",
+  "licensing": {
+    "spdx_expression": "Apache-2.0",
+    "commercial_use": "allowed",
+    "redistribution": "allowed",
+    "attribution_required": true,
+    "verification": {
+      "status": "maintainer-declared"
+    },
+    "license_files": [
+      "LICENSE"
+    ],
+    "source_url": "https://github.com/traverse-framework/registry/blob/main/LICENSE"
+  },
   "artifact": {
     "digest": "sha256:84282710492f90fc9a74369574d85ffb77a692c21b445691030255140ab2b4d8",
     "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/doc-approval.recommend-1.3.0/recommend-agent.wasm"

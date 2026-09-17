@@ -441,6 +441,19 @@
     "cloud"
   ],
   "artifact_type": "native",
+  "licensing": {
+    "spdx_expression": "Apache-2.0",
+    "commercial_use": "allowed",
+    "redistribution": "allowed",
+    "attribution_required": true,
+    "verification": {
+      "status": "maintainer-declared"
+    },
+    "license_files": [
+      "LICENSE"
+    ],
+    "source_url": "https://github.com/traverse-framework/registry/blob/main/LICENSE"
+  },
   "artifact": {
     "digest": "sha256:844081f9329040f28a6cba49400f949834894aa49247a07e92728e78d4ccc29c",
     "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/core.validate-action-item-1.1.0/core-validate-action-item.wasm"

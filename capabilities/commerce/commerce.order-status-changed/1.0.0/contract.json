@@ -103,6 +103,19 @@
     "adr_refs": [],
     "exception_refs": []
   },
+  "licensing": {
+    "spdx_expression": "Apache-2.0",
+    "commercial_use": "allowed",
+    "redistribution": "allowed",
+    "attribution_required": true,
+    "verification": {
+      "status": "maintainer-declared"
+    },
+    "license_files": [
+      "LICENSE"
+    ],
+    "source_url": "https://github.com/traverse-framework/registry/blob/main/LICENSE"
+  },
   "artifact": {
     "digest": "sha256:e6301d00e45f41bbf0baf7d1009d53f1edba00d99f2a49b8f8c8566505933a5f",
     "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/commerce.order-status-changed-1.0.0/commerce-order-status-changed.wasm"
