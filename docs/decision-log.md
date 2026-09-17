@@ -976,3 +976,5 @@ This is the second of the downstream ideas from entry 110's "Five Engines, What 
 
 121. **Capability detail: sidebar beside prose only; use cases full width (2026-09-16)**: after #563/#566 the License sidebar shared a two-column grid with the entire main column, so use-case INPUT/OUTPUT boxes were permanently narrow while the long description sat above with unused right-side space. Restructured `.detail-layout` into grid areas `intro`+`sidebar` on the first row and full-bleed `body` below (SPA + static generator). Sidebar stays next to summary/description; coding boxes expand to container width.
 
+122. **Revert capability detail to a simple always-two-column layout (2026-09-16)**: entry 121's intro/body split left a tall empty gap when prose was short (first row height = sidebar) and sticky sidebar painted over full-bleed `body` (overlap on use-case OUTPUT). Owner asked for the simple model: left column = text + use cases + rest; right column = License/Package always. Restored that grid; stack use-case IO in the main column so JSON cannot overflow into the sidebar.
+
