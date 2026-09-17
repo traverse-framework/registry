@@ -676,6 +676,126 @@
     return container;
   }
 
+  function rightsBadgeClass(value) {
+    if (value === "allowed") { return "badge badge-success"; }
+    if (value === "forbidden") { return "badge badge-danger"; }
+    if (value === "conditional") { return "badge badge-conditional"; }
+    return "badge";
+  }
+
+  function sidebarRow(label, valueNode) {
+    if (!valueNode) { return document.createDocumentFragment(); }
+    return el("div", { className: "sidebar-row" }, [
+      el("span", { className: "sidebar-label", textContent: label }),
+      el("span", { className: "sidebar-value" }, [valueNode]),
+    ]);
+  }
+
+  // Spec 025: publisher-declared capability rights only. Missing block indexes
+  // as unknown and must never read as permission.
+  function normalizeLicensing(contract) {
+    var licensing = contract && contract.licensing;
+    if (!licensing || typeof licensing !== "object") {
+      return {
+        present: false,
+        spdx: null,
+        commercial_use: "unknown",
+        redistribution: "unknown",
+        verification_status: "unknown",
+      };
+    }
+    var verification = licensing.verification;
+    return {
+      present: true,
+      spdx: licensing.spdx_expression || null,
+      commercial_use: licensing.commercial_use || "unknown",
+      redistribution: licensing.redistribution || "unknown",
+      verification_status: (verification && verification.status) || "unknown",
+      attribution_required: licensing.attribution_required === true,
+      source_url: licensing.source_url || null,
+    };
+  }
+
+  function renderLicensingSidebarCard(contract) {
+    var info = normalizeLicensing(contract);
+    var rows = [
+      sidebarRow("License", info.spdx
+        ? el("span", { className: "t-mono", textContent: info.spdx })
+        : el("span", { className: "badge", textContent: "unknown" })),
+      sidebarRow("Commercial use", el("span", { className: rightsBadgeClass(info.commercial_use), textContent: info.commercial_use })),
+      sidebarRow("Redistribution", el("span", { className: rightsBadgeClass(info.redistribution), textContent: info.redistribution })),
+      sidebarRow("Verification", el("span", { className: "badge", textContent: info.verification_status })),
+    ];
+    if (info.present && info.attribution_required) {
+      rows.push(sidebarRow("Attribution", textNode("required")));
+    }
+    if (info.source_url) {
+      rows.push(sidebarRow("License source", el("a", { href: info.source_url, textContent: info.source_url, target: "_blank", rel: "noopener" })));
+    }
+    var note = info.present
+      ? "Publisher-declared capability artifact rights (Spec 025). Not a legal certification; model/dataset rights do not inherit. unknown / conditional / forbidden are never permission."
+      : "No licensing block on this version — treat commercial use and redistribution as unknown (deny-by-default). New versions must declare licensing.";
+    return el("div", { className: "sidebar-card" }, [
+      el("div", { className: "sidebar-card-title", textContent: "License" }),
+      el("div", {}, rows),
+      el("p", { className: "sidebar-note", textContent: note }),
+    ]);
+  }
+
+  function renderPackageSidebar(cap) {
+    var contract = cap.contract;
+    var permalink = "/capability/" + contract.namespace + "/" + contract.id + "/" + contract.version + "/";
+    var packageRows = [
+      sidebarRow("Version", el("span", { className: "t-mono", textContent: contract.version })),
+      sidebarRow("Namespace", el("span", { className: "t-mono", textContent: contract.namespace })),
+    ];
+    if (contract.lifecycle) {
+      packageRows.push(sidebarRow("Lifecycle", el("span", { className: "badge", textContent: contract.lifecycle })));
+    }
+    if (cap.deprecated) {
+      packageRows.push(sidebarRow("Status", el("span", { className: "badge badge-danger", textContent: "deprecated" })));
+    }
+    if (contract.service_type) {
+      var serviceTypeDef = SERVICE_TYPE_DEFINITIONS[contract.service_type];
+      packageRows.push(sidebarRow(
+        "Service type",
+        serviceTypeDef
+          ? el("a", { className: "badge", href: serviceTypeHash(contract.service_type), textContent: serviceTypeDef.name })
+          : textNode(contract.service_type)
+      ));
+    }
+    if (isAgent(contract)) {
+      packageRows.push(sidebarRow("Agent", el("span", { className: "badge badge-agent", textContent: "model-backed" })));
+      var models = agentModels(contract);
+      if (models.length) {
+        var modelLinks = models.map(function (modelId, index) {
+          var parts = [el("a", { className: "t-mono", href: aiModelHash(modelId), textContent: modelId })];
+          if (index < models.length - 1) { parts.push(document.createTextNode(", ")); }
+          return parts;
+        }).reduce(function (a, b) { return a.concat(b); }, []);
+        packageRows.push(sidebarRow("Models", el("span", {}, modelLinks)));
+      }
+    }
+    var targets = (contract.permitted_targets || []).join(", ");
+    if (targets) { packageRows.push(sidebarRow("Targets", textNode(targets))); }
+    packageRows.push(sidebarRow("Owner", renderOwner(contract.owner)));
+    if (contract.artifact && contract.artifact.digest) {
+      packageRows.push(sidebarRow("Digest", el("span", { className: "t-mono" }, [textNode(contract.artifact.digest)])));
+    }
+    if (contract.artifact && contract.artifact.url) {
+      packageRows.push(sidebarRow("Artifact", el("a", { href: contract.artifact.url, textContent: contract.artifact.url })));
+    }
+    packageRows.push(sidebarRow("Permalink", el("a", { href: permalink, textContent: permalink })));
+
+    return el("aside", { className: "detail-sidebar" }, [
+      renderLicensingSidebarCard(contract),
+      el("div", { className: "sidebar-card" }, [
+        el("div", { className: "sidebar-card-title", textContent: "Package" }),
+        el("div", {}, packageRows),
+      ]),
+    ]);
+  }
+
   function renderDetailView(reference) {
     var cap = catalog.capabilities.find(function (c) { return c.reference === reference; });
     appEl.textContent = "";
@@ -698,76 +818,49 @@
     if (contract.summary) { appEl.appendChild(el("p", { className: "detail-summary", textContent: contract.summary })); }
     if (contract.description) { appEl.appendChild(el("p", { className: "detail-description", textContent: contract.description })); }
 
-    var permalink = "/capability/" + contract.namespace + "/" + contract.id + "/" + contract.version + "/";
-    appEl.appendChild(fieldRow("Permalink", el("a", { href: permalink, textContent: permalink })));
-    if (contract.service_type) {
-      var serviceTypeDef = SERVICE_TYPE_DEFINITIONS[contract.service_type];
-      var serviceTypeValue = serviceTypeDef
-        ? el("a", { className: "badge", href: serviceTypeHash(contract.service_type), textContent: serviceTypeDef.name })
-        : textNode(contract.service_type);
-      appEl.appendChild(fieldRow("Service type", serviceTypeValue));
-    }
-    if (isAgent(contract)) {
-      appEl.appendChild(fieldRow("Agent", el("span", { className: "badge badge-agent", textContent: "model-backed" })));
-      var models = agentModels(contract);
-      if (models.length) {
-        var modelLinks = models.map(function (modelId, index) {
-          var parts = [el("a", { className: "t-mono", href: aiModelHash(modelId), textContent: modelId })];
-          if (index < models.length - 1) { parts.push(document.createTextNode(", ")); }
-          return parts;
-        }).reduce(function (a, b) { return a.concat(b); }, []);
-        appEl.appendChild(fieldRow("Models", el("span", {}, modelLinks)));
-      }
-    }
-    appEl.appendChild(fieldRow("Permitted targets", textNode((contract.permitted_targets || []).join(", "))));
-    appEl.appendChild(fieldRow("Owner", renderOwner(contract.owner)));
-    if (contract.artifact && contract.artifact.digest) { appEl.appendChild(fieldRow("Artifact digest", el("span", { className: "t-mono" }, [textNode(contract.artifact.digest)]))); }
-    if (contract.artifact && contract.artifact.url) {
-      var link = el("a", { href: contract.artifact.url, textContent: contract.artifact.url });
-      appEl.appendChild(fieldRow("Artifact", link));
-    }
-
-    appEl.appendChild(el("h2", { className: "t-h2", textContent: "Use cases" }));
+    var main = el("div", { className: "detail-main" });
+    main.appendChild(el("h2", { className: "t-h2", textContent: "Use cases" }));
     if (Array.isArray(contract.use_cases) && contract.use_cases.length > 0) {
-      contract.use_cases.forEach(function (useCase) { appEl.appendChild(renderUseCase(useCase)); });
+      contract.use_cases.forEach(function (useCase) { main.appendChild(renderUseCase(useCase)); });
     } else {
-      appEl.appendChild(el("p", { className: "empty", textContent: "No use cases published for this version yet." }));
+      main.appendChild(el("p", { className: "empty", textContent: "No use cases published for this version yet." }));
     }
 
-    appEl.appendChild(el("h2", { className: "t-h2", textContent: "Test coverage" }));
-    appEl.appendChild(renderCoverage(cap.test_coverage));
+    main.appendChild(el("h2", { className: "t-h2", textContent: "Test coverage" }));
+    main.appendChild(renderCoverage(cap.test_coverage));
 
-    appEl.appendChild(el("h2", { className: "t-h2", textContent: "Interface" }));
+    main.appendChild(el("h2", { className: "t-h2", textContent: "Interface" }));
     if (contract.inputs && contract.inputs.schema) {
-      appEl.appendChild(el("div", { className: "io-label", textContent: "Input schema" }));
-      appEl.appendChild(jsonBlock(contract.inputs.schema));
+      main.appendChild(el("div", { className: "io-label", textContent: "Input schema" }));
+      main.appendChild(jsonBlock(contract.inputs.schema));
     }
     if (contract.outputs && contract.outputs.schema) {
-      appEl.appendChild(el("div", { className: "io-label", style: "margin-top:0.75rem", textContent: "Output schema" }));
-      appEl.appendChild(jsonBlock(contract.outputs.schema));
+      main.appendChild(el("div", { className: "io-label", style: "margin-top:0.75rem", textContent: "Output schema" }));
+      main.appendChild(jsonBlock(contract.outputs.schema));
     }
     if (contract.execution && contract.execution.constraints) {
       var c = contract.execution.constraints;
-      appEl.appendChild(fieldRow("Host API access", textNode(c.host_api_access)));
-      appEl.appendChild(fieldRow("Network access", textNode(c.network_access)));
-      appEl.appendChild(fieldRow("Filesystem access", textNode(c.filesystem_access)));
+      main.appendChild(fieldRow("Host API access", textNode(c.host_api_access)));
+      main.appendChild(fieldRow("Network access", textNode(c.network_access)));
+      main.appendChild(fieldRow("Filesystem access", textNode(c.filesystem_access)));
     }
     if (Array.isArray(contract.permissions) && contract.permissions.length > 0) {
-      appEl.appendChild(fieldRow("Permissions", textNode(contract.permissions.map(function (p) { return p.id; }).join(", "))));
+      main.appendChild(fieldRow("Permissions", textNode(contract.permissions.map(function (p) { return p.id; }).join(", "))));
     }
 
-    appEl.appendChild(el("h2", { className: "t-h2", textContent: "Events" }));
-    appEl.appendChild(renderEvents(contract));
+    main.appendChild(el("h2", { className: "t-h2", textContent: "Events" }));
+    main.appendChild(renderEvents(contract));
 
-    appEl.appendChild(el("h2", { className: "t-h2", textContent: "Version history" }));
-    appEl.appendChild(renderVersionHistory(reference));
+    main.appendChild(el("h2", { className: "t-h2", textContent: "Version history" }));
+    main.appendChild(renderVersionHistory(reference));
 
     var redactedContract = Object.assign({}, contract);
     if (redactedContract.owner && redactedContract.owner.contact) {
       redactedContract.owner = Object.assign({}, redactedContract.owner, { contact: "[redacted -- see Owner field above]" });
     }
-    var details = el("details", {}, [el("summary", { textContent: "Full contract.json" }), jsonBlock(redactedContract)]);
-    appEl.appendChild(details);
+    main.appendChild(el("details", {}, [el("summary", { textContent: "Full contract.json" }), jsonBlock(redactedContract)]));
+
+    appEl.appendChild(el("div", { className: "detail-layout" }, [main, renderPackageSidebar(cap)]));
   }
 
   // One entry per distinct persona id, pointing at its highest version --

@@ -302,13 +302,92 @@ input[type="search"]::placeholder { color: var(--fg-subtle); }
 .back-link { display: inline-flex; align-items: center; gap: 0.4rem; font-size: 0.85rem; color: var(--fg-muted); margin-bottom: 1.5rem; }
 .back-link:hover { color: var(--fg); }
 .detail-header-badges { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 0.75rem; }
-.detail-title { font-family: var(--font-mono); }
-.detail-summary { font-size: 1.0625rem; color: var(--fg); margin: 0.75rem 0 0.5rem; }
-.detail-description { font-size: 0.9375rem; color: var(--fg-muted); line-height: 1.7; margin-bottom: 0.5rem; }
+.detail-title { font-family: var(--font-mono); font-size: clamp(1.35rem, 2.4vw, 1.75rem); letter-spacing: -0.02em; line-height: 1.25; }
+.detail-summary { font-size: 1.125rem; color: var(--fg); margin: 0.85rem 0 0.65rem; line-height: 1.55; font-weight: 400; }
+.detail-description { font-size: 0.9375rem; color: var(--fg-muted); line-height: 1.75; margin-bottom: 0.25rem; max-width: 62ch; }
 .field-row { display: flex; gap: 0.5rem; font-size: 0.875rem; margin: 0.35rem 0; }
 .field-label { color: var(--fg-subtle); min-width: 9rem; flex-shrink: 0; }
 .field-value { color: var(--fg-muted); min-width: 0; overflow-wrap: anywhere; }
 .field-value a { color: var(--accent); overflow-wrap: anywhere; }
+
+/* npm-inspired package layout: readable main column + sticky facts sidebar
+   (registry#563 / Spec 025 licensing). Stacks below 900px. */
+.detail-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(15.5rem, 18.5rem);
+  gap: 2rem 2.25rem;
+  align-items: start;
+  margin-top: 1.25rem;
+}
+.detail-main > .t-h2:first-child { margin-top: 0; }
+.detail-main .t-h2 {
+  margin-top: 2rem;
+  margin-bottom: 0.85rem;
+  padding-bottom: 0.45rem;
+  border-bottom: 1px solid var(--border);
+  font-size: 1.05rem;
+}
+.detail-sidebar {
+  position: sticky;
+  top: calc(var(--nav-h) + var(--subnav-h) + 1rem);
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+.sidebar-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1rem 1.1rem;
+}
+.sidebar-card-title {
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--fg-subtle);
+  margin-bottom: 0.75rem;
+}
+.sidebar-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  padding: 0.55rem 0;
+  border-top: 1px solid var(--border);
+  font-size: 0.8125rem;
+}
+.sidebar-row:first-of-type { border-top: none; padding-top: 0; }
+.sidebar-label {
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--fg-subtle);
+}
+.sidebar-value { color: var(--fg-muted); overflow-wrap: anywhere; line-height: 1.45; }
+.sidebar-value a { color: var(--accent); }
+.sidebar-value .badge { margin: 0.15rem 0.25rem 0.15rem 0; }
+.sidebar-note {
+  margin-top: 0.65rem;
+  font-size: 0.75rem;
+  color: var(--fg-subtle);
+  line-height: 1.5;
+}
+.badge-conditional {
+  border-color: rgba(255, 196, 87, 0.35);
+  color: #ffd27a;
+  background: rgba(255, 196, 87, 0.08);
+}
+[data-theme="light"] .badge-conditional,
+:root:not([data-theme="dark"]) .badge-conditional {
+  color: #8a5a00;
+  background: rgba(255, 196, 87, 0.14);
+  border-color: rgba(138, 90, 0, 0.28);
+}
+@media (max-width: 900px) {
+  .detail-layout { grid-template-columns: 1fr; gap: 1.5rem; }
+  .detail-sidebar { position: static; order: -1; }
+}
 
 /* ─── Coverage stats ──────────────────────────────────────────────────── */
 .coverage-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.75rem; }
