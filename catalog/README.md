@@ -16,12 +16,10 @@ It fetches `./catalog.json` at page-load time and renders:
   `search_index`.
 - A hash-routed (`#/capability/<namespace>/<id>@<version>`, shareable)
   **detail view** per capability version in an npm-inspired two-column
-  layout (registry#563): hero title; top row with summary/description beside
-  sticky sidebar (**License**, **Model licenses**, package facts); full-width
-  body below for **use cases** (color-coded happy/unhappy, real input/output
-  JSON), **test coverage**, **interface**, **events**, **version history**,
-  and a collapsible raw `contract.json`. Spec 025 License missing block shows
-  `unknown` / deny-by-default, never as allowed.
+  layout (registry#563 / decision 122): hero title; always-two-column body —
+  left = summary/description + use cases + coverage + schemas; right sticky
+  sidebar = Spec 025 **License**, **Model licenses** when applicable, and
+  package facts. Missing License block shows `unknown` / deny-by-default.
 
 Client-side routing was chosen for this interactive experience because the
 WASM ABI only allows a single output stream (`fd_write`) per invocation --
