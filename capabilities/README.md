@@ -44,7 +44,25 @@ Copy-paste sequence for a new capability version (manual path today; `traverse-c
 5. **Ensure every `use_cases[].persona_ref` resolves** to an existing `personas/<id>/<version>/persona.json` (see `specs/017-persona-registry/spec.md` and [`personas/README.md`](../personas/README.md)). Author missing personas before opening the contract PR — prefer `bash scripts/scaffold/new-persona.sh` so `distinguished_from` and local `validate_persona` checks pass first.
 6. **Open the PR with the org body sections** required by `spec-alignment`: `## Summary`, `## Governing Spec` (bare approved-spec ids in backticks, one per bullet), `## Project Item`, `## Definition of Done`, `## Validation`. Editing the body alone does not re-run that check — push a new commit after body fixes.
 
-**Optional — declare `ai` if the capability is model-backed (an "agent").** `specs/001-registry-foundation/spec.md` FR-017: add `"ai": { "model_backed": true, "models": ["<id>", …] }` when the capability runs model inference at execution time (a forward pass / model call). Static lookup tables, quantized weights, or embeddings compiled into the WASM and used only for deterministic arithmetic do **not** count — omit `ai` for those. `models` must be a non-empty string array whenever `model_backed` is `true` (CI: `contract.invalid_ai`). The field flows through to the public index and the catalog's "Agent" badge. No published capability declares it today.
+**Optional — declare `ai` if the capability is model-backed (an "agent").** `specs/001-registry-foundation/spec.md` FR-017: add `"ai": { "model_backed": true, "models": [...] }` when the capability runs model inference at execution time (a forward pass / model call). Static lookup tables, quantized weights, or embeddings compiled into the WASM and used only for deterministic arithmetic do **not** count — omit `ai` for those. `models` must be non-empty whenever `model_backed` is `true` (CI: `contract.invalid_ai`).
+
+**`ai.models` shape — object required on newly added contracts (amended 2026-09-16, Decision 124 / registry#571).** Every `models` entry on a newly ADDED `model_backed: true` contract must be an object with pinned HF/provenance attribution, not a bare string:
+
+```json
+"models": [
+  {
+    "id": "dslim/distilbert-NER",
+    "spdx_expression": "Apache-2.0",
+    "attribution_required": false,
+    "huggingface_id": "dslim/distilbert-NER",
+    "revision": "<pinned commit sha, not main/latest>"
+  }
+]
+```
+
+Required fields: `id`, `spdx_expression` (a syntactically valid SPDX expression), `attribution_required`, and either (`huggingface_id` + `revision`) or `source_url` (for non-HF sources, e.g. a GitHub repo). Optional: `copyright`. CI validates shape and SPDX syntax only — it does not live-fetch Hugging Face or `source_url`. The **contract is the source of truth** for model license/attribution; the catalog may display it, but `catalog/model-attribution.json` is a fallback used only for the legacy shape below.
+
+The original `models: ["<id>", ...]` string-array shape is **grandfathered permanently** on already-published contracts (this rule only binds what a PR newly ADDs; an already-merged `contract.json` is never edited to match it). Both shapes flow through to the public index and the catalog's "Agent" badge / per-model pages. Five published capabilities declare `ai.model_backed: true` today (`report.translate-fr-semantic`, `audio.detect-speech-segments`, `text.detect-entities`, `audio.transcribe-speech`, `text.redact-entities`), all still on the legacy string shape as of this amendment.
 
 **Declare `licensing` for machine-readable reuse rights (required on newly added versions).** `specs/025-capability-licensing-metadata/spec.md`: add a flat `"licensing"` object with `spdx_expression`, `commercial_use` / `redistribution` (`allowed` | `forbidden` | `conditional` | `unknown`), `attribution_required`, and `verification.status: "maintainer-declared"`. This is **publisher-declared metadata**, signed with the contract — not a legal certification. It describes the capability implementation/artifact only and does **not** inherit to models, datasets, or other dependencies. Legacy contracts without the field index as `unknown`. `LicenseRef-*` requires `verification.evidence_url` or `license_files`. SPDX parsing uses pinned `license-expression==30.4.4`.
 

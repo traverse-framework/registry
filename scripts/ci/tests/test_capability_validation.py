@@ -118,6 +118,97 @@ class AiObjectValidationTests(unittest.TestCase):
     def test_ai_not_an_object_is_rejected(self):
         self.assertIn("contract.invalid_ai", self._codes(["model_backed"]))
 
+    # --- spec 001 FR-017 amendment (decision-log entry 124, registry#571):
+    # object-shaped ai.models, accepted alongside the legacy string[] shape.
+
+    def _object_model_ref(self, **overrides):
+        base = {
+            "id": "minishlab/potion-base-32M",
+            "spdx_expression": "MIT",
+            "attribution_required": True,
+            "huggingface_id": "minishlab/potion-base-32M",
+            "revision": "abc1234",
+        }
+        base.update(overrides)
+        return base
+
+    def test_object_shaped_models_with_hf_pin_passes(self):
+        self.assertEqual(
+            self._codes({"model_backed": True, "models": [self._object_model_ref()]}),
+            [],
+        )
+
+    def test_object_shaped_models_with_source_url_passes(self):
+        ref = self._object_model_ref(source_url="https://github.com/snakers4/silero-vad")
+        del ref["huggingface_id"]
+        del ref["revision"]
+        self.assertEqual(self._codes({"model_backed": True, "models": [ref]}), [])
+
+    def test_object_shaped_models_missing_id_is_rejected(self):
+        ref = self._object_model_ref()
+        del ref["id"]
+        self.assertIn(
+            "contract.invalid_ai", self._codes({"model_backed": True, "models": [ref]})
+        )
+
+    def test_object_shaped_models_missing_spdx_expression_is_rejected(self):
+        ref = self._object_model_ref()
+        del ref["spdx_expression"]
+        self.assertIn(
+            "contract.invalid_ai", self._codes({"model_backed": True, "models": [ref]})
+        )
+
+    def test_object_shaped_models_non_boolean_attribution_required_is_rejected(self):
+        ref = self._object_model_ref(attribution_required="yes")
+        self.assertIn(
+            "contract.invalid_ai", self._codes({"model_backed": True, "models": [ref]})
+        )
+
+    def test_object_shaped_models_without_hf_pin_or_source_url_is_rejected(self):
+        ref = self._object_model_ref()
+        del ref["huggingface_id"]
+        del ref["revision"]
+        self.assertIn(
+            "contract.invalid_ai", self._codes({"model_backed": True, "models": [ref]})
+        )
+
+    def test_object_shaped_models_partial_hf_pin_is_rejected(self):
+        # huggingface_id without revision is not a real pin (decision 124:
+        # "pin, don't live-fetch" -- an unpinned id has no fixed provenance).
+        ref = self._object_model_ref()
+        del ref["revision"]
+        self.assertIn(
+            "contract.invalid_ai", self._codes({"model_backed": True, "models": [ref]})
+        )
+
+    def test_object_shaped_models_invalid_spdx_expression_is_rejected(self):
+        ref = self._object_model_ref(spdx_expression="Not A Real License")
+        self.assertIn(
+            "contract.invalid_licensing_spdx",
+            self._codes({"model_backed": True, "models": [ref]}),
+        )
+
+    def test_object_shaped_models_unsafe_source_url_is_rejected(self):
+        ref = self._object_model_ref(source_url="http://example.com/model")
+        del ref["huggingface_id"]
+        del ref["revision"]
+        self.assertIn(
+            "contract.invalid_ai", self._codes({"model_backed": True, "models": [ref]})
+        )
+
+    def test_object_shaped_models_non_string_copyright_is_rejected(self):
+        ref = self._object_model_ref(copyright=2026)
+        self.assertIn(
+            "contract.invalid_ai", self._codes({"model_backed": True, "models": [ref]})
+        )
+
+    def test_legacy_string_models_still_passes(self):
+        # Grandfathered forever on already-published contracts (decision 124).
+        self.assertEqual(
+            self._codes({"model_backed": True, "models": ["dslim/distilbert-NER"]}),
+            [],
+        )
+
 
 def valid_licensing(**overrides):
     base = {
@@ -1278,6 +1369,71 @@ class CheckNewContractLicensingTests(unittest.TestCase):
             errors: list = []
             capability_validation.check_new_contract_licensing(path, errors)
             self.assertIn("contract.missing_licensing", [e["code"] for e in errors])
+
+
+class CheckNewContractAiModelsObjectShapeTests(unittest.TestCase):
+    """check_new_contract_ai_models_object_shape implements spec 001 FR-017's
+    amendment (decision-log entry 124, registry#571): a newly-ADDED contract
+    with ai.model_backed: true must use the object-shaped ai.models, not the
+    legacy string[] shape."""
+
+    def _object_model_ref(self):
+        return {
+            "id": "minishlab/potion-base-32M",
+            "spdx_expression": "MIT",
+            "attribution_required": True,
+            "huggingface_id": "minishlab/potion-base-32M",
+            "revision": "abc1234",
+        }
+
+    def test_object_shaped_models_on_new_contract_passes(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            contract = valid_contract()
+            contract["ai"] = {"model_backed": True, "models": [self._object_model_ref()]}
+            path = write_contract(tmp, contract)
+            errors: list = []
+            capability_validation.check_new_contract_ai_models_object_shape(path, errors)
+            self.assertEqual(errors, [])
+
+    def test_legacy_string_models_on_new_contract_is_rejected(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            contract = valid_contract()
+            contract["ai"] = {"model_backed": True, "models": ["dslim/distilbert-NER"]}
+            path = write_contract(tmp, contract)
+            errors: list = []
+            capability_validation.check_new_contract_ai_models_object_shape(path, errors)
+            self.assertIn(
+                "contract.ai_models_legacy_shape_on_new_contract",
+                [e["code"] for e in errors],
+            )
+
+    def test_non_model_backed_contract_is_not_flagged(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            contract = valid_contract()
+            contract["ai"] = {"model_backed": False}
+            path = write_contract(tmp, contract)
+            errors: list = []
+            capability_validation.check_new_contract_ai_models_object_shape(path, errors)
+            self.assertEqual(errors, [])
+
+    def test_contract_without_ai_is_not_flagged(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = write_contract(tmp, valid_contract())
+            errors: list = []
+            capability_validation.check_new_contract_ai_models_object_shape(path, errors)
+            self.assertEqual(errors, [])
+
+    def test_missing_models_is_not_flagged_here(self):
+        # Already reported by validate_contract's whole-tree ai check
+        # (contract.invalid_ai); this forward gate only judges shape once a
+        # non-empty models array is present.
+        with tempfile.TemporaryDirectory() as tmp:
+            contract = valid_contract()
+            contract["ai"] = {"model_backed": True}
+            path = write_contract(tmp, contract)
+            errors: list = []
+            capability_validation.check_new_contract_ai_models_object_shape(path, errors)
+            self.assertEqual(errors, [])
 
 
 class CheckNewContractRiskMetadataTests(unittest.TestCase):

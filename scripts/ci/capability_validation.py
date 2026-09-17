@@ -123,6 +123,25 @@ publishes point artifact.url at a fork release the contributor cannot
 upload to; CONTRIBUTING.md's maintainer-mirror-before-green handoff is
 advisory until this gate makes a 404 or a digest mismatch a hard merge
 blocker. Diff-based, same reason as every other new-contract check above.
+
+Also enforces specs/001-registry-foundation FR-017's amendment (registry#571,
+decision-log entry 124, owner `/brainstorm` 2026-09-16): `ai.models` may be
+either the original `string[]` shape (grandfathered forever on
+already-published contracts -- validate_contract accepts it whole-tree,
+mirroring how string[] was the only shape decision-log entry 104 ever
+declared) or a new `object[]` shape carrying pinned HF/provenance
+attribution per entry (`id`, `spdx_expression`, `attribution_required`, plus
+either `huggingface_id`+`revision` or `source_url`; optional `copyright`).
+Object-shape entries get full SPDX-syntax validation via the same
+validate_spdx_expression spec-025 uses. A newly-ADDED contract.json with
+`ai.model_backed: true` MUST use the object shape -- diff-based FR-010-style
+forward gate (check_new_contracts_declare_ai_models_object_shape), same
+reason as every other new-contract check above: already-published immutable
+versions predate the object shape and can never be edited to match it. CI
+pins/validates shape only -- it does not live-fetch Hugging Face or
+source_url at validation time (decision 124's "pin, don't live-fetch" CI
+posture; an optional advisory HF-drift check may come later, out of scope
+here).
 """
 
 import hashlib
@@ -459,6 +478,85 @@ def validate_licensing(path: Path, contract: dict, errors: list) -> None:
             )
 
 
+def _model_ref_shape_error(model_ref):
+    """Returns a human-readable reason `model_ref` is not a well-formed
+    spec 001 FR-017 object-shaped model reference (decision-log entry 124 /
+    registry#571), or None if it is well-formed. Required: `id`,
+    `spdx_expression` (a non-empty string; full SPDX-syntax validation
+    happens where `path`/`errors` are in scope, in `_ai_models_shape_ok`),
+    `attribution_required` (boolean), and either (`huggingface_id` +
+    `revision`) or `source_url` -- pinned provenance, not a live reference:
+    CI validates the *shape* of these fields, it does not fetch Hugging Face
+    or the source_url (decision 124's "pin, don't live-fetch" CI posture)."""
+    if not isinstance(model_ref, dict):
+        return "must be an object (spec 001 FR-017 object-shaped ai.models)"
+    id_ = model_ref.get("id")
+    if not isinstance(id_, str) or not id_.strip():
+        return "ai.models[].id is required and must be a non-empty string"
+    spdx = model_ref.get("spdx_expression")
+    if not isinstance(spdx, str) or not spdx.strip():
+        return "ai.models[].spdx_expression is required and must be a non-empty string"
+    attribution_required = model_ref.get("attribution_required")
+    if not isinstance(attribution_required, bool):
+        return "ai.models[].attribution_required is required and must be a boolean"
+    huggingface_id = model_ref.get("huggingface_id")
+    revision = model_ref.get("revision")
+    has_hf_pin = (
+        isinstance(huggingface_id, str) and huggingface_id.strip()
+        and isinstance(revision, str) and revision.strip()
+    )
+    source_url = model_ref.get("source_url")
+    has_source_url = isinstance(source_url, str) and source_url.strip()
+    if not (has_hf_pin or has_source_url):
+        return (
+            "ai.models[] must include either (huggingface_id + revision) "
+            "or source_url (spec 001 FR-017)"
+        )
+    if source_url is not None and has_source_url and not is_safe_https_url(source_url):
+        return "ai.models[].source_url must be a safe https URL (spec 001 FR-017)"
+    copyright_ = model_ref.get("copyright")
+    if copyright_ is not None and not isinstance(copyright_, str):
+        return "ai.models[].copyright must be a string when present (spec 001 FR-017)"
+    return None
+
+
+def _ai_models_shape_ok(models: list, path: Path, errors: list) -> bool:
+    """`models` is well-formed under EITHER spec 001 FR-017 shape, checked
+    per-array (a single ai.models array is one shape or the other, not
+    mixed): the legacy `string[]` shape (grandfathered on already-published
+    contracts, decision-log entry 124), or the new object[] shape (required
+    on newly-ADDED contracts -- see
+    check_new_contracts_declare_ai_models_object_shape). Appends a
+    contract.invalid_ai failure per malformed entry and returns whether the
+    whole array was well-formed."""
+    if not models:
+        return True
+    if all(isinstance(m, str) for m in models):
+        ok = all(m.strip() for m in models)
+        if not ok:
+            fail(
+                errors,
+                "contract.invalid_ai",
+                str(path),
+                "ai.models (legacy string[] shape) must be an array of non-empty strings (spec 001 FR-017)",
+            )
+        return ok
+    ok = True
+    for i, model_ref in enumerate(models):
+        error = _model_ref_shape_error(model_ref)
+        if error is not None:
+            fail(errors, "contract.invalid_ai", str(path), f"ai.models[{i}]: {error}")
+            ok = False
+            continue
+        spdx = model_ref.get("spdx_expression")
+        if isinstance(spdx, str) and spdx.strip():
+            before = len(errors)
+            validate_spdx_expression(spdx.strip(), errors, path)
+            if len(errors) != before:
+                ok = False
+    return ok
+
+
 def validate_contract(path: Path, errors: list) -> None:
     try:
         contract = json.loads(path.read_text())
@@ -530,10 +628,16 @@ def validate_contract(path: Path, errors: list) -> None:
             "(traverse-framework/traverse spec 014-service-type-taxonomy)",
         )
 
-    # spec 001 FR-017 (decision-log entry 104): optional `ai` object marking a
-    # model-backed capability ("agent"). Whole-tree check like service_type --
-    # no already-published contract declares it, so it can never fail
-    # retroactively.
+    # spec 001 FR-017 (added decision-log entry 104; amended decision-log
+    # entry 124 / registry#571): optional `ai` object marking a model-backed
+    # capability ("agent"). Whole-tree check like service_type -- accepts
+    # BOTH the legacy `models: string[]` shape (grandfathered forever, since
+    # already-published immutable versions can never be edited to the new
+    # shape) and the new `models: object[]` shape (pinned HF/provenance
+    # attribution: id, spdx_expression, attribution_required, plus either
+    # huggingface_id+revision or source_url). Newly-ADDED contracts are
+    # additionally REQUIRED to use the object shape -- see
+    # check_new_contracts_declare_ai_models_object_shape's forward gate.
     ai = contract.get("ai")
     if ai is not None:
         if not isinstance(ai, dict):
@@ -541,14 +645,13 @@ def validate_contract(path: Path, errors: list) -> None:
                 errors,
                 "contract.invalid_ai",
                 str(path),
-                "contract 'ai' must be an object {model_backed: boolean, models?: string[]} (spec 001 FR-017)",
+                "contract 'ai' must be an object {model_backed: boolean, models?: string[] | object[]} (spec 001 FR-017)",
             )
         else:
             model_backed = ai.get("model_backed")
             models = ai.get("models")
             models_well_formed = models is None or (
-                isinstance(models, list)
-                and all(isinstance(m, str) and m.strip() for m in models)
+                isinstance(models, list) and _ai_models_shape_ok(models, path, errors)
             )
             if not isinstance(model_backed, bool):
                 fail(
@@ -557,12 +660,12 @@ def validate_contract(path: Path, errors: list) -> None:
                     str(path),
                     "ai.model_backed must be a boolean (spec 001 FR-017)",
                 )
-            if not models_well_formed:
+            if models is not None and not isinstance(models, list):
                 fail(
                     errors,
                     "contract.invalid_ai",
                     str(path),
-                    "ai.models must be an array of non-empty strings (spec 001 FR-017)",
+                    "ai.models must be an array of non-empty strings or model-reference objects (spec 001 FR-017)",
                 )
             if model_backed is True and not (
                 models_well_formed and isinstance(models, list) and len(models) > 0
@@ -1319,6 +1422,54 @@ def check_new_contracts_declare_licensing(base_sha: str, head_sha: str, errors: 
         status, path = parts[0], parts[-1]
         if status == "A" and path.endswith("contract.json"):
             check_new_contract_licensing(Path(path), errors)
+
+
+def check_new_contract_ai_models_object_shape(path: Path, errors: list) -> None:
+    """spec 001 FR-017 amendment (decision-log entry 124, registry#571): a
+    newly-ADDED contract.json with `ai.model_backed: true` MUST use the
+    object-shaped `ai.models` (pinned HF/provenance attribution), not the
+    legacy `string[]` shape -- FR-010-style forward gate, same shape as
+    check_new_contract_licensing. Already-published contracts keep the
+    string[] shape valid forever (see _ai_models_shape_ok); this only binds
+    what a PR may newly ADD. Per-entry shape validation itself still runs in
+    validate_contract (whole-tree) -- this function only enforces WHICH
+    shape a new contract must pick."""
+    try:
+        contract = json.loads(path.read_text())
+    except Exception:
+        return
+    ai = contract.get("ai")
+    if not isinstance(ai, dict) or ai.get("model_backed") is not True:
+        return
+    models = ai.get("models")
+    if not isinstance(models, list) or not models:
+        return  # missing/empty is already reported by validate_contract's ai check
+    if any(isinstance(m, str) for m in models):
+        fail(
+            errors,
+            "contract.ai_models_legacy_shape_on_new_contract",
+            str(path),
+            "newly added contract.json with ai.model_backed: true must use the "
+            "object-shaped ai.models (id, spdx_expression, attribution_required, "
+            "plus huggingface_id+revision or source_url) -- the legacy string[] "
+            "shape is grandfathered on already-published contracts only "
+            "(spec 001 FR-017 amendment; decision-log entry 124, registry#571)",
+        )
+
+
+def check_new_contracts_declare_ai_models_object_shape(base_sha: str, head_sha: str, errors: list) -> None:
+    """Only validates newly-ADDED contract.json files (FR-017 amendment forward gate)."""
+    diff = subprocess.check_output(
+        ["git", "diff", "--name-status", f"{base_sha}...{head_sha}", "--", "capabilities/"],
+        text=True,
+    )
+    for line in diff.splitlines():
+        if not line.strip():
+            continue
+        parts = line.split("\t")
+        status, path = parts[0], parts[-1]
+        if status == "A" and path.endswith("contract.json"):
+            check_new_contract_ai_models_object_shape(Path(path), errors)
 
 
 def _risk_shape_error(risk):
@@ -2732,6 +2883,10 @@ def main() -> int:
             fail(errors, "git.diff_failed", "capabilities/", f"Unable to compute diff: {exc}")
         try:
             check_new_contracts_declare_licensing(base_sha, head_sha, errors)
+        except subprocess.CalledProcessError as exc:
+            fail(errors, "git.diff_failed", "capabilities/", f"Unable to compute diff: {exc}")
+        try:
+            check_new_contracts_declare_ai_models_object_shape(base_sha, head_sha, errors)
         except subprocess.CalledProcessError as exc:
             fail(errors, "git.diff_failed", "capabilities/", f"Unable to compute diff: {exc}")
         try:

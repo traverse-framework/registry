@@ -59,6 +59,27 @@ class AiFieldHtmlTests(unittest.TestCase):
         self.assertIn("Models", html)
         self.assertIn("minishlab/potion-base-32M", html)
 
+    def test_object_shaped_models_still_render_id_in_summary_row(self):
+        # spec 001 FR-017 amendment (Decision 124 / registry#571): the
+        # "Models" summary row must not go silently empty for the new
+        # object-shaped ai.models -- extract the id the same as string[].
+        html = self.mod.ai_field_html(
+            {
+                "model_backed": True,
+                "models": [
+                    {
+                        "id": "dslim/distilbert-NER",
+                        "spdx_expression": "Apache-2.0",
+                        "attribution_required": False,
+                        "source_url": "https://huggingface.co/dslim/distilbert-NER",
+                    }
+                ],
+            }
+        )
+        self.assertIn("badge-agent", html)
+        self.assertIn("Models", html)
+        self.assertIn("dslim/distilbert-NER", html)
+
 
 class LicensingSidebarTests(unittest.TestCase):
     """registry#563 / Spec 025: license card on static capability pages."""
@@ -162,10 +183,116 @@ class ModelAttributionSidebarTests(unittest.TestCase):
             "",
         )
 
+    def test_object_shaped_model_ref_is_pinned_on_contract_not_looked_up(self):
+        # spec 001 FR-017 amendment (Decision 124 / registry#571): an
+        # object-shaped ai.models entry is rendered from the contract's own
+        # pinned data, never consulting catalog/model-attribution.json.
+        html = self.mod.model_attribution_sidebar_html(
+            {
+                "namespace": "text",
+                "id": "text.redact-entities",
+                "version": "1.0.0",
+                "ai": {
+                    "model_backed": True,
+                    "models": [
+                        {
+                            "id": "dslim/distilbert-NER",
+                            "spdx_expression": "Apache-2.0",
+                            "attribution_required": False,
+                            "huggingface_id": "dslim/distilbert-NER",
+                            "revision": "cafe123",
+                        }
+                    ],
+                },
+            }
+        )
+        self.assertIn("Model licenses", html)
+        self.assertIn("dslim/distilbert-NER", html)
+        self.assertIn("Apache-2.0", html)
+        self.assertIn("cafe123", html)
+        self.assertIn("Pinned on this capability", html)
+
+    def test_object_shaped_model_ref_with_source_url_renders_source_row(self):
+        html = self.mod.model_attribution_sidebar_html(
+            {
+                "namespace": "audio",
+                "id": "audio.detect-speech-segments",
+                "version": "1.0.0",
+                "ai": {
+                    "model_backed": True,
+                    "models": [
+                        {
+                            "id": "snakers4/silero-vad",
+                            "spdx_expression": "MIT",
+                            "attribution_required": True,
+                            "source_url": "https://github.com/snakers4/silero-vad",
+                        }
+                    ],
+                },
+            }
+        )
+        self.assertIn("https://github.com/snakers4/silero-vad", html)
+        self.assertIn("Attribution", html)
+
+    def test_mixed_legacy_and_object_shapes_both_render(self):
+        html = self.mod.model_attribution_sidebar_html(
+            {
+                "namespace": "core",
+                "id": "core.example-multi-model",
+                "version": "1.0.0",
+                "ai": {
+                    "model_backed": True,
+                    "models": [
+                        "dslim/distilbert-NER",
+                        {
+                            "id": "openai/whisper-tiny",
+                            "spdx_expression": "MIT",
+                            "attribution_required": True,
+                            "huggingface_id": "openai/whisper-tiny",
+                            "revision": "deadbee",
+                        },
+                    ],
+                },
+            }
+        )
+        # legacy entry: looked up in catalog/model-attribution.json
+        self.assertIn("Apache-2.0", html)
+        # object entry: pinned on the contract itself
+        self.assertIn("deadbee", html)
+        self.assertIn("Pinned on this capability", html)
+
     def test_single_model_page_block(self):
-        html = self.mod.single_model_attribution_html("openai/whisper-tiny")
+        html = self.mod.single_model_attribution_html("openai/whisper-tiny", [])
         self.assertIn("Model license", html)
         self.assertIn("Copyright (c) 2022 OpenAI", html)
+
+    def test_single_model_page_block_prefers_inline_object_ref(self):
+        # spec 001 FR-017 amendment (Decision 124 / registry#571): when a
+        # matching capability declares this model in the new object shape,
+        # that pinned contract data wins over catalog/model-attribution.json.
+        matching = [
+            {
+                "contract": {
+                    "ai": {
+                        "model_backed": True,
+                        "models": [
+                            {
+                                "id": "openai/whisper-tiny",
+                                "spdx_expression": "MIT",
+                                "attribution_required": True,
+                                "huggingface_id": "openai/whisper-tiny",
+                                "revision": "deadbee",
+                            }
+                        ],
+                    }
+                }
+            }
+        ]
+        html = self.mod.single_model_attribution_html("openai/whisper-tiny", matching)
+        self.assertIn("Model license", html)
+        self.assertIn("deadbee", html)
+        self.assertIn("Pinned on this capability", html)
+        self.assertNotIn("Copyright (c) 2022 OpenAI", html)
 
 
 if __name__ == "__main__":
