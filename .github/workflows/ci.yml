@@ -76,10 +76,20 @@ jobs:
       # registry#509: check_new_contracts_have_wasm32_execution runs the
       # newly-published capability's actual wasm32 artifact, same recipe
       # build-catalog already uses to run catalog-builder.wasm.
+      # registry#576: connector-backed capabilities need the mediated
+      # connector_invoke mock host (scripts/ci/wasm32_fixture_runner).
       - name: Install wasmtime
         run: |
           curl https://wasmtime.dev/install.sh -sSf | bash
           echo "$HOME/.wasmtime/bin" >> "$GITHUB_PATH"
+
+      - name: Build connector-aware wasm32 fixture runner
+        run: |
+          cargo build --manifest-path scripts/ci/wasm32_fixture_runner/Cargo.toml
+          echo "WASM32_FIXTURE_RUNNER_BIN=${{ github.workspace }}/scripts/ci/wasm32_fixture_runner/target/debug/wasm32-fixture-runner" >> "$GITHUB_ENV"
+
+      - name: Test connector-aware wasm32 fixture runner
+        run: cargo test --manifest-path scripts/ci/wasm32_fixture_runner/Cargo.toml
 
       - name: Build event-product validator
         run: cargo build --locked -p traverse-registry --bin validate_event_products

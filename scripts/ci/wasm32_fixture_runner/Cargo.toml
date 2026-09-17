@@ -1,0 +1,17 @@
+[package]
+name = "wasm32-fixture-runner"
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+publish = false
+description = "CI helper: run a capability WASM under WASI with an optional mediated connector_invoke mock (registry#576)."
+
+# Standalone CI helper — not part of the traverse-registry workspace.
+[workspace]
+
+[dependencies]
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+wat = "1.0"
+wasmtime = { version = "44", default-features = false, features = ["cranelift", "runtime", "std", "wat"] }
+wasmtime-wasi = "44"

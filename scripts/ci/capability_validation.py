@@ -105,6 +105,16 @@ see OVERSIZED_INTEGER_VALUE's comment for the text.truncate@1.0.0 (#487)
 incident that motivated this. Diff-based, same reason as every other
 new-contract check above.
 
+Also enforces registry#576 (decision-log entry 126): when a newly-ADDED
+contract declares non-empty connector_requirements (or its wasm imports
+traverse_host::connector_invoke), the wasm32 gate provisions a
+deterministic mediated connector_invoke mock via
+scripts/ci/wasm32_fixture_runner rather than bare `wasmtime run`, runs a
+positive activated fixture and a negative unbound (fail-closed) fixture,
+and accepts optional use_cases[].connector_fixture response bodies that
+MUST NOT carry host paths or credentials. Pure capabilities keep the
+wasmtime CLI path unchanged.
+
 Also enforces registry#510 (decision-log entry 113 Q5): a newly-ADDED
 contract.json's artifact.url must actually be fetchable and its bytes must
 match artifact.digest, not just have the right shape (which
@@ -121,6 +131,7 @@ import os
 import re
 import subprocess
 import sys
+import tempfile
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -1501,12 +1512,23 @@ def check_new_contract_test_coverage(path: Path, errors: list) -> None:
         return
 
     if result.returncode != 0:
+        stderr_tail = result.stderr.strip()[-2000:]
+        hint = ""
+        if "E0152" in result.stderr or "lang item" in result.stderr:
+            hint = (
+                " — bare #![no_std]/#![no_main] crates cannot be measured by "
+                "cargo llvm-cov on the host; use "
+                "#![cfg_attr(not(test), no_std)] / "
+                "#![cfg_attr(not(test), no_main)] and #[cfg(test)] stubs for "
+                "traverse_host imports (see CONTRIBUTING.md 'Effectful / "
+                "connector-backed capabilities')"
+            )
         fail(
             errors,
             "capability.test_coverage_build_or_test_failed",
             str(path),
             f"cargo llvm-cov failed for '{capability_id}' "
-            f"({manifest_path}): {result.stderr.strip()[-2000:]}",
+            f"({manifest_path}): {stderr_tail}{hint}",
         )
         return
 
@@ -1602,22 +1624,158 @@ def _happy_path_fixtures(contract: dict) -> list:
     return fixtures
 
 
-def _run_wasm32_fixture(wasm_path: Path, fixture: dict):
+# Keys that must never appear in fixture-declared connector responses
+# (Spec 104 FR-004: host paths/credentials stay host-owned).
+_CONNECTOR_FIXTURE_FORBIDDEN_KEY_RE = re.compile(
+    r"(password|secret|credential|token|api[_-]?key|private[_-]?key|"
+    r"filepath|file_path|host_path|absolute_path|endpoint_url|connection_string)",
+    re.IGNORECASE,
+)
+
+
+def _contract_declares_connectors(contract: dict) -> bool:
+    requirements = contract.get("connector_requirements")
+    return isinstance(requirements, list) and len(requirements) > 0
+
+
+def _forbidden_connector_fixture_keys(value, path="") -> list:
+    """Return dotted paths of keys that look like host-private material."""
+    found = []
+    if isinstance(value, dict):
+        for key, child in value.items():
+            child_path = f"{path}.{key}" if path else str(key)
+            if _CONNECTOR_FIXTURE_FORBIDDEN_KEY_RE.search(str(key)):
+                found.append(child_path)
+            found.extend(_forbidden_connector_fixture_keys(child, child_path))
+    elif isinstance(value, list):
+        for index, child in enumerate(value):
+            found.extend(
+                _forbidden_connector_fixture_keys(child, f"{path}[{index}]")
+            )
+    return found
+
+
+def _connector_fixture_for_use_case(contract: dict, use_case: dict) -> dict:
+    """Build the JSON document passed to wasm32-fixture-runner.
+
+    Publishers may declare an explicit use_cases[].connector_fixture. Otherwise
+    the gate synthesizes one response per connector_requirements entry whose
+    payload is the use case's output_example (Callweave-style guests copy the
+    host response payload to stdout).
+    """
+    explicit = use_case.get("connector_fixture")
+    if isinstance(explicit, dict):
+        return explicit
+
+    responses = []
+    for requirement in contract.get("connector_requirements") or []:
+        if not isinstance(requirement, dict):
+            continue
+        connector_id = requirement.get("connector_id")
+        if not isinstance(connector_id, str) or not connector_id.strip():
+            continue
+        output_example = use_case.get("output_example")
+        payload = output_example if isinstance(output_example, dict) else {}
+        responses.append(
+            {
+                "connector_id": connector_id,
+                # Empty operation = wildcard match in the fixture runner.
+                "operation": "",
+                "body": {
+                    "abi_version": "1.0.0",
+                    "result_class": "ok",
+                    "payload": payload,
+                },
+            }
+        )
+    return {"activated": True, "responses": responses}
+
+
+def _unbound_connector_fixture() -> dict:
+    return {"activated": False, "responses": []}
+
+
+def _wasm32_fixture_runner_bin() -> Path:
+    """Resolve the connector-aware fixture runner binary.
+
+    Prefers WASM32_FIXTURE_RUNNER_BIN (CI sets this after building the helper).
+    Falls back to the debug build under scripts/ci/wasm32_fixture_runner/target
+    for local iteration.
+    """
+    override = os.environ.get("WASM32_FIXTURE_RUNNER_BIN")
+    if override:
+        return Path(override)
+    return (
+        Path("scripts/ci/wasm32_fixture_runner/target/debug/wasm32-fixture-runner")
+    )
+
+
+def _run_wasm32_fixture(wasm_path: Path, fixture: dict, connector_fixture=None):
     """Runs one JSON fixture through wasmtime (stdin in, stdout out -- the
     wasi-capability-runtime ABI every capability-src/ crate shares). Returns
-    (returncode, stdout, stderr); returncode is None if wasmtime itself
-    could not be invoked."""
+    (returncode, stdout, stderr); returncode is None if the runner itself
+    could not be invoked.
+
+    When connector_fixture is provided (registry#576), uses the mediated
+    connector_invoke mock host instead of bare `wasmtime run`.
+    """
     try:
-        result = subprocess.run(
-            ["wasmtime", "run", str(wasm_path)],
-            input=json.dumps(fixture),
-            capture_output=True,
-            text=True,
-            timeout=30,
-        )
+        if connector_fixture is None:
+            result = subprocess.run(
+                ["wasmtime", "run", str(wasm_path)],
+                input=json.dumps(fixture),
+                capture_output=True,
+                text=True,
+                timeout=30,
+            )
+            return result.returncode, result.stdout, result.stderr
+
+        runner = _wasm32_fixture_runner_bin()
+        if not runner.is_file():
+            return (
+                None,
+                "",
+                f"connector-aware wasm32 fixture runner not found at {runner} "
+                "(build scripts/ci/wasm32_fixture_runner or set "
+                "WASM32_FIXTURE_RUNNER_BIN)",
+            )
+
+        with tempfile.TemporaryDirectory() as tmp:
+            fixture_path = Path(tmp) / "connector-fixture.json"
+            fixture_path.write_text(json.dumps(connector_fixture))
+            result = subprocess.run(
+                [
+                    str(runner),
+                    "--wasm",
+                    str(wasm_path),
+                    "--connector-fixture",
+                    str(fixture_path),
+                ],
+                input=json.dumps(fixture),
+                capture_output=True,
+                text=True,
+                timeout=30,
+            )
+        return result.returncode, result.stdout, result.stderr
     except Exception as exc:
         return None, "", str(exc)
-    return result.returncode, result.stdout, result.stderr
+
+
+def _stdout_indicates_connector_unavailable(stdout: str) -> bool:
+    if "connector_unavailable" in stdout:
+        return True
+    try:
+        output = json.loads(stdout)
+    except Exception:
+        return False
+    if not isinstance(output, dict):
+        return False
+    result_class = output.get("result_class")
+    return isinstance(result_class, str) and result_class in {
+        "connector_unavailable",
+        "unavailable",
+        "unbound",
+    }
 
 
 def check_new_contract_wasm32_execution(path: Path, errors: list) -> None:
@@ -1627,7 +1785,12 @@ def check_new_contract_wasm32_execution(path: Path, errors: list) -> None:
     OVERSIZED_INTEGER_VALUE comment above for the #487 incident this closes.
     Deliberately does not re-report a missing capability-src/ crate --
     check_new_contract_test_coverage already does, and this check runs after
-    it in main()."""
+    it in main().
+
+    registry#576: when connector_requirements is non-empty, provision the
+    mediated connector_invoke mock, run activated happy fixtures, and prove
+    unbound activation fails closed.
+    """
     try:
         contract = json.loads(path.read_text())
     except Exception:
@@ -1643,7 +1806,8 @@ def check_new_contract_wasm32_execution(path: Path, errors: list) -> None:
 
     input_schema = (contract.get("inputs") or {}).get("schema") or {}
     happy_fixtures = _happy_path_fixtures(contract)
-    if not happy_fixtures:
+    connector_backed = _contract_declares_connectors(contract)
+    if not happy_fixtures and not connector_backed:
         # No happy-path use case to execute -- nothing for this gate to run,
         # and no need to pay for a wasm32 build. check_new_use_cases_...
         # already requires a non-empty use_cases array elsewhere; not this
@@ -1712,22 +1876,71 @@ def check_new_contract_wasm32_execution(path: Path, errors: list) -> None:
         )
         return
 
-    fixtures = [("happy", f) for f in happy_fixtures]
+    # Pair each happy input with its use_case so connector fixtures can be
+    # derived (output_example / explicit connector_fixture).
+    happy_use_cases = [
+        use_case
+        for use_case in (contract.get("use_cases") or [])
+        if isinstance(use_case, dict)
+        and use_case.get("happy")
+        and isinstance(use_case.get("input_example"), dict)
+    ]
+
+    fixtures = []
+    for use_case in happy_use_cases:
+        connector_fixture = None
+        if connector_backed:
+            connector_fixture = _connector_fixture_for_use_case(contract, use_case)
+            forbidden = _forbidden_connector_fixture_keys(connector_fixture)
+            if forbidden:
+                fail(
+                    errors,
+                    "capability.connector_fixture_leaks_host_private_data",
+                    str(path),
+                    f"'{capability_id}' connector_fixture declares host-private "
+                    f"key(s) {forbidden} -- Spec 104 FR-004 forbids paths/"
+                    f"credentials in guest-visible fixture responses",
+                )
+                continue
+        fixtures.append(("happy", use_case["input_example"], connector_fixture))
+
+    if connector_backed and happy_use_cases:
+        # Negative path: same first happy input, unbound connector (fail closed).
+        fixtures.append(
+            (
+                "connector_unbound",
+                happy_use_cases[0]["input_example"],
+                _unbound_connector_fixture(),
+            )
+        )
+
     for field in _budget_integer_fields(input_schema):
         base = next((f for f in happy_fixtures if field in f), None)
         if base is None:
             continue
         zero_fixture = dict(base)
         zero_fixture[field] = 0
-        fixtures.append((f"{field}=0", zero_fixture))
+        fixtures.append((f"{field}=0", zero_fixture, None if not connector_backed else _connector_fixture_for_use_case(contract, happy_use_cases[0] if happy_use_cases else {})))
 
         oversized_fixture = dict(base)
         oversized_fixture[field] = OVERSIZED_INTEGER_VALUE
-        fixtures.append((f"{field}=oversized:{id(base)}", oversized_fixture))
+        fixtures.append(
+            (
+                f"{field}=oversized:{id(base)}",
+                oversized_fixture,
+                None
+                if not connector_backed
+                else _connector_fixture_for_use_case(
+                    contract, happy_use_cases[0] if happy_use_cases else {}
+                ),
+            )
+        )
 
     baseline_outputs = {}
-    for label, fixture in fixtures:
-        returncode, stdout, stderr = _run_wasm32_fixture(wasm_path, fixture)
+    for label, fixture, connector_fixture in fixtures:
+        returncode, stdout, stderr = _run_wasm32_fixture(
+            wasm_path, fixture, connector_fixture=connector_fixture
+        )
         if returncode is None:
             fail(
                 errors,
@@ -1747,6 +1960,19 @@ def check_new_contract_wasm32_execution(path: Path, errors: list) -> None:
                 f"({json.dumps(fixture)}): {stderr.strip()[-2000:]}",
             )
             continue
+
+        if label == "connector_unbound":
+            if not _stdout_indicates_connector_unavailable(stdout):
+                fail(
+                    errors,
+                    "capability.connector_unbound_did_not_fail_closed",
+                    str(path),
+                    f"'{capability_id}' unbound-connector fixture exited 0 but "
+                    f"stdout did not indicate fail-closed connector_unavailable "
+                    f"(got {stdout.strip()[:500]!r})",
+                )
+            continue
+
         try:
             output = json.loads(stdout)
         except Exception as exc:
