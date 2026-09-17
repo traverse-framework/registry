@@ -60,5 +60,65 @@ class AiFieldHtmlTests(unittest.TestCase):
         self.assertIn("minishlab/potion-base-32M", html)
 
 
+class LicensingSidebarTests(unittest.TestCase):
+    """registry#563 / Spec 025: license card on static capability pages."""
+
+    def setUp(self):
+        self.mod = load_module()
+
+    def test_absent_licensing_renders_unknown_not_allowed(self):
+        html = self.mod.licensing_sidebar_html({"id": "demo.cap"})
+        self.assertIn("sidebar-card-title", html)
+        self.assertIn(">unknown<", html)
+        self.assertIn("deny-by-default", html)
+        self.assertNotIn(">allowed<", html)
+
+    def test_present_licensing_projects_rights_and_spdx(self):
+        html = self.mod.licensing_sidebar_html(
+            {
+                "licensing": {
+                    "spdx_expression": "MIT",
+                    "commercial_use": "allowed",
+                    "redistribution": "forbidden",
+                    "attribution_required": True,
+                    "verification": {"status": "maintainer-declared"},
+                }
+            }
+        )
+        self.assertIn("MIT", html)
+        self.assertIn("badge-success", html)
+        self.assertIn("badge-danger", html)
+        self.assertIn("maintainer-declared", html)
+        self.assertIn("Attribution", html)
+        self.assertIn("Spec 025", html)
+
+    def test_package_sidebar_includes_license_and_package_cards(self):
+        entry = {
+            "deprecated": False,
+            "contract": {
+                "namespace": "demo",
+                "id": "demo.cap",
+                "version": "1.0.0",
+                "service_type": "stateless",
+                "permitted_targets": ["wasm"],
+                "owner": {"team": "traverse-core"},
+                "artifact": {
+                    "digest": "sha256:abc",
+                    "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/demo.cap-1.0.0/demo.wasm",
+                },
+            },
+        }
+        html = self.mod.package_sidebar_html(
+            entry,
+            "https://registry.traverse-framework.com",
+            "/capability/demo/demo.cap/1.0.0/",
+        )
+        self.assertIn("License", html)
+        self.assertIn("Package", html)
+        self.assertIn("1.0.0", html)
+        self.assertIn("CORS mirror", html)
+        self.assertIn("deny-by-default", html)
+
+
 if __name__ == "__main__":
     unittest.main()

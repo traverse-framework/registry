@@ -148,9 +148,179 @@ def owner_html(owner: dict) -> str:
         return ""
     handle = OWNER_GITHUB.get(team)
     if not handle:
-        return field_row(team, team)
+        return field_row("Owner", team)
     link = f'<a href="https://github.com/{esc(handle)}" target="_blank" rel="noopener">@{esc(handle)}</a>'
     return field_row_html("Owner", f"{esc(team)} · {link}")
+
+
+def sidebar_row(label: str, value_html: str) -> str:
+    if not value_html:
+        return ""
+    return (
+        f'<div class="sidebar-row"><span class="sidebar-label">{esc(label)}</span>'
+        f'<span class="sidebar-value">{value_html}</span></div>'
+    )
+
+
+def rights_badge_class(value: str) -> str:
+    if value == "allowed":
+        return "badge badge-success"
+    if value == "forbidden":
+        return "badge badge-danger"
+    if value == "conditional":
+        return "badge badge-conditional"
+    return "badge"
+
+
+def normalize_licensing(contract: dict) -> dict:
+    """Spec 025 display projection: absent licensing → explicit unknown."""
+    licensing = contract.get("licensing")
+    if not isinstance(licensing, dict):
+        return {
+            "present": False,
+            "spdx": None,
+            "commercial_use": "unknown",
+            "redistribution": "unknown",
+            "verification_status": "unknown",
+            "attribution_required": False,
+            "source_url": None,
+        }
+    verification = licensing.get("verification")
+    status = "unknown"
+    if isinstance(verification, dict) and verification.get("status"):
+        status = str(verification["status"])
+    return {
+        "present": True,
+        "spdx": licensing.get("spdx_expression"),
+        "commercial_use": licensing.get("commercial_use") or "unknown",
+        "redistribution": licensing.get("redistribution") or "unknown",
+        "verification_status": status,
+        "attribution_required": licensing.get("attribution_required") is True,
+        "source_url": licensing.get("source_url"),
+    }
+
+
+def licensing_sidebar_html(contract: dict) -> str:
+    info = normalize_licensing(contract)
+    rows = []
+    if info["spdx"]:
+        rows.append(sidebar_row("License", f'<span class="t-mono">{esc(info["spdx"])}</span>'))
+    else:
+        rows.append(sidebar_row("License", '<span class="badge">unknown</span>'))
+    rows.append(
+        sidebar_row(
+            "Commercial use",
+            f'<span class="{rights_badge_class(info["commercial_use"])}">{esc(info["commercial_use"])}</span>',
+        )
+    )
+    rows.append(
+        sidebar_row(
+            "Redistribution",
+            f'<span class="{rights_badge_class(info["redistribution"])}">{esc(info["redistribution"])}</span>',
+        )
+    )
+    rows.append(
+        sidebar_row(
+            "Verification",
+            f'<span class="badge">{esc(info["verification_status"])}</span>',
+        )
+    )
+    if info["present"] and info["attribution_required"]:
+        rows.append(sidebar_row("Attribution", "required"))
+    if info["source_url"]:
+        url = esc(info["source_url"])
+        rows.append(sidebar_row("License source", f'<a href="{url}">{url}</a>'))
+    note = (
+        "Publisher-declared capability artifact rights (Spec 025). Not a legal "
+        "certification; model/dataset rights do not inherit. unknown / conditional / "
+        "forbidden are never permission."
+        if info["present"]
+        else "No licensing block on this version — treat commercial use and "
+        "redistribution as unknown (deny-by-default). New versions must declare licensing."
+    )
+    return (
+        '<div class="sidebar-card"><div class="sidebar-card-title">License</div>'
+        f'{"".join(rows)}<p class="sidebar-note">{esc(note)}</p></div>'
+    )
+
+
+def package_sidebar_html(
+    entry: dict,
+    base_url: str,
+    permalink: str,
+) -> str:
+    contract = entry["contract"]
+    rows = [
+        sidebar_row("Version", f'<span class="t-mono">{esc(contract["version"])}</span>'),
+        sidebar_row("Namespace", f'<span class="t-mono">{esc(contract["namespace"])}</span>'),
+    ]
+    if contract.get("lifecycle"):
+        rows.append(sidebar_row("Lifecycle", f'<span class="badge">{esc(contract["lifecycle"])}</span>'))
+    if entry.get("deprecated"):
+        rows.append(sidebar_row("Status", '<span class="badge badge-danger">deprecated</span>'))
+
+    service_type = contract.get("service_type")
+    if service_type:
+        definition = SERVICE_TYPE_DEFINITIONS.get(service_type)
+        if definition:
+            href = f"{base_url}/{service_type_page_path(service_type)}"
+            rows.append(
+                sidebar_row(
+                    "Service type",
+                    f'<a class="badge" href="{esc(href)}">{esc(definition["name"])}</a>',
+                )
+            )
+        else:
+            rows.append(sidebar_row("Service type", esc(service_type)))
+
+    ai = contract.get("ai")
+    if isinstance(ai, dict) and ai.get("model_backed") is True:
+        rows.append(sidebar_row("Agent", '<span class="badge badge-agent">model-backed</span>'))
+        models = [m for m in (ai.get("models") or []) if isinstance(m, str) and m.strip()]
+        if models:
+            rows.append(sidebar_row("Models", esc(", ".join(models))))
+
+    targets = ", ".join(contract.get("permitted_targets") or [])
+    if targets:
+        rows.append(sidebar_row("Targets", esc(targets)))
+
+    owner = contract.get("owner") or {}
+    team = owner.get("team")
+    if team:
+        handle = OWNER_GITHUB.get(team)
+        if handle:
+            rows.append(
+                sidebar_row(
+                    "Owner",
+                    f'{esc(team)} · <a href="https://github.com/{esc(handle)}" '
+                    f'target="_blank" rel="noopener">@{esc(handle)}</a>',
+                )
+            )
+        else:
+            rows.append(sidebar_row("Owner", esc(team)))
+
+    artifact = contract.get("artifact") or {}
+    if artifact.get("digest"):
+        rows.append(sidebar_row("Digest", f'<span class="t-mono">{esc(artifact["digest"])}</span>'))
+    if artifact.get("url"):
+        rows.append(
+            sidebar_row("Artifact", f'<a href="{esc(artifact["url"])}">{esc(artifact["url"])}</a>')
+        )
+        mirror_url = artifact_mirror_url(base_url, artifact["url"])
+        if mirror_url:
+            rows.append(
+                sidebar_row(
+                    "CORS mirror",
+                    f'<a href="{esc(mirror_url)}">{esc(mirror_url)}</a>',
+                )
+            )
+    rows.append(sidebar_row("Permalink", f'<a href="{esc(permalink)}">{esc(permalink)}</a>'))
+
+    return (
+        f'{licensing_sidebar_html(contract)}'
+        '<div class="sidebar-card"><div class="sidebar-card-title">Package</div>'
+        f'{"".join(rows)}</div>'
+    )
 
 
 def find_event_by_id(catalog_events: list, event_id: str) -> Optional[dict]:
@@ -469,7 +639,8 @@ PAGE_TEMPLATE = """<!doctype html>
 <h1 class="t-h1 detail-title">{id}</h1>
 {summary_html}
 {description_html}
-{field_rows}
+<div class="detail-layout">
+<div class="detail-main">
 <h2 class="t-h2">Use cases</h2>
 {use_cases_html}
 <h2 class="t-h2">Test coverage</h2>
@@ -482,6 +653,9 @@ PAGE_TEMPLATE = """<!doctype html>
 {version_history_html}
 <details><summary>Full contract.json</summary>{raw_contract_block}</details>
 <p style="margin-top:2rem"><a href="/#/capability/{encoded_reference}">Open in the interactive catalog →</a></p>
+</div>
+<aside class="detail-sidebar">{sidebar_html}</aside>
+</div>
 </div>
 <footer class="site-footer">
 <div class="footer-inner">
@@ -545,23 +719,6 @@ def render_capability_page(
     summary = contract.get("summary") or ""
     description = contract.get("description") or ""
 
-    field_rows = "".join(
-        [
-            service_type_field_html(contract.get("service_type"), base_url),
-            ai_field_html(contract.get("ai")),
-            field_row("Permitted targets", ", ".join(contract.get("permitted_targets") or [])),
-            owner_html(contract.get("owner")),
-        ]
-    )
-    artifact = contract.get("artifact") or {}
-    if artifact.get("digest"):
-        field_rows += f'<div class="field-row"><span class="field-label">Artifact digest</span><span class="field-value t-mono">{esc(artifact["digest"])}</span></div>'
-    if artifact.get("url"):
-        field_rows += f'<div class="field-row"><span class="field-label">Artifact</span><span class="field-value"><a href="{esc(artifact["url"])}">{esc(artifact["url"])}</a></span></div>'
-        mirror_url = artifact_mirror_url(base_url, artifact["url"])
-        if mirror_url:
-            field_rows += f'<div class="field-row"><span class="field-label">Artifact (CORS mirror)</span><span class="field-value"><a href="{esc(mirror_url)}">{esc(mirror_url)}</a></span></div>'
-
     use_cases = contract.get("use_cases") or []
     use_cases_html = (
         "".join(use_case_block(uc, base_url, personas_by_id) for uc in use_cases)
@@ -585,6 +742,7 @@ def render_capability_page(
 
     title = f"{contract['id']}@{contract['version']} · Traverse Registry Catalog"
     canonical_url = f"{base_url}/{capability_page_path(contract)}"
+    permalink = f"/{capability_page_path(contract)}"
 
     return PAGE_TEMPLATE.format(
         site_nav=SITE_NAV_HTML,
@@ -597,7 +755,7 @@ def render_capability_page(
         id=esc(contract["id"]),
         summary_html=f'<p class="detail-summary">{esc(summary)}</p>' if summary else "",
         description_html=f'<p class="detail-description">{esc(description)}</p>' if description else "",
-        field_rows=field_rows,
+        sidebar_html=package_sidebar_html(entry, base_url, permalink),
         use_cases_html=use_cases_html,
         coverage_html=coverage_block(entry.get("test_coverage")),
         interface_html="".join(interface_parts),

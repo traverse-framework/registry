@@ -15,13 +15,16 @@ It fetches `./catalog.json` at page-load time and renders:
   by default (a checkbox hides them) and free-text search across
   `search_index`.
 - A hash-routed (`#/capability/<namespace>/<id>@<version>`, shareable)
-  **detail view** per capability version: description, a prominent **use
-  cases** section (color-coded happy/unhappy, real input/output JSON),
+  **detail view** per capability version in an npm-inspired two-column
+  layout (registry#563): hero title/summary/description; main column with
+  **use cases** (color-coded happy/unhappy, real input/output JSON),
   **test coverage** (real `cargo llvm-cov` line/function/region percentages
-  and test count -- see below), an **interface** section (input/output JSON
-  schemas plus execution constraints and permissions), a **version history**
-  list linking every version of that same capability id (marking the current
-  and any deprecated ones), and a collapsible raw `contract.json`.
+  and test count -- see below), **interface**, **events**, **version
+  history**, and a collapsible raw `contract.json`; sticky sidebar with
+  Spec 025 **License** (SPDX, commercial use, redistribution, verification
+  -- missing block shows `unknown` / deny-by-default, never as allowed)
+  plus package facts (version, namespace, service type, owner, artifact,
+  permalink).
 
 Client-side routing was chosen for this interactive experience because the
 WASM ABI only allows a single output stream (`fd_write`) per invocation --
