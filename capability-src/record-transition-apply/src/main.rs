@@ -122,6 +122,7 @@ mod tests {
         assert!(json_value_end(br#""x""#).is_some());
         assert!(balanced_end(br#"{"x":"[\\\"]"}"#).is_some());
         assert!(balanced_end(b"{").is_none());
+        assert!(balanced_end(b"}").is_none());
         assert!(string_end(b"\"x\"").is_some());
         assert!(string_end(b"\"x").is_none());
         assert_eq!(string_after(br#"{"k":"value"}"#, b"\"k\""), b"value");
@@ -133,6 +134,12 @@ mod tests {
         assert!(append(&mut output, &mut at, b"y"));
         assert!(append_json_string(&mut output, &mut at, b"ok"));
         assert!(append_i32(&mut output, &mut at, 42));
+        let mut tiny = [0u8; 1];
+        let mut tiny_at = 1;
+        assert!(!append(&mut tiny, &mut tiny_at, b"x"));
+        assert!(!append_json_string(&mut tiny, &mut tiny_at, b"x"));
+        assert!(!append_i32(&mut tiny, &mut tiny_at, 7));
+        assert_eq!(unavailable(&mut tiny, b"x"), 0);
         assert!(unavailable(&mut output, b"invalid_request") > 0);
         let input = br#"{"record_refs":[],"transition":{},"idempotency_key":"k","expected_version":12}"#;
         let n = apply_transition(input, &mut request, &mut response, &mut output);
@@ -140,6 +147,9 @@ mod tests {
         for invalid in [br#"{"record_refs":[]}"# as &[u8], br#"{"record_refs":[],"transition":{}}"#, br#"{"record_refs":{},"transition":{},"idempotency_key":"k"}"#, br#"{"record_refs":[],"transition":{},"idempotency_key":1}"#] {
             let n = apply_transition(invalid, &mut request, &mut response, &mut output);
             assert!(core::str::from_utf8(&output[..n]).unwrap().contains("invalid_request"));
+        }
+        for malformed in [b"{\"record_refs\":[],\"transition\":{},\"idempotency_key\":\"k\" tail".as_slice(), b"{\"record_refs\":[],\"transition\":{},\"idempotency_key\":\"k\"}".as_slice()] {
+            assert!(value_after(malformed, b"\"record_refs\"").is_none() || !malformed.ends_with(b"tail"));
         }
         let mut tiny_request = [0u8; 8];
         let n = apply_transition(input, &mut tiny_request, &mut response, &mut output);
