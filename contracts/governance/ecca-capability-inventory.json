@@ -988,6 +988,13 @@
       "path": "capabilities/record/record.transition-apply/1.0.1/contract.json",
       "classification": "no-event-required",
       "evidence": "direct idempotent transition result; no asynchronous domain event is emitted or consumed."
+    },
+    {
+      "capability_id": "artifact.recording-finalize",
+      "published_versions": ["1.0.1"],
+      "path": "capabilities/artifact/artifact.recording-finalize/1.0.1/contract.json",
+      "classification": "no-event-required",
+      "evidence": "direct immutable artifact finalization result; no asynchronous domain event is emitted or consumed."
     }
   ]
 }
