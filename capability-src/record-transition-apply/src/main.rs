@@ -103,6 +103,7 @@ mod tests {
         let mut request = [0u8; 8192];
         let mut response = [0u8; 4096];
         let mut output = [0u8; 4096];
+        assert_eq!(unsafe { connector_invoke(0, 0, 0, 0) }, 0);
         let length = apply_transition(b"{}", &mut request, &mut response, &mut output);
         assert_eq!(&output[..length], b"{\"result_ref\":\"\",\"version\":0,\"replay\":false,\"result_class\":\"invalid_request\"}");
     }
@@ -136,6 +137,13 @@ mod tests {
         let input = br#"{"record_refs":[],"transition":{},"idempotency_key":"k","expected_version":12}"#;
         let n = apply_transition(input, &mut request, &mut response, &mut output);
         assert!(core::str::from_utf8(&output[..n]).unwrap().contains("\"result_ref\":\"r\""));
+        for invalid in [br#"{"record_refs":[]}"# as &[u8], br#"{"record_refs":[],"transition":{}}"#, br#"{"record_refs":{},"transition":{},"idempotency_key":"k"}"#, br#"{"record_refs":[],"transition":{},"idempotency_key":1}"#] {
+            let n = apply_transition(invalid, &mut request, &mut response, &mut output);
+            assert!(core::str::from_utf8(&output[..n]).unwrap().contains("invalid_request"));
+        }
+        let mut tiny_request = [0u8; 8];
+        let n = apply_transition(input, &mut tiny_request, &mut response, &mut output);
+        assert!(n > 0);
     }
 }
 
