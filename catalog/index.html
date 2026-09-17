@@ -114,6 +114,7 @@
 (function () {
   var appEl = document.getElementById("app");
   var catalog = null;
+  var modelAttribution = { models: {}, capability_extra_models: {} };
   var showDeprecated = true;
   var searchQuery = "";
   var searchDebounceTimer = null;
@@ -733,13 +734,68 @@
       rows.push(sidebarRow("License source", el("a", { href: info.source_url, textContent: info.source_url, target: "_blank", rel: "noopener" })));
     }
     var note = info.present
-      ? "Publisher-declared capability artifact rights (Spec 025). Not a legal certification; model/dataset rights do not inherit. unknown / conditional / forbidden are never permission."
+      ? "Publisher-declared capability artifact rights (Spec 025). Not a legal certification; model/dataset rights do not inherit — see Model licenses below. unknown / conditional / forbidden are never permission."
       : "No licensing block on this version — treat commercial use and redistribution as unknown (deny-by-default). New versions must declare licensing.";
     return el("div", { className: "sidebar-card" }, [
       el("div", { className: "sidebar-card-title", textContent: "License" }),
       el("div", {}, rows),
       el("p", { className: "sidebar-note", textContent: note }),
     ]);
+  }
+
+  function modelIdsForContract(contract) {
+    var models = agentModels(contract).slice();
+    var key = contract && contract.namespace && contract.id
+      ? (contract.namespace + "/" + contract.id)
+      : null;
+    var extras = key && modelAttribution.capability_extra_models
+      ? (modelAttribution.capability_extra_models[key] || [])
+      : [];
+    extras.forEach(function (modelId) {
+      if (models.indexOf(modelId) === -1) { models.push(modelId); }
+    });
+    return models;
+  }
+
+  function renderModelAttributionSidebarCard(contract) {
+    var modelIds = modelIdsForContract(contract);
+    if (!modelIds.length) { return null; }
+    var table = modelAttribution.models || {};
+    var children = [
+      el("div", { className: "sidebar-card-title", textContent: "Model licenses" }),
+    ];
+    modelIds.forEach(function (modelId) {
+      var info = table[modelId] || {};
+      var spdx = info.spdx_expression || "unknown";
+      var commercial = info.commercial_use || "unknown";
+      var redistribution = info.redistribution || "unknown";
+      var rows = [
+        sidebarRow("Model", el("a", { className: "t-mono", href: aiModelHash(modelId), textContent: modelId })),
+        sidebarRow("License", el("span", { className: "t-mono", textContent: spdx })),
+        sidebarRow("Commercial use", el("span", { className: rightsBadgeClass(commercial), textContent: commercial })),
+        sidebarRow("Redistribution", el("span", { className: rightsBadgeClass(redistribution), textContent: redistribution })),
+      ];
+      if (info.attribution_required === true) {
+        rows.push(sidebarRow("Attribution", textNode("required")));
+      }
+      if (info.copyright) {
+        rows.push(sidebarRow("Copyright", textNode(info.copyright)));
+      }
+      (info.source_urls || []).forEach(function (url) {
+        if (typeof url === "string" && url.indexOf("https://") === 0) {
+          rows.push(sidebarRow("Source", el("a", { href: url, textContent: url, target: "_blank", rel: "noopener" })));
+        }
+      });
+      if (info.notes) {
+        rows.push(el("p", { className: "sidebar-note", textContent: info.notes }));
+      }
+      children.push(el("div", { style: "margin-bottom:0.75rem" }, rows));
+    });
+    children.push(el("p", {
+      className: "sidebar-note",
+      textContent: "Third-party model rights (separate from Spec 025 capability License). Permissive upstream licenses; keep required copyright/notices on redistribute. See catalog/THIRD_PARTY_NOTICES.md.",
+    }));
+    return el("div", { className: "sidebar-card" }, children);
   }
 
   function renderPackageSidebar(cap) {
@@ -787,13 +843,14 @@
     }
     packageRows.push(sidebarRow("Permalink", el("a", { href: permalink, textContent: permalink })));
 
-    return el("aside", { className: "detail-sidebar" }, [
-      renderLicensingSidebarCard(contract),
-      el("div", { className: "sidebar-card" }, [
-        el("div", { className: "sidebar-card-title", textContent: "Package" }),
-        el("div", {}, packageRows),
-      ]),
-    ]);
+    var sidebarChildren = [renderLicensingSidebarCard(contract)];
+    var modelCard = renderModelAttributionSidebarCard(contract);
+    if (modelCard) { sidebarChildren.push(modelCard); }
+    sidebarChildren.push(el("div", { className: "sidebar-card" }, [
+      el("div", { className: "sidebar-card-title", textContent: "Package" }),
+      el("div", {}, packageRows),
+    ]));
+    return el("aside", { className: "detail-sidebar" }, sidebarChildren);
   }
 
   function renderDetailView(reference) {
@@ -1058,6 +1115,34 @@
     appEl.appendChild(el("div", { className: "detail-header-badges" }, [el("span", { className: "badge badge-agent", textContent: "Agent model" })]));
     appEl.appendChild(el("h1", { className: "t-h1 detail-title t-mono", textContent: modelId }));
     appEl.appendChild(el("p", { className: "detail-summary", textContent: "Capabilities whose contract declares ai.model_backed: true with this model in ai.models." }));
+
+    var info = (modelAttribution.models || {})[modelId];
+    if (info) {
+      var attrRows = [
+        sidebarRow("License", el("span", { className: "t-mono", textContent: info.spdx_expression || "unknown" })),
+        sidebarRow("Commercial use", el("span", { className: rightsBadgeClass(info.commercial_use || "unknown"), textContent: info.commercial_use || "unknown" })),
+        sidebarRow("Redistribution", el("span", { className: rightsBadgeClass(info.redistribution || "unknown"), textContent: info.redistribution || "unknown" })),
+      ];
+      if (info.attribution_required === true) {
+        attrRows.push(sidebarRow("Attribution", textNode("required")));
+      }
+      if (info.copyright) {
+        attrRows.push(sidebarRow("Copyright", textNode(info.copyright)));
+      }
+      (info.source_urls || []).forEach(function (url) {
+        if (typeof url === "string" && url.indexOf("https://") === 0) {
+          attrRows.push(sidebarRow("Source", el("a", { href: url, textContent: url, target: "_blank", rel: "noopener" })));
+        }
+      });
+      if (info.notes) {
+        attrRows.push(el("p", { className: "sidebar-note", textContent: info.notes }));
+      }
+      appEl.appendChild(el("div", { className: "sidebar-card", style: "margin:1.25rem 0; max-width:42rem" }, [
+        el("div", { className: "sidebar-card-title", textContent: "Model license" }),
+        el("div", {}, attrRows),
+        el("p", { className: "sidebar-note", textContent: "Third-party model rights (Spec 025 non-inheritance). See catalog/THIRD_PARTY_NOTICES.md." }),
+      ]));
+    }
 
     appEl.appendChild(el("h2", { className: "t-h2", textContent: "Capabilities" }));
     groups.groups.forEach(function (group) {
@@ -1439,7 +1524,21 @@
 
   fetch("./catalog.json")
     .then(function (response) { if (!response.ok) { throw new Error("HTTP " + response.status); } return response.json(); })
-    .then(function (data) { catalog = data; router(); })
+    .then(function (data) {
+      catalog = data;
+      return fetch("./model-attribution.json")
+        .then(function (response) {
+          if (!response.ok) { return null; }
+          return response.json();
+        })
+        .catch(function () { return null; });
+    })
+    .then(function (attribution) {
+      if (attribution && typeof attribution === "object") {
+        modelAttribution = attribution;
+      }
+      router();
+    })
     .catch(function (error) {
       appEl.textContent = "";
       appEl.appendChild(el("p", { className: "error", textContent: "Could not load catalog.json: " + error.message }));

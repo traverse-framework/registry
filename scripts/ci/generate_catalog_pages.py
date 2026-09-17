@@ -232,8 +232,8 @@ def licensing_sidebar_html(contract: dict) -> str:
         rows.append(sidebar_row("License source", f'<a href="{url}">{url}</a>'))
     note = (
         "Publisher-declared capability artifact rights (Spec 025). Not a legal "
-        "certification; model/dataset rights do not inherit. unknown / conditional / "
-        "forbidden are never permission."
+        "certification; model/dataset rights do not inherit — see Model licenses below. "
+        "unknown / conditional / forbidden are never permission."
         if info["present"]
         else "No licensing block on this version — treat commercial use and "
         "redistribution as unknown (deny-by-default). New versions must declare licensing."
@@ -241,6 +241,93 @@ def licensing_sidebar_html(contract: dict) -> str:
     return (
         '<div class="sidebar-card"><div class="sidebar-card-title">License</div>'
         f'{"".join(rows)}<p class="sidebar-note">{esc(note)}</p></div>'
+    )
+
+
+_MODEL_ATTRIBUTION_CACHE: Optional[dict] = None
+
+
+def load_model_attribution() -> dict:
+    """catalog/model-attribution.json — maintainer-declared model notices."""
+    global _MODEL_ATTRIBUTION_CACHE
+    if _MODEL_ATTRIBUTION_CACHE is not None:
+        return _MODEL_ATTRIBUTION_CACHE
+    path = Path(__file__).resolve().parents[2] / "catalog" / "model-attribution.json"
+    try:
+        _MODEL_ATTRIBUTION_CACHE = json.loads(path.read_text())
+    except Exception:
+        _MODEL_ATTRIBUTION_CACHE = {"models": {}, "capability_extra_models": {}}
+    return _MODEL_ATTRIBUTION_CACHE
+
+
+def model_ids_for_contract(contract: dict) -> list:
+    """ai.models[] plus capability_extra_models (e.g. Whisper also embeds Silero)."""
+    attribution = load_model_attribution()
+    models: list = []
+    ai = contract.get("ai")
+    if isinstance(ai, dict) and ai.get("model_backed") is True:
+        for model_id in ai.get("models") or []:
+            if isinstance(model_id, str) and model_id.strip():
+                models.append(model_id.strip())
+    namespace = contract.get("namespace")
+    cap_id = contract.get("id")
+    if isinstance(namespace, str) and isinstance(cap_id, str):
+        extras = (attribution.get("capability_extra_models") or {}).get(
+            f"{namespace}/{cap_id}"
+        ) or []
+        for model_id in extras:
+            if isinstance(model_id, str) and model_id.strip() and model_id not in models:
+                models.append(model_id.strip())
+    return models
+
+
+def model_attribution_sidebar_html(contract: dict) -> str:
+    """Separate from Spec 025 capability License card (non-inheritance)."""
+    attribution = load_model_attribution()
+    model_table = attribution.get("models") or {}
+    model_ids = model_ids_for_contract(contract)
+    if not model_ids:
+        return ""
+    blocks = []
+    for model_id in model_ids:
+        info = model_table.get(model_id) or {}
+        spdx = info.get("spdx_expression") or "unknown"
+        commercial = info.get("commercial_use") or "unknown"
+        redistribution = info.get("redistribution") or "unknown"
+        rows = [
+            sidebar_row("Model", f'<span class="t-mono">{esc(model_id)}</span>'),
+            sidebar_row("License", f'<span class="t-mono">{esc(spdx)}</span>'),
+            sidebar_row(
+                "Commercial use",
+                f'<span class="{rights_badge_class(commercial)}">{esc(commercial)}</span>',
+            ),
+            sidebar_row(
+                "Redistribution",
+                f'<span class="{rights_badge_class(redistribution)}">{esc(redistribution)}</span>',
+            ),
+        ]
+        if info.get("attribution_required") is True:
+            rows.append(sidebar_row("Attribution", "required"))
+        if info.get("copyright"):
+            rows.append(sidebar_row("Copyright", esc(str(info["copyright"]))))
+        for url in info.get("source_urls") or []:
+            if isinstance(url, str) and url.startswith("https://"):
+                rows.append(
+                    sidebar_row("Source", f'<a href="{esc(url)}">{esc(url)}</a>')
+                )
+        if info.get("notes"):
+            rows.append(
+                f'<p class="sidebar-note">{esc(str(info["notes"]))}</p>'
+            )
+        blocks.append("".join(rows))
+    note = (
+        "Third-party model rights (separate from Spec 025 capability License). "
+        "Permissive upstream licenses; keep required copyright/notices on redistribute. "
+        "See catalog/THIRD_PARTY_NOTICES.md."
+    )
+    return (
+        '<div class="sidebar-card"><div class="sidebar-card-title">Model licenses</div>'
+        f'{"".join(blocks)}<p class="sidebar-note">{esc(note)}</p></div>'
     )
 
 
@@ -318,6 +405,7 @@ def package_sidebar_html(
 
     return (
         f'{licensing_sidebar_html(contract)}'
+        f'{model_attribution_sidebar_html(contract)}'
         '<div class="sidebar-card"><div class="sidebar-card-title">Package</div>'
         f'{"".join(rows)}</div>'
     )
@@ -1017,6 +1105,7 @@ AI_MODEL_PAGE_TEMPLATE = """<!doctype html>
 <div class="detail-header-badges"><span class="badge badge-agent">Agent model</span></div>
 <h1 class="t-h1 detail-title t-mono">{model_id}</h1>
 <p class="detail-summary">Capabilities whose contract declares ai.model_backed: true with this model in ai.models (spec 001 FR-017).</p>
+{attribution_html}
 <h2 class="t-h2">Capabilities</h2>
 {capabilities_html}
 <p style="margin-top:2rem"><a href="/#/ai-model/{encoded_model_id}">Open in the interactive catalog →</a></p>
@@ -1082,6 +1171,49 @@ def distinct_agent_models(capabilities: list) -> dict:
     return by_model
 
 
+def single_model_attribution_html(model_id: str) -> str:
+    """Attribution block for a static AI-model detail page."""
+    info = (load_model_attribution().get("models") or {}).get(model_id)
+    if not isinstance(info, dict):
+        return (
+            '<div class="sidebar-card" style="margin:1.25rem 0">'
+            '<div class="sidebar-card-title">Model license</div>'
+            '<p class="sidebar-note">No maintainer-declared attribution entry for this '
+            "model id yet — treat rights as unknown until catalog/model-attribution.json "
+            "is updated.</p></div>"
+        )
+    spdx = info.get("spdx_expression") or "unknown"
+    commercial = info.get("commercial_use") or "unknown"
+    redistribution = info.get("redistribution") or "unknown"
+    rows = [
+        sidebar_row("License", f'<span class="t-mono">{esc(spdx)}</span>'),
+        sidebar_row(
+            "Commercial use",
+            f'<span class="{rights_badge_class(commercial)}">{esc(commercial)}</span>',
+        ),
+        sidebar_row(
+            "Redistribution",
+            f'<span class="{rights_badge_class(redistribution)}">{esc(redistribution)}</span>',
+        ),
+    ]
+    if info.get("attribution_required") is True:
+        rows.append(sidebar_row("Attribution", "required"))
+    if info.get("copyright"):
+        rows.append(sidebar_row("Copyright", esc(str(info["copyright"]))))
+    for url in info.get("source_urls") or []:
+        if isinstance(url, str) and url.startswith("https://"):
+            rows.append(sidebar_row("Source", f'<a href="{esc(url)}">{esc(url)}</a>'))
+    if info.get("notes"):
+        rows.append(f'<p class="sidebar-note">{esc(str(info["notes"]))}</p>')
+    return (
+        '<div class="sidebar-card" style="margin:1.25rem 0">'
+        '<div class="sidebar-card-title">Model license</div>'
+        f'{"".join(rows)}'
+        '<p class="sidebar-note">Third-party model rights (Spec 025 non-inheritance). '
+        "See catalog/THIRD_PARTY_NOTICES.md.</p></div>"
+    )
+
+
 def render_ai_model_page(base_url: str, model_id: str, matching: list) -> str:
     rows = []
     for entry in matching:
@@ -1105,6 +1237,7 @@ def render_ai_model_page(base_url: str, model_id: str, matching: list) -> str:
         meta_description=esc(summary),
         canonical_url=esc(canonical_url),
         model_id=esc(model_id),
+        attribution_html=single_model_attribution_html(model_id),
         capabilities_html=capabilities_html,
         encoded_model_id=esc(model_id).replace("/", "%2F"),
     )
