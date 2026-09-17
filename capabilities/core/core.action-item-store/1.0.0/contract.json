@@ -135,6 +135,19 @@
     "adr_refs": [],
     "exception_refs": []
   },
+  "licensing": {
+    "spdx_expression": "Apache-2.0",
+    "commercial_use": "allowed",
+    "redistribution": "allowed",
+    "attribution_required": true,
+    "verification": {
+      "status": "maintainer-declared"
+    },
+    "license_files": [
+      "LICENSE"
+    ],
+    "source_url": "https://github.com/traverse-framework/registry/blob/main/LICENSE"
+  },
   "artifact": {
     "digest": "sha256:d0b9a4dd91c5c735471609a70d6253e3be9041020c3b9971d69f41f8e29eee8e",
     "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/core.action-item-store-1.0.0/core-action-item-store.wasm"

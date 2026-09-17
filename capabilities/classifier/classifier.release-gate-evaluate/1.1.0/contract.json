@@ -1,4 +1,17 @@
 {
+  "licensing": {
+    "spdx_expression": "Apache-2.0",
+    "commercial_use": "allowed",
+    "redistribution": "allowed",
+    "attribution_required": true,
+    "verification": {
+      "status": "maintainer-declared"
+    },
+    "license_files": [
+      "LICENSE"
+    ],
+    "source_url": "https://github.com/traverse-framework/registry/blob/main/LICENSE"
+  },
   "artifact": {
     "digest": "sha256:72f4ebda68fec383946c388b337fed1b698a192491f2eed38aa3ade9175a09dd",
     "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/classifier.release-gate-evaluate-1.0.0/release-gate-evaluate.wasm"

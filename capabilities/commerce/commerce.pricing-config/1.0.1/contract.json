@@ -133,6 +133,19 @@
     "adr_refs": [],
     "exception_refs": []
   },
+  "licensing": {
+    "spdx_expression": "Apache-2.0",
+    "commercial_use": "allowed",
+    "redistribution": "allowed",
+    "attribution_required": true,
+    "verification": {
+      "status": "maintainer-declared"
+    },
+    "license_files": [
+      "LICENSE"
+    ],
+    "source_url": "https://github.com/traverse-framework/registry/blob/main/LICENSE"
+  },
   "artifact": {
     "digest": "sha256:825eda9b6cf9269ace61717f8f215027c062fa58ebb9535ab7ad051da9294b57",
     "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/commerce.pricing-config-1.0.1/commerce-pricing-config.wasm"

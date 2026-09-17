@@ -138,6 +138,19 @@
     "adr_refs": [],
     "exception_refs": []
   },
+  "licensing": {
+    "spdx_expression": "Apache-2.0",
+    "commercial_use": "allowed",
+    "redistribution": "allowed",
+    "attribution_required": true,
+    "verification": {
+      "status": "maintainer-declared"
+    },
+    "license_files": [
+      "LICENSE"
+    ],
+    "source_url": "https://github.com/traverse-framework/registry/blob/main/LICENSE"
+  },
   "artifact": {
     "digest": "sha256:7197bf0b263e899a6e6e6e3986724378d658a764a3f59fbd3bc1aaaf77a0f533",
     "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/doc-approval.packet-store-1.0.0/doc-approval-packet-store.wasm"

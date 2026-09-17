@@ -1924,22 +1924,12 @@ class SignatureCompletenessTests(unittest.TestCase):
 
 
 class LicensingBackfillImmutabilityExceptionTests(unittest.TestCase):
-    """registry#565 / decision-log 119: closed allowlist may add only
-    `licensing` to listed contracts; any other edit still fails."""
+    """decision-log 119 / 123: pure top-level `licensing` addition is
+    allowed when previously absent; any other edit still fails."""
 
-    EXCEPTION_PATH = (
+    SAMPLE_PATH = (
         "capabilities/text/text.detect-entities/1.0.0/contract.json"
     )
-
-    def test_allowlist_contains_exactly_five_ai_agent_paths(self):
-        self.assertEqual(
-            len(capability_validation.LICENSING_BACKFILL_IMMUTABILITY_EXCEPTIONS),
-            5,
-        )
-        self.assertIn(
-            self.EXCEPTION_PATH,
-            capability_validation.LICENSING_BACKFILL_IMMUTABILITY_EXCEPTIONS,
-        )
 
     def test_licensing_only_addition_helper_accepts_pure_add(self):
         before = {"id": "x", "version": "1.0.0"}
@@ -1958,7 +1948,7 @@ class LicensingBackfillImmutabilityExceptionTests(unittest.TestCase):
         with patch("subprocess.check_output", side_effect=fake_show):
             self.assertTrue(
                 capability_validation._licensing_only_addition(
-                    "base", "head", self.EXCEPTION_PATH
+                    "base", "head", self.SAMPLE_PATH
                 )
             )
 
@@ -1979,18 +1969,19 @@ class LicensingBackfillImmutabilityExceptionTests(unittest.TestCase):
         with patch("subprocess.check_output", side_effect=fake_show):
             self.assertFalse(
                 capability_validation._licensing_only_addition(
-                    "base", "head", self.EXCEPTION_PATH
+                    "base", "head", self.SAMPLE_PATH
                 )
             )
 
-    def test_check_immutability_allows_listed_licensing_only_edit(self):
+    def test_check_immutability_allows_licensing_only_edit_any_path(self):
+        path = "capabilities/approval/approval.decision-apply/1.0.0/contract.json"
+
         def fake_check_output(cmd, text=True):
             if cmd[1] == "diff":
-                return f"M\t{self.EXCEPTION_PATH}\n"
-            # git show base:path / head:path
+                return f"M\t{path}\n"
             ref = cmd[2]
-            sha, _, path = ref.partition(":")
-            before = {"id": "text.detect-entities", "version": "1.0.0"}
+            sha, _, _rest = ref.partition(":")
+            before = {"id": "approval.decision-apply", "version": "1.0.0"}
             after = {
                 **before,
                 "licensing": {
@@ -2010,13 +2001,19 @@ class LicensingBackfillImmutabilityExceptionTests(unittest.TestCase):
             capability_validation.check_immutability("BASE", "HEAD", errors)
         self.assertEqual(errors, [])
 
-    def test_check_immutability_still_rejects_unlisted_contract_edit(self):
+    def test_check_immutability_still_rejects_non_licensing_edit(self):
         other = "capabilities/core/core.authorize/1.0.0/contract.json"
 
         def fake_check_output(cmd, text=True):
             if cmd[1] == "diff":
                 return f"M\t{other}\n"
-            return "{}"
+            ref = cmd[2]
+            sha, _, _rest = ref.partition(":")
+            before = {"id": "core.authorize", "version": "1.0.0", "summary": "a"}
+            after = {"id": "core.authorize", "version": "1.0.0", "summary": "b"}
+            if sha == "BASE":
+                return json.dumps(before)
+            return json.dumps(after)
 
         errors: list = []
         with patch("subprocess.check_output", side_effect=fake_check_output):
@@ -2025,6 +2022,37 @@ class LicensingBackfillImmutabilityExceptionTests(unittest.TestCase):
             [e["code"] for e in errors],
             ["capabilities.contract_modified"],
         )
+
+    def test_changed_contract_gates_skip_licensing_only_modification(self):
+        path = "capabilities/core/core.aggregate-team-action-health/1.0.0/contract.json"
+        before = {"id": "core.aggregate-team-action-health", "version": "1.0.0"}
+        after = {
+            **before,
+            "licensing": {"spdx_expression": "Apache-2.0"},
+        }
+
+        def fake_check_output(cmd, text=True):
+            if cmd[1] == "diff":
+                return f"M\t{path}\n"
+            ref = cmd[2]
+            sha, _, _rest = ref.partition(":")
+            if sha == "BASE":
+                return json.dumps(before)
+            return json.dumps(after)
+
+        errors: list = []
+        with patch("subprocess.check_output", side_effect=fake_check_output):
+            capability_validation.check_new_contracts_declare_risk_metadata(
+                "BASE", "HEAD", errors
+            )
+            capability_validation.check_new_contracts_declare_authoring_method(
+                "BASE", "HEAD", errors
+            )
+            capability_validation.check_new_contracts_use_cases_surface_coverage(
+                "BASE", "HEAD", errors
+            )
+        self.assertEqual(errors, [])
+
 
 
 if __name__ == "__main__":

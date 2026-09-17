@@ -124,6 +124,19 @@
     "device"
   ],
   "artifact_type": "native",
+  "licensing": {
+    "spdx_expression": "Apache-2.0",
+    "commercial_use": "allowed",
+    "redistribution": "allowed",
+    "attribution_required": true,
+    "verification": {
+      "status": "maintainer-declared"
+    },
+    "license_files": [
+      "LICENSE"
+    ],
+    "source_url": "https://github.com/traverse-framework/registry/blob/main/LICENSE"
+  },
   "artifact": {
     "digest": "sha256:2c6690fd00432f8bff4366d4852395af22a3c766517020532590bab1fba1ab34",
     "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/traverse-starter.process-1.0.1/process-agent.wasm"

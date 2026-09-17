@@ -312,6 +312,19 @@
     "device"
   ],
   "artifact_type": "native",
+  "licensing": {
+    "spdx_expression": "Apache-2.0",
+    "commercial_use": "allowed",
+    "redistribution": "allowed",
+    "attribution_required": true,
+    "verification": {
+      "status": "maintainer-declared"
+    },
+    "license_files": [
+      "LICENSE"
+    ],
+    "source_url": "https://github.com/traverse-framework/registry/blob/main/LICENSE"
+  },
   "artifact": {
     "digest": "sha256:d9fd9f6ebc4bb47db33903a2111684133bef91060a110758fb16c572f1f7eca0",
     "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/event.append-plan-create-1.0.0/append-plan-create.wasm"

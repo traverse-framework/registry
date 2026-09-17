@@ -126,6 +126,19 @@
     "spec_ref": null,
     "source": "registry-wave2"
   },
+  "licensing": {
+    "spdx_expression": "Apache-2.0",
+    "commercial_use": "allowed",
+    "redistribution": "allowed",
+    "attribution_required": true,
+    "verification": {
+      "status": "maintainer-declared"
+    },
+    "license_files": [
+      "LICENSE"
+    ],
+    "source_url": "https://github.com/traverse-framework/registry/blob/main/LICENSE"
+  },
   "artifact": {
     "digest": "sha256:50ac96c0c18550cdb6671b3a8ae02e89a36fbefad9f7dd1b80cae51907cfa909",
     "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/commerce.cart-1.0.0/commerce-cart.wasm"

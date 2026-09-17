@@ -202,11 +202,13 @@ def normalize_licensing(contract: dict) -> dict:
 
 def licensing_sidebar_html(contract: dict) -> str:
     info = normalize_licensing(contract)
+    # Card title is already "License" — SPDX is the lead value, not a
+    # second "License" row (that duplicated the heading).
     rows = []
     if info["spdx"]:
-        rows.append(sidebar_row("License", f'<span class="t-mono">{esc(info["spdx"])}</span>'))
+        rows.append(f'<div class="sidebar-spdx"><span class="t-mono">{esc(info["spdx"])}</span></div>')
     else:
-        rows.append(sidebar_row("License", '<span class="badge">unknown</span>'))
+        rows.append('<div class="sidebar-spdx"><span class="badge">unknown</span></div>')
     rows.append(
         sidebar_row(
             "Commercial use",

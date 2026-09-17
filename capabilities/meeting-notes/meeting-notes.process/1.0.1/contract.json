@@ -165,6 +165,19 @@
     "device"
   ],
   "artifact_type": "native",
+  "licensing": {
+    "spdx_expression": "Apache-2.0",
+    "commercial_use": "allowed",
+    "redistribution": "allowed",
+    "attribution_required": true,
+    "verification": {
+      "status": "maintainer-declared"
+    },
+    "license_files": [
+      "LICENSE"
+    ],
+    "source_url": "https://github.com/traverse-framework/registry/blob/main/LICENSE"
+  },
   "artifact": {
     "digest": "sha256:bddc4423a5ae611b5606886d5b0b9c87bbfb39fff2826724f6c34850d88020f6",
     "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/meeting-notes.process-1.0.1/process-agent.wasm"

@@ -294,6 +294,19 @@
     "device"
   ],
   "artifact_type": "native",
+  "licensing": {
+    "spdx_expression": "Apache-2.0",
+    "commercial_use": "allowed",
+    "redistribution": "allowed",
+    "attribution_required": true,
+    "verification": {
+      "status": "maintainer-declared"
+    },
+    "license_files": [
+      "LICENSE"
+    ],
+    "source_url": "https://github.com/traverse-framework/registry/blob/main/LICENSE"
+  },
   "artifact": {
     "digest": "sha256:233490558e65c15d6b11ed316b13106e64c1dc129b1ef743a685ac4d1492aa1b",
     "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/inference.evidence-normalize-1.0.0/evidence-normalize.wasm"
