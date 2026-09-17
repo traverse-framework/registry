@@ -1507,7 +1507,9 @@ class CheckNewContractWasm32ExecutionTests(unittest.TestCase):
     """registry#509: run the newly-published capability's actual wasm32
     artifact under wasmtime, using fixtures derived from the contract."""
 
-    def _write_contract(self, tmp: Path, capability_id: str, use_cases=None, properties=None) -> Path:
+    def _write_contract(
+        self, tmp: Path, capability_id: str, use_cases=None, properties=None, connector_requirements=None
+    ) -> Path:
         path = Path(tmp) / "capabilities" / "example" / capability_id / "1.0.0" / "contract.json"
         path.parent.mkdir(parents=True, exist_ok=True)
         contract = {
@@ -1515,6 +1517,8 @@ class CheckNewContractWasm32ExecutionTests(unittest.TestCase):
             "use_cases": use_cases or [],
             "inputs": {"schema": {"type": "object", "properties": properties or {}}},
         }
+        if connector_requirements is not None:
+            contract["connector_requirements"] = connector_requirements
         path.write_text(json.dumps(contract))
         return path
 
@@ -1607,6 +1611,140 @@ class CheckNewContractWasm32ExecutionTests(unittest.TestCase):
             finally:
                 os.chdir(cwd)
             self.assertEqual(errors, [])
+
+    def test_connector_backed_happy_and_unbound_fixtures(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            use_cases = [
+                {
+                    "happy": True,
+                    "input_example": {"content_ref": "c1"},
+                    "output_example": {
+                        "asset_ref": "a1",
+                        "result_class": "created",
+                    },
+                }
+            ]
+            path = self._write_contract(
+                tmp,
+                "example.connector-capability",
+                use_cases=use_cases,
+                connector_requirements=[{"connector_id": "traverse.object-store", "version": "^1"}],
+            )
+            self._write_crate(tmp, "example-connector-capability")
+            wasm_path = Path(tmp) / "out.wasm"
+            wasm_path.write_bytes(b"\0asm")
+            errors: list = []
+            cwd = os.getcwd()
+            try:
+                os.chdir(tmp)
+                build_result = self._build_result(wasm_path)
+                happy_run = self._wasmtime_result(
+                    stdout=json.dumps({"asset_ref": "a1", "result_class": "created"})
+                )
+                unbound_run = self._wasmtime_result(
+                    stdout=json.dumps(
+                        {"asset_ref": "", "result_class": "connector_unavailable"}
+                    )
+                )
+                with patch(
+                    "capability_validation.subprocess.run",
+                    side_effect=[build_result, happy_run, unbound_run],
+                ), patch(
+                    "capability_validation._wasm32_fixture_runner_bin",
+                    return_value=Path(tmp) / "fake-runner",
+                ):
+                    (Path(tmp) / "fake-runner").write_text("#!/bin/sh\n")
+                    (Path(tmp) / "fake-runner").chmod(0o755)
+                    capability_validation.check_new_contract_wasm32_execution(path, errors)
+            finally:
+                os.chdir(cwd)
+            self.assertEqual(errors, [])
+
+    def test_connector_unbound_without_fail_closed_is_rejected(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            use_cases = [
+                {
+                    "happy": True,
+                    "input_example": {"content_ref": "c1"},
+                    "output_example": {"asset_ref": "a1", "result_class": "created"},
+                }
+            ]
+            path = self._write_contract(
+                tmp,
+                "example.connector-capability",
+                use_cases=use_cases,
+                connector_requirements=[{"connector_id": "traverse.object-store", "version": "^1"}],
+            )
+            self._write_crate(tmp, "example-connector-capability")
+            wasm_path = Path(tmp) / "out.wasm"
+            wasm_path.write_bytes(b"\0asm")
+            errors: list = []
+            cwd = os.getcwd()
+            try:
+                os.chdir(tmp)
+                build_result = self._build_result(wasm_path)
+                happy_run = self._wasmtime_result(
+                    stdout=json.dumps({"asset_ref": "a1", "result_class": "created"})
+                )
+                unbound_run = self._wasmtime_result(
+                    stdout=json.dumps({"asset_ref": "a1", "result_class": "created"})
+                )
+                with patch(
+                    "capability_validation.subprocess.run",
+                    side_effect=[build_result, happy_run, unbound_run],
+                ), patch(
+                    "capability_validation._wasm32_fixture_runner_bin",
+                    return_value=Path(tmp) / "fake-runner",
+                ):
+                    (Path(tmp) / "fake-runner").write_text("#!/bin/sh\n")
+                    (Path(tmp) / "fake-runner").chmod(0o755)
+                    capability_validation.check_new_contract_wasm32_execution(path, errors)
+            finally:
+                os.chdir(cwd)
+            codes = [e["code"] for e in errors]
+            self.assertIn("capability.connector_unbound_did_not_fail_closed", codes)
+
+    def test_connector_fixture_host_private_keys_are_rejected(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            use_cases = [
+                {
+                    "happy": True,
+                    "input_example": {"content_ref": "c1"},
+                    "connector_fixture": {
+                        "activated": True,
+                        "responses": [
+                            {
+                                "connector_id": "traverse.object-store",
+                                "operation": "",
+                                "body": {"payload": {"secret": "nope"}},
+                            }
+                        ],
+                    },
+                }
+            ]
+            path = self._write_contract(
+                tmp,
+                "example.connector-capability",
+                use_cases=use_cases,
+                connector_requirements=[{"connector_id": "traverse.object-store", "version": "^1"}],
+            )
+            self._write_crate(tmp, "example-connector-capability")
+            wasm_path = Path(tmp) / "out.wasm"
+            wasm_path.write_bytes(b"\0asm")
+            errors: list = []
+            cwd = os.getcwd()
+            try:
+                os.chdir(tmp)
+                build_result = self._build_result(wasm_path)
+                with patch(
+                    "capability_validation.subprocess.run",
+                    return_value=build_result,
+                ):
+                    capability_validation.check_new_contract_wasm32_execution(path, errors)
+            finally:
+                os.chdir(cwd)
+            codes = [e["code"] for e in errors]
+            self.assertIn("capability.connector_fixture_leaks_host_private_data", codes)
 
     def test_wasm32_panic_is_rejected(self):
         with tempfile.TemporaryDirectory() as tmp:

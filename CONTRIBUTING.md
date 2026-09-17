@@ -75,11 +75,49 @@ enough (`specs/018-capability-test-coverage`, `docs/decision-log.md` entry 64):
    cargo install cargo-llvm-cov   # once, if you don't already have it
    cargo llvm-cov --summary-only --json --manifest-path capability-src/<your-crate>/Cargo.toml
    ```
-   CI requires `functions.percent == 100.0` and `lines.percent >= 95.0` and
-   `regions.percent >= 95.0` from that same command's output. A small allowance below
-   literal 100% on lines/regions exists because genuinely unreachable defensive branches
-   (e.g. an `unwrap_or` fallback a prior validation already rules out) are real in Rust —
-   functions have no such exception: every function you ship must be exercised by a test.
+CI requires `functions.percent == 100.0` and `lines.percent >= 95.0` and
+`regions.percent >= 95.0` from that same command's output. A small allowance below
+literal 100% on lines/regions exists because genuinely unreachable defensive branches
+(e.g. an `unwrap_or` fallback a prior validation already rules out) are real in Rust —
+functions have no such exception: every function you ship must be exercised by a test.
+
+### Effectful / connector-backed capabilities
+
+Capabilities that import `traverse_host::*` (including Spec 104
+`connector_invoke`) must still pass the host `cargo llvm-cov` gate. Bare
+`#![no_std]` / `#![no_main]` crates fail that measurement with a duplicate
+lang-item error (`E0152`). Use the same pattern every effectful crate in
+this repo already uses:
+
+```rust
+#![cfg_attr(not(test), no_std)]
+#![cfg_attr(not(test), no_main)]
+
+#[cfg(not(test))]
+#[link(wasm_import_module = "traverse_host")]
+unsafe extern "C" {
+    fn connector_invoke(request_ptr: i32, request_len: i32, response_ptr: i32, response_capacity: i32) -> i32;
+}
+
+#[cfg(test)]
+unsafe fn connector_invoke(
+    _request_ptr: i32,
+    _request_len: i32,
+    _response_ptr: i32,
+    _response_capacity: i32,
+) -> i32 {
+    0
+}
+```
+
+When `connector_requirements` is non-empty, the wasm32 execution gate
+(registry#576) provisions a deterministic mediated `connector_invoke` mock
+via `scripts/ci/wasm32_fixture_runner` instead of bare `wasmtime run`. It
+runs every happy-path use case with the mock activated, then a negative
+unbound fixture that must fail closed (`result_class` /
+stdout containing `connector_unavailable`). Optional
+`use_cases[].connector_fixture` may declare exact response bodies; those
+bodies MUST NOT include host paths, credentials, or similar private keys.
 
 There is no attestation-only path — CI runs your test suite itself rather than trusting a
 self-reported percentage, the same reason `docs/decision-log.md` entry 61 stopped trusting
