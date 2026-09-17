@@ -2023,6 +2023,37 @@ class LicensingBackfillImmutabilityExceptionTests(unittest.TestCase):
             ["capabilities.contract_modified"],
         )
 
+    def test_changed_contract_gates_skip_licensing_only_modification(self):
+        path = "capabilities/core/core.aggregate-team-action-health/1.0.0/contract.json"
+        before = {"id": "core.aggregate-team-action-health", "version": "1.0.0"}
+        after = {
+            **before,
+            "licensing": {"spdx_expression": "Apache-2.0"},
+        }
+
+        def fake_check_output(cmd, text=True):
+            if cmd[1] == "diff":
+                return f"M\t{path}\n"
+            ref = cmd[2]
+            sha, _, _rest = ref.partition(":")
+            if sha == "BASE":
+                return json.dumps(before)
+            return json.dumps(after)
+
+        errors: list = []
+        with patch("subprocess.check_output", side_effect=fake_check_output):
+            capability_validation.check_new_contracts_declare_risk_metadata(
+                "BASE", "HEAD", errors
+            )
+            capability_validation.check_new_contracts_declare_authoring_method(
+                "BASE", "HEAD", errors
+            )
+            capability_validation.check_new_contracts_use_cases_surface_coverage(
+                "BASE", "HEAD", errors
+            )
+        self.assertEqual(errors, [])
+
+
 
 if __name__ == "__main__":
     unittest.main()

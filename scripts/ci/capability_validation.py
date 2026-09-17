@@ -1058,6 +1058,8 @@ def check_new_contracts_use_cases_surface_coverage(base_sha: str, head_sha: str,
         parts = line.split("\t")
         status, path = parts[0], parts[-1]
         if path.endswith("contract.json") and (status == "A" or status.startswith("M")):
+            if _is_licensing_only_modification(status, base_sha, head_sha, path):
+                continue
             check_new_use_cases_surface_coverage(Path(path), errors)
 
 
@@ -1268,6 +1270,8 @@ def check_new_contracts_declare_authoring_method(base_sha: str, head_sha: str, e
         parts = line.split("\t")
         status, path = parts[0], parts[-1]
         if path.endswith("contract.json") and (status == "A" or status.startswith("M")):
+            if _is_licensing_only_modification(status, base_sha, head_sha, path):
+                continue
             check_new_contract_authoring_method(Path(path), errors)
 
 
@@ -1422,6 +1426,8 @@ def check_new_contracts_declare_risk_metadata(base_sha: str, head_sha: str, erro
         parts = line.split("\t")
         status, path = parts[0], parts[-1]
         if path.endswith("contract.json") and (status == "A" or status.startswith("M")):
+            if _is_licensing_only_modification(status, base_sha, head_sha, path):
+                continue
             check_new_contract_risk_metadata(Path(path), errors)
 
 
@@ -2045,6 +2051,18 @@ def _licensing_only_addition(base_sha: str, head_sha: str, path: str) -> bool:
             return False
     return True
 
+
+def _is_licensing_only_modification(
+    status: str, base_sha: str, head_sha: str, path: str
+) -> bool:
+    """True for Modified contract.json paths whose sole change is a Spec 025
+    licensing backfill. Diff-based gates that apply to CHANGED contracts
+    (risk / authoring / use-cases) must skip these — otherwise catalog-wide
+    licensing backfill would falsely require pre-spec fields on immutable
+    legacy contracts (decision-log 123)."""
+    if not status.startswith("M"):
+        return False
+    return _licensing_only_addition(base_sha, head_sha, path)
 
 def check_immutability(base_sha: str, head_sha: str, errors: list) -> None:
     """FR: no PR may modify an existing contract.json/workflow.json/product.json
