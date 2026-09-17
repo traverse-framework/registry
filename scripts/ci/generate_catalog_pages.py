@@ -124,11 +124,18 @@ def service_type_field_html(service_type: str, base_url: str) -> str:
 
 def ai_field_html(ai) -> str:
     """spec 001 FR-017: a contract with `ai.model_backed: true` is an "agent".
-    CI guarantees `models` is a non-empty string array when true, so this
-    renders unconditionally once model_backed is set."""
+    CI guarantees `models` is non-empty when true, in either the legacy
+    string[] shape or the object[] ModelRef shape (Decision 124 /
+    registry#571) -- this renders just the id for either shape; full
+    per-model attribution lives in model_attribution_sidebar_html."""
     if not isinstance(ai, dict) or ai.get("model_backed") is not True:
         return ""
-    models = [m for m in (ai.get("models") or []) if isinstance(m, str) and m.strip()]
+    models = []
+    for m in ai.get("models") or []:
+        if isinstance(m, str) and m.strip():
+            models.append(m.strip())
+        elif isinstance(m, dict) and isinstance(m.get("id"), str) and m["id"].strip():
+            models.append(m["id"].strip())
     rows = field_row_html("Agent", '<span class="badge badge-agent">model-backed</span>')
     if models:
         rows += field_row("Models", ", ".join(models))
@@ -262,15 +269,33 @@ def load_model_attribution() -> dict:
     return _MODEL_ATTRIBUTION_CACHE
 
 
-def model_ids_for_contract(contract: dict) -> list:
-    """ai.models[] plus capability_extra_models (e.g. Whisper also embeds Silero)."""
+def model_refs_for_contract(contract: dict) -> list:
+    """`(model_id, inline_ref)` pairs from `ai.models[]` (spec 001 FR-017)
+    plus `capability_extra_models` (e.g. Whisper also embeds Silero).
+    `inline_ref` is the object itself when the contract declares this model
+    in the new `ModelRef[]` shape (Decision 124 / registry#571) -- the
+    contract is the source of truth for that entry, and
+    catalog/model-attribution.json is never consulted for it. `inline_ref`
+    is `None` for the legacy `string[]` shape or an extra model, both of
+    which fall back to catalog/model-attribution.json for display."""
     attribution = load_model_attribution()
-    models: list = []
+    refs: list = []
+    seen_ids: set = set()
     ai = contract.get("ai")
     if isinstance(ai, dict) and ai.get("model_backed") is True:
-        for model_id in ai.get("models") or []:
-            if isinstance(model_id, str) and model_id.strip():
-                models.append(model_id.strip())
+        for entry in ai.get("models") or []:
+            if isinstance(entry, str) and entry.strip():
+                model_id = entry.strip()
+                if model_id not in seen_ids:
+                    refs.append((model_id, None))
+                    seen_ids.add(model_id)
+            elif isinstance(entry, dict):
+                model_id = entry.get("id")
+                if isinstance(model_id, str) and model_id.strip():
+                    model_id = model_id.strip()
+                    if model_id not in seen_ids:
+                        refs.append((model_id, entry))
+                        seen_ids.add(model_id)
     namespace = contract.get("namespace")
     cap_id = contract.get("id")
     if isinstance(namespace, str) and isinstance(cap_id, str):
@@ -278,50 +303,102 @@ def model_ids_for_contract(contract: dict) -> list:
             f"{namespace}/{cap_id}"
         ) or []
         for model_id in extras:
-            if isinstance(model_id, str) and model_id.strip() and model_id not in models:
-                models.append(model_id.strip())
-    return models
+            if isinstance(model_id, str) and model_id.strip():
+                model_id = model_id.strip()
+                if model_id not in seen_ids:
+                    refs.append((model_id, None))
+                    seen_ids.add(model_id)
+    return refs
+
+
+def model_ids_for_contract(contract: dict) -> list:
+    """Bare model-id view of model_refs_for_contract, for callers (e.g. the
+    per-model aggregate index) that only need membership, not attribution
+    display data."""
+    return [model_id for model_id, _ref in model_refs_for_contract(contract)]
+
+
+def _inline_model_ref_rows(model_id: str, ref: dict) -> str:
+    """Sidebar rows for a contract's own object-shaped ai.models entry
+    (spec 001 FR-017 amendment, Decision 124 / registry#571) -- pinned on
+    the contract itself, not looked up in catalog/model-attribution.json."""
+    spdx = ref.get("spdx_expression") or "unknown"
+    rows = [
+        sidebar_row("Model", f'<span class="t-mono">{esc(model_id)}</span>'),
+        sidebar_row("License", f'<span class="t-mono">{esc(spdx)}</span>'),
+    ]
+    huggingface_id = ref.get("huggingface_id")
+    revision = ref.get("revision")
+    if isinstance(huggingface_id, str) and huggingface_id.strip() and isinstance(revision, str) and revision.strip():
+        rows.append(
+            sidebar_row(
+                "Hugging Face",
+                f'<span class="t-mono">{esc(huggingface_id)}@{esc(revision)}</span>',
+            )
+        )
+    source_url = ref.get("source_url")
+    if isinstance(source_url, str) and source_url.startswith("https://"):
+        rows.append(sidebar_row("Source", f'<a href="{esc(source_url)}">{esc(source_url)}</a>'))
+    if ref.get("attribution_required") is True:
+        rows.append(sidebar_row("Attribution", "required"))
+    if ref.get("copyright"):
+        rows.append(sidebar_row("Copyright", esc(str(ref["copyright"]))))
+    rows.append(
+        '<p class="sidebar-note">Pinned on this capability\'s own contract '
+        "(spec 001 FR-017 amendment, Decision 124).</p>"
+    )
+    return "".join(rows)
+
+
+def _catalog_model_attribution_rows(model_id: str, model_table: dict) -> str:
+    """Sidebar rows for a legacy string-shaped ai.models entry, looked up
+    in catalog/model-attribution.json (the pre-Decision-124 fallback path,
+    grandfathered on already-published contracts)."""
+    info = model_table.get(model_id) or {}
+    spdx = info.get("spdx_expression") or "unknown"
+    commercial = info.get("commercial_use") or "unknown"
+    redistribution = info.get("redistribution") or "unknown"
+    rows = [
+        sidebar_row("Model", f'<span class="t-mono">{esc(model_id)}</span>'),
+        sidebar_row("License", f'<span class="t-mono">{esc(spdx)}</span>'),
+        sidebar_row(
+            "Commercial use",
+            f'<span class="{rights_badge_class(commercial)}">{esc(commercial)}</span>',
+        ),
+        sidebar_row(
+            "Redistribution",
+            f'<span class="{rights_badge_class(redistribution)}">{esc(redistribution)}</span>',
+        ),
+    ]
+    if info.get("attribution_required") is True:
+        rows.append(sidebar_row("Attribution", "required"))
+    if info.get("copyright"):
+        rows.append(sidebar_row("Copyright", esc(str(info["copyright"]))))
+    for url in info.get("source_urls") or []:
+        if isinstance(url, str) and url.startswith("https://"):
+            rows.append(sidebar_row("Source", f'<a href="{esc(url)}">{esc(url)}</a>'))
+    if info.get("notes"):
+        rows.append(f'<p class="sidebar-note">{esc(str(info["notes"]))}</p>')
+    return "".join(rows)
 
 
 def model_attribution_sidebar_html(contract: dict) -> str:
-    """Separate from Spec 025 capability License card (non-inheritance)."""
+    """Separate from Spec 025 capability License card (non-inheritance).
+    Prefers the contract's own object-shaped ai.models entry (spec 001
+    FR-017 amendment, Decision 124 / registry#571) -- the contract is the
+    source of truth; catalog/model-attribution.json is a fallback display
+    aid used only for legacy string-shaped model ids."""
     attribution = load_model_attribution()
     model_table = attribution.get("models") or {}
-    model_ids = model_ids_for_contract(contract)
-    if not model_ids:
+    refs = model_refs_for_contract(contract)
+    if not refs:
         return ""
-    blocks = []
-    for model_id in model_ids:
-        info = model_table.get(model_id) or {}
-        spdx = info.get("spdx_expression") or "unknown"
-        commercial = info.get("commercial_use") or "unknown"
-        redistribution = info.get("redistribution") or "unknown"
-        rows = [
-            sidebar_row("Model", f'<span class="t-mono">{esc(model_id)}</span>'),
-            sidebar_row("License", f'<span class="t-mono">{esc(spdx)}</span>'),
-            sidebar_row(
-                "Commercial use",
-                f'<span class="{rights_badge_class(commercial)}">{esc(commercial)}</span>',
-            ),
-            sidebar_row(
-                "Redistribution",
-                f'<span class="{rights_badge_class(redistribution)}">{esc(redistribution)}</span>',
-            ),
-        ]
-        if info.get("attribution_required") is True:
-            rows.append(sidebar_row("Attribution", "required"))
-        if info.get("copyright"):
-            rows.append(sidebar_row("Copyright", esc(str(info["copyright"]))))
-        for url in info.get("source_urls") or []:
-            if isinstance(url, str) and url.startswith("https://"):
-                rows.append(
-                    sidebar_row("Source", f'<a href="{esc(url)}">{esc(url)}</a>')
-                )
-        if info.get("notes"):
-            rows.append(
-                f'<p class="sidebar-note">{esc(str(info["notes"]))}</p>'
-            )
-        blocks.append("".join(rows))
+    blocks = [
+        _inline_model_ref_rows(model_id, ref)
+        if ref is not None
+        else _catalog_model_attribution_rows(model_id, model_table)
+        for model_id, ref in refs
+    ]
     note = (
         "Third-party model rights (separate from Spec 025 capability License). "
         "Permissive upstream licenses; keep required copyright/notices on redistribute. "
@@ -1157,7 +1234,12 @@ Traverse<span class="nav-logo-dot">.</span>
 
 def distinct_agent_models(capabilities: list) -> dict:
     """Model id -> list of current capability entries declaring it in
-    contract.ai.models (spec 001 FR-017). Unlike SERVICE_TYPE_DEFINITIONS,
+    contract.ai.models (spec 001 FR-017, either the legacy string[] shape
+    or the object[] ModelRef shape added by Decision 124 / registry#571) --
+    deliberately NOT capability_extra_models (unlike model_ids_for_contract,
+    used for a capability's own sidebar): this index is "which capabilities
+    are agents for this model", the primary declared ai.models set, not
+    every model a capability happens to embed. Unlike SERVICE_TYPE_DEFINITIONS,
     this is not a fixed enum -- discovered from whatever is actually
     published, the same "membership, not a closed set" shape as personas."""
     current = current_capabilities_by_group(capabilities)
@@ -1166,15 +1248,44 @@ def distinct_agent_models(capabilities: list) -> dict:
         ai = entry["contract"].get("ai")
         if not isinstance(ai, dict) or ai.get("model_backed") is not True:
             continue
-        for model_id in ai.get("models") or []:
-            if not isinstance(model_id, str) or not model_id.strip():
+        for model_entry in ai.get("models") or []:
+            if isinstance(model_entry, str) and model_entry.strip():
+                model_id = model_entry.strip()
+            elif isinstance(model_entry, dict) and isinstance(model_entry.get("id"), str) and model_entry["id"].strip():
+                model_id = model_entry["id"].strip()
+            else:
                 continue
             by_model.setdefault(model_id, []).append(entry)
     return by_model
 
 
-def single_model_attribution_html(model_id: str) -> str:
-    """Attribution block for a static AI-model detail page."""
+def _first_inline_model_ref(model_id: str, matching: list):
+    """The first object-shaped ai.models entry (spec 001 FR-017 amendment,
+    Decision 124 / registry#571) for `model_id` among `matching` capability
+    entries, or None if every matching capability still uses the legacy
+    string[] shape for this model."""
+    for entry in matching:
+        ai = entry["contract"].get("ai")
+        if not isinstance(ai, dict):
+            continue
+        for model_entry in ai.get("models") or []:
+            if isinstance(model_entry, dict) and model_entry.get("id") == model_id:
+                return model_entry
+    return None
+
+
+def single_model_attribution_html(model_id: str, matching: list) -> str:
+    """Attribution block for a static AI-model detail page. Prefers a
+    contract's own object-shaped ai.models entry over
+    catalog/model-attribution.json (spec 001 FR-017 amendment, Decision 124
+    / registry#571) -- the contract is the source of truth."""
+    inline_ref = _first_inline_model_ref(model_id, matching)
+    if inline_ref is not None:
+        return (
+            '<div class="sidebar-card" style="margin:1.25rem 0">'
+            '<div class="sidebar-card-title">Model license</div>'
+            f'{_inline_model_ref_rows(model_id, inline_ref)}</div>'
+        )
     info = (load_model_attribution().get("models") or {}).get(model_id)
     if not isinstance(info, dict):
         return (
@@ -1239,7 +1350,7 @@ def render_ai_model_page(base_url: str, model_id: str, matching: list) -> str:
         meta_description=esc(summary),
         canonical_url=esc(canonical_url),
         model_id=esc(model_id),
-        attribution_html=single_model_attribution_html(model_id),
+        attribution_html=single_model_attribution_html(model_id, matching),
         capabilities_html=capabilities_html,
         encoded_model_id=esc(model_id).replace("/", "%2F"),
     )

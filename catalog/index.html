@@ -416,6 +416,14 @@
   function agentModels(contract) {
     return (contract && contract.ai && Array.isArray(contract.ai.models)) ? contract.ai.models : [];
   }
+  // spec 001 FR-017 amendment (Decision 124 / registry#571): ai.models
+  // entries are either a bare string id (legacy) or an object with an
+  // `id` field (ModelRef). Extract the bare id either way.
+  function modelIdOf(entry) {
+    if (typeof entry === "string" && entry.trim()) { return entry.trim(); }
+    if (entry && typeof entry === "object" && typeof entry.id === "string" && entry.id.trim()) { return entry.id.trim(); }
+    return null;
+  }
 
   // Shown next to the capability id itself (card title / table first cell)
   // rather than as its own "Status" column -- deprecated is the only status
@@ -432,10 +440,10 @@
   function serviceTypeAndAgentNode(contract) {
     var nodes = [serviceTypeNode(contract)];
     if (isAgent(contract)) {
-      var models = agentModels(contract);
+      var modelIds = agentModels(contract).map(modelIdOf).filter(Boolean);
       nodes.push(el("span", {
         className: "badge badge-agent",
-        title: models.length ? ("Model-backed capability — " + models.join(", ")) : "Model-backed capability",
+        title: modelIds.length ? ("Model-backed capability — " + modelIds.join(", ")) : "Model-backed capability",
         textContent: "Agent",
       }));
     }
@@ -747,8 +755,23 @@
     ]);
   }
 
-  function modelIdsForContract(contract) {
-    var models = agentModels(contract).slice();
+  // spec 001 FR-017 amendment (Decision 124 / registry#571): (modelId, ref)
+  // pairs, mirroring generate_catalog_pages.py's model_refs_for_contract.
+  // `ref` is the contract's own object-shaped ai.models entry when present
+  // (the contract is the source of truth for it), or null for a legacy
+  // string id / an extra model -- both fall back to model-attribution.json.
+  function modelRefsForContract(contract) {
+    var refs = [];
+    var seen = {};
+    agentModels(contract).forEach(function (entry) {
+      if (typeof entry === "string") {
+        var id = entry.trim();
+        if (id && !seen[id]) { seen[id] = true; refs.push({ modelId: id, ref: null }); }
+      } else if (entry && typeof entry === "object") {
+        var oid = typeof entry.id === "string" ? entry.id.trim() : "";
+        if (oid && !seen[oid]) { seen[oid] = true; refs.push({ modelId: oid, ref: entry }); }
+      }
+    });
     var key = contract && contract.namespace && contract.id
       ? (contract.namespace + "/" + contract.id)
       : null;
@@ -756,43 +779,81 @@
       ? (modelAttribution.capability_extra_models[key] || [])
       : [];
     extras.forEach(function (modelId) {
-      if (models.indexOf(modelId) === -1) { models.push(modelId); }
+      if (modelId && !seen[modelId]) { seen[modelId] = true; refs.push({ modelId: modelId, ref: null }); }
     });
-    return models;
+    return refs;
+  }
+
+  function modelIdsForContract(contract) {
+    return modelRefsForContract(contract).map(function (r) { return r.modelId; });
+  }
+
+  // Sidebar rows for a contract's own object-shaped ai.models entry --
+  // pinned on the contract itself, not looked up in model-attribution.json.
+  function inlineModelRefRows(modelId, ref) {
+    var rows = [
+      sidebarRow("Model", el("a", { className: "t-mono", href: aiModelHash(modelId), textContent: modelId })),
+      sidebarRow("License", el("span", { className: "t-mono", textContent: ref.spdx_expression || "unknown" })),
+    ];
+    var huggingfaceId = ref.huggingface_id;
+    var revision = ref.revision;
+    if (typeof huggingfaceId === "string" && huggingfaceId.trim() && typeof revision === "string" && revision.trim()) {
+      rows.push(sidebarRow("Hugging Face", el("span", { className: "t-mono", textContent: huggingfaceId + "@" + revision })));
+    }
+    var sourceUrl = ref.source_url;
+    if (typeof sourceUrl === "string" && sourceUrl.indexOf("https://") === 0) {
+      rows.push(sidebarRow("Source", el("a", { href: sourceUrl, textContent: sourceUrl, target: "_blank", rel: "noopener" })));
+    }
+    if (ref.attribution_required === true) {
+      rows.push(sidebarRow("Attribution", textNode("required")));
+    }
+    if (ref.copyright) {
+      rows.push(sidebarRow("Copyright", textNode(ref.copyright)));
+    }
+    rows.push(el("p", { className: "sidebar-note", textContent: "Pinned on this capability's own contract (spec 001 FR-017 amendment, Decision 124)." }));
+    return rows;
+  }
+
+  // Sidebar rows for a legacy string-shaped ai.models entry, looked up in
+  // model-attribution.json (the pre-Decision-124 fallback, grandfathered
+  // on already-published contracts).
+  function catalogModelAttributionRows(modelId) {
+    var table = modelAttribution.models || {};
+    var info = table[modelId] || {};
+    var spdx = info.spdx_expression || "unknown";
+    var commercial = info.commercial_use || "unknown";
+    var redistribution = info.redistribution || "unknown";
+    var rows = [
+      sidebarRow("Model", el("a", { className: "t-mono", href: aiModelHash(modelId), textContent: modelId })),
+      sidebarRow("License", el("span", { className: "t-mono", textContent: spdx })),
+      sidebarRow("Commercial use", el("span", { className: rightsBadgeClass(commercial), textContent: commercial })),
+      sidebarRow("Redistribution", el("span", { className: rightsBadgeClass(redistribution), textContent: redistribution })),
+    ];
+    if (info.attribution_required === true) {
+      rows.push(sidebarRow("Attribution", textNode("required")));
+    }
+    if (info.copyright) {
+      rows.push(sidebarRow("Copyright", textNode(info.copyright)));
+    }
+    (info.source_urls || []).forEach(function (url) {
+      if (typeof url === "string" && url.indexOf("https://") === 0) {
+        rows.push(sidebarRow("Source", el("a", { href: url, textContent: url, target: "_blank", rel: "noopener" })));
+      }
+    });
+    if (info.notes) {
+      rows.push(el("p", { className: "sidebar-note", textContent: info.notes }));
+    }
+    return rows;
   }
 
   function renderModelAttributionSidebarCard(contract) {
-    var modelIds = modelIdsForContract(contract);
-    if (!modelIds.length) { return null; }
-    var table = modelAttribution.models || {};
+    var refs = modelRefsForContract(contract);
+    if (!refs.length) { return null; }
     var children = [
       el("div", { className: "sidebar-card-title", textContent: "Model licenses" }),
     ];
-    modelIds.forEach(function (modelId) {
-      var info = table[modelId] || {};
-      var spdx = info.spdx_expression || "unknown";
-      var commercial = info.commercial_use || "unknown";
-      var redistribution = info.redistribution || "unknown";
-      var rows = [
-        sidebarRow("Model", el("a", { className: "t-mono", href: aiModelHash(modelId), textContent: modelId })),
-        sidebarRow("License", el("span", { className: "t-mono", textContent: spdx })),
-        sidebarRow("Commercial use", el("span", { className: rightsBadgeClass(commercial), textContent: commercial })),
-        sidebarRow("Redistribution", el("span", { className: rightsBadgeClass(redistribution), textContent: redistribution })),
-      ];
-      if (info.attribution_required === true) {
-        rows.push(sidebarRow("Attribution", textNode("required")));
-      }
-      if (info.copyright) {
-        rows.push(sidebarRow("Copyright", textNode(info.copyright)));
-      }
-      (info.source_urls || []).forEach(function (url) {
-        if (typeof url === "string" && url.indexOf("https://") === 0) {
-          rows.push(sidebarRow("Source", el("a", { href: url, textContent: url, target: "_blank", rel: "noopener" })));
-        }
-      });
-      if (info.notes) {
-        rows.push(el("p", { className: "sidebar-note", textContent: info.notes }));
-      }
+    refs.forEach(function (entry) {
+      var rows = entry.ref ? inlineModelRefRows(entry.modelId, entry.ref) : catalogModelAttributionRows(entry.modelId);
       children.push(el("div", { style: "margin-bottom:0.75rem" }, rows));
     });
     children.push(el("p", {
@@ -826,7 +887,11 @@
     }
     if (isAgent(contract)) {
       packageRows.push(sidebarRow("Agent", el("span", { className: "badge badge-agent", textContent: "model-backed" })));
-      var models = agentModels(contract);
+      // Mirrors generate_catalog_pages.py's package_sidebar_html: this
+      // summary row only lists legacy string ids -- an object-shaped
+      // ai.models entry gets its full pinned attribution in the "Model
+      // licenses" card instead (spec 001 FR-017 amendment, registry#571).
+      var models = agentModels(contract).filter(function (m) { return typeof m === "string" && m.trim(); });
       if (models.length) {
         var modelLinks = models.map(function (modelId, index) {
           var parts = [el("a", { className: "t-mono", href: aiModelHash(modelId), textContent: modelId })];
@@ -1074,7 +1139,9 @@
     groupedCapabilities().forEach(function (group) {
       var contract = group.latest.contract;
       if (!isAgent(contract)) { return; }
-      agentModels(contract).forEach(function (modelId) {
+      agentModels(contract).forEach(function (modelEntry) {
+        var modelId = modelIdOf(modelEntry);
+        if (!modelId) { return; }
         if (!byModel[modelId]) { byModel[modelId] = []; }
         byModel[modelId].push(group);
       });
@@ -1123,32 +1190,70 @@
     appEl.appendChild(el("h1", { className: "t-h1 detail-title t-mono", textContent: modelId }));
     appEl.appendChild(el("p", { className: "detail-summary", textContent: "Capabilities whose contract declares ai.model_backed: true with this model in ai.models." }));
 
-    var info = (modelAttribution.models || {})[modelId];
-    if (info) {
-      var attrRows = [
-        sidebarRow("License", el("span", { className: "t-mono", textContent: info.spdx_expression || "unknown" })),
-        sidebarRow("Commercial use", el("span", { className: rightsBadgeClass(info.commercial_use || "unknown"), textContent: info.commercial_use || "unknown" })),
-        sidebarRow("Redistribution", el("span", { className: rightsBadgeClass(info.redistribution || "unknown"), textContent: info.redistribution || "unknown" })),
+    // spec 001 FR-017 amendment (Decision 124 / registry#571): prefer a
+    // matching capability's own object-shaped ai.models entry -- pinned on
+    // the contract, the source of truth -- over model-attribution.json.
+    var inlineRef = null;
+    for (var gi = 0; gi < groups.groups.length && !inlineRef; gi++) {
+      var candidateAi = groups.groups[gi].latest.contract.ai;
+      if (!candidateAi || !Array.isArray(candidateAi.models)) { continue; }
+      for (var mi = 0; mi < candidateAi.models.length; mi++) {
+        var candidate = candidateAi.models[mi];
+        if (candidate && typeof candidate === "object" && candidate.id === modelId) { inlineRef = candidate; break; }
+      }
+    }
+    if (inlineRef) {
+      var pinnedRows = [
+        sidebarRow("License", el("span", { className: "t-mono", textContent: inlineRef.spdx_expression || "unknown" })),
       ];
-      if (info.attribution_required === true) {
-        attrRows.push(sidebarRow("Attribution", textNode("required")));
+      var huggingfaceId = inlineRef.huggingface_id;
+      var revision = inlineRef.revision;
+      if (typeof huggingfaceId === "string" && huggingfaceId.trim() && typeof revision === "string" && revision.trim()) {
+        pinnedRows.push(sidebarRow("Hugging Face", el("span", { className: "t-mono", textContent: huggingfaceId + "@" + revision })));
       }
-      if (info.copyright) {
-        attrRows.push(sidebarRow("Copyright", textNode(info.copyright)));
+      var pinnedSourceUrl = inlineRef.source_url;
+      if (typeof pinnedSourceUrl === "string" && pinnedSourceUrl.indexOf("https://") === 0) {
+        pinnedRows.push(sidebarRow("Source", el("a", { href: pinnedSourceUrl, textContent: pinnedSourceUrl, target: "_blank", rel: "noopener" })));
       }
-      (info.source_urls || []).forEach(function (url) {
-        if (typeof url === "string" && url.indexOf("https://") === 0) {
-          attrRows.push(sidebarRow("Source", el("a", { href: url, textContent: url, target: "_blank", rel: "noopener" })));
-        }
-      });
-      if (info.notes) {
-        attrRows.push(el("p", { className: "sidebar-note", textContent: info.notes }));
+      if (inlineRef.attribution_required === true) {
+        pinnedRows.push(sidebarRow("Attribution", textNode("required")));
+      }
+      if (inlineRef.copyright) {
+        pinnedRows.push(sidebarRow("Copyright", textNode(inlineRef.copyright)));
       }
       appEl.appendChild(el("div", { className: "sidebar-card", style: "margin:1.25rem 0; max-width:42rem" }, [
         el("div", { className: "sidebar-card-title", textContent: "Model license" }),
-        el("div", {}, attrRows),
-        el("p", { className: "sidebar-note", textContent: "Third-party model rights (Spec 025 non-inheritance). See catalog/THIRD_PARTY_NOTICES.md." }),
+        el("div", {}, pinnedRows),
+        el("p", { className: "sidebar-note", textContent: "Pinned on this capability's own contract (spec 001 FR-017 amendment, Decision 124)." }),
       ]));
+    } else {
+      var info = (modelAttribution.models || {})[modelId];
+      if (info) {
+        var attrRows = [
+          sidebarRow("License", el("span", { className: "t-mono", textContent: info.spdx_expression || "unknown" })),
+          sidebarRow("Commercial use", el("span", { className: rightsBadgeClass(info.commercial_use || "unknown"), textContent: info.commercial_use || "unknown" })),
+          sidebarRow("Redistribution", el("span", { className: rightsBadgeClass(info.redistribution || "unknown"), textContent: info.redistribution || "unknown" })),
+        ];
+        if (info.attribution_required === true) {
+          attrRows.push(sidebarRow("Attribution", textNode("required")));
+        }
+        if (info.copyright) {
+          attrRows.push(sidebarRow("Copyright", textNode(info.copyright)));
+        }
+        (info.source_urls || []).forEach(function (url) {
+          if (typeof url === "string" && url.indexOf("https://") === 0) {
+            attrRows.push(sidebarRow("Source", el("a", { href: url, textContent: url, target: "_blank", rel: "noopener" })));
+          }
+        });
+        if (info.notes) {
+          attrRows.push(el("p", { className: "sidebar-note", textContent: info.notes }));
+        }
+        appEl.appendChild(el("div", { className: "sidebar-card", style: "margin:1.25rem 0; max-width:42rem" }, [
+          el("div", { className: "sidebar-card-title", textContent: "Model license" }),
+          el("div", {}, attrRows),
+          el("p", { className: "sidebar-note", textContent: "Third-party model rights (Spec 025 non-inheritance). See catalog/THIRD_PARTY_NOTICES.md." }),
+        ]));
+      }
     }
 
     appEl.appendChild(el("h2", { className: "t-h2", textContent: "Capabilities" }));
