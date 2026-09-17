@@ -95,7 +95,7 @@ pub extern "C" fn _start() {
 
 #[cfg(test)]
 mod tests {
-    use super::apply_transition;
+    use super::*;
 
     #[test]
     fn rejects_missing_required_fields() {
@@ -104,6 +104,37 @@ mod tests {
         let mut output = [0u8; 4096];
         let length = apply_transition(b"{}", &mut request, &mut response, &mut output);
         assert_eq!(&output[..length], b"{\"result_ref\":\"\",\"version\":0,\"replay\":false,\"result_class\":\"invalid_request\"}");
+    }
+
+    #[test]
+    fn exercises_validation_and_encoding_helpers() {
+        let mut request = [0u8; 8192];
+        let mut response = [0u8; 4096];
+        let mut output = [0u8; 4096];
+        assert_eq!(skip(b" \n\tx"), b"x");
+        assert!(value_after(b"[]", b"x").is_none());
+        assert!(value_after(br#"{"record_refs":[],"transition":{},"idempotency_key":"k","expected_version":12}"#, b"\"record_refs\"").is_some());
+        assert!(value_after(br#"{"x":1,"x":2}"#, b"\"x\"").is_none());
+        assert!(json_value_end(br#"{"x":1}"#).is_some());
+        assert!(json_value_end(br#"[1]"#).is_some());
+        assert!(json_value_end(br#""x""#).is_some());
+        assert!(balanced_end(br#"{"x":"[\\\"]"}"#).is_some());
+        assert!(balanced_end(b"{").is_none());
+        assert!(string_end(b"\"x\"").is_some());
+        assert!(string_end(b"\"x").is_none());
+        assert_eq!(string_after(br#"{"k":"value"}"#, b"\"k\""), b"value");
+        assert_eq!(string_after(br#"{"k":1}"#, b"\"k\""), b"");
+        assert_eq!(int_value_after(br#"{"n":123}"#, b"\"n\""), Some(123));
+        assert!(int_value_after(br#"{"n":"x"}"#, b"\"n\"").is_none());
+        assert_eq!(copy(&mut output, 0, b"x"), 1);
+        let mut at = 1;
+        assert!(append(&mut output, &mut at, b"y"));
+        assert!(append_json_string(&mut output, &mut at, b"ok"));
+        assert!(append_i32(&mut output, &mut at, 42));
+        assert!(unavailable(&mut output, b"invalid_request") > 0);
+        let input = br#"{"record_refs":[],"transition":{},"idempotency_key":"k","expected_version":12}"#;
+        let n = apply_transition(input, &mut request, &mut response, &mut output);
+        assert!(core::str::from_utf8(&output[..n]).unwrap().contains("connector_unavailable"));
     }
 }
 
