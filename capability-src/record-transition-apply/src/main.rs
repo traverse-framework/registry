@@ -127,6 +127,7 @@ mod tests {
         assert!(json_value_end(br#"[1]"#).is_some());
         assert!(json_value_end(br#""x""#).is_some());
         assert!(balanced_end(br#"{"x":"[\\\"]"}"#).is_some());
+        assert!(balanced_end(br#"{"x":"escaped\\\"quote"}"#).is_some());
         assert!(balanced_end(b"{").is_none());
         assert!(balanced_end(b"}").is_none());
         assert!(string_end(b"\"x\"").is_some());
@@ -135,11 +136,13 @@ mod tests {
         assert_eq!(string_after(br#"{"k":1}"#, b"\"k\""), b"");
         assert_eq!(int_value_after(br#"{"n":123}"#, b"\"n\""), Some(123));
         assert!(int_value_after(br#"{"n":"x"}"#, b"\"n\"").is_none());
+        assert!(int_value_after(br#"{"n":999999999999999999999}"#, b"\"n\"").is_none());
         assert_eq!(copy(&mut output, 0, b"x"), 1);
         let mut at = 1;
         assert!(append(&mut output, &mut at, b"y"));
         assert!(append_json_string(&mut output, &mut at, b"ok"));
         assert!(append_i32(&mut output, &mut at, 42));
+        assert!(append_i32(&mut output, &mut at, 0));
         let mut tiny = [0u8; 1];
         let mut tiny_at = 1;
         assert!(!append(&mut tiny, &mut tiny_at, b"x"));
