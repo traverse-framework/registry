@@ -1,0 +1,243 @@
+{
+  "artifact": {
+    "digest": "sha256:377d8f1f67e3144b920d9f04f6bc2fbc8887e15e2e9e2c53f5255909ef909ae0",
+    "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/artifact.recording-finalize-1.0.1/recording-finalize.wasm"
+  },
+  "authoring": {
+    "method": "llm-assisted",
+    "review": "https://github.com/enricopiovesan/Callweave/commit/f26c012",
+    "source_revision": "https://github.com/enricopiovesan/Callweave/commit/f26c012",
+    "test_evidence": "https://github.com/enricopiovesan/Callweave/commit/f26c012"
+  },
+  "connector_requirements": [
+    {
+      "connector_id": "traverse.object-store",
+      "version": "^1.0.0"
+    }
+  ],
+  "consumes": [],
+  "dependencies": [],
+  "description": "A portable WASM capability that submits an opaque captured-content reference for immutable storage. It never receives recording bytes, chooses a filesystem/database/provider, accesses a microphone, knows an application, or exposes host-private storage details.",
+  "emits": [],
+  "event_trigger": null,
+  "evidence": [],
+  "execution": {
+    "binary_format": "wasm",
+    "constraints": {
+      "filesystem_access": "none",
+      "host_api_access": "exception_required",
+      "network_access": "forbidden"
+    },
+    "entrypoint": {
+      "command": "run",
+      "kind": "wasi-command"
+    },
+    "preferred_targets": [
+      "local",
+      "browser",
+      "edge",
+      "device"
+    ]
+  },
+  "id": "artifact.recording-finalize",
+  "inputs": {
+    "schema": {
+      "additionalProperties": false,
+      "properties": {
+        "content_ref": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "idempotency_key": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "media_type": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retention_class": {
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "content_ref",
+        "media_type",
+        "retention_class",
+        "idempotency_key"
+      ],
+      "type": "object"
+    }
+  },
+  "kind": "capability_contract",
+  "lifecycle": "active",
+  "name": "recording-finalize",
+  "namespace": "artifact",
+  "outputs": {
+    "schema": {
+      "additionalProperties": false,
+      "properties": {
+        "asset_ref": {
+          "type": "string"
+        },
+        "content_digest": {
+          "type": "string"
+        },
+        "result_class": {
+          "enum": [
+            "created",
+            "replayed",
+            "connector_unavailable",
+            "invalid_request"
+          ],
+          "type": "string"
+        },
+        "size": {
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "asset_ref",
+        "content_digest",
+        "size",
+        "result_class"
+      ],
+      "type": "object"
+    }
+  },
+  "owner": {
+    "contact": "https://github.com/enricopiovesan",
+    "team": "callweave"
+  },
+  "permissions": [
+    {
+      "id": "artifact.recording-finalize.execute"
+    }
+  ],
+  "permitted_targets": [
+    "local",
+    "browser",
+    "edge",
+    "device"
+  ],
+  "policies": [
+    {
+      "id": "immutable-artifact-policy"
+    },
+    {
+      "id": "host-details-forbidden"
+    }
+  ],
+  "postconditions": [
+    {
+      "description": "The result represents one immutable write, a replay, or a stable non-secret inability to submit.",
+      "id": "immutable-or-stable-result"
+    },
+    {
+      "description": "No path, provider, credential, or private configuration is returned.",
+      "id": "no-host-detail-leakage"
+    }
+  ],
+  "preconditions": [
+    {
+      "description": "A non-empty opaque content reference is supplied.",
+      "id": "opaque-content-reference"
+    },
+    {
+      "description": "The host has activated a compatible Traverse object-store binding.",
+      "id": "object-store-activated"
+    }
+  ],
+  "provenance": {
+    "adr_refs": [
+      "ADR-0039"
+    ],
+    "author": "Callweave",
+    "created_at": "2026-09-05T00:00:00Z",
+    "exception_refs": [
+      "mediated-connector-invoke"
+    ],
+    "source": "greenfield",
+    "spec_ref": "104-mediated-connector-invocation@1.0.0"
+  },
+  "risk": {
+    "data_flow": {
+      "accepted_data_classifications": [],
+      "egress_policy": "denied",
+      "produced_data_classifications": []
+    },
+    "determinism_class": "model_derived",
+    "effect_class": "irreversible_effect",
+    "reliability": {
+      "compensation_available": false,
+      "idempotency_required": true,
+      "retryable": false
+    }
+  },
+  "schema_version": "1.0.0",
+  "service_type": "stateless",
+  "side_effects": [
+    {
+      "description": "Requests an immutable object finalization through the declared object-store connector.",
+      "kind": "state_change"
+    }
+  ],
+  "state_schema": null,
+  "summary": "Finalize captured recording bytes as an immutable artifact through a declared object-store connector.",
+  "use_cases": [
+    {
+      "happy": true,
+      "input_example": {
+        "content_ref": "capture-buffer:segment-17",
+        "idempotency_key": "finalize-segment-17",
+        "media_type": "audio/wav",
+        "retention_class": "standard"
+      },
+      "output_example": {
+        "asset_ref": "asset:sha256:segment-17",
+        "content_digest": "sha256:segment-17",
+        "result_class": "created",
+        "size": 128
+      },
+      "persona_ref": "artifact-operator",
+      "scenario": "As an artifact operator, I want captured audio finalized once as an immutable asset so that later processing refers to verified content."
+    },
+    {
+      "happy": true,
+      "input_example": {
+        "content_ref": "capture-buffer:segment-17",
+        "idempotency_key": "finalize-segment-17",
+        "media_type": "audio/wav",
+        "retention_class": "standard"
+      },
+      "output_example": {
+        "asset_ref": "asset:sha256:segment-17",
+        "content_digest": "sha256:segment-17",
+        "result_class": "replayed",
+        "size": 128
+      },
+      "persona_ref": "artifact-operator",
+      "scenario": "As an artifact operator, I want an idempotent replay reported so that a retry does not duplicate a recording artifact."
+    },
+    {
+      "happy": false,
+      "input_example": {
+        "content_ref": "capture-buffer:segment-17",
+        "idempotency_key": "finalize-unavailable",
+        "media_type": "audio/wav",
+        "retention_class": "standard"
+      },
+      "output_example": {
+        "asset_ref": "",
+        "content_digest": "",
+        "result_class": "connector_unavailable",
+        "size": 0
+      },
+      "persona_ref": "artifact-operator",
+      "scenario": "As an artifact operator, I want unavailable storage represented without a path, credential, or provider detail so that host internals stay private."
+    }
+  ],
+  "version": "1.0.1"
+}
