@@ -103,7 +103,7 @@ mod tests {
         let mut response = [0u8; 4096];
         let mut output = [0u8; 4096];
         let length = apply_transition(b"{}", &mut request, &mut response, &mut output);
-        assert_eq!(&output[..length], b"{\"result_class\":\"invalid_request\"}");
+        assert_eq!(&output[..length], b"{\"result_ref\":\"\",\"version\":0,\"replay\":false,\"result_class\":\"invalid_request\"}");
     }
 }
 
