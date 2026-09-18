@@ -45,15 +45,6 @@
       "evidence": "active immutable successor; artifact byte-identical to signed 1.1.0 and digest-verified."
     },
     {
-      "capability_id": "audio.activity-interval-classify",
-      "published_versions": [
-        "1.0.0"
-      ],
-      "path": "capabilities/audio/audio.activity-interval-classify/1.0.0/contract.json",
-      "classification": "no-event-required",
-      "evidence": "pure deterministic memory-only capability; no emits/consumes and no asynchronous domain fact."
-    },
-    {
       "capability_id": "audio.calibration-plan-create",
       "published_versions": [
         "1.0.0"
@@ -103,15 +94,6 @@
       "path": "capabilities/audio/audio.privacy-risk-evaluate/1.1.1/contract.json",
       "classification": "no-event-required",
       "evidence": "active immutable successor; artifact byte-identical to signed 1.1.0 and digest-verified."
-    },
-    {
-      "capability_id": "audio.signal-quality-evaluate",
-      "published_versions": [
-        "1.0.0"
-      ],
-      "path": "capabilities/audio/audio.signal-quality-evaluate/1.0.0/contract.json",
-      "classification": "no-event-required",
-      "evidence": "pure deterministic memory-only capability; no emits/consumes and no asynchronous domain fact."
     },
     {
       "capability_id": "audio.transcribe-speech",
@@ -609,15 +591,6 @@
         "path": "events/identity/identity.session.revoked/1.0.0/product.json"
       },
       "evidence": "Session revocations are domain facts independent consumers may observe. Contract declares emits=[{event_id: identity.session.revoked, version: 1.0.0}], service_type=subscribable, and the WASM guest calls traverse_host::emit_event on accepted revocations (reason_code=ok)."
-    },
-    {
-      "capability_id": "inference.ensemble-reconcile",
-      "published_versions": [
-        "1.0.0"
-      ],
-      "path": "capabilities/inference/inference.ensemble-reconcile/1.0.0/contract.json",
-      "classification": "no-event-required",
-      "evidence": "pure deterministic memory-only capability; no emits/consumes and no asynchronous domain fact."
     },
     {
       "capability_id": "inference.evidence-normalize",
