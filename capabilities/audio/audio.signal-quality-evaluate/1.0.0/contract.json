@@ -290,6 +290,6 @@
   "artifact_type": "native",
   "artifact": {
     "digest": "sha256:9b15887c90f8bb93a2bbdfc87c5ea89f5e03f8c9de3e1c3dd5c2071dcd0236af",
-    "url": "https://github.com/enricopiovesan/Callweave/raw/358857b/capabilities/audio.signal-quality-evaluate/artifacts/signal-quality-evaluate.wasm"
+    "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/audio.signal-quality-evaluate-1.0.0/signal-quality-evaluate.wasm"
   }
 }

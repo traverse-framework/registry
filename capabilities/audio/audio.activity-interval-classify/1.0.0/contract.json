@@ -107,6 +107,34 @@
       },
       "happy": false,
       "persona_ref": "audio-processing-consumer"
+    },
+    {
+      "scenario": "As an audio-processing consumer, I want clipped windows represented explicitly so that corrupted signal is never mistaken for a possible event.",
+      "input_example": {
+        "policy": {
+          "version": "activity-1"
+        },
+        "windows": [
+          {
+            "start_ms": 0,
+            "end_ms": 1000,
+            "state": "clipped"
+          }
+        ]
+      },
+      "output_example": {
+        "represented_window_count": 1,
+        "intervals": [
+          {
+            "start_ms": 0,
+            "end_ms": 1000,
+            "activity": "clipped",
+            "window_count": 1
+          }
+        ]
+      },
+      "happy": false,
+      "persona_ref": "audio-processing-consumer"
     }
   ],
   "inputs": {
@@ -326,6 +354,6 @@
   "artifact_type": "native",
   "artifact": {
     "digest": "sha256:946cf616601fc19f706aaee603367fa4c3be9fac5f7ab8367b5f00e2f1cdb084",
-    "url": "https://github.com/enricopiovesan/Callweave/raw/35937ca/capabilities/audio.activity-interval-classify/artifacts/activity-interval-classify.wasm"
+    "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/audio.activity-interval-classify-1.0.0/activity-interval-classify.wasm"
   }
 }

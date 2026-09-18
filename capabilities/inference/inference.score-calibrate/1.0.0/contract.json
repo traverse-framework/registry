@@ -246,6 +246,6 @@
   "artifact_type": "native",
   "artifact": {
     "digest": "sha256:42f7817e369a811b3761315dd574f31b2020e5a9e2dab0307c24c59ae3b28539",
-    "url": "https://github.com/enricopiovesan/Callweave/raw/5f48de4/capabilities/inference.score-calibrate/artifacts/score-calibrate.wasm"
+    "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/inference.score-calibrate-1.0.0/score-calibrate.wasm"
   }
 }

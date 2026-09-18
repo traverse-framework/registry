@@ -81,4 +81,5 @@ fn classify(input: &[u8], output: &mut [u8]) -> usize {
 }
 fn error(output: &mut [u8], code: &[u8]) -> usize { let mut at = 0; put(output, &mut at, b"{\"error\":\""); put(output, &mut at, code); put(output, &mut at, b"\"}"); at }
 #[cfg(not(test))]
+#[cfg(not(test))]
 #[panic_handler] fn panic(_: &core::panic::PanicInfo<'_>) -> ! { loop {} }
