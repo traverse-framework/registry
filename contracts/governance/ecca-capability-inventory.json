@@ -602,6 +602,15 @@
       "evidence": "side_effects=[memory_only] with empty emits/consumes; deterministic normalization result returns directly to caller."
     },
     {
+      "capability_id": "inference.ensemble-reconcile",
+      "published_versions": [
+        "1.0.0"
+      ],
+      "path": "capabilities/inference/inference.ensemble-reconcile/1.0.0/contract.json",
+      "classification": "no-event-required",
+      "evidence": "pure deterministic memory-only capability; no emits/consumes and no asynchronous domain fact."
+    },
+    {
       "capability_id": "inference.score-calibrate",
       "published_versions": [
         "1.0.0"
