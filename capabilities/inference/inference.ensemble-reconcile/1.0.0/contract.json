@@ -249,6 +249,6 @@
   "artifact_type": "native",
   "artifact": {
     "digest": "sha256:36d533e1aaec6ff7d3c23e98e94c703cc5e281f7885c309165afa186fefe88dd",
-    "url": "https://github.com/enricopiovesan/Callweave/raw/673aa3a/capabilities/inference.ensemble-reconcile/artifacts/ensemble-reconcile.wasm"
+    "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/inference.ensemble-reconcile-1.0.0/ensemble-reconcile.wasm"
   }
 }
