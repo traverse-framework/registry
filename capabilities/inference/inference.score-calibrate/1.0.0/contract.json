@@ -1,11 +1,251 @@
 {
-  "kind":"capability_contract","schema_version":"1.0.0","id":"inference.score-calibrate","namespace":"inference","name":"score-calibrate","version":"1.0.0","lifecycle":"experimental",
-  "owner":{"team":"callweave","contact":"https://github.com/enricopiovesan"},
-  "authoring":{"method":"llm-assisted","source_revision":"5f48de4","test_evidence":"Callweave WASM build and direct WASI smoke test","review":{"decision":"pending-qualified-review","pr":"pending","reviewer":"traverse-registry-maintainer"}},
-  "summary":"Apply a bounded, deterministic calibration policy to one model score.",
-  "description":"Taxonomy-neutral score calibration. It applies an explicitly supplied affine policy and clamps the result to 0..1000; it does not select a model, name a taxon, access a host, or persist evidence.",
-  "use_cases":[{"scenario":"As an evidence consumer, I want a raw model score calibrated by an explicit policy so that downstream decisions use comparable confidence values.","input_example":{"evidence_id":"e1","raw_score_millis":800,"policy":{"version":"cal-1","scale_millis":900,"offset_millis":20}},"output_example":{"evidence_id":"e1","raw_score_millis":800,"calibrated_score_millis":740,"policy_version":"cal-1","result_class":"calibrated"},"happy":true,"persona_ref":"audio-processing-consumer"},{"scenario":"As an evidence consumer, I want malformed scores rejected before calibration so that confidence cannot exceed its declared bounds.","input_example":{"evidence_id":"e2","raw_score_millis":1200,"policy":{"version":"cal-1","scale_millis":1000,"offset_millis":0}},"output_example":{"result_class":"score_out_of_bounds"},"happy":false,"persona_ref":"audio-processing-consumer"}],
-  "inputs":{"schema":{"type":"object","required":["evidence_id","raw_score_millis","policy"],"properties":{"evidence_id":{"type":"string","minLength":1},"raw_score_millis":{"type":"integer","minimum":0,"maximum":1000},"policy":{"type":"object","required":["version","scale_millis","offset_millis"],"properties":{"version":{"type":"string","minLength":1},"scale_millis":{"type":"integer","minimum":0,"maximum":2000},"offset_millis":{"type":"integer","minimum":-1000,"maximum":1000}},"additionalProperties":false}},"additionalProperties":false}},
-  "outputs":{"schema":{"type":"object","required":["evidence_id","raw_score_millis","calibrated_score_millis","policy_version","result_class"],"properties":{"evidence_id":{"type":"string"},"raw_score_millis":{"type":"integer"},"calibrated_score_millis":{"type":"integer","minimum":0,"maximum":1000},"policy_version":{"type":"string"},"result_class":{"type":"string","enum":["calibrated","invalid_request","score_out_of_bounds"]}},"additionalProperties":false}},
-  "preconditions":[{"id":"explicit-policy","description":"A bounded affine calibration policy is supplied."}],"postconditions":[{"id":"bounded-output","description":"Calibrated score is always within 0..1000."},{"id":"deterministic","description":"Identical input and policy produce identical output."}],"side_effects":[{"kind":"memory_only","description":"Pure calculation."}],"emits":[],"consumes":[],"permissions":[{"id":"inference.score-calibrate.execute"}],"execution":{"binary_format":"wasm","entrypoint":{"kind":"wasi-command","command":"run"},"preferred_targets":["local","browser","edge","device"],"constraints":{"host_api_access":"none","network_access":"forbidden","filesystem_access":"none"}},"policies":[{"id":"bounded-score-calibration"}],"dependencies":[],"provenance":{"source":"greenfield","author":"Callweave","created_at":"2026-09-17T00:00:00Z","spec_ref":"100-capability-package-authoring@1.0.0","adr_refs":[],"exception_refs":[]},"evidence":[],"state_schema":null,"service_type":"stateless","permitted_targets":["local","browser","edge","device"]
+  "kind": "capability_contract",
+  "schema_version": "1.0.0",
+  "id": "inference.score-calibrate",
+  "namespace": "inference",
+  "name": "score-calibrate",
+  "version": "1.0.0",
+  "lifecycle": "experimental",
+  "owner": {
+    "team": "callweave",
+    "contact": "https://github.com/enricopiovesan"
+  },
+  "authoring": {
+    "method": "llm-assisted",
+    "source_revision": "5f48de4",
+    "test_evidence": "Callweave WASM build and direct WASI smoke test",
+    "review": {
+      "decision": "pending-qualified-review",
+      "pr": "pending",
+      "reviewer": "traverse-registry-maintainer"
+    }
+  },
+  "summary": "Apply a bounded, deterministic calibration policy to one model score.",
+  "description": "Taxonomy-neutral score calibration. It applies an explicitly supplied affine policy and clamps the result to 0..1000; it does not select a model, name a taxon, access a host, or persist evidence.",
+  "use_cases": [
+    {
+      "scenario": "As an evidence consumer, I want a raw model score calibrated by an explicit policy so that downstream decisions use comparable confidence values.",
+      "input_example": {
+        "evidence_id": "e1",
+        "raw_score_millis": 800,
+        "policy": {
+          "version": "cal-1",
+          "scale_millis": 900,
+          "offset_millis": 20
+        }
+      },
+      "output_example": {
+        "evidence_id": "e1",
+        "raw_score_millis": 800,
+        "calibrated_score_millis": 740,
+        "policy_version": "cal-1",
+        "result_class": "calibrated"
+      },
+      "happy": true,
+      "persona_ref": "audio-processing-consumer"
+    },
+    {
+      "scenario": "As an evidence consumer, I want malformed scores rejected before calibration so that confidence cannot exceed its declared bounds.",
+      "input_example": {
+        "evidence_id": "e2",
+        "raw_score_millis": 1200,
+        "policy": {
+          "version": "cal-1",
+          "scale_millis": 1000,
+          "offset_millis": 0
+        }
+      },
+      "output_example": {
+        "result_class": "score_out_of_bounds"
+      },
+      "happy": false,
+      "persona_ref": "audio-processing-consumer"
+    }
+  ],
+  "inputs": {
+    "schema": {
+      "type": "object",
+      "required": [
+        "evidence_id",
+        "raw_score_millis",
+        "policy"
+      ],
+      "properties": {
+        "evidence_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "raw_score_millis": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000
+        },
+        "policy": {
+          "type": "object",
+          "required": [
+            "version",
+            "scale_millis",
+            "offset_millis"
+          ],
+          "properties": {
+            "version": {
+              "type": "string",
+              "minLength": 1
+            },
+            "scale_millis": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 2000
+            },
+            "offset_millis": {
+              "type": "integer",
+              "minimum": -1000,
+              "maximum": 1000
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "outputs": {
+    "schema": {
+      "type": "object",
+      "required": [
+        "evidence_id",
+        "raw_score_millis",
+        "calibrated_score_millis",
+        "policy_version",
+        "result_class"
+      ],
+      "properties": {
+        "evidence_id": {
+          "type": "string"
+        },
+        "raw_score_millis": {
+          "type": "integer"
+        },
+        "calibrated_score_millis": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000
+        },
+        "policy_version": {
+          "type": "string"
+        },
+        "result_class": {
+          "type": "string",
+          "enum": [
+            "calibrated",
+            "invalid_request",
+            "score_out_of_bounds"
+          ]
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "preconditions": [
+    {
+      "id": "explicit-policy",
+      "description": "A bounded affine calibration policy is supplied."
+    }
+  ],
+  "postconditions": [
+    {
+      "id": "bounded-output",
+      "description": "Calibrated score is always within 0..1000."
+    },
+    {
+      "id": "deterministic",
+      "description": "Identical input and policy produce identical output."
+    }
+  ],
+  "side_effects": [
+    {
+      "kind": "memory_only",
+      "description": "Pure calculation."
+    }
+  ],
+  "emits": [],
+  "consumes": [],
+  "permissions": [
+    {
+      "id": "inference.score-calibrate.execute"
+    }
+  ],
+  "execution": {
+    "binary_format": "wasm",
+    "entrypoint": {
+      "kind": "wasi-command",
+      "command": "run"
+    },
+    "preferred_targets": [
+      "local",
+      "browser",
+      "edge",
+      "device"
+    ],
+    "constraints": {
+      "host_api_access": "none",
+      "network_access": "forbidden",
+      "filesystem_access": "none"
+    }
+  },
+  "policies": [
+    {
+      "id": "bounded-score-calibration"
+    }
+  ],
+  "dependencies": [],
+  "provenance": {
+    "source": "greenfield",
+    "author": "Callweave",
+    "created_at": "2026-09-17T00:00:00Z",
+    "spec_ref": "100-capability-package-authoring@1.0.0",
+    "adr_refs": [],
+    "exception_refs": []
+  },
+  "evidence": [],
+  "state_schema": null,
+  "service_type": "stateless",
+  "permitted_targets": [
+    "local",
+    "browser",
+    "edge",
+    "device"
+  ],
+  "risk": {
+    "effect_class": "pure_read",
+    "determinism_class": "deterministic",
+    "data_flow": {
+      "accepted_data_classifications": [],
+      "produced_data_classifications": [],
+      "egress_policy": "denied"
+    },
+    "reliability": {
+      "idempotency_required": false,
+      "retryable": true,
+      "compensation_available": true
+    }
+  },
+  "licensing": {
+    "spdx_expression": "Apache-2.0",
+    "commercial_use": "allowed",
+    "redistribution": "allowed",
+    "attribution_required": true,
+    "verification": {
+      "status": "maintainer-declared"
+    },
+    "license_files": [
+      "LICENSE"
+    ],
+    "source_url": "https://github.com/traverse-framework/registry/blob/main/LICENSE"
+  },
+  "artifact_type": "native",
+  "artifact": {
+    "digest": "sha256:42f7817e369a811b3761315dd574f31b2020e5a9e2dab0307c24c59ae3b28539",
+    "url": "https://github.com/enricopiovesan/Callweave/raw/5f48de4/capabilities/inference.score-calibrate/artifacts/score-calibrate.wasm"
+  }
 }

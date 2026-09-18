@@ -1,5 +1,5 @@
-#![no_std]
-#![no_main]
+#![cfg_attr(not(test), no_std)]
+#![cfg_attr(not(test), no_main)]
 
 const INPUT_LIMIT: usize = 1_000_000;
 const OUTPUT_LIMIT: usize = 32_768;
@@ -80,4 +80,5 @@ fn classify(input: &[u8], output: &mut [u8]) -> usize {
     put(output, &mut at, b"],\"represented_window_count\":"); number(output, &mut at, windows as i32); put(output, &mut at, b"}"); at
 }
 fn error(output: &mut [u8], code: &[u8]) -> usize { let mut at = 0; put(output, &mut at, b"{\"error\":\""); put(output, &mut at, code); put(output, &mut at, b"\"}"); at }
+#[cfg(not(test))]
 #[panic_handler] fn panic(_: &core::panic::PanicInfo<'_>) -> ! { loop {} }

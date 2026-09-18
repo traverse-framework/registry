@@ -1,14 +1,295 @@
 {
-  "kind":"capability_contract","schema_version":"1.0.0","id":"audio.signal-quality-evaluate","namespace":"audio","name":"signal-quality-evaluate","version":"1.0.0","lifecycle":"experimental",
-  "owner":{"team":"callweave","contact":"https://github.com/enricopiovesan"},
-  "authoring":{"method":"llm-assisted","source_revision":"358857b","test_evidence":"Callweave WASM build and direct WASI smoke test","review":{"decision":"pending-qualified-review","pr":"pending","reviewer":"traverse-registry-maintainer"}},
-  "summary":"Measure deterministic quality facts for one bounded PCM16 window.",
-  "description":"Taxonomy-neutral signal measurement over supplied signed PCM16 samples. It computes RMS, peak, clipping, zero crossings, and a quality state without accessing a device, model, location, network, filesystem, or application workflow.",
-  "use_cases":[
-    {"scenario":"As an audio-processing consumer, I want deterministic quality facts for a bounded PCM window so that later classifiers can reject unusable evidence.","input_example":{"samples":[0,1000,-1000],"sample_rate_hz":48000,"policy":{"version":"quality-1"}},"output_example":{"state":"active","rms_milli":31,"peak_milli":31,"clipping_samples":0},"happy":true,"persona_ref":"audio-processing-consumer"},
-    {"scenario":"As an audio-processing consumer, I want malformed or over-bounded samples rejected before analysis so that quality metrics cannot be fabricated.","input_example":{"samples":[40000],"sample_rate_hz":48000,"policy":{"version":"quality-1"}},"output_example":{"error":"samples must be signed PCM16"},"happy":false,"persona_ref":"audio-processing-consumer"}
+  "kind": "capability_contract",
+  "schema_version": "1.0.0",
+  "id": "audio.signal-quality-evaluate",
+  "namespace": "audio",
+  "name": "signal-quality-evaluate",
+  "version": "1.0.0",
+  "lifecycle": "experimental",
+  "owner": {
+    "team": "callweave",
+    "contact": "https://github.com/enricopiovesan"
+  },
+  "authoring": {
+    "method": "llm-assisted",
+    "source_revision": "358857b",
+    "test_evidence": "Callweave WASM build and direct WASI smoke test",
+    "review": {
+      "decision": "pending-qualified-review",
+      "pr": "pending",
+      "reviewer": "traverse-registry-maintainer"
+    }
+  },
+  "summary": "Measure deterministic quality facts for one bounded PCM16 window.",
+  "description": "Taxonomy-neutral signal measurement over supplied signed PCM16 samples. It computes RMS, peak, clipping, zero crossings, and a quality state without accessing a device, model, location, network, filesystem, or application workflow.",
+  "use_cases": [
+    {
+      "scenario": "As an audio-processing consumer, I want deterministic quality facts for a bounded PCM window so that later classifiers can reject unusable evidence.",
+      "input_example": {
+        "samples": [
+          0,
+          1000,
+          -1000
+        ],
+        "sample_rate_hz": 48000,
+        "policy": {
+          "version": "quality-1"
+        }
+      },
+      "output_example": {
+        "state": "active",
+        "rms_milli": 31,
+        "peak_milli": 31,
+        "clipping_samples": 0
+      },
+      "happy": true,
+      "persona_ref": "audio-processing-consumer"
+    },
+    {
+      "scenario": "As an audio-processing consumer, I want malformed or over-bounded samples rejected before analysis so that quality metrics cannot be fabricated.",
+      "input_example": {
+        "samples": [
+          40000
+        ],
+        "sample_rate_hz": 48000,
+        "policy": {
+          "version": "quality-1"
+        }
+      },
+      "output_example": {
+        "error": "samples must be signed PCM16"
+      },
+      "happy": false,
+      "persona_ref": "audio-processing-consumer"
+    }
   ],
-  "inputs":{"schema":{"type":"object","required":["samples","sample_rate_hz","policy"],"properties":{"samples":{"type":"array","minItems":1,"maxItems":48000,"items":{"type":"integer","minimum":-32768,"maximum":32767}},"sample_rate_hz":{"type":"integer","minimum":1},"window_start_ms":{"type":"integer","minimum":0},"policy":{"type":"object","required":["version"],"properties":{"version":{"type":"string","minLength":1},"max_samples":{"type":"integer","minimum":1,"maximum":48000},"quiet_rms_milli":{"type":"integer","minimum":0,"maximum":1000},"clip_threshold":{"type":"integer","minimum":1,"maximum":32767},"clip_ratio_milli":{"type":"integer","minimum":1,"maximum":1000}},"additionalProperties":false}},"additionalProperties":false}},
-  "outputs":{"schema":{"type":"object","required":["policy_version","sample_count","sample_rate_hz","window_start_ms","window_end_ms","rms_milli","peak_milli","clipping_samples","clip_ratio_milli","zero_crossings","state","reason"],"properties":{"policy_version":{"type":"string"},"sample_count":{"type":"integer"},"sample_rate_hz":{"type":"integer"},"window_start_ms":{"type":"integer"},"window_end_ms":{"type":"integer"},"rms_milli":{"type":"integer"},"peak_milli":{"type":"integer"},"clipping_samples":{"type":"integer"},"clip_ratio_milli":{"type":"integer"},"zero_crossings":{"type":"integer"},"state":{"type":"string","enum":["quiet","active","clipped"]},"reason":{"type":"string"}},"additionalProperties":false}},
-  "preconditions":[{"id":"bounded-pcm","description":"The caller supplies signed PCM16 samples within the configured bound."}],"postconditions":[{"id":"deterministic","description":"Identical samples and policy produce identical metrics."},{"id":"lossless-source","description":"Input samples are measured but never modified or persisted."}],"side_effects":[{"kind":"memory_only","description":"Pure calculation."}],"emits":[],"consumes":[],"permissions":[{"id":"audio.signal-quality-evaluate.execute"}],"execution":{"binary_format":"wasm","entrypoint":{"kind":"wasi-command","command":"run"},"preferred_targets":["local","browser","edge","device"],"constraints":{"host_api_access":"none","network_access":"forbidden","filesystem_access":"none"}},"policies":[{"id":"bounded-signal-quality"}],"dependencies":[],"provenance":{"source":"greenfield","author":"Callweave","created_at":"2026-09-17T00:00:00Z","spec_ref":"100-capability-package-authoring@1.0.0","adr_refs":[],"exception_refs":[]},"evidence":[],"state_schema":null,"service_type":"stateless","permitted_targets":["local","browser","edge","device"]
+  "inputs": {
+    "schema": {
+      "type": "object",
+      "required": [
+        "samples",
+        "sample_rate_hz",
+        "policy"
+      ],
+      "properties": {
+        "samples": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 48000,
+          "items": {
+            "type": "integer",
+            "minimum": -32768,
+            "maximum": 32767
+          }
+        },
+        "sample_rate_hz": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "window_start_ms": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "policy": {
+          "type": "object",
+          "required": [
+            "version"
+          ],
+          "properties": {
+            "version": {
+              "type": "string",
+              "minLength": 1
+            },
+            "max_samples": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 48000
+            },
+            "quiet_rms_milli": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 1000
+            },
+            "clip_threshold": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 32767
+            },
+            "clip_ratio_milli": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1000
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "outputs": {
+    "schema": {
+      "type": "object",
+      "required": [
+        "policy_version",
+        "sample_count",
+        "sample_rate_hz",
+        "window_start_ms",
+        "window_end_ms",
+        "rms_milli",
+        "peak_milli",
+        "clipping_samples",
+        "clip_ratio_milli",
+        "zero_crossings",
+        "state",
+        "reason"
+      ],
+      "properties": {
+        "policy_version": {
+          "type": "string"
+        },
+        "sample_count": {
+          "type": "integer"
+        },
+        "sample_rate_hz": {
+          "type": "integer"
+        },
+        "window_start_ms": {
+          "type": "integer"
+        },
+        "window_end_ms": {
+          "type": "integer"
+        },
+        "rms_milli": {
+          "type": "integer"
+        },
+        "peak_milli": {
+          "type": "integer"
+        },
+        "clipping_samples": {
+          "type": "integer"
+        },
+        "clip_ratio_milli": {
+          "type": "integer"
+        },
+        "zero_crossings": {
+          "type": "integer"
+        },
+        "state": {
+          "type": "string",
+          "enum": [
+            "quiet",
+            "active",
+            "clipped"
+          ]
+        },
+        "reason": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "preconditions": [
+    {
+      "id": "bounded-pcm",
+      "description": "The caller supplies signed PCM16 samples within the configured bound."
+    }
+  ],
+  "postconditions": [
+    {
+      "id": "deterministic",
+      "description": "Identical samples and policy produce identical metrics."
+    },
+    {
+      "id": "lossless-source",
+      "description": "Input samples are measured but never modified or persisted."
+    }
+  ],
+  "side_effects": [
+    {
+      "kind": "memory_only",
+      "description": "Pure calculation."
+    }
+  ],
+  "emits": [],
+  "consumes": [],
+  "permissions": [
+    {
+      "id": "audio.signal-quality-evaluate.execute"
+    }
+  ],
+  "execution": {
+    "binary_format": "wasm",
+    "entrypoint": {
+      "kind": "wasi-command",
+      "command": "run"
+    },
+    "preferred_targets": [
+      "local",
+      "browser",
+      "edge",
+      "device"
+    ],
+    "constraints": {
+      "host_api_access": "none",
+      "network_access": "forbidden",
+      "filesystem_access": "none"
+    }
+  },
+  "policies": [
+    {
+      "id": "bounded-signal-quality"
+    }
+  ],
+  "dependencies": [],
+  "provenance": {
+    "source": "greenfield",
+    "author": "Callweave",
+    "created_at": "2026-09-17T00:00:00Z",
+    "spec_ref": "100-capability-package-authoring@1.0.0",
+    "adr_refs": [],
+    "exception_refs": []
+  },
+  "evidence": [],
+  "state_schema": null,
+  "service_type": "stateless",
+  "permitted_targets": [
+    "local",
+    "browser",
+    "edge",
+    "device"
+  ],
+  "risk": {
+    "effect_class": "pure_read",
+    "determinism_class": "deterministic",
+    "data_flow": {
+      "accepted_data_classifications": [],
+      "produced_data_classifications": [],
+      "egress_policy": "denied"
+    },
+    "reliability": {
+      "idempotency_required": false,
+      "retryable": true,
+      "compensation_available": true
+    }
+  },
+  "licensing": {
+    "spdx_expression": "Apache-2.0",
+    "commercial_use": "allowed",
+    "redistribution": "allowed",
+    "attribution_required": true,
+    "verification": {
+      "status": "maintainer-declared"
+    },
+    "license_files": [
+      "LICENSE"
+    ],
+    "source_url": "https://github.com/traverse-framework/registry/blob/main/LICENSE"
+  },
+  "artifact_type": "native",
+  "artifact": {
+    "digest": "sha256:9b15887c90f8bb93a2bbdfc87c5ea89f5e03f8c9de3e1c3dd5c2071dcd0236af",
+    "url": "https://github.com/enricopiovesan/Callweave/raw/358857b/capabilities/audio.signal-quality-evaluate/artifacts/signal-quality-evaluate.wasm"
+  }
 }
