@@ -1,5 +1,5 @@
-#![no_std]
-#![no_main]
+#![cfg_attr(not(test), no_std)]
+#![cfg_attr(not(test), no_main)]
 const MAX_INPUT:usize=1_000_000; const MAX_OUTPUT:usize=2048; const MAX_SAMPLES:usize=48_000;
 #[repr(C)]struct V{buffer:*const u8,length:usize} #[repr(C)]struct VM{buffer:*mut u8,length:usize}
 #[link(wasm_import_module="wasi_snapshot_preview1")]unsafe extern "C"{fn fd_read(fd:u32,v:*const VM,count:usize,read:*mut usize)->u32;fn fd_write(fd:u32,v:*const V,count:usize,written:*mut usize)->u32;}
@@ -13,4 +13,5 @@ fn num(o:&mut[u8],at:&mut usize,mut n:i32){let mut b=[0;12];let mut c=0;if n==0{
 fn isqrt(n:i64)->i64{let(mut x,mut y)=(n,1i64);while y<x{let z=(x+n/x)/2;if z>=x{break}x=z;y=z}x}
 fn run(i:&[u8],o:&mut[u8],s:&mut[i16])->usize{let Some(n)=samples(i,s)else{return err(o,b"invalid_samples")};let rate=int(i,b"\"sample_rate_hz\"").unwrap_or(0);if n==0||rate<1{return err(o,b"invalid_request")}let clip=int(i,b"\"clip_threshold\"").unwrap_or(32760);let quiet=int(i,b"\"quiet_rms_milli\"").unwrap_or(5);let ratio=int(i,b"\"clip_ratio_milli\"").unwrap_or(10);let mut peak=0i32;let mut sum=0i64;let(mut clips,mut crossings)=(0i32,0i32);for x in 0..n{let v=s[x]as i32;let a=if v<0{-v}else{v};if a>peak{peak=a}sum+=(v as i64)*(v as i64);if a>=clip{clips+=1}if x>0&&((s[x-1]<0&&s[x]>=0)||(s[x-1]>=0&&s[x]<0)){crossings+=1}}let rm=(isqrt(sum/n as i64)*1000/32768)as i32;let pm=peak*1000/32768;let cr=clips*1000/n as i32;let state:&[u8]=if cr>=ratio{b"clipped"}else if rm<quiet{b"quiet"}else{b"active"};let mut a=0;put(o,&mut a,b"{\"sample_count\":");num(o,&mut a,n as i32);put(o,&mut a,b",\"sample_rate_hz\":");num(o,&mut a,rate);put(o,&mut a,b",\"rms_milli\":");num(o,&mut a,rm);put(o,&mut a,b",\"peak_milli\":");num(o,&mut a,pm);put(o,&mut a,b",\"clipping_samples\":");num(o,&mut a,clips);put(o,&mut a,b",\"clip_ratio_milli\":");num(o,&mut a,cr);put(o,&mut a,b",\"zero_crossings\":");num(o,&mut a,crossings);put(o,&mut a,b",\"state\":\"");put(o,&mut a,state);put(o,&mut a,b"\"}");a}
 fn err(o:&mut[u8],c:&[u8])->usize{let mut a=0;put(o,&mut a,b"{\"error\":\"");put(o,&mut a,c);put(o,&mut a,b"\"}");a}
+#[cfg(not(test))]
 #[panic_handler]fn panic(_: &core::panic::PanicInfo<'_>)->!{loop{}}
