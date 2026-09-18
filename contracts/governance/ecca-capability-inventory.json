@@ -85,6 +85,15 @@
       "evidence": "active immutable successor; artifact byte-identical to signed 1.1.0 and digest-verified."
     },
     {
+      "capability_id": "audio.activity-interval-classify",
+      "published_versions": [
+        "1.0.0"
+      ],
+      "path": "capabilities/audio/audio.activity-interval-classify/1.0.0/contract.json",
+      "classification": "no-event-required",
+      "evidence": "pure deterministic memory-only capability; no emits/consumes and no asynchronous domain fact."
+    },
+    {
       "capability_id": "audio.privacy-risk-evaluate",
       "published_versions": [
         "1.0.0",
