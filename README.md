@@ -10,6 +10,13 @@ Read [`specs/001-registry-foundation/spec.md`](specs/001-registry-foundation/spe
 
 ## How Publishing Works
 
+**Usual authoring path (no Rust required from you):** the Claude skill
+[`traverse-capability-author`](https://github.com/traverse-framework/claude-skills/tree/main/skills/traverse-capability-author)
+interviews you in plain English, checks this registry (and any private one),
+writes the contract, produces executable WASM, and opens a human-reviewed PR
+here. Under the hood that is still Rust→WASM. Manual authoring still uses
+Rust→WASM and ends in the same publish flow.
+
 1. A capability author runs `traverse-cli capability publish` (in the `traverse` repo), which validates the contract locally and opens a PR here automatically.
 2. CI runs deterministic checks (schema, semver-bump-vs-diff, digest integrity, namespace collisions, dependency resolvability). The advisory AI pass (duplicate/boundary-quality flags) runs in-chat via the `capability-review` skill (`.agents/skills/capability-review/`) during the owner's review — the CI job for it is intentionally dormant (no API key; see `docs/decision-log.md` entries 19 and 25) and posts a degraded-mode notice.
 3. A human reviews and approves — automated checks alone can never merge a publish, and the advisory pass never blocks one.
@@ -20,7 +27,7 @@ Read [`specs/001-registry-foundation/spec.md`](specs/001-registry-foundation/spe
 
 Newly **added** `capabilities/**/contract.json` files must include `artifact.digest` (`sha256:…`) and `artifact.url` pointing at a GitHub Release asset under `https://github.com/traverse-framework/registry/releases/download/artifacts/<tag>/<asset>` (see `specs/007-artifact-hosting/spec.md`). CI rejects missing or non-matching references at PR time so unusable records never reach the index. Until [traverse#859](https://github.com/traverse-framework/traverse/issues/859) is fixed, verify `traverse-cli capability publish` did not strip these fields from the opened PR.
 
-Building with an AI coding agent? [traverse-framework/claude-skills](https://github.com/traverse-framework/claude-skills) hosts a Claude Skill that checks this registry before authoring a new capability, so you don't duplicate something that's already published.
+Prefer starting from [traverse-framework/claude-skills](https://github.com/traverse-framework/claude-skills) (`traverse-capability-author`) so the registry is checked before anything new is drafted. Manual Rust→WASM remains available; both paths publish through the same human-reviewed PR gates here.
 
 ## Layout
 
