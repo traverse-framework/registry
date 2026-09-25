@@ -392,7 +392,7 @@
     }
   },
   "artifact": {
-    "digest": "sha256:c6b7b3f10c0d2c4911391b72180837eed0470ea05ce5ab1d8d2da6d924923689",
+    "digest": "sha256:b18b637900e0e1100c3e99e27ab8475b0fe7800e37e5970ee1f04516bc67e59b",
     "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/core.consent-purpose-check-1.0.0/core-consent-purpose-check.wasm"
   }
 }
