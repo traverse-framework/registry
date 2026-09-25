@@ -1,0 +1,398 @@
+{
+  "kind": "capability_contract",
+  "schema_version": "1.0.0",
+  "id": "core.consent-purpose-check",
+  "namespace": "core",
+  "name": "consent-purpose-check",
+  "version": "1.0.0",
+  "lifecycle": "active",
+  "owner": {
+    "team": "traverse-core",
+    "contact": "capability-authors@traverse-framework.com"
+  },
+  "summary": "Pure, deterministic consent and purpose binding check answering whether supplied consent data allows a requested purpose.",
+  "description": "Pure, deterministic decision procedure for consent and purpose binding evaluation (issue #500). Evaluates whether caller-supplied consent records allow a requested processing purpose for a subject under a caller-supplied policy version and evaluation timestamp (now). Never accesses external storage, clocks, connectors, or network.\n\nMatching and evaluation semantics:\n- Consents are evaluated in declaration order. The first record whose purpose exactly matches requested_purpose determines the decision and matched_consent_index.\n- If status is 'withdrawn', decision is 'deny' with reason_code 'consent_withdrawn'.\n- If status is 'denied', decision is 'deny' with reason_code 'consent_denied'.\n- If status is 'granted', validity timestamps are evaluated: if granted_at > now or unparseable, fails closed with 'deny' / 'invalid_input'; if expires_at <= now, decision is 'deny' with 'consent_expired'; otherwise 'allow' with 'consent_granted'.\n- If no record matches requested_purpose, decision is 'deny' with 'purpose_not_granted'.\n- Malformed input fields or timestamps fail closed with 'deny' and 'invalid_input'.\n- Scope intersection: v1.0.0 performs exact purpose matching; scope is preserved as metadata without filtering.",
+  "inputs": {
+    "type": "object",
+    "required": [
+      "subject_id",
+      "requested_purpose",
+      "now",
+      "policy_version",
+      "consents"
+    ],
+    "properties": {
+      "subject_id": {
+        "type": "string",
+        "description": "Identifier of the data subject whose consent is being evaluated."
+      },
+      "requested_purpose": {
+        "type": "string",
+        "description": "Purpose being requested for processing."
+      },
+      "now": {
+        "type": "string",
+        "description": "Current evaluation reference timestamp in ISO-8601 UTC format."
+      },
+      "policy_version": {
+        "type": "string",
+        "description": "Version identifier of the governing consent policy."
+      },
+      "consents": {
+        "type": "array",
+        "description": "List of recorded consent records for the data subject.",
+        "items": {
+          "type": "object",
+          "required": [
+            "purpose",
+            "status"
+          ],
+          "properties": {
+            "purpose": {
+              "type": "string",
+              "description": "Purpose for which this consent record was established."
+            },
+            "status": {
+              "type": "string",
+              "enum": [
+                "granted",
+                "denied",
+                "withdrawn"
+              ],
+              "description": "Consent status."
+            },
+            "granted_at": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "description": "ISO-8601 UTC timestamp when consent was granted, or null if omitted."
+            },
+            "expires_at": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "description": "ISO-8601 UTC timestamp when consent expires, or null if indefinite."
+            },
+            "scope": {
+              "type": [
+                "array",
+                "null"
+              ],
+              "items": {
+                "type": "string"
+              },
+              "description": "Optional scopes associated with the consent (preserved metadata in v1.0.0)."
+            }
+          }
+        }
+      }
+    }
+  },
+  "outputs": {
+    "type": "object",
+    "required": [
+      "decision",
+      "reason_code",
+      "matched_consent_index",
+      "policy_version"
+    ],
+    "properties": {
+      "decision": {
+        "type": "string",
+        "enum": [
+          "allow",
+          "deny"
+        ],
+        "description": "Binary authorization decision."
+      },
+      "reason_code": {
+        "type": "string",
+        "enum": [
+          "consent_granted",
+          "consent_withdrawn",
+          "consent_denied",
+          "consent_expired",
+          "purpose_not_granted",
+          "invalid_input"
+        ],
+        "description": "Machine-readable reason code explaining the decision."
+      },
+      "matched_consent_index": {
+        "type": [
+          "integer",
+          "null"
+        ],
+        "description": "0-based index of the consent item in the input array that determined the decision, or null if no consent matched."
+      },
+      "policy_version": {
+        "type": "string",
+        "description": "Echoed policy version."
+      }
+    }
+  },
+  "use_cases": [
+    {
+      "scenario": "As a compliance officer, I want a granted consent for the requested purpose to be allowed, so that lawful processing can proceed.",
+      "persona_ref": "compliance-officer",
+      "happy": true,
+      "input_example": {
+        "subject_id": "user-1",
+        "requested_purpose": "marketing",
+        "now": "2026-08-15T12:00:00Z",
+        "policy_version": "1.0.0",
+        "consents": [
+          {
+            "purpose": "marketing",
+            "status": "granted",
+            "granted_at": "2026-08-01T00:00:00Z",
+            "expires_at": "2026-09-01T00:00:00Z",
+            "scope": [
+              "email",
+              "sms"
+            ]
+          }
+        ]
+      },
+      "output_example": {
+        "decision": "allow",
+        "matched_consent_index": 0,
+        "policy_version": "1.0.0",
+        "reason_code": "consent_granted"
+      }
+    },
+    {
+      "scenario": "As a compliance officer, I want a withdrawn consent for the requested purpose to be denied, so that processing immediately ceases when consent is rescinded.",
+      "persona_ref": "compliance-officer",
+      "happy": false,
+      "input_example": {
+        "subject_id": "user-2",
+        "requested_purpose": "analytics",
+        "now": "2026-08-15T12:00:00Z",
+        "policy_version": "1.0.0",
+        "consents": [
+          {
+            "purpose": "analytics",
+            "status": "withdrawn",
+            "granted_at": "2026-08-01T00:00:00Z",
+            "expires_at": null,
+            "scope": [
+              "product-analytics"
+            ]
+          }
+        ]
+      },
+      "output_example": {
+        "decision": "deny",
+        "matched_consent_index": 0,
+        "policy_version": "1.0.0",
+        "reason_code": "consent_withdrawn"
+      }
+    },
+    {
+      "scenario": "As a compliance officer, I want an explicitly denied consent for the requested purpose to be denied, so that opt-outs are strictly enforced.",
+      "persona_ref": "compliance-officer",
+      "happy": false,
+      "input_example": {
+        "subject_id": "user-3",
+        "requested_purpose": "cross-border-sharing",
+        "now": "2026-08-15T12:00:00Z",
+        "policy_version": "1.0.0",
+        "consents": [
+          {
+            "purpose": "cross-border-sharing",
+            "status": "denied",
+            "granted_at": "2026-08-01T00:00:00Z",
+            "expires_at": null,
+            "scope": []
+          }
+        ]
+      },
+      "output_example": {
+        "decision": "deny",
+        "matched_consent_index": 0,
+        "policy_version": "1.0.0",
+        "reason_code": "consent_denied"
+      }
+    },
+    {
+      "scenario": "As a compliance officer, I want an expired consent for the requested purpose to be denied, so that processing stops once the validity window closes.",
+      "persona_ref": "compliance-officer",
+      "happy": false,
+      "input_example": {
+        "subject_id": "user-4",
+        "requested_purpose": "promotions",
+        "now": "2026-09-02T00:00:00Z",
+        "policy_version": "1.0.0",
+        "consents": [
+          {
+            "purpose": "promotions",
+            "status": "granted",
+            "granted_at": "2026-08-01T00:00:00Z",
+            "expires_at": "2026-09-01T00:00:00Z",
+            "scope": [
+              "email"
+            ]
+          }
+        ]
+      },
+      "output_example": {
+        "decision": "deny",
+        "matched_consent_index": 0,
+        "policy_version": "1.0.0",
+        "reason_code": "consent_expired"
+      }
+    },
+    {
+      "scenario": "As a compliance officer, I want a request with no matching consent purpose to be denied, so that unauthorized purposes fail closed by default.",
+      "persona_ref": "compliance-officer",
+      "happy": false,
+      "input_example": {
+        "subject_id": "user-5",
+        "requested_purpose": "telemetry",
+        "now": "2026-08-15T12:00:00Z",
+        "policy_version": "1.0.0",
+        "consents": [
+          {
+            "purpose": "billing",
+            "status": "granted",
+            "granted_at": "2026-08-01T00:00:00Z",
+            "expires_at": null,
+            "scope": [
+              "invoices"
+            ]
+          }
+        ]
+      },
+      "output_example": {
+        "decision": "deny",
+        "matched_consent_index": null,
+        "policy_version": "1.0.0",
+        "reason_code": "purpose_not_granted"
+      }
+    },
+    {
+      "scenario": "As a runtime engineer, I want malformed timestamps to be rejected, so that corrupted inputs fail safely without guessing intent.",
+      "persona_ref": "runtime-engineer",
+      "happy": false,
+      "input_example": {
+        "subject_id": "user-6",
+        "requested_purpose": "marketing",
+        "now": "not-a-valid-timestamp",
+        "policy_version": "1.0.0",
+        "consents": []
+      },
+      "output_example": {
+        "decision": "deny",
+        "matched_consent_index": null,
+        "policy_version": "1.0.0",
+        "reason_code": "invalid_input"
+      }
+    }
+  ],
+  "side_effects": [
+    {
+      "kind": "memory_only",
+      "description": "Pure deterministic consent evaluation in memory"
+    }
+  ],
+  "emits": [],
+  "consumes": [],
+  "permissions": [
+    {
+      "id": "core.consent-purpose-check"
+    }
+  ],
+  "execution": {
+    "binary_format": "wasm",
+    "entrypoint": {
+      "kind": "wasi-command",
+      "command": "run"
+    },
+    "preferred_targets": [
+      "local",
+      "edge",
+      "browser"
+    ],
+    "constraints": {
+      "host_api_access": "none",
+      "network_access": "forbidden",
+      "filesystem_access": "none"
+    }
+  },
+  "policies": [
+    {
+      "id": "fail-closed-default"
+    },
+    {
+      "id": "pure-computation-only"
+    }
+  ],
+  "dependencies": [],
+  "provenance": {
+    "source": "ai-assisted",
+    "author": "traverse-capability-author",
+    "created_at": "2026-09-18T12:00:00Z",
+    "spec_ref": "core.consent-purpose-check@1.0.0",
+    "adr_refs": [
+      "0001-rust-wasm-foundation"
+    ],
+    "exception_refs": []
+  },
+  "evidence": [
+    {
+      "evidence_id": "core-consent-purpose-check-1.0.0-contract-validation",
+      "type": "contract_validation",
+      "status": "passed"
+    }
+  ],
+  "service_type": "stateless",
+  "permitted_targets": [
+    "local",
+    "edge",
+    "browser",
+    "cloud"
+  ],
+  "artifact_type": "native",
+  "licensing": {
+    "spdx_expression": "Apache-2.0",
+    "commercial_use": "allowed",
+    "redistribution": "allowed",
+    "attribution_required": true,
+    "verification": {
+      "status": "maintainer-declared"
+    },
+    "license_files": [
+      "LICENSE"
+    ],
+    "source_url": "https://github.com/traverse-framework/registry/blob/main/LICENSE"
+  },
+  "authoring": {
+    "method": "llm-assisted",
+    "source_revision": "issue-500",
+    "test_evidence": "capability-src/core-consent-purpose-check/src/main.rs",
+    "review": {
+      "status": "maintainer-review-pending",
+      "reviewer": "traverse-registry-maintainer"
+    }
+  },
+  "risk": {
+    "effect_class": "pure_read",
+    "determinism_class": "deterministic",
+    "data_flow": {
+      "accepted_data_classifications": [],
+      "produced_data_classifications": [],
+      "egress_policy": "denied"
+    },
+    "reliability": {
+      "idempotency_required": false,
+      "retryable": true,
+      "compensation_available": true
+    }
+  },
+  "artifact": {
+    "digest": "sha256:b18b637900e0e1100c3e99e27ab8475b0fe7800e37e5970ee1f04516bc67e59b",
+    "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/core.consent-purpose-check-1.0.0/core-consent-purpose-check.wasm"
+  }
+}
