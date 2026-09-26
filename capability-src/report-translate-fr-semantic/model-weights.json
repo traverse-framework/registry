@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "description": "Weight blobs the full-model build embeds via include_bytes! (gitignored; pinned release assets). Fetched and sha256-verified by the capability-validation wasm32 gate (registry#609); see data/README.md for how each blob is generated.",
+  "files": [
+    {
+      "path": "data/minilm-l3-fr-semantic-int8.bin",
+      "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/report.translate-fr-semantic-1.0.0/minilm-l3-fr-semantic-int8.bin",
+      "sha256": "8ae804ef04a1ae3b90e2e07036f6df6d9885d3406133b3a18b519e118a02f900"
+    }
+  ]
+}

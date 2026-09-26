@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "description": "Weight blobs the full-model build embeds via include_bytes! (gitignored; pinned release assets). Fetched and sha256-verified by the capability-validation wasm32 gate (registry#609); see data/README.md for how each blob is generated.",
+  "files": [
+    {
+      "path": "data/distilbert-ner-int8.bin",
+      "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/text.detect-entities-1.0.0/distilbert-ner-int8.bin",
+      "sha256": "12891d6c53ff7808d2dd6edfe78235cf7ad8d17a8ebdbd5d14f31a9b6998e120"
+    }
+  ]
+}
