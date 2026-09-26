@@ -56,9 +56,10 @@
     {
       "capability_id": "audio.detect-speech-segments",
       "published_versions": [
-        "1.0.0"
+        "1.0.0",
+        "1.1.0"
       ],
-      "path": "capabilities/audio/audio.detect-speech-segments/1.0.0/contract.json",
+      "path": "capabilities/audio/audio.detect-speech-segments/1.1.0/contract.json",
       "classification": "no-event-required",
       "evidence": "side_effects=[memory_only] on published version 1.0.0; empty emits/consumes; model-derived speech-risk score plus updated streaming state returns directly to the caller with no asynchronous domain fact broadcast to independent consumers."
     },
@@ -117,9 +118,10 @@
       "capability_id": "audio.transcribe-speech",
       "published_versions": [
         "1.0.0",
-        "1.1.0"
+        "1.1.0",
+        "1.2.0"
       ],
-      "path": "capabilities/audio/audio.transcribe-speech/1.0.0/contract.json",
+      "path": "capabilities/audio/audio.transcribe-speech/1.2.0/contract.json",
       "classification": "no-event-required",
       "evidence": "side_effects=[memory_only] on published version 1.0.0; empty emits/consumes; model-derived transcript returns directly to the caller with no asynchronous domain fact broadcast to independent consumers. Unchanged in 1.1.0 (adds an internal VAD pre-check, still memory_only/no emits/consumes)."
     },
@@ -790,9 +792,10 @@
     {
       "capability_id": "report.translate-fr-semantic",
       "published_versions": [
-        "1.0.0"
+        "1.0.0",
+        "1.1.0"
       ],
-      "path": "capabilities/report/report.translate-fr-semantic/1.0.0/contract.json",
+      "path": "capabilities/report/report.translate-fr-semantic/1.1.0/contract.json",
       "classification": "no-event-required",
       "evidence": "side_effects=[memory_only] on published version 1.0.0; empty emits/consumes; model-derived French translation returns directly to the caller with no asynchronous domain fact broadcast to independent consumers."
     },
@@ -901,9 +904,10 @@
     {
       "capability_id": "text.detect-entities",
       "published_versions": [
-        "1.0.0"
+        "1.0.0",
+        "1.1.0"
       ],
-      "path": "capabilities/text/text.detect-entities/1.0.0/contract.json",
+      "path": "capabilities/text/text.detect-entities/1.1.0/contract.json",
       "classification": "no-event-required",
       "evidence": "side_effects=[memory_only] on published version 1.0.0; empty emits/consumes; model-derived entity array returns directly to the caller with no asynchronous domain fact broadcast to independent consumers."
     },
@@ -919,9 +923,10 @@
     {
       "capability_id": "text.redact-entities",
       "published_versions": [
-        "1.0.0"
+        "1.0.0",
+        "1.1.0"
       ],
-      "path": "capabilities/text/text.redact-entities/1.0.0/contract.json",
+      "path": "capabilities/text/text.redact-entities/1.1.0/contract.json",
       "classification": "no-event-required",
       "evidence": "side_effects=[memory_only] on published version 1.0.0; empty emits/consumes; model-derived redacted text returns directly to the caller with no asynchronous domain fact broadcast to independent consumers."
     },
