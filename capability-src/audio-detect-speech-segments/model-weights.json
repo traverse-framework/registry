@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "description": "Weight blobs the full-model build embeds via include_bytes! (gitignored; pinned release assets). Fetched and sha256-verified by the capability-validation wasm32 gate (registry#609); see data/README.md for how each blob is generated.",
+  "files": [
+    {
+      "path": "data/silero-vad-16k-f32.bin",
+      "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/audio.detect-speech-segments-1.0.0/silero-vad-16k-f32.bin",
+      "sha256": "0688f0fadaeba187dc827d90228ea7bb2eda887829e8d9524d0b9535557668fe"
+    }
+  ]
+}

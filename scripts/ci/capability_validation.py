@@ -1861,7 +1861,7 @@ def _wasm32_fixture_runner_bin() -> Path:
     )
 
 
-def _run_wasm32_fixture(wasm_path: Path, fixture: dict, connector_fixture=None):
+def _run_wasm32_fixture(wasm_path: Path, fixture: dict, connector_fixture=None, timeout=30):
     """Runs one JSON fixture through wasmtime (stdin in, stdout out -- the
     wasi-capability-runtime ABI every capability-src/ crate shares). Returns
     (returncode, stdout, stderr); returncode is None if the runner itself
@@ -1877,7 +1877,7 @@ def _run_wasm32_fixture(wasm_path: Path, fixture: dict, connector_fixture=None):
                 input=json.dumps(fixture),
                 capture_output=True,
                 text=True,
-                timeout=30,
+                timeout=timeout,
             )
             return result.returncode, result.stdout, result.stderr
 
@@ -1905,7 +1905,7 @@ def _run_wasm32_fixture(wasm_path: Path, fixture: dict, connector_fixture=None):
                 input=json.dumps(fixture),
                 capture_output=True,
                 text=True,
-                timeout=30,
+                timeout=timeout,
             )
         return result.returncode, result.stdout, result.stderr
     except Exception as exc:
@@ -1927,6 +1927,136 @@ def _stdout_indicates_connector_unavailable(stdout: str) -> bool:
         "unavailable",
         "unbound",
     }
+
+
+# registry#609: spec 001 FR-017 agents (`ai.model_backed: true`) embed their
+# weights via include_bytes!("../data/<blob>.bin") behind a `full-model` cargo
+# feature. The blobs are gitignored and published as pinned release assets, so
+# a default-feature build (what check_new_contract_wasm32_execution did before)
+# either fails to compile or runs with no model at all. Each agent crate
+# declares its blobs in capability-src/<crate>/model-weights.json; the gate
+# fetches and sha256-verifies them, then builds and runs the real model.
+MODEL_WEIGHTS_MANIFEST = "model-weights.json"
+MODEL_WEIGHTS_FETCH_TIMEOUT_SECONDS = 300
+MODEL_BACKED_FIXTURE_TIMEOUT_SECONDS = 300
+SHA256_HEX_RE = re.compile(r"^[0-9a-f]{64}$")
+
+
+def _load_model_weights_manifest(crate_dir: Path, capability_id: str, path: Path, errors: list):
+    """Returns [(target_path, url, sha256)] for every blob declared in the
+    crate's model-weights.json, or None (after recording a failure) when the
+    manifest is missing or any entry is malformed. Fails closed: a path that
+    resolves outside capability-src/ or a URL that is not one of this
+    registry's own release assets is rejected, never fetched."""
+    manifest_path = crate_dir / MODEL_WEIGHTS_MANIFEST
+    if not manifest_path.is_file():
+        fail(
+            errors,
+            "capability.model_weights_manifest_missing",
+            str(path),
+            f"'{capability_id}' declares ai.model_backed: true but "
+            f"{manifest_path} does not exist -- list each full-model weight "
+            f"blob (path, url, sha256) so the wasm32 gate can build the real "
+            f"model (registry#609)",
+        )
+        return None
+    try:
+        manifest = json.loads(manifest_path.read_text())
+    except Exception as exc:
+        fail(
+            errors,
+            "capability.model_weights_manifest_invalid",
+            str(path),
+            f"unable to parse {manifest_path}: {exc}",
+        )
+        return None
+    files = manifest.get("files") if isinstance(manifest, dict) else None
+    if not isinstance(files, list) or not files:
+        fail(
+            errors,
+            "capability.model_weights_manifest_invalid",
+            str(path),
+            f"{manifest_path} must contain a non-empty 'files' array",
+        )
+        return None
+    root = Path("capability-src").resolve()
+    entries = []
+    for index, entry in enumerate(files):
+        rel = entry.get("path") if isinstance(entry, dict) else None
+        url = entry.get("url") if isinstance(entry, dict) else None
+        sha256 = entry.get("sha256") if isinstance(entry, dict) else None
+        reason = None
+        target = None
+        if not isinstance(rel, str) or not rel.strip():
+            reason = "path must be a non-empty string"
+        else:
+            target = (crate_dir / rel).resolve()
+            if root not in target.parents:
+                reason = f"path '{rel}' resolves outside capability-src/"
+        if reason is None and (not isinstance(url, str) or not ARTIFACT_RELEASE_URL_RE.match(url)):
+            reason = "url must be a traverse-framework/registry artifacts/ release asset"
+        if reason is None and (not isinstance(sha256, str) or not SHA256_HEX_RE.match(sha256)):
+            reason = "sha256 must be 64 lowercase hex characters"
+        if reason is not None:
+            fail(
+                errors,
+                "capability.model_weights_manifest_invalid",
+                str(path),
+                f"{manifest_path} files[{index}]: {reason}",
+            )
+            return None
+        entries.append((target, url, sha256))
+    return entries
+
+
+def _sha256_file(file_path: Path) -> str:
+    hasher = hashlib.sha256()
+    with file_path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1 << 20), b""):
+            hasher.update(chunk)
+    return hasher.hexdigest()
+
+
+def _ensure_model_weights(entries: list, capability_id: str, path: Path, errors: list) -> bool:
+    """Makes every declared blob present with its pinned sha256, fetching
+    any that is missing or stale. Returns False (after recording failures)
+    if any blob cannot be fetched or does not match its digest."""
+    ok = True
+    for target, url, sha256 in entries:
+        if target.is_file() and _sha256_file(target) == sha256:
+            continue
+        target.parent.mkdir(parents=True, exist_ok=True)
+        partial = target.with_name(target.name + ".partial")
+        request = urllib.request.Request(url, headers={"User-Agent": "traverse-registry-ci"})
+        hasher = hashlib.sha256()
+        try:
+            with urllib.request.urlopen(request, timeout=MODEL_WEIGHTS_FETCH_TIMEOUT_SECONDS) as response, partial.open("wb") as out:
+                for chunk in iter(lambda: response.read(1 << 20), b""):
+                    hasher.update(chunk)
+                    out.write(chunk)
+        except (urllib.error.URLError, OSError, ValueError) as exc:
+            partial.unlink(missing_ok=True)
+            fail(
+                errors,
+                "capability.model_weights_unavailable",
+                str(path),
+                f"unable to fetch model weights for '{capability_id}' from {url}: {exc}",
+            )
+            ok = False
+            continue
+        if hasher.hexdigest() != sha256:
+            partial.unlink(missing_ok=True)
+            fail(
+                errors,
+                "capability.model_weights_digest_mismatch",
+                str(path),
+                f"model weights for '{capability_id}' at {url} have sha256 "
+                f"{hasher.hexdigest()}, expected {sha256}",
+            )
+            ok = False
+            continue
+        partial.replace(target)
+    return ok
 
 
 def check_new_contract_wasm32_execution(path: Path, errors: list) -> None:
@@ -1965,6 +2095,17 @@ def check_new_contract_wasm32_execution(path: Path, errors: list) -> None:
         # check's job to duplicate that.
         return
 
+    ai = contract.get("ai")
+    model_backed = isinstance(ai, dict) and ai.get("model_backed") is True
+    build_features = []
+    fixture_timeout = 30
+    if model_backed:
+        weights = _load_model_weights_manifest(crate_dir, capability_id, path, errors)
+        if weights is None or not _ensure_model_weights(weights, capability_id, path, errors):
+            return
+        build_features = ["--features", "full-model"]
+        fixture_timeout = MODEL_BACKED_FIXTURE_TIMEOUT_SECONDS
+
     try:
         build = subprocess.run(
             [
@@ -1975,6 +2116,7 @@ def check_new_contract_wasm32_execution(path: Path, errors: list) -> None:
                 "wasm32-unknown-unknown",
                 "--manifest-path",
                 str(manifest_path),
+                *build_features,
                 "--message-format=json",
             ],
             capture_output=True,
@@ -2090,7 +2232,7 @@ def check_new_contract_wasm32_execution(path: Path, errors: list) -> None:
     baseline_outputs = {}
     for label, fixture, connector_fixture in fixtures:
         returncode, stdout, stderr = _run_wasm32_fixture(
-            wasm_path, fixture, connector_fixture=connector_fixture
+            wasm_path, fixture, connector_fixture=connector_fixture, timeout=fixture_timeout
         )
         if returncode is None:
             fail(

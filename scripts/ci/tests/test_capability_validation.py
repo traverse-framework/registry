@@ -1991,6 +1991,173 @@ class CheckNewContractWasm32ExecutionTests(unittest.TestCase):
             self.assertEqual(errors, [])
 
 
+class ModelBackedWasm32ExecutionTests(unittest.TestCase):
+    """registry#609: ai.model_backed contracts fetch and sha256-verify their
+    declared weight blobs, then build with --features full-model."""
+
+    BLOB = b"weights"
+    BLOB_SHA = hashlib.sha256(b"weights").hexdigest()
+    URL = "https://github.com/traverse-framework/registry/releases/download/artifacts/example.agent-1.0.0/w.bin"
+
+    def _setup(self, tmp, manifest=None, model_backed=True, write_blob=False):
+        path = Path(tmp) / "capabilities" / "example" / "example.agent" / "1.0.0" / "contract.json"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        contract = {
+            "id": "example.agent",
+            "use_cases": [{"happy": True, "input_example": {"text": "hi"}}],
+            "inputs": {"schema": {"type": "object", "properties": {}}},
+        }
+        if model_backed:
+            contract["ai"] = {"model_backed": True, "models": ["example/model"]}
+        path.write_text(json.dumps(contract))
+        crate_dir = Path(tmp) / "capability-src" / "example-agent"
+        crate_dir.mkdir(parents=True, exist_ok=True)
+        (crate_dir / "Cargo.toml").write_text("[package]\nname = \"x\"\n")
+        if manifest is not None:
+            (crate_dir / "model-weights.json").write_text(
+                manifest if isinstance(manifest, str) else json.dumps(manifest)
+            )
+        if write_blob:
+            (crate_dir / "data").mkdir()
+            (crate_dir / "data" / "w.bin").write_bytes(self.BLOB)
+        wasm_path = Path(tmp) / "out.wasm"
+        wasm_path.write_bytes(b"\0asm")
+        return path, crate_dir, wasm_path
+
+    def _manifest(self, path="data/w.bin", url=None, sha256=None):
+        return {"files": [{"path": path, "url": url or self.URL, "sha256": sha256 or self.BLOB_SHA}]}
+
+    def _results(self, wasm_path):
+        build = type("R", (), {
+            "returncode": 0,
+            "stdout": json.dumps({"reason": "compiler-artifact", "target": {"kind": ["bin"]}, "filenames": [str(wasm_path)]}),
+            "stderr": "",
+        })()
+        run = type("R", (), {"returncode": 0, "stdout": json.dumps({"text": "hi"}), "stderr": ""})()
+        return [build, run]
+
+    def _check(self, tmp, path, run_side_effect=None, urlopen=None):
+        errors: list = []
+        cwd = os.getcwd()
+        try:
+            os.chdir(tmp)
+            with patch("capability_validation.subprocess.run", side_effect=run_side_effect or []) as run:
+                if urlopen is not None:
+                    with patch("capability_validation.urllib.request.urlopen", urlopen):
+                        capability_validation.check_new_contract_wasm32_execution(path, errors)
+                else:
+                    capability_validation.check_new_contract_wasm32_execution(path, errors)
+        finally:
+            os.chdir(cwd)
+        return errors, run
+
+    def _codes(self, errors):
+        return [e["code"] for e in errors]
+
+    def _fake_urlopen(self, body=None, exc=None):
+        import io
+
+        class _Response(io.BytesIO):
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *args):
+                self.close()
+
+        def _open(request, timeout=None):
+            if exc is not None:
+                raise exc
+            return _Response(body if body is not None else self.BLOB)
+
+        return _open
+
+    def test_missing_manifest_fails_without_building(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path, _, _ = self._setup(tmp)
+            errors, run = self._check(tmp, path)
+            self.assertEqual(self._codes(errors), ["capability.model_weights_manifest_missing"])
+            run.assert_not_called()
+
+    def test_unparseable_manifest_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path, _, _ = self._setup(tmp, manifest="{not json")
+            errors, run = self._check(tmp, path)
+            self.assertEqual(self._codes(errors), ["capability.model_weights_manifest_invalid"])
+            run.assert_not_called()
+
+    def test_empty_files_array_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path, _, _ = self._setup(tmp, manifest={"files": []})
+            errors, _ = self._check(tmp, path)
+            self.assertEqual(self._codes(errors), ["capability.model_weights_manifest_invalid"])
+
+    def test_malformed_entries_fail_closed(self):
+        cases = [
+            self._manifest(path="../../../etc/passwd"),
+            {"files": [{"path": "", "url": self.URL, "sha256": self.BLOB_SHA}]},
+            {"files": ["data/w.bin"]},
+            self._manifest(url="https://huggingface.co/x/resolve/main/w.bin"),
+            self._manifest(sha256="ABC"),
+        ]
+        for manifest in cases:
+            with self.subTest(manifest=manifest), tempfile.TemporaryDirectory() as tmp:
+                path, _, _ = self._setup(tmp, manifest=manifest)
+                errors, run = self._check(tmp, path)
+                self.assertEqual(self._codes(errors), ["capability.model_weights_manifest_invalid"])
+                run.assert_not_called()
+
+    def test_present_blob_builds_full_model_with_long_timeout(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path, _, wasm_path = self._setup(tmp, manifest=self._manifest(), write_blob=True)
+            errors, run = self._check(tmp, path, run_side_effect=self._results(wasm_path))
+            self.assertEqual(errors, [])
+            build_args = run.call_args_list[0].args[0]
+            self.assertIn("full-model", build_args)
+            self.assertEqual(build_args[build_args.index("full-model") - 1], "--features")
+            self.assertEqual(
+                run.call_args_list[1].kwargs["timeout"],
+                capability_validation.MODEL_BACKED_FIXTURE_TIMEOUT_SECONDS,
+            )
+
+    def test_missing_blob_is_fetched_and_verified(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path, crate_dir, wasm_path = self._setup(tmp, manifest=self._manifest())
+            errors, _ = self._check(
+                tmp, path, run_side_effect=self._results(wasm_path), urlopen=self._fake_urlopen()
+            )
+            self.assertEqual(errors, [])
+            self.assertEqual((crate_dir / "data" / "w.bin").read_bytes(), self.BLOB)
+            self.assertFalse((crate_dir / "data" / "w.bin.partial").exists())
+
+    def test_fetched_blob_digest_mismatch_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path, crate_dir, _ = self._setup(tmp, manifest=self._manifest())
+            errors, run = self._check(tmp, path, urlopen=self._fake_urlopen(body=b"tampered"))
+            self.assertEqual(self._codes(errors), ["capability.model_weights_digest_mismatch"])
+            self.assertFalse((crate_dir / "data" / "w.bin").exists())
+            self.assertFalse((crate_dir / "data" / "w.bin.partial").exists())
+            run.assert_not_called()
+
+    def test_unreachable_blob_fails(self):
+        import urllib.error
+
+        with tempfile.TemporaryDirectory() as tmp:
+            path, _, _ = self._setup(tmp, manifest=self._manifest())
+            errors, run = self._check(
+                tmp, path, urlopen=self._fake_urlopen(exc=urllib.error.URLError("404"))
+            )
+            self.assertEqual(self._codes(errors), ["capability.model_weights_unavailable"])
+            run.assert_not_called()
+
+    def test_non_agent_build_is_unchanged(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path, _, wasm_path = self._setup(tmp, model_backed=False)
+            errors, run = self._check(tmp, path, run_side_effect=self._results(wasm_path))
+            self.assertEqual(errors, [])
+            self.assertNotIn("--features", run.call_args_list[0].args[0])
+            self.assertEqual(run.call_args_list[1].kwargs["timeout"], 30)
+
+
 class CheckEccaCapabilityInventoryCoverageTests(unittest.TestCase):
     """Spec 534 FR-020 / registry#253: inventory must cover every published capability."""
 
