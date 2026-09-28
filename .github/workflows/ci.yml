@@ -502,6 +502,14 @@ jobs:
       - name: Mirror artifact WASM + verified contract files for CORS-enabled fetch (registry#304/#383)
         run: python3 scripts/ci/mirror_artifacts.py catalog https://registry.traverse-framework.com
 
+      # registry#577 Track 2: one-click hosted copy of the client-first NER
+      # demo. Static files only; the page verifies the artifact's digest and
+      # the pinned-key signature itself before running anything.
+      - name: Publish client-first NER demo
+        run: |
+          mkdir -p catalog/demos/hub-client-first-ner
+          cp examples/hub-client-first-ner/index.html examples/hub-client-first-ner/ner-demo.js catalog/demos/hub-client-first-ner/
+
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v5
         with:

@@ -7,6 +7,8 @@
 
 Both use the same verified bytes and the same ~150 lines of JavaScript. The text you analyze never leaves the device.
 
+**Try it in your browser:** <https://registry.traverse-framework.com/demos/hub-client-first-ner/>
+
 ```text
 $ node cli.js "Elon Musk founded SpaceX in California."
 ✓ Contract text.detect-entities@1.1.1: model dslim/distilbert-NER@dfa2838a (Apache-2.0)
@@ -27,7 +29,8 @@ Requires Node 22 or newer, or any current browser with WebCrypto Ed25519.
 # Local (Node)
 node cli.js "Angela Merkel met Emmanuel Macron at the Élysée Palace in Paris."
 
-# Browser: serve this folder over http (ES modules don't load from file://)
+# Browser: open the hosted copy above, or serve this folder over http
+# (ES modules don't load from file://)
 npx serve .          # or: python3 -m http.server
 ```
 
