@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Client-first NER</title>
+<style>
+  :root {
+    --bg: #fafaf9; --fg: #1c1917; --muted: #57534e; --line: #e7e5e4; --card: #ffffff;
+    --ok: #15803d; --err: #b91c1c; --accent: #1d4ed8;
+    --per: #dbeafe; --org: #dcfce7; --loc: #fef3c7; --misc: #f3e8ff;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0c0a09; --fg: #f5f5f4; --muted: #a8a29e; --line: #292524; --card: #1c1917;
+      --ok: #4ade80; --err: #f87171; --accent: #93c5fd;
+      --per: #1e3a8a; --org: #14532d; --loc: #713f12; --misc: #581c87;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--fg); font: 16px/1.5 system-ui, -apple-system, sans-serif; }
+  main { max-width: 760px; margin: 0 auto; padding: 32px 16px 64px; }
+  h1 { font-size: 1.5rem; margin: 0 0 4px; }
+  .lede { color: var(--muted); margin: 0 0 24px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 16px; margin-bottom: 16px; }
+  .card h2 { font-size: .8rem; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 0 0 10px; }
+  ol#steps { margin: 0; padding-left: 20px; font-size: .92rem; }
+  ol#steps li.ok::marker { color: var(--ok); }
+  #status { font-size: .92rem; color: var(--muted); }
+  #status.err { color: var(--err); }
+  textarea { width: 100%; min-height: 88px; padding: 10px; font: inherit; color: var(--fg); background: var(--bg); border: 1px solid var(--line); border-radius: 8px; resize: vertical; }
+  button { margin-top: 10px; padding: 8px 16px; font: inherit; font-weight: 600; color: #fff; background: var(--accent); border: 0; border-radius: 8px; cursor: pointer; }
+  button:disabled { opacity: .5; cursor: default; }
+  #output { font-size: 1.05rem; line-height: 2; white-space: pre-wrap; overflow-wrap: anywhere; }
+  mark { color: var(--fg); padding: 2px 4px; border-radius: 4px; }
+  mark small { font-size: .65rem; font-weight: 700; margin-left: 4px; color: var(--muted); }
+  mark.PER { background: var(--per); } mark.ORG { background: var(--org); }
+  mark.LOC { background: var(--loc); } mark.MISC { background: var(--misc); }
+  .meta { font-size: .85rem; color: var(--muted); margin-top: 8px; }
+  a { color: var(--accent); }
+  code { font-size: .88em; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Hugging Face model, running in your browser</h1>
+  <p class="lede">
+    <a id="model-link" href="https://huggingface.co/dslim/distilbert-NER">dslim/distilbert-NER</a>, packaged as the
+    Traverse capability <code>text.detect-entities@1.1.1</code>: pinned model revision, signed WASM, and inference
+    on this device. Your text never leaves the page.
+  </p>
+
+  <div class="card">
+    <h2>Verified before it runs</h2>
+    <ol id="steps"></ol>
+    <p id="status">Fetching the signed artifact (~66 MB, once)…</p>
+  </div>
+
+  <div class="card">
+    <h2>Try it</h2>
+    <textarea id="text">Sarah Chen from Acme Corp will follow up with the Berlin team next week.</textarea>
+    <button id="run" disabled>Find entities</button>
+    <div id="output" class="meta"></div>
+    <div id="timing" class="meta"></div>
+  </div>
+</main>
+<script type="module">
+  import { loadVerifiedCapability, runCapability } from "./ner-demo.js";
+
+  const $ = (id) => document.getElementById(id);
+  const addStep = (text) => {
+    const li = document.createElement("li");
+    li.className = "ok";
+    li.textContent = text;
+    $("steps").append(li);
+  };
+
+  // Entity offsets are UTF-8 byte offsets into the input (contract
+  // postcondition byte-offsets-into-input), so slice bytes, not JS chars.
+  function render(text, entities) {
+    const bytes = new TextEncoder().encode(text);
+    const decode = (a, b) => new TextDecoder().decode(bytes.subarray(a, b));
+    const out = $("output");
+    out.className = "";
+    out.replaceChildren();
+    let cursor = 0;
+    for (const e of entities) {
+      out.append(decode(cursor, e.start));
+      const mark = document.createElement("mark");
+      mark.className = e.label;
+      mark.append(decode(e.start, e.end));
+      const tag = document.createElement("small");
+      tag.textContent = e.label;
+      mark.append(tag);
+      out.append(mark);
+      cursor = e.end;
+    }
+    out.append(decode(cursor, bytes.length));
+    if (entities.length === 0) {
+      out.className = "meta";
+      out.textContent = "No entities found.";
+    }
+  }
+
+  try {
+    const { module, model } = await loadVerifiedCapability(addStep);
+    $("model-link").href = `https://huggingface.co/${model.huggingface_id}/tree/${model.revision}`;
+    $("status").textContent = "Ready. Inference runs locally from here on.";
+    $("run").disabled = false;
+    $("run").addEventListener("click", async () => {
+      $("run").disabled = true;
+      const text = $("text").value;
+      const started = performance.now();
+      try {
+        const { entities } = await runCapability(module, { text });
+        render(text, entities);
+        $("timing").textContent = `${entities.length} entities in ${Math.round(performance.now() - started)} ms, on this device.`;
+      } catch (error) {
+        $("output").className = "meta";
+        $("output").textContent = String(error.message || error);
+      } finally {
+        $("run").disabled = false;
+      }
+    });
+  } catch (error) {
+    $("status").className = "err";
+    $("status").textContent = `Refused to run: ${error.message || error}`;
+  }
+</script>
+</body>
+</html>
