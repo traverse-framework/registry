@@ -434,7 +434,12 @@ pub struct Token {
     id: u32,
     start_byte: usize,
     end_byte: usize,
+    /// Index of the basic (whitespace/punctuation-split) word this WordPiece
+    /// came from; every piece of one word shares it. `NO_WORD` for CLS/SEP.
+    word: usize,
 }
+
+const NO_WORD: usize = usize::MAX;
 
 /// `[CLS] <wordpieces> [SEP]`, byte-offset-tracked. CLS/SEP carry a
 /// zero-width offset at their conceptual position (never used for entity
@@ -446,8 +451,9 @@ pub fn encode(model: &Model, text: &str) -> Vec<Token> {
         id: model.cls_id,
         start_byte: 0,
         end_byte: 0,
+        word: NO_WORD,
     });
-    'words: for range in basic_token_ranges(&chars) {
+    'words: for (word, range) in basic_token_ranges(&chars).into_iter().enumerate() {
         for (id, cs, ce) in wordpiece_ids(model, &chars, range) {
             if tokens.len() >= MAX_SEQ_TOKENS - 1 {
                 break 'words;
@@ -456,6 +462,7 @@ pub fn encode(model: &Model, text: &str) -> Vec<Token> {
                 id,
                 start_byte: offsets[cs],
                 end_byte: offsets[ce],
+                word,
             });
         }
     }
@@ -464,6 +471,7 @@ pub fn encode(model: &Model, text: &str) -> Vec<Token> {
         id: model.sep_id,
         start_byte: end,
         end_byte: end,
+        word: NO_WORD,
     });
     tokens
 }
@@ -666,16 +674,39 @@ pub struct Entity {
     pub end: usize,
 }
 
-/// BIO decode over the CONTENT tokens only (CLS/SEP excluded -- their
-/// labels are never meaningful spans). A dangling `I-X` with no open `B-X`
-/// (a real, if rare, model error mode) is treated leniently as starting a
-/// new entity, matching common BIO-decoding practice.
+/// Collapses WordPiece tokens into whole words: each word takes the label
+/// of its FIRST sub-token and spans all of its pieces (Hugging Face's
+/// token-classification `aggregation_strategy="first"`). `dslim/distilbert-NER`
+/// was fine-tuned CoNLL-style with only first sub-tokens labeled, so its
+/// predictions on continuation pieces are untrained and routinely repeat
+/// `B-*` -- decoding them per-token split `Acme` into `A`/`c`/`me`
+/// (registry#611). Returns `(label, start_byte, end_byte)` per word, CLS/SEP
+/// excluded.
+fn aggregate_words(tokens: &[Token], logits: &[Vec<f32>]) -> Vec<(&'static str, usize, usize)> {
+    let mut words: Vec<(&'static str, usize, usize)> = Vec::new();
+    let mut current_word = NO_WORD;
+    let n = tokens.len();
+    for i in 1..n.saturating_sub(1) {
+        let token = &tokens[i];
+        match words.last_mut() {
+            Some((_, _, end)) if token.word == current_word => *end = token.end_byte,
+            _ => {
+                current_word = token.word;
+                words.push((label_name(argmax(&logits[i])), token.start_byte, token.end_byte));
+            }
+        }
+    }
+    words
+}
+
+/// BIO decode over whole words (see `aggregate_words`; CLS/SEP excluded --
+/// their labels are never meaningful spans). A dangling `I-X` with no open
+/// `B-X` (a real, if rare, model error mode) is treated leniently as
+/// starting a new entity, matching common BIO-decoding practice.
 pub fn decode_entities(tokens: &[Token], logits: &[Vec<f32>]) -> Vec<Entity> {
     let mut entities = Vec::new();
     let mut open: Option<(String, usize, usize)> = None; // (type, start, end)
-    let n = tokens.len();
-    for i in 1..n.saturating_sub(1) {
-        let label = label_name(argmax(&logits[i]));
+    for (label, start, end) in aggregate_words(tokens, logits) {
         let ty = entity_type(label);
         if label.starts_with("B-") {
             if let Some((t, s, e)) = open.take() {
@@ -685,11 +716,11 @@ pub fn decode_entities(tokens: &[Token], logits: &[Vec<f32>]) -> Vec<Entity> {
                     end: e,
                 });
             }
-            open = Some((String::from(ty), tokens[i].start_byte, tokens[i].end_byte));
+            open = Some((String::from(ty), start, end));
         } else if label.starts_with("I-") {
             match &mut open {
                 Some((t, _s, e)) if t.as_str() == ty => {
-                    *e = tokens[i].end_byte;
+                    *e = end;
                 }
                 _ => {
                     if let Some((t, s, e)) = open.take() {
@@ -699,7 +730,7 @@ pub fn decode_entities(tokens: &[Token], logits: &[Vec<f32>]) -> Vec<Entity> {
                             end: e,
                         });
                     }
-                    open = Some((String::from(ty), tokens[i].start_byte, tokens[i].end_byte));
+                    open = Some((String::from(ty), start, end));
                 }
             }
         } else {
@@ -1011,6 +1042,81 @@ mod tests {
         assert_eq!(entities.len(), 2);
         assert_eq!(entities[0].label, "PER");
         assert_eq!(entities[1].label, "ORG");
+    }
+
+    fn tok(start_byte: usize, end_byte: usize, word: usize) -> Token {
+        Token {
+            id: 0,
+            start_byte,
+            end_byte,
+            word,
+        }
+    }
+
+    /// Rows of one-hot logits peaking at each given label index.
+    fn peaked(labels: &[usize]) -> Vec<Vec<f32>> {
+        labels
+            .iter()
+            .map(|&l| {
+                let mut row = alloc::vec![0f32; NUM_LABELS];
+                row[l] = 10.0;
+                row
+            })
+            .collect()
+    }
+
+    #[test]
+    fn decode_entities_merges_b_on_continuation_pieces_into_one_word() {
+        // registry#611, real-model shape: "Acme Corp" -> A:B-ORG ##c:B-ORG
+        // ##me:B-ORG Corp:I-ORG must be ONE entity "Acme Corp" (0..9).
+        let tokens = [tok(0, 0, NO_WORD), tok(0, 1, 0), tok(1, 2, 0), tok(2, 4, 0), tok(5, 9, 1), tok(9, 9, NO_WORD)];
+        let logits = peaked(&[0, 3, 3, 3, 4, 0]);
+        let entities = decode_entities(&tokens, &logits);
+        assert_eq!(entities.len(), 1);
+        assert_eq!(entities[0].label, "ORG");
+        assert_eq!((entities[0].start, entities[0].end), (0, 9));
+    }
+
+    #[test]
+    fn decode_entities_word_label_comes_from_first_piece_only() {
+        // "SpaceX" = Space:B-ORG ##X:B-PER -> one ORG word; a continuation
+        // piece of a different type never splits or retypes the word.
+        let tokens = [tok(0, 0, NO_WORD), tok(0, 5, 0), tok(5, 6, 0), tok(6, 6, NO_WORD)];
+        let logits = peaked(&[0, 3, 1, 0]);
+        let entities = decode_entities(&tokens, &logits);
+        assert_eq!(entities.len(), 1);
+        assert_eq!(entities[0].label, "ORG");
+        assert_eq!((entities[0].start, entities[0].end), (0, 6));
+    }
+
+    #[test]
+    fn decode_entities_o_first_piece_suppresses_entity_continuations() {
+        // A word whose first piece is O stays O even if later pieces are B-*.
+        let tokens = [tok(0, 0, NO_WORD), tok(0, 2, 0), tok(2, 4, 0), tok(4, 4, NO_WORD)];
+        let logits = peaked(&[0, 0, 1, 0]);
+        assert!(decode_entities(&tokens, &logits).is_empty());
+    }
+
+    #[test]
+    fn decode_entities_adjacent_b_words_stay_separate_entities() {
+        // Two words each starting B-PER are two entities, not one.
+        let tokens = [tok(0, 0, NO_WORD), tok(0, 3, 0), tok(4, 7, 1), tok(7, 7, NO_WORD)];
+        let logits = peaked(&[0, 1, 1, 0]);
+        let entities = decode_entities(&tokens, &logits);
+        assert_eq!(entities.len(), 2);
+        assert_eq!((entities[1].start, entities[1].end), (4, 7));
+    }
+
+    #[test]
+    fn encode_assigns_one_word_index_per_basic_token() {
+        let m = model();
+        let tokens = encode(&m, "hello, world");
+        assert_eq!(tokens.first().unwrap().word, NO_WORD);
+        assert_eq!(tokens.last().unwrap().word, NO_WORD);
+        let words: Vec<usize> = tokens[1..tokens.len() - 1].iter().map(|t| t.word).collect();
+        assert_eq!(words.first(), Some(&0));
+        assert!(words.windows(2).all(|w| w[1] == w[0] || w[1] == w[0] + 1));
+        assert_eq!(*words.last().unwrap(), 2); // hello / , / world
     }
 
     #[test]
