@@ -1,0 +1,12 @@
+{
+  "name": "hub-client-first-ner",
+  "private": true,
+  "type": "module",
+  "description": "Hugging Face dslim/distilbert-NER as a pinned, signed, client-first Traverse capability (registry#577 Track 2).",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "demo": "node cli.js"
+  }
+}
