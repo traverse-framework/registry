@@ -1,0 +1,203 @@
+{
+  "kind": "capability_contract",
+  "schema_version": "1.0.0",
+  "id": "text.redact-entities",
+  "namespace": "text",
+  "name": "redact-entities",
+  "version": "1.1.1",
+  "lifecycle": "active",
+  "owner": {
+    "team": "traverse-core",
+    "contact": "enrico.piovesan10@gmail.com"
+  },
+  "summary": "Redact person, organization, and location mentions from free text using text.detect-entities' real DistilBERT-NER forward pass.",
+  "description": "Runs the exact same tokenize -> DistilBERT-NER forward pass -> BIO-decode pipeline as text.detect-entities (registry#465, dslim/distilbert-NER, Apache-2.0), reused directly via a source-level dependency rather than duplicated, then substitutes a bracketed placeholder (\"[PER]\", \"[ORG]\", \"[LOC]\", \"[MISC]\") for each detected entity span instead of returning raw entity data -- copying everything else through unchanged. A real model forward pass at execution time, not a keyword list or regex-based masking. Second pick (after audio.transcribe-speech@1.1.0's VAD gate, registry#477) from a post-#473 downstream-capability review of this session's shipped model engines: no new model, no new license/verification burden -- same weight table, same license record as text.detect-entities. A new capability id, not a version of text.detect-entities, since \"redact\" is a genuinely different action from \"detect\" for a caller (different intent, different output shape), not a refinement of the same one. 1.1.1 inherits text.detect-entities@1.1.1's word-level aggregation fix (registry#611): a multi-piece entity such as 'Acme Corp' is now replaced by one '[ORG]' instead of '[ORG][ORG][ORG]'. Does not detect speech, translate, resolve entities against a knowledge base, read storage, invoke connectors, or know an application or workflow.",
+  "use_cases": [
+    {
+      "scenario": "As a privacy export reviewer, I want person, organization, and location mentions blanked out of a document before it leaves a privacy boundary, so that a forwarded support ticket or shared transcript doesn't carry PII a vendor or auditor shouldn't see.",
+      "input_example": {
+        "text": "Sarah Chen from Acme Corp will follow up with the Berlin team next week."
+      },
+      "output_example": {
+        "redacted_text": "[PER] from [ORG] will follow up with the [LOC] team next week."
+      },
+      "happy": true,
+      "persona_ref": "privacy-export-reviewer"
+    },
+    {
+      "scenario": "As a privacy export reviewer, I want each multi-piece name (a person like 'Elon Musk', an organization like 'SpaceX') replaced by exactly one placeholder, so that no fragment of a detected entity leaks through and the redacted text stays readable.",
+      "input_example": {
+        "text": "Elon Musk founded SpaceX in California."
+      },
+      "output_example": {
+        "redacted_text": "[PER] founded [ORG] in [LOC]."
+      },
+      "happy": true,
+      "persona_ref": "privacy-export-reviewer"
+    },
+    {
+      "scenario": "As a privacy export reviewer, I want text with no detected entities returned completely unchanged, so that redaction never alters content that doesn't need it.",
+      "input_example": {
+        "text": "The quarterly report is due next Friday."
+      },
+      "output_example": {
+        "redacted_text": "The quarterly report is due next Friday."
+      },
+      "happy": true,
+      "persona_ref": "privacy-export-reviewer"
+    }
+  ],
+  "inputs": {
+    "schema": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "text"
+      ],
+      "properties": {
+        "text": {
+          "type": "string",
+          "maxLength": 20000
+        }
+      }
+    }
+  },
+  "outputs": {
+    "schema": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "redacted_text"
+      ],
+      "properties": {
+        "redacted_text": {
+          "type": "string"
+        }
+      }
+    }
+  },
+  "preconditions": [
+    {
+      "id": "text-provided",
+      "description": "Caller supplies a text string (may be empty)."
+    }
+  ],
+  "postconditions": [
+    {
+      "id": "non-entity-text-preserved-verbatim",
+      "description": "Every byte of the input not covered by a detected entity span appears unchanged, in order, in redacted_text; each detected span is replaced by exactly one bracketed placeholder ([PER]/[ORG]/[LOC]/[MISC])."
+    },
+    {
+      "id": "deterministic-per-call",
+      "description": "Identical input yields identical output within one WASM instantiation. Cross-instantiation / cross-host-architecture byte-identity is NOT proven -- see risk.determinism_class."
+    }
+  ],
+  "side_effects": [
+    {
+      "kind": "memory_only",
+      "description": "Produces a redacted string in memory; does not log, persist, or transmit input text."
+    }
+  ],
+  "emits": [],
+  "consumes": [],
+  "permissions": [
+    {
+      "id": "text.redact-entities"
+    }
+  ],
+  "execution": {
+    "binary_format": "wasm",
+    "entrypoint": {
+      "kind": "wasi-command",
+      "command": "run"
+    },
+    "preferred_targets": [
+      "local",
+      "browser",
+      "edge",
+      "device"
+    ],
+    "constraints": {
+      "filesystem_access": "none",
+      "host_api_access": "none",
+      "network_access": "forbidden"
+    }
+  },
+  "policies": [],
+  "dependencies": [],
+  "provenance": {
+    "source": "derived",
+    "author": "enricopiovesan",
+    "created_at": "2026-09-12T02:57:07Z",
+    "spec_ref": "registry#481, second pick from the post-#473 'Five Engines, What Next' downstream-capability review, after audio.transcribe-speech@1.1.0's VAD gate (#477). Reuses text.detect-entities' (#465) DistilBERT-NER engine directly via a source-level path dependency on that crate's new lib.rs (split out of its single main.rs the same way audio-detect-speech-segments was split for #477) -- no new model, no new verification burden.",
+    "adr_refs": [
+      "0001-rust-wasm-foundation"
+    ],
+    "exception_refs": []
+  },
+  "evidence": [],
+  "service_type": "stateless",
+  "permitted_targets": [
+    "local",
+    "browser",
+    "edge",
+    "device"
+  ],
+  "event_trigger": null,
+  "connector_requirements": [],
+  "state_schema": null,
+  "artifact_type": "native",
+  "licensing": {
+    "spdx_expression": "Apache-2.0",
+    "commercial_use": "allowed",
+    "redistribution": "allowed",
+    "attribution_required": true,
+    "verification": {
+      "status": "maintainer-declared"
+    },
+    "license_files": [
+      "LICENSE"
+    ],
+    "source_url": "https://github.com/traverse-framework/registry/blob/main/LICENSE"
+  },
+  "artifact": {
+    "digest": "sha256:9f6fcff01b9b9045bcb1dc54d331a8ca3b3e9c1c2e0508b2b78629f227f06191",
+    "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/text.redact-entities-1.1.1/redact-entities-agent.wasm"
+  },
+  "ai": {
+    "model_backed": true,
+    "models": [
+      {
+        "id": "dslim/distilbert-NER",
+        "spdx_expression": "Apache-2.0",
+        "attribution_required": true,
+        "copyright": "Copyright holders of dslim/distilbert-NER (Apache-2.0)",
+        "huggingface_id": "dslim/distilbert-NER",
+        "revision": "dfa2838a127384aabb82ed7719e16dab84c42a2a"
+      }
+    ]
+  },
+  "authoring": {
+    "method": "llm-assisted",
+    "source_revision": "claude/issue-611-ner-word-aggregation",
+    "test_evidence": "registry#611 fix: decode_entities now aggregates WordPiece tokens into whole words (first sub-token's label, full-word span) before BIO merging. text-detect-entities: 24 #[test] cases (5 new: B-on-continuation merge, first-piece-only labeling, O-first-piece suppression, adjacent-B words stay separate, per-word index assignment); cargo llvm-cov functions=100%, lines=97.52%, regions=96.75%. text-redact-entities: 10 tests, 100% functions/lines/regions. Verified on the real model (wasm32 --features full-model under wasmtime): every use_case output_example regenerated from the built artifact; extra sentences with accented/hyphenated names (Élysée Palace, São Paulo, Okonjo-Iweala) return whole entities with byte offsets matching input.text[start..end].",
+    "review": {
+      "decision": "pending-qualified-review",
+      "reviewer": "traverse-registry-maintainer"
+    }
+  },
+  "risk": {
+    "effect_class": "pure_read",
+    "determinism_class": "model_derived",
+    "data_flow": {
+      "accepted_data_classifications": [],
+      "produced_data_classifications": [],
+      "egress_policy": "denied"
+    },
+    "reliability": {
+      "idempotency_required": false,
+      "retryable": true,
+      "compensation_available": true
+    }
+  }
+}

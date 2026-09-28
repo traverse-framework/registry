@@ -1,0 +1,284 @@
+{
+  "kind": "capability_contract",
+  "schema_version": "1.0.0",
+  "id": "text.detect-entities",
+  "namespace": "text",
+  "name": "detect-entities",
+  "version": "1.1.1",
+  "lifecycle": "active",
+  "owner": {
+    "team": "traverse-core",
+    "contact": "enrico.piovesan10@gmail.com"
+  },
+  "summary": "Extract named entities (person, organization, location, misc) from free text using a real DistilBERT-NER model forward pass.",
+  "description": "Runs a real DistilBERT (dslim/distilbert-NER, Apache-2.0) token-classification forward pass -- WordPiece tokenize (case-preserving; capitalization is real signal for this model), 6 transformer layers, per-token BIO-tag classification, then aggregate WordPieces into whole words -- each word takes its FIRST sub-token's label and spans all of its pieces (Hugging Face aggregation_strategy='first'; the model was fine-tuned with only first sub-tokens labeled, so its continuation-piece predictions are untrained) -- then merge adjacent B-/I- word tags of the same type into entity spans with byte offsets into the input text. Returns an array of {text, label, start, end} (label one of PER, ORG, LOC, MISC; start/end are UTF-8 byte offsets). A real model forward pass at execution time, not a keyword list or a 'leading capitalized word' heuristic. 1.1.1 fixes registry#611: 1.0.0/1.1.0 decoded per WordPiece, so a B- tag on an interior piece split one entity into fragments ('Acme Corp' -> 'A'/'c'/'me Corp'); word-level aggregation now returns 'Acme Corp'. Does not resolve entities against a knowledge base, deduplicate mentions, read storage, invoke connectors, or know an application or workflow.",
+  "use_cases": [
+    {
+      "scenario": "As a meeting organizer, I want person, organization, and location entities extracted from a sentence, so that a caller can build a structured summary without a keyword list.",
+      "input_example": {
+        "text": "Sarah Chen from Acme Corp will follow up with the Berlin team next week."
+      },
+      "output_example": {
+        "entities": [
+          {
+            "text": "Sarah Chen",
+            "label": "PER",
+            "start": 0,
+            "end": 10
+          },
+          {
+            "text": "Acme Corp",
+            "label": "ORG",
+            "start": 16,
+            "end": 25
+          },
+          {
+            "text": "Berlin",
+            "label": "LOC",
+            "start": 50,
+            "end": 56
+          }
+        ]
+      },
+      "happy": true,
+      "persona_ref": "meeting-organizer"
+    },
+    {
+      "scenario": "As a meeting organizer, I want a well-known person, organization, and location correctly grouped into single clean spans when the model tags them consistently, so that common cases read naturally.",
+      "input_example": {
+        "text": "Elon Musk founded SpaceX in California."
+      },
+      "output_example": {
+        "entities": [
+          {
+            "text": "Elon Musk",
+            "label": "PER",
+            "start": 0,
+            "end": 9
+          },
+          {
+            "text": "SpaceX",
+            "label": "ORG",
+            "start": 18,
+            "end": 24
+          },
+          {
+            "text": "California",
+            "label": "LOC",
+            "start": 28,
+            "end": 38
+          }
+        ]
+      },
+      "happy": true,
+      "persona_ref": "meeting-organizer"
+    },
+    {
+      "scenario": "As a meeting organizer, I want text with no named entities to return an empty array rather than a forced guess, so that ordinary sentences aren't mislabeled.",
+      "input_example": {
+        "text": "The quick brown fox jumps over the lazy dog."
+      },
+      "output_example": {
+        "entities": []
+      },
+      "happy": false,
+      "persona_ref": "meeting-organizer"
+    },
+    {
+      "scenario": "As a meeting organizer, I want empty input to return an empty array rather than an error, so that an empty upstream field never breaks the pipeline.",
+      "input_example": {
+        "text": ""
+      },
+      "output_example": {
+        "entities": []
+      },
+      "happy": false,
+      "persona_ref": "meeting-organizer"
+    }
+  ],
+  "inputs": {
+    "schema": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "text"
+      ],
+      "properties": {
+        "text": {
+          "type": "string",
+          "maxLength": 20000
+        }
+      }
+    }
+  },
+  "outputs": {
+    "schema": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "entities"
+      ],
+      "properties": {
+        "entities": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "text",
+              "label",
+              "start",
+              "end"
+            ],
+            "properties": {
+              "text": {
+                "type": "string"
+              },
+              "label": {
+                "type": "string",
+                "enum": [
+                  "PER",
+                  "ORG",
+                  "LOC",
+                  "MISC"
+                ]
+              },
+              "start": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "end": {
+                "type": "integer",
+                "minimum": 0
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "preconditions": [
+    {
+      "id": "text-provided",
+      "description": "Caller supplies a text string (may be empty)."
+    }
+  ],
+  "postconditions": [
+    {
+      "id": "byte-offsets-into-input",
+      "description": "Each entity's start/end are UTF-8 byte offsets into the exact input text string, and entities[i].text equals input.text[start..end]."
+    },
+    {
+      "id": "deterministic-per-call",
+      "description": "Identical input yields identical output within one WASM instantiation. Cross-instantiation / cross-host-architecture byte-identity is NOT proven -- see risk.determinism_class."
+    }
+  ],
+  "side_effects": [
+    {
+      "kind": "memory_only",
+      "description": "Produces an entity array in memory; does not log, persist, or transmit input text."
+    }
+  ],
+  "emits": [],
+  "consumes": [],
+  "permissions": [
+    {
+      "id": "text.detect-entities"
+    }
+  ],
+  "execution": {
+    "binary_format": "wasm",
+    "entrypoint": {
+      "kind": "wasi-command",
+      "command": "run"
+    },
+    "preferred_targets": [
+      "local",
+      "browser",
+      "edge",
+      "device"
+    ],
+    "constraints": {
+      "filesystem_access": "none",
+      "host_api_access": "none",
+      "network_access": "forbidden"
+    }
+  },
+  "policies": [],
+  "dependencies": [],
+  "provenance": {
+    "source": "derived",
+    "author": "enricopiovesan",
+    "created_at": "2026-09-11T02:50:00Z",
+    "spec_ref": "registry#465, follow-up to #455/#460 (third spec 001 FR-017 agent). Motivated by a traverse-framework/reference-apps survey finding the same task -- classify/extract entities from free text -- implemented independently, rule-based, in doc-approval.analyze's docType, traverse-starter.process's noteType, and meeting-notes.process's owner extraction (self-disclosed as 'not production-grade named-entity recognition'). meeting-notes.process is additionally the one capability with governed two-app reuse in that repo (docs/two-app-reuse-contract.md). Reuses the #![no_std] BERT-encoder engine proven in report.translate-fr-semantic.",
+    "adr_refs": [
+      "0001-rust-wasm-foundation"
+    ],
+    "exception_refs": []
+  },
+  "evidence": [],
+  "service_type": "stateless",
+  "permitted_targets": [
+    "local",
+    "browser",
+    "edge",
+    "device"
+  ],
+  "event_trigger": null,
+  "connector_requirements": [],
+  "state_schema": null,
+  "artifact_type": "native",
+  "licensing": {
+    "spdx_expression": "Apache-2.0",
+    "commercial_use": "allowed",
+    "redistribution": "allowed",
+    "attribution_required": true,
+    "verification": {
+      "status": "maintainer-declared"
+    },
+    "license_files": [
+      "LICENSE"
+    ],
+    "source_url": "https://github.com/traverse-framework/registry/blob/main/LICENSE"
+  },
+  "artifact": {
+    "digest": "sha256:f11f230260f0896d558051ee844de780cde9e5392f4d5219f9a9a84e6b15f6ec",
+    "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/text.detect-entities-1.1.1/detect-entities-agent.wasm"
+  },
+  "ai": {
+    "model_backed": true,
+    "models": [
+      {
+        "id": "dslim/distilbert-NER",
+        "spdx_expression": "Apache-2.0",
+        "attribution_required": true,
+        "copyright": "Copyright holders of dslim/distilbert-NER (Apache-2.0)",
+        "huggingface_id": "dslim/distilbert-NER",
+        "revision": "dfa2838a127384aabb82ed7719e16dab84c42a2a"
+      }
+    ]
+  },
+  "authoring": {
+    "method": "llm-assisted",
+    "source_revision": "claude/issue-611-ner-word-aggregation",
+    "test_evidence": "registry#611 fix: decode_entities now aggregates WordPiece tokens into whole words (first sub-token's label, full-word span) before BIO merging. text-detect-entities: 24 #[test] cases (5 new: B-on-continuation merge, first-piece-only labeling, O-first-piece suppression, adjacent-B words stay separate, per-word index assignment); cargo llvm-cov functions=100%, lines=97.52%, regions=96.75%. text-redact-entities: 10 tests, 100% functions/lines/regions. Verified on the real model (wasm32 --features full-model under wasmtime): every use_case output_example regenerated from the built artifact; extra sentences with accented/hyphenated names (Élysée Palace, São Paulo, Okonjo-Iweala) return whole entities with byte offsets matching input.text[start..end].",
+    "review": {
+      "decision": "pending-qualified-review",
+      "reviewer": "traverse-registry-maintainer"
+    }
+  },
+  "risk": {
+    "effect_class": "pure_read",
+    "determinism_class": "model_derived",
+    "data_flow": {
+      "accepted_data_classifications": [],
+      "produced_data_classifications": [],
+      "egress_policy": "denied"
+    },
+    "reliability": {
+      "idempotency_required": false,
+      "retryable": true,
+      "compensation_available": true
+    }
+  }
+}
