@@ -305,7 +305,7 @@
   function visibleGroups() {
     var matched = matchedReferencesForQuery(searchQuery);
     return groupedCapabilities().filter(function (group) {
-      if (!showDeprecated && group.latest.deprecated) { return false; }
+      if (!showDeprecated && (group.latest.deprecated || group.latest.revoked)) { return false; }
       if (matched !== null) {
         var anyVersionMatches = group.versions.some(function (v) { return matched.has(v.reference); });
         if (!anyVersionMatches) { return false; }
@@ -343,7 +343,7 @@
     var deprecatedToggle = el("input", { type: "checkbox", id: "show-deprecated" });
     deprecatedToggle.checked = showDeprecated;
     deprecatedToggle.addEventListener("change", function () { showDeprecated = deprecatedToggle.checked; renderResultsGrid(); });
-    var deprecatedLabel = el("label", {}, [deprecatedToggle, document.createTextNode("Include deprecated versions")]);
+    var deprecatedLabel = el("label", {}, [deprecatedToggle, document.createTextNode("Include deprecated and revoked versions")]);
     appEl.appendChild(el("div", { className: "controls" }, [deprecatedLabel, renderViewToggle()]));
 
     appEl.appendChild(el("div", { id: "results" }));
@@ -429,9 +429,15 @@
   // rather than as its own "Status" column -- deprecated is the only status
   // worth a visual flag; active is the silent default (owner feedback).
   function deprecatedBadge(group) {
-    return group.latest.deprecated
-      ? el("span", { className: "badge badge-danger", textContent: "deprecated" })
-      : null;
+    return statusBadge(group.latest);
+  }
+
+  // specs/026-model-rights-compliance FR-013: revoked wins over deprecated;
+  // neither is ever presented as active.
+  function statusBadge(cap) {
+    if (cap.revoked) { return el("span", { className: "badge badge-danger", textContent: "revoked" }); }
+    if (cap.deprecated) { return el("span", { className: "badge badge-danger", textContent: "deprecated" }); }
+    return null;
   }
 
   // Service type + Agent share one column/fact -- an agent is a kind of
@@ -675,7 +681,7 @@
       var isCurrent = v.reference === versions[0].reference;
       var badges = [el("span", { className: "t-mono", textContent: "v" + v.contract.version })];
       if (isCurrent) { badges.push(el("span", { className: "badge badge-accent", textContent: "latest" })); }
-      if (v.deprecated) { badges.push(el("span", { className: "badge badge-danger", textContent: "deprecated" })); }
+      if (statusBadge(v)) { badges.push(statusBadge(v)); }
       var row = el("a", { className: "version-row" + (v.reference === reference ? " current" : ""), href: referenceHash(v.reference) }, [
         el("div", { className: "version-left" }, badges),
         el("span", { className: "t-muted", style: "font-size:0.8rem" }, [document.createTextNode(v.reference === reference ? "viewing" : "view →")]),
@@ -788,6 +794,76 @@
     return modelRefsForContract(contract).map(function (r) { return r.modelId; });
   }
 
+  var MODEL_RIGHTS_FIELDS = [["commercial_use", "Commercial use"], ["redistribution", "Redistribution"], ["derivatives", "Derivatives"]];
+
+  // specs/026-model-rights-compliance "Derived usage class" -- same
+  // projection as build_index.py's model_usage; null for pre-026 refs.
+  function modelUsageClass(ref) {
+    var values = MODEL_RIGHTS_FIELDS.map(function (f) { return ref[f[0]]; });
+    var known = ["allowed", "forbidden", "conditional", "unknown"];
+    if (values.some(function (v) { return known.indexOf(v) === -1; })) { return null; }
+    if (values.every(function (v) { return v === "allowed"; })) { return "unrestricted"; }
+    if (ref.commercial_use === "forbidden") { return "evaluation-only"; }
+    return "conditional";
+  }
+
+  function evidenceFileLinks(files) {
+    var links = (Array.isArray(files) ? files : []).filter(function (f) {
+      return f && typeof f.url === "string" && f.url.indexOf("https://") === 0;
+    });
+    if (!links.length) { return null; }
+    var span = el("span", {});
+    links.forEach(function (f, i) {
+      if (i) { span.appendChild(document.createTextNode(", ")); }
+      span.appendChild(el("a", { href: f.url, textContent: f.url.split("/").pop(), target: "_blank", rel: "noopener" }));
+    });
+    return span;
+  }
+
+  // Spec 026 rows for an object ModelRef. Pre-026 refs render rights as
+  // `unknown` (never permission) and data obligations as not stated.
+  function modelRightsRows(ref) {
+    var rows = MODEL_RIGHTS_FIELDS.map(function (f) {
+      var value = ref[f[0]] || "unknown";
+      return sidebarRow(f[1], el("span", { className: rightsBadgeClass(value), textContent: value }));
+    });
+    var usage = modelUsageClass(ref);
+    if (usage) { rows.push(sidebarRow("Usage class", el("span", { className: "badge", textContent: usage }))); }
+    rows.push(sidebarRow("License text", evidenceFileLinks(ref.license_files)));
+    rows.push(sidebarRow("NOTICE", evidenceFileLinks(ref.notice_files)));
+    if (Object.prototype.hasOwnProperty.call(ref, "derivation")) {
+      var derivation = ref.derivation;
+      if (derivation && typeof derivation === "object") {
+        rows.push(sidebarRow("Converted", textNode((derivation.transformations || []).join(", "))));
+        if (derivation.description) { rows.push(el("p", { className: "sidebar-note", textContent: derivation.description })); }
+      } else {
+        rows.push(sidebarRow("Converted", textNode("no — shipped verbatim from upstream")));
+      }
+    }
+    var obligations = ref.data_obligations;
+    if (Array.isArray(obligations) && obligations.length) {
+      obligations.forEach(function (item) {
+        if (!item || typeof item !== "object") { return; }
+        var dataset = typeof item.source_url === "string" && item.source_url.indexOf("https://") === 0
+          ? el("a", { href: item.source_url, textContent: item.dataset || "", target: "_blank", rel: "noopener" })
+          : textNode(item.dataset);
+        rows.push(sidebarRow("Data (" + (item.kind || "") + ")", dataset));
+        if (item.obligation) { rows.push(el("p", { className: "sidebar-note", textContent: item.obligation })); }
+      });
+    } else if (Array.isArray(obligations)) {
+      rows.push(sidebarRow("Data obligations", textNode("none declared")));
+    } else {
+      rows.push(sidebarRow("Data obligations", el("span", { className: "t-muted", textContent: "not stated by the publisher" })));
+    }
+    if (ref.verification && ref.verification.status) {
+      rows.push(sidebarRow("Verification", textNode(ref.verification.status)));
+    }
+    if (ref.rights_change && ref.rights_change.reason) {
+      rows.push(el("p", { className: "sidebar-note", textContent: "Rights changed from an earlier declaration: " + ref.rights_change.reason }));
+    }
+    return rows;
+  }
+
   // Sidebar rows for a contract's own object-shaped ai.models entry --
   // pinned on the contract itself, not looked up in model-attribution.json.
   function inlineModelRefRows(modelId, ref) {
@@ -810,7 +886,8 @@
     if (ref.copyright) {
       rows.push(sidebarRow("Copyright", textNode(ref.copyright)));
     }
-    rows.push(el("p", { className: "sidebar-note", textContent: "Pinned on this capability's own contract (spec 001 FR-017 amendment, Decision 124)." }));
+    rows = rows.concat(modelRightsRows(ref));
+    rows.push(el("p", { className: "sidebar-note", textContent: "Pinned on this capability's own contract (spec 001 FR-017 / spec 026)." }));
     return rows;
   }
 
@@ -858,7 +935,7 @@
     });
     children.push(el("p", {
       className: "sidebar-note",
-      textContent: "Third-party model rights (separate from Spec 025 capability License). Permissive upstream licenses; keep required copyright/notices on redistribute. See catalog/THIRD_PARTY_NOTICES.md.",
+      textContent: "Third-party model rights, separate from the Spec 025 capability License. Publisher-declared (spec 026), signed with the contract; not a legal certification. unknown / conditional / forbidden are never permission. Ship any NOTICE when redistributing. See catalog/THIRD_PARTY_NOTICES.md.",
     }));
     return el("div", { className: "sidebar-card" }, children);
   }
@@ -873,8 +950,18 @@
     if (contract.lifecycle) {
       packageRows.push(sidebarRow("Lifecycle", el("span", { className: "badge", textContent: contract.lifecycle })));
     }
-    if (cap.deprecated) {
-      packageRows.push(sidebarRow("Status", el("span", { className: "badge badge-danger", textContent: "deprecated" })));
+    if (statusBadge(cap)) {
+      packageRows.push(sidebarRow("Status", statusBadge(cap)));
+    }
+    if (cap.revoked && cap.revocation) {
+      packageRows.push(sidebarRow("Revoked", textNode(cap.revocation.revoked_at)));
+      var revokedNote = el("p", { className: "sidebar-note" }, [document.createTextNode("Do not run: " + (cap.revocation.reason || ""))]);
+      if (typeof cap.revocation.evidence_url === "string" && cap.revocation.evidence_url.indexOf("https://") === 0) {
+        revokedNote.appendChild(document.createTextNode(" ("));
+        revokedNote.appendChild(el("a", { href: cap.revocation.evidence_url, textContent: "evidence", target: "_blank", rel: "noopener" }));
+        revokedNote.appendChild(document.createTextNode(")"));
+      }
+      packageRows.push(revokedNote);
     }
     if (contract.service_type) {
       var serviceTypeDef = SERVICE_TYPE_DEFINITIONS[contract.service_type];
@@ -937,7 +1024,7 @@
       el("span", { className: "badge", textContent: "v" + contract.version }),
     ];
     if (contract.lifecycle) { headerBadges.push(el("span", { className: "badge", textContent: contract.lifecycle })); }
-    if (cap.deprecated) { headerBadges.push(el("span", { className: "badge badge-danger", textContent: "deprecated" })); }
+    if (statusBadge(cap)) { headerBadges.push(statusBadge(cap)); }
     appEl.appendChild(el("div", { className: "detail-header-badges" }, headerBadges));
     appEl.appendChild(el("h1", { className: "t-h1 detail-title", textContent: contract.id }));
 
@@ -1221,10 +1308,11 @@
       if (inlineRef.copyright) {
         pinnedRows.push(sidebarRow("Copyright", textNode(inlineRef.copyright)));
       }
+      pinnedRows = pinnedRows.concat(modelRightsRows(inlineRef));
       appEl.appendChild(el("div", { className: "sidebar-card", style: "margin:1.25rem 0; max-width:42rem" }, [
         el("div", { className: "sidebar-card-title", textContent: "Model license" }),
         el("div", {}, pinnedRows),
-        el("p", { className: "sidebar-note", textContent: "Pinned on this capability's own contract (spec 001 FR-017 amendment, Decision 124)." }),
+        el("p", { className: "sidebar-note", textContent: "Pinned on this capability's own contract (spec 001 FR-017 / spec 026)." }),
       ]));
     } else {
       var info = (modelAttribution.models || {})[modelId];

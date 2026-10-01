@@ -7,8 +7,8 @@
 //! `events/**/product.json` (the WASM ABI only allows a single input/single
 //! output via `fd_read`/`fd_write`, no filesystem access, so this crate
 //! cannot walk those trees itself):
-//! `{capabilities: [{deprecated, contract, test_coverage, risk?,
-//! is_automatic_eligible?, risk_source?}], personas: [{persona}],
+//! `{capabilities: [{deprecated, revoked?, revocation?, contract,
+//! test_coverage, risk?, is_automatic_eligible?, risk_source?}], personas: [{persona}],
 //! events: [{deprecated, product, observed_lineage?}]}`. The three risk
 //! fields (specs/024-capability-risk-classification-adoption) are computed
 //! upstream through `traverse-contracts` and passed through verbatim here,
@@ -207,6 +207,13 @@ fn build_catalog(input: &Value) -> Value {
             .cloned()
             .unwrap_or(Value::Null);
         let risk_source = record.get("risk_source").cloned().unwrap_or(Value::Null);
+        // specs/026-model-rights-compliance FR-013: pass the revocation through
+        // verbatim so the catalog never presents a revoked version as active.
+        let revoked = record
+            .get("revoked")
+            .and_then(Value::as_bool)
+            .unwrap_or(false);
+        let revocation = record.get("revocation").cloned().unwrap_or(Value::Null);
 
         let reference = capability_reference(namespace, id, version);
 
@@ -238,6 +245,8 @@ fn build_catalog(input: &Value) -> Value {
         capabilities.push(object(alloc::vec![
             ("reference", Value::String(reference)),
             ("deprecated", Value::Bool(deprecated)),
+            ("revoked", Value::Bool(revoked)),
+            ("revocation", revocation),
             ("contract", contract.clone()),
             ("test_coverage", test_coverage),
             ("risk", risk),
@@ -560,6 +569,37 @@ mod tests {
         let capabilities = catalog.get("capabilities").unwrap().as_array().unwrap();
         assert_eq!(capabilities.len(), 1);
         assert_eq!(capabilities[0].get("deprecated").unwrap().as_bool(), Some(true));
+    }
+
+    #[test]
+    fn revocation_is_passed_through_and_defaults_to_active() {
+        let mut revoked = record(
+            contract("core", "core.example", "1.0.0", "Example", "Example capability"),
+            false,
+        );
+        if let Value::Object(fields) = &mut revoked {
+            fields.push((String::from("revoked"), Value::Bool(true)));
+            fields.push((
+                String::from("revocation"),
+                object(vec![("reason", Value::String(String::from("takedown")))]),
+            ));
+        }
+        let active = record(
+            contract("core", "core.other", "1.0.0", "Other", "Other capability"),
+            false,
+        );
+        let catalog = build_catalog(&capabilities_input(vec![revoked, active]));
+        let capabilities = catalog.get("capabilities").unwrap().as_array().unwrap();
+        assert_eq!(capabilities[0].get("revoked").unwrap().as_bool(), Some(true));
+        assert_eq!(
+            capabilities[0]
+                .get("revocation")
+                .and_then(|r| r.get("reason"))
+                .and_then(Value::as_str),
+            Some("takedown")
+        );
+        assert_eq!(capabilities[1].get("revoked").unwrap().as_bool(), Some(false));
+        assert!(matches!(capabilities[1].get("revocation"), Some(Value::Null)));
     }
 
     #[test]

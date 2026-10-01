@@ -295,5 +295,98 @@ class ModelAttributionSidebarTests(unittest.TestCase):
         self.assertNotIn("Copyright (c) 2022 OpenAI", html)
 
 
+MODEL_RIGHTS_EXAMPLE = (
+    REPO_ROOT / "examples" / "model-rights" / "capabilities" / "example" / "example.detect-things" / "1.0.0" / "contract.json"
+)
+
+
+class ModelRightsCatalogSpec026Tests(unittest.TestCase):
+    """specs/026-model-rights-compliance (registry#622): the catalog shows the
+    full model rights record and never presents a revoked version as active."""
+
+    def setUp(self):
+        import json
+
+        self.mod = load_module()
+        self.contract = json.loads(MODEL_RIGHTS_EXAMPLE.read_text())
+        self.ref = self.contract["ai"]["models"][0]
+
+    def test_full_record_renders_every_rights_field(self):
+        html = self.mod.model_attribution_sidebar_html(self.contract)
+        for text in (
+            "Commercial use",
+            "Redistribution",
+            "Derivatives",
+            "unrestricted",
+            ">LICENSE</a>",
+            ">NOTICE</a>",
+            "quantize, format-convert",
+            "Per-row int8 quantization",
+            "Data (labels)",
+            "example-ner-corpus",
+            "maintainer-declared",
+            "never permission",
+        ):
+            with self.subTest(text=text):
+                self.assertIn(text, html)
+        self.assertNotIn("Permissive upstream licenses", html)
+
+    def test_usage_class_matches_index_projection(self):
+        cases = (
+            ({}, "unrestricted"),
+            ({"commercial_use": "forbidden"}, "evaluation-only"),
+            ({"derivatives": "conditional"}, "conditional"),
+        )
+        for change, expected in cases:
+            with self.subTest(change=change):
+                self.assertEqual(self.mod.model_usage_class({**self.ref, **change}), expected)
+        self.assertIsNone(self.mod.model_usage_class({"id": "x"}))
+
+    def test_pre_026_ref_renders_unknown_and_not_stated(self):
+        legacy = {k: self.ref[k] for k in ("id", "spdx_expression", "attribution_required", "huggingface_id", "revision")}
+        html = self.mod._inline_model_ref_rows(legacy["id"], legacy)
+        self.assertEqual(html.count('<span class="badge">unknown</span>'), 3)
+        self.assertIn("not stated by the publisher", html)
+        self.assertNotIn("Usage class", html)
+        self.assertNotIn("Converted", html)
+
+    def test_verbatim_derivation_and_empty_obligations(self):
+        html = self.mod._inline_model_ref_rows(
+            self.ref["id"], {**self.ref, "derivation": None, "data_obligations": []}
+        )
+        self.assertIn("shipped verbatim from upstream", html)
+        self.assertIn("none declared", html)
+
+    def test_rights_change_is_surfaced(self):
+        ref = {**self.ref, "rights_change": {"reason": "upstream relicensed", "evidence_url": "https://x"}}
+        self.assertIn("upstream relicensed", self.mod._inline_model_ref_rows(ref["id"], ref))
+
+    def test_single_model_page_shows_rights(self):
+        html = self.mod.single_model_attribution_html(self.ref["id"], [{"contract": self.contract}])
+        self.assertIn("Derivatives", html)
+
+    def test_status_badge_prefers_revoked(self):
+        self.assertEqual(self.mod.status_badge_html({"deprecated": False}), "")
+        self.assertIn(">deprecated<", self.mod.status_badge_html({"deprecated": True}))
+        self.assertIn(">revoked<", self.mod.status_badge_html({"deprecated": True, "revoked": True}))
+
+    def test_revoked_package_sidebar_shows_reason_and_evidence(self):
+        entry = {
+            "deprecated": False,
+            "revoked": True,
+            "revocation": {
+                "reason": "Upstream takedown",
+                "evidence_url": "https://example.org/takedown",
+                "revoked_at": "2026-10-01T00:00:00Z",
+            },
+            "contract": {**self.contract, "service_type": "stateless"},
+        }
+        html = self.mod.package_sidebar_html(entry, "https://registry.traverse-framework.com", "/x/")
+        self.assertIn(">revoked<", html)
+        self.assertIn("Do not run: Upstream takedown", html)
+        self.assertIn('href="https://example.org/takedown"', html)
+        self.assertIn("2026-10-01T00:00:00Z", html)
+
+
 if __name__ == "__main__":
     unittest.main()
