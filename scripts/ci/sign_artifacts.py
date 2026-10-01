@@ -11,6 +11,14 @@ produces that signature as an additive `signature.json` sibling next to each
 non-deprecated, artifact-bearing `contract.json`, and never touches the
 immutable `contract.json` itself (spec 007 Amendment FR-007/FR-012).
 
+Each signature also covers the contract (specs/026-model-rights-compliance
+FR-012, v1.1.0 / decision-log entry 128): `contract_sha256` is the SHA-256 of
+the exact committed `contract.json` bytes (the index's `contract_digest`), and
+`contract_signature_hex` is an Ed25519 signature over those 32 raw digest
+bytes -- so every rights field, NOTICE digest and derivation record is
+authenticated, not just the WASM. Revoked versions (`revoked.json`) are never
+signed, same as deprecated ones.
+
 Modes (exactly one):
 
   --since-merge   Sign only capability versions whose `contract.json` was added
@@ -36,6 +44,7 @@ any file. When the variable is unset the script exits 0 after printing a notice
 """
 
 import argparse
+import hashlib
 import json
 import os
 import subprocess
@@ -84,7 +93,7 @@ def _sign_hex(signer, data: bytes) -> str:
 
 
 def _is_deprecated(version_dir: Path) -> bool:
-    return (version_dir / "deprecated.json").is_file()
+    return (version_dir / "deprecated.json").is_file() or (version_dir / "revoked.json").is_file()
 
 
 def _artifact_url(contract_path: Path):
@@ -155,10 +164,13 @@ def _targets(mode: str) -> list:
 
 
 def _write_signature(version_dir: Path, signer, data: bytes) -> Path:
+    contract_digest = hashlib.sha256((version_dir / "contract.json").read_bytes()).digest()
     record = {
         "scheme": SIGNATURE_SCHEME,
         "public_key_hex": _public_key_hex(signer),
         "signature_hex": _sign_hex(signer, data),
+        "contract_sha256": contract_digest.hex(),
+        "contract_signature_hex": _sign_hex(signer, contract_digest),
         "sigstore_bundle_ref": None,
         "signed_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
     }

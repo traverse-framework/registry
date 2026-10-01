@@ -172,6 +172,13 @@ try:
 except ImportError:  # pragma: no cover - CI installs the pinned dep
     get_spdx_licensing = None
 
+try:
+    from cryptography.exceptions import InvalidSignature
+    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
+except ImportError:  # pragma: no cover - CI installs cryptography
+    Ed25519PublicKey = None
+    InvalidSignature = Exception
+
 SEMVER_RE = re.compile(
     r"^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)"
     r"(?:-((?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)"
@@ -3076,6 +3083,7 @@ def check_immutability(base_sha: str, head_sha: str, errors: list) -> None:
     for governed_dir, filename, error_code in (
         ("capabilities/", "contract.json", "capabilities.contract_modified"),
         ("capabilities/", "signature.json", "capabilities.signature_modified"),
+        ("capabilities/", "revoked.json", "capabilities.revocation_modified"),
         ("workflows/", "workflow.json", "workflows.workflow_modified"),
         ("events/", "product.json", "events.product_modified"),
     ):
@@ -3286,6 +3294,150 @@ def validate_signature_file(path: Path, errors: list) -> None:
         fail(errors, "signature.bad_signature", str(path), "'signature_hex' must be 128 hex chars (64-byte Ed25519 signature)")
     if not isinstance(sig.get("signed_at"), str) or not sig.get("signed_at"):
         fail(errors, "signature.bad_signed_at", str(path), "'signed_at' must be a non-empty ISO-8601 UTC timestamp string")
+    validate_contract_signature(path, sig, errors)
+
+
+def validate_contract_signature(path: Path, sig: dict, errors: list) -> None:
+    """specs/026-model-rights-compliance FR-012 (v1.1.0, decision-log entry
+    128): when a signature.json carries `contract_sha256` /
+    `contract_signature_hex`, the digest must equal the SHA-256 of the exact
+    committed contract.json bytes and the Ed25519 signature over those 32
+    digest bytes must verify under `public_key_hex`. Signatures written before
+    spec 026 carry neither field and stay valid unchanged; that a NEWLY added
+    signature.json carries both is enforced diff-based in
+    check_new_signatures_cover_contract."""
+    has_digest = "contract_sha256" in sig
+    has_signature = "contract_signature_hex" in sig
+    if not has_digest and not has_signature:
+        return
+    if has_digest != has_signature:
+        fail(
+            errors,
+            "signature.missing_contract_signature",
+            str(path),
+            "contract_sha256 and contract_signature_hex must appear together (spec 026 FR-012)",
+        )
+        return
+    declared = sig.get("contract_sha256")
+    signature_hex = sig.get("contract_signature_hex")
+    if not isinstance(declared, str) or not SHA256_HEX_RE.match(declared):
+        fail(errors, "signature.bad_contract_sha256", str(path), "'contract_sha256' must be 64 lowercase hex characters")
+        return
+    if not _is_hex(signature_hex) or len(signature_hex) != 128:
+        fail(
+            errors,
+            "signature.bad_contract_signature",
+            str(path),
+            "'contract_signature_hex' must be 128 hex chars (64-byte Ed25519 signature)",
+        )
+        return
+    contract_path = path.parent / "contract.json"
+    try:
+        digest = hashlib.sha256(contract_path.read_bytes()).digest()
+    except OSError:
+        fail(errors, "signature.unexpected", str(path), "signature.json has no sibling contract.json to cover")
+        return
+    if digest.hex() != declared:
+        fail(
+            errors,
+            "signature.contract_digest_mismatch",
+            str(path),
+            f"contract_sha256 {declared} does not match the committed contract.json bytes "
+            f"({digest.hex()}) (spec 026 FR-012)",
+        )
+        return
+    if Ed25519PublicKey is None:
+        fail(
+            errors,
+            "signature.verifier_unavailable",
+            str(path),
+            "the `cryptography` package is required to verify contract signatures (spec 026 FR-012)",
+        )
+        return
+    public_key_hex = sig.get("public_key_hex")
+    try:
+        Ed25519PublicKey.from_public_bytes(bytes.fromhex(public_key_hex)).verify(
+            bytes.fromhex(signature_hex), digest
+        )
+    except (InvalidSignature, ValueError, TypeError):
+        fail(
+            errors,
+            "signature.bad_contract_signature",
+            str(path),
+            "contract_signature_hex does not verify under public_key_hex over the contract "
+            "digest (spec 026 FR-012)",
+        )
+
+
+def check_new_signatures_cover_contract(base_sha: str, head_sha: str, errors: list) -> None:
+    """specs/026 FR-012: a signature.json ADDED in this diff must carry the
+    contract signature. Diff-based so the immutable pre-026 signatures, which
+    never had it, stay valid."""
+    diff = subprocess.check_output(
+        ["git", "diff", "--name-status", "--diff-filter=A", f"{base_sha}...{head_sha}", "--", "capabilities/"],
+        text=True,
+    )
+    for line in diff.splitlines():
+        path = line.split("\t")[-1] if line.strip() else ""
+        if not path.endswith("/signature.json"):
+            continue
+        try:
+            sig = json.loads(Path(path).read_text())
+        except (OSError, json.JSONDecodeError):
+            continue  # reported by validate_signature_file
+        if not isinstance(sig, dict) or "contract_sha256" not in sig or "contract_signature_hex" not in sig:
+            fail(
+                errors,
+                "signature.missing_contract_signature",
+                path,
+                "newly added signature.json must include contract_sha256 and "
+                "contract_signature_hex -- regenerate it with scripts/ci/sign_artifacts.py "
+                "(spec 026 FR-012)",
+            )
+
+
+REVOCATION_REQUIRED_FIELDS = ("reason", "evidence_url", "revoked_at")
+ISO_UTC_RE = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$")
+
+
+def validate_revocation_file(path: Path, errors: list) -> None:
+    """specs/026-model-rights-compliance FR-013: a `revoked.json` sibling is
+    an additive lifecycle marker `{reason, evidence_url, revoked_at}` next to
+    a published contract.json. Whole-tree safe: only inspects files that
+    exist. Its immutability (and the contract's) is check_immutability's job."""
+    try:
+        record = json.loads(path.read_text())
+    except (OSError, json.JSONDecodeError):
+        fail(errors, "revocation.invalid_json", str(path), "revoked.json is not valid JSON")
+        return
+    if not isinstance(record, dict):
+        fail(errors, "revocation.invalid_json", str(path), "revoked.json must be a JSON object")
+        return
+    if not (path.parent / "contract.json").is_file():
+        fail(
+            errors,
+            "revocation.orphaned",
+            str(path),
+            "revoked.json must sit next to a published contract.json (spec 026 FR-013)",
+        )
+    reason = record.get("reason")
+    if not isinstance(reason, str) or not reason.strip():
+        fail(errors, "revocation.invalid", str(path), "revoked.json 'reason' must be a non-empty string")
+    if not is_safe_https_url(record.get("evidence_url")):
+        fail(
+            errors,
+            "revocation.invalid",
+            str(path),
+            "revoked.json 'evidence_url' must be a safe https URL (spec 026 FR-013)",
+        )
+    revoked_at = record.get("revoked_at")
+    if not isinstance(revoked_at, str) or not ISO_UTC_RE.match(revoked_at):
+        fail(
+            errors,
+            "revocation.invalid",
+            str(path),
+            "revoked.json 'revoked_at' must be an ISO-8601 UTC timestamp like 2026-10-01T00:00:00Z",
+        )
 
 
 def pr_added_contract_version_dirs(base_sha: str, head_sha: str) -> set:
@@ -3337,7 +3489,7 @@ def check_signature_siblings(errors: list, pr_added_dirs: set = None) -> None:
     unsigned_new_in_pr = []
     for contract_path in sorted(capabilities_dir.rglob("contract.json")):
         version_dir = contract_path.parent
-        if (version_dir / "deprecated.json").is_file():
+        if (version_dir / "deprecated.json").is_file() or (version_dir / "revoked.json").is_file():
             continue
         try:
             artifact = json.loads(contract_path.read_text()).get("artifact")
@@ -3455,6 +3607,8 @@ def main() -> int:
         check_semver_bump(errors)
         check_dependency_resolvability(errors)
         check_signature_siblings(errors, pr_added_dirs)
+        for revocation_path in sorted(capabilities_dir.rglob("revoked.json")):
+            validate_revocation_file(revocation_path, errors)
 
     if personas_dir.is_dir():
         for persona_path in sorted(personas_dir.rglob("persona.json")):
@@ -3509,6 +3663,10 @@ def main() -> int:
             fail(errors, "git.diff_failed", "capabilities/", f"Unable to compute diff: {exc}")
         try:
             check_new_contracts_declare_ai_models_object_shape(base_sha, head_sha, errors)
+        except subprocess.CalledProcessError as exc:
+            fail(errors, "git.diff_failed", "capabilities/", f"Unable to compute diff: {exc}")
+        try:
+            check_new_signatures_cover_contract(base_sha, head_sha, errors)
         except subprocess.CalledProcessError as exc:
             fail(errors, "git.diff_failed", "capabilities/", f"Unable to compute diff: {exc}")
         try:

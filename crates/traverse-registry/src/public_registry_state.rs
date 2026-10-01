@@ -5,7 +5,9 @@ use std::collections::BTreeSet;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use crate::model_rights::{PublicAiDeclaration, PublicModelUsage, PublicRecordStatus};
+use crate::model_rights::{
+    PublicAiDeclaration, PublicModelUsage, PublicRecordStatus, PublicRevocation,
+};
 
 const PUBLIC_REGISTRY_STATE_SCHEMA_VERSION: &str = "1.0.0";
 const PUBLIC_REGISTRY_STATE_SCOPE: &str = "public_registry_synced";
@@ -82,6 +84,9 @@ pub struct PublicRegistryCapabilityRecord {
     /// specs/026 derived `{id, usage_class}` per fully-declared model.
     #[serde(default)]
     pub model_usage: Vec<PublicModelUsage>,
+    /// specs/026 FR-013: why a revoked version was revoked; `None` otherwise.
+    #[serde(default)]
+    pub revocation: Option<PublicRevocation>,
 }
 
 impl PublicRegistryCapabilityRecord {
@@ -597,6 +602,7 @@ fn capability_json_value(record: &PublicRegistryCapabilityRecord) -> Value {
         "ai": record.ai,
         "status": record.status,
         "model_usage": record.model_usage,
+        "revocation": record.revocation,
     })
 }
 
@@ -1125,6 +1131,16 @@ mod tests {
         let workspace_root = unique_temp_dir();
         let mut index = valid_index();
         index.capabilities[0].status = Some(PublicRecordStatus::Revoked);
+        index.capabilities[0].revocation = Some(PublicRevocation {
+            reason: "upstream takedown".to_string(),
+            evidence_url: "https://example.invalid/takedown".to_string(),
+            revoked_at: "2026-10-01T00:00:00Z".to_string(),
+        });
+        let projected = capability_json_value(&index.capabilities[0]);
+        assert_eq!(projected["revocation"]["reason"], "upstream takedown");
+        let reparsed: PublicRegistryCapabilityRecord =
+            serde_json::from_value(projected).expect("projection should deserialize");
+        assert_eq!(reparsed.revocation, index.capabilities[0].revocation);
         write_synced_public_registry_state(
             &workspace_root,
             "local",
@@ -1374,6 +1390,7 @@ mod tests {
                 ai: None,
                 status: None,
                 model_usage: Vec::new(),
+                revocation: None,
             }],
             events: Vec::new(),
         }

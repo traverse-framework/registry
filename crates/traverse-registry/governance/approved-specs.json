@@ -385,7 +385,7 @@
     },
     {
       "id": "026-model-rights-compliance",
-      "version": "1.0.0",
+      "version": "1.1.0",
       "status": "approved",
       "immutable": true,
       "path": "specs/026-model-rights-compliance/spec.md",

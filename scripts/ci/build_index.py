@@ -64,7 +64,8 @@ model-backed capabilities.
 
 Also implements specs/026-model-rights-compliance FR-013/FR-014 (decision-log
 entry 127): each capability entry gains `status` (`active` | `deprecated` |
-`revoked`, from sibling `deprecated.json` / `revoked.json`) and `model_usage`,
+`revoked`, from sibling `deprecated.json` / `revoked.json`, with the revocation record itself as
+`revocation` when revoked) and `model_usage`,
 a derived `{id, usage_class}` per object ModelRef declaring all three rights
 enums. The full ModelRef rights record itself rides in `ai`, verbatim.
 
@@ -200,7 +201,8 @@ def build_index(previous_index_version: int, source_commit: str, repo_slug: str 
 
             deprecated_path = contract_path.parent / "deprecated.json"
             deprecated = deprecated_path.is_file()
-            revoked = (contract_path.parent / "revoked.json").is_file()
+            revoked_path = contract_path.parent / "revoked.json"
+            revoked = revoked_path.is_file()
 
             artifact = contract.get("artifact") or {}
             artifact_digest = artifact.get("digest")
@@ -248,6 +250,17 @@ def build_index(previous_index_version: int, source_commit: str, repo_slug: str 
                 "status": "revoked" if revoked else ("deprecated" if deprecated else "active"),
                 "model_usage": model_usage(contract.get("ai")),
             }
+            if revoked:
+                # spec 026 FR-013: a revoked entry keeps its full record plus
+                # the revocation itself, so consumers can see why.
+                try:
+                    entry["revocation"] = json.loads(revoked_path.read_text())
+                except Exception as exc:
+                    raise IndexBuildError(
+                        "index.revocation_unreadable",
+                        str(revoked_path),
+                        f"Unable to read/parse revoked.json: {exc}",
+                    )
 
             # specs/025-capability-licensing-metadata FR-009: normalized rights
             # for index filters. Missing block → unknown (never allowed).

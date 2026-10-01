@@ -2,7 +2,7 @@
 
 **Feature Branch**: `claude/model-license-registry-contract-907e5f`
 **Created**: 2026-09-30
-**Status**: Approved (2026-09-30, v1.0.0)
+**Status**: Approved (2026-09-30, v1.0.0; amended 2026-10-01, v1.1.0 -- contract signature covers the raw committed contract bytes, not canonical JSON; decision-log entry 128 / registry#621)
 **Input**: App-developer request for a model-license compliance contract,
 decided via `/brainstorm` with the repo owner. Full reasoning, all fourteen
 questions with options and rationale: `docs/decision-log.md` entry 127, which
@@ -126,10 +126,16 @@ never a contract field.
 ### Contract signing
 
 `signature.json` files written after this spec's signing change add
-`contract_sha256` and `contract_signature_hex`: an Ed25519 signature, by the
-same key as `public_key_hex` / `catalog/signing-key.pub`, over the SHA-256 of
-the contract's canonical JSON (UTF-8, keys sorted, no insignificant
-whitespace). This authenticates every rights field, NOTICE digest and
+`contract_sha256` (64 lowercase hex: the SHA-256 of the exact committed
+`contract.json` bytes, identical to the index's `contract_digest` without its
+`sha256:` prefix) and `contract_signature_hex`: an Ed25519 signature, by the
+same key as `public_key_hex` / `catalog/signing-key.pub`, over those 32 raw
+digest bytes. No canonicalization is involved -- contracts are immutable, so
+the committed bytes are the signed bytes; a consumer hashes exactly what it
+fetched from `contract_url`. (v1.0.0 specified canonical JSON; amended in
+v1.1.0 because published contracts carry tens of thousands of floating-point
+values that Python, JavaScript and Rust serialize differently, so a canonical
+form could not be reproduced reliably across languages.) This authenticates every rights field, NOTICE digest and
 derivation record, and is what satisfies spec 025 FR-012. Existing
 `signature.json` files are immutable and are not re-signed.
 

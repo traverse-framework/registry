@@ -554,6 +554,25 @@ class BuildIndexModelRightsSpec026Tests(unittest.TestCase):
         revoked = self._index_for(self._example(), markers=["deprecated.json", "revoked.json"])
         self.assertEqual(revoked["status"], "revoked")
         self.assertEqual(revoked["ai"], self._example()["ai"])
+        self.assertEqual(revoked["revocation"], {})
+        self.assertNotIn("revocation", deprecated)
+
+    def test_revocation_record_is_carried_and_unreadable_one_aborts(self):
+        record = {"reason": "upstream takedown", "evidence_url": "https://example.org/t", "revoked_at": "2026-10-01T00:00:00Z"}
+        with tempfile.TemporaryDirectory() as tmp:
+            path = write_contract(tmp, self._example())
+            (path.parent / "revoked.json").write_text(json.dumps(record))
+            cwd = os.getcwd()
+            os.chdir(tmp)
+            try:
+                entry = build_index_module.build_index(0, "deadbeef")["capabilities"][0]
+                (path.parent / "revoked.json").write_text("{not json")
+                with self.assertRaises(build_index_module.IndexBuildError) as ctx:
+                    build_index_module.build_index(0, "deadbeef")
+            finally:
+                os.chdir(cwd)
+        self.assertEqual((entry["status"], entry["revocation"]), ("revoked", record))
+        self.assertEqual(ctx.exception.code, "index.revocation_unreadable")
 
     def test_revoked_contract_missing_artifact_is_excluded_not_failed(self):
         contract = self._example()
