@@ -5,6 +5,8 @@ use std::collections::BTreeSet;
 use std::fs;
 use std::path::{Path, PathBuf};
 
+use crate::model_rights::{PublicAiDeclaration, PublicModelUsage, PublicRecordStatus};
+
 const PUBLIC_REGISTRY_STATE_SCHEMA_VERSION: &str = "1.0.0";
 const PUBLIC_REGISTRY_STATE_SCOPE: &str = "public_registry_synced";
 const PUBLIC_REGISTRY_GOVERNING_SPEC: &str = "055-registry-sync";
@@ -68,6 +70,39 @@ pub struct PublicRegistryCapabilityRecord {
     pub verification_status: String,
     #[serde(default)]
     pub license_expression: Option<String>,
+    /// spec 001 FR-017 `ai` declaration carried verbatim, including each
+    /// model's spec 026 rights record. `None` for plain capabilities and for
+    /// index rows that predate the projection.
+    #[serde(default)]
+    pub ai: Option<PublicAiDeclaration>,
+    /// specs/026-model-rights-compliance FR-014: `None` on index rows that
+    /// predate it -- use [`PublicRegistryCapabilityRecord::lifecycle_status`].
+    #[serde(default)]
+    pub status: Option<PublicRecordStatus>,
+    /// specs/026 derived `{id, usage_class}` per fully-declared model.
+    #[serde(default)]
+    pub model_usage: Vec<PublicModelUsage>,
+}
+
+impl PublicRegistryCapabilityRecord {
+    /// The record's lifecycle status: the index's spec 026 `status` when
+    /// present, else derived from the legacy `deprecated` flag. A revoked
+    /// record is never active.
+    #[must_use]
+    pub fn lifecycle_status(&self) -> PublicRecordStatus {
+        match self.status {
+            Some(PublicRecordStatus::Revoked) => PublicRecordStatus::Revoked,
+            _ if self.deprecated => PublicRecordStatus::Deprecated,
+            Some(status) => status,
+            None => PublicRecordStatus::Active,
+        }
+    }
+
+    /// Whether resolution may select this record.
+    #[must_use]
+    pub fn is_active(&self) -> bool {
+        self.lifecycle_status() == PublicRecordStatus::Active
+    }
 }
 
 fn unknown_licensing_value() -> String {
@@ -333,7 +368,8 @@ pub fn load_synced_public_registry_state(
     Ok(state)
 }
 
-/// Resolves an exact non-deprecated public capability record from local state.
+/// Resolves an exact active (neither deprecated nor revoked) public capability
+/// record from local state.
 ///
 /// # Errors
 ///
@@ -351,11 +387,12 @@ pub fn resolve_synced_public_registry_record(
         record.namespace == namespace
             && record.id == id
             && record.version == version
-            && !record.deprecated
+            && record.is_active()
     }))
 }
 
-/// Resolves the highest non-deprecated public record that satisfies a semver range.
+/// Resolves the highest active (neither deprecated nor revoked) public record
+/// that satisfies a semver range.
 ///
 /// # Errors
 ///
@@ -392,7 +429,7 @@ pub fn resolve_synced_public_registry_range(
         .collect::<Vec<_>>();
     let mut active = matching
         .iter()
-        .filter(|(_, record)| !record.deprecated)
+        .filter(|(_, record)| record.is_active())
         .cloned()
         .collect::<Vec<_>>();
     active.sort_by(|left, right| right.0.cmp(&left.0));
@@ -410,7 +447,7 @@ pub fn resolve_synced_public_registry_range(
         (
             PublicRegistryStateErrorCode::OnlyDeprecatedVersions,
             format!(
-                "only deprecated public registry versions for {namespace}:{id} satisfy {version_range}"
+                "only deprecated or revoked public registry versions for {namespace}:{id} satisfy {version_range}"
             ),
         )
     };
@@ -557,6 +594,9 @@ fn capability_json_value(record: &PublicRegistryCapabilityRecord) -> Value {
         "redistribution": record.redistribution,
         "verification_status": record.verification_status,
         "license_expression": record.license_expression,
+        "ai": record.ai,
+        "status": record.status,
+        "model_usage": record.model_usage,
     })
 }
 
@@ -591,6 +631,7 @@ mod tests {
     #![allow(clippy::expect_used)]
 
     use super::*;
+    use crate::model_rights::{ModelUsageClass, PublicModelReference};
     use serde_json::Value;
     use std::sync::atomic::{AtomicU64, Ordering};
 
@@ -1004,6 +1045,121 @@ mod tests {
     }
 
     #[test]
+    fn capability_record_round_trips_spec_026_model_rights() {
+        // Mirrors examples/model-rights' ai block; inlined so the packaged
+        // crate's tests never read outside CARGO_MANIFEST_DIR.
+        let contract = serde_json::json!({"ai": {
+            "model_backed": true,
+            "models": [{
+                "id": "example-org/tiny-ner",
+                "huggingface_id": "example-org/tiny-ner",
+                "revision": "0123456789abcdef0123456789abcdef01234567",
+                "spdx_expression": "Apache-2.0",
+                "attribution_required": true,
+                "commercial_use": "allowed",
+                "redistribution": "allowed",
+                "derivatives": "allowed",
+                "license_files": [{"url": "https://example.invalid/LICENSE", "sha256": "aa"}],
+                "notice_files": [{"url": "https://example.invalid/NOTICE", "sha256": "bb"}],
+                "derivation": {
+                    "transformations": ["quantize"],
+                    "description": "int8",
+                    "converted_sha256": "cc"
+                },
+                "data_obligations": [{
+                    "dataset": "corpus",
+                    "kind": "labels",
+                    "obligation": "attribute",
+                    "source_url": "https://example.invalid/corpus"
+                }],
+                "verification": {"status": "maintainer-declared"}
+            }]
+        }});
+        let raw = serde_json::json!({
+            "namespace": "example",
+            "id": "example.detect-things",
+            "version": "1.0.0",
+            "digest": "sha256:abc",
+            "artifact_url": "https://example.invalid/a.wasm",
+            "contract_digest": "sha256:abc",
+            "contract_url": "https://example.invalid/c.json",
+            "deprecated": false,
+            "ai": contract["ai"],
+            "status": "active",
+            "model_usage": [{"id": "example-org/tiny-ner", "usage_class": "unrestricted"}]
+        });
+
+        let record: PublicRegistryCapabilityRecord =
+            serde_json::from_value(raw).expect("spec 026 projection should deserialize");
+        let projected = capability_json_value(&record);
+
+        assert_eq!(projected["ai"], contract["ai"]);
+        assert_eq!(projected["status"], "active");
+        assert_eq!(projected["model_usage"][0]["usage_class"], "unrestricted");
+        let Some(PublicModelReference::Object(model_ref)) =
+            record.ai.as_ref().and_then(|ai| ai.models.first())
+        else {
+            unreachable!("example declares one object ModelRef");
+        };
+        assert_eq!(model_ref.usage_class(), Some(ModelUsageClass::Unrestricted));
+    }
+
+    #[test]
+    fn lifecycle_status_prefers_revoked_and_falls_back_to_deprecated_flag() {
+        let mut record = valid_index().capabilities[0].clone();
+        assert_eq!(record.lifecycle_status(), PublicRecordStatus::Active);
+        record.deprecated = true;
+        assert_eq!(record.lifecycle_status(), PublicRecordStatus::Deprecated);
+        record.status = Some(PublicRecordStatus::Revoked);
+        assert_eq!(record.lifecycle_status(), PublicRecordStatus::Revoked);
+        record.deprecated = false;
+        assert!(!record.is_active());
+        record.status = Some(PublicRecordStatus::Deprecated);
+        assert_eq!(record.lifecycle_status(), PublicRecordStatus::Deprecated);
+        record.status = Some(PublicRecordStatus::Active);
+        assert!(record.is_active());
+    }
+
+    #[test]
+    fn resolution_never_selects_a_revoked_record() {
+        let workspace_root = unique_temp_dir();
+        let mut index = valid_index();
+        index.capabilities[0].status = Some(PublicRecordStatus::Revoked);
+        write_synced_public_registry_state(
+            &workspace_root,
+            "local",
+            "traverse-framework/registry",
+            "index-v7",
+            "2026-07-06T00:00:00Z",
+            index,
+        )
+        .expect("state should write");
+
+        let exact = resolve_synced_public_registry_record(
+            &workspace_root,
+            "local",
+            "traverse-starter",
+            "traverse-starter.process",
+            "1.0.0",
+        )
+        .expect("lookup should read local state");
+        let range = resolve_synced_public_registry_range(
+            &workspace_root,
+            "local",
+            "traverse-starter",
+            "traverse-starter.process",
+            "^1",
+        )
+        .expect_err("a revoked-only range must not resolve");
+
+        assert!(exact.is_none());
+        assert_eq!(
+            range.errors[0].code,
+            PublicRegistryStateErrorCode::OnlyDeprecatedVersions
+        );
+    }
+
+    #[test]
     fn range_resolution_selects_highest_active_version_and_reports_yanked_only() {
         let workspace_root = unique_temp_dir();
         let mut index = valid_index();
@@ -1215,6 +1371,9 @@ mod tests {
                 redistribution: "unknown".to_string(),
                 verification_status: "unknown".to_string(),
                 license_expression: None,
+                ai: None,
+                status: None,
+                model_usage: Vec::new(),
             }],
             events: Vec::new(),
         }

@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "description": "Example only (spec 026 SC-005). Weight blobs the full-model build would embed.",
+  "files": [
+    {
+      "path": "data/tiny-ner-int8.bin",
+      "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/example.detect-things-1.0.0/tiny-ner-int8.bin",
+      "sha256": "27625f3440cb0e4b44f9d2b3a0db29ffd8cc7086168e690ed9918d200a9d5e6f"
+    }
+  ]
+}

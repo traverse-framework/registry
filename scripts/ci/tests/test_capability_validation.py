@@ -2516,5 +2516,259 @@ class LicensingBackfillImmutabilityExceptionTests(unittest.TestCase):
 
 
 
+MODEL_RIGHTS_EXAMPLE_ROOT = Path(__file__).resolve().parents[3] / "examples" / "model-rights"
+MODEL_RIGHTS_EXAMPLE_CONTRACT = (
+    MODEL_RIGHTS_EXAMPLE_ROOT / "capabilities" / "example" / "example.detect-things" / "1.0.0" / "contract.json"
+)
+
+
+def _release_asset_urlopen(request, timeout=None):
+    """Serves the example's release-assets/ bytes for its Release URLs."""
+    name = request.full_url.rsplit("/", 1)[-1]
+    return _FakeArtifactResponse((MODEL_RIGHTS_EXAMPLE_ROOT / "release-assets" / name).read_bytes())
+
+
+class ModelRightsComplianceTests(unittest.TestCase):
+    """specs/026-model-rights-compliance (registry#620): the example package
+    passes every gate, and each SC-002 negative case fails with a stable
+    code."""
+
+    def _example(self) -> dict:
+        return json.loads(MODEL_RIGHTS_EXAMPLE_CONTRACT.read_text())
+
+    def _codes(self, contract: dict, others=(), fetch=True) -> list:
+        """Writes `contract` (plus `others`, as (cap_id, version, contract))
+        into a temp root carrying the example's model-weights.json, then runs
+        both spec 026 checks."""
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            crate = root / "capability-src" / "example-detect-things"
+            crate.mkdir(parents=True)
+            (crate / "model-weights.json").write_text(
+                (MODEL_RIGHTS_EXAMPLE_ROOT / "capability-src" / "example-detect-things" / "model-weights.json").read_text()
+            )
+            for cap_id, version, other in others:
+                write_contract(tmp, other, namespace="example", cap_id=cap_id, version=version)
+            path = write_contract(tmp, contract, namespace="example", cap_id="example.detect-things", version="1.1.0")
+            errors: list = []
+            with patch("capability_validation.urllib.request.urlopen", side_effect=_release_asset_urlopen):
+                capability_validation.check_new_contract_model_rights(path, errors, root=root, fetch=fetch)
+            capability_validation.check_new_contract_model_rights_drift(path, errors, root=root)
+            return [e["code"] for e in errors]
+
+    def _with_model(self, **changes) -> dict:
+        contract = self._example()
+        model = contract["ai"]["models"][0]
+        for key, value in changes.items():
+            if value is _DROP:
+                model.pop(key, None)
+            else:
+                model[key] = value
+        return contract
+
+    # SC-001 / SC-005 -------------------------------------------------------
+
+    def test_example_package_passes_every_gate(self):
+        self.assertEqual(self._codes(self._example()), [])
+
+    def test_example_package_passes_whole_tree_contract_validation(self):
+        errors: list = []
+        capability_validation.validate_contract(MODEL_RIGHTS_EXAMPLE_CONTRACT, errors)
+        self.assertEqual([e for e in errors if e["code"].startswith("contract.invalid_ai")], [])
+
+    def test_evaluation_only_and_conditional_rights_publish(self):
+        self.assertEqual(self._codes(self._with_model(commercial_use="forbidden")), [])
+        self.assertEqual(self._codes(self._with_model(redistribution="conditional", derivatives="conditional")), [])
+
+    def test_verbatim_weights_declare_null_derivation(self):
+        self.assertEqual(self._codes(self._with_model(derivation=None)), [])
+
+    def test_non_model_backed_and_legacy_refs_are_skipped(self):
+        contract = self._example()
+        contract["ai"] = {"model_backed": False}
+        self.assertEqual(self._codes(contract), [])
+        contract["ai"] = {"model_backed": True, "models": ["example-org/tiny-ner"]}
+        self.assertEqual(self._codes(contract), [])
+
+    def test_attribution_not_required_does_not_need_notice(self):
+        self.assertEqual(self._codes(self._with_model(attribution_required=False, notice_files=_DROP)), [])
+
+    def test_source_url_with_commit_is_an_immutable_pin(self):
+        contract = self._with_model(
+            huggingface_id=_DROP,
+            revision=_DROP,
+            source_url="https://github.com/example-org/tiny-ner/blob/0123456789abcdef0123456789abcdef01234567/model.onnx",
+        )
+        self.assertEqual(self._codes(contract), [])
+
+    # SC-002 negatives -------------------------------------------------------
+
+    def test_missing_rights_field_fails(self):
+        self.assertIn("contract.invalid_model_rights", self._codes(self._with_model(derivatives=_DROP)))
+
+    def test_malformed_rights_enum_fails(self):
+        self.assertIn("contract.invalid_model_rights", self._codes(self._with_model(commercial_use="yes")))
+
+    def test_unknown_rights_fail_for_each_enum(self):
+        for field in ("commercial_use", "redistribution", "derivatives"):
+            with self.subTest(field=field):
+                self.assertIn("contract.model_rights_unknown", self._codes(self._with_model(**{field: "unknown"})))
+
+    def test_redistribution_forbidden_is_a_contradiction(self):
+        self.assertIn("contract.model_rights_contradiction", self._codes(self._with_model(redistribution="forbidden")))
+
+    def test_derivatives_forbidden_with_derivation_is_a_contradiction(self):
+        self.assertIn("contract.model_rights_contradiction", self._codes(self._with_model(derivatives="forbidden")))
+        self.assertEqual(self._codes(self._with_model(derivatives="forbidden", derivation=None)), [])
+
+    def test_non_redistributable_marker_with_allowed_is_a_contradiction(self):
+        codes = self._codes(self._with_model(spdx_expression="LicenseRef-Proprietary"))
+        self.assertIn("contract.model_rights_contradiction", codes)
+
+    def test_licenseref_without_evidence_url_fails(self):
+        contract = self._with_model(
+            spdx_expression="LicenseRef-Example-Model", verification={"status": "maintainer-declared"}
+        )
+        self.assertIn("contract.model_rights_licenseref_needs_evidence", self._codes(contract))
+
+    def test_missing_or_reserved_verification_fails(self):
+        self.assertIn("contract.invalid_model_rights_verification", self._codes(self._with_model(verification=_DROP)))
+        codes = self._codes(self._with_model(verification={"status": "verified-with-evidence"}))
+        self.assertIn("contract.invalid_model_rights_verification", codes)
+        codes = self._codes(self._with_model(verification={"status": "maintainer-declared", "evidence_url": "http://x"}))
+        self.assertIn("contract.invalid_model_rights_url", codes)
+
+    def test_missing_license_files_fails(self):
+        self.assertIn("contract.invalid_model_rights", self._codes(self._with_model(license_files=_DROP)))
+        self.assertIn("contract.invalid_model_rights", self._codes(self._with_model(license_files=[])))
+
+    def test_missing_notice_when_attribution_required_fails(self):
+        self.assertIn("contract.model_rights_missing_notice", self._codes(self._with_model(notice_files=_DROP)))
+
+    def test_evidence_file_off_registry_or_malformed_digest_fails(self):
+        contract = self._with_model(license_files=[{"url": "https://huggingface.co/x/LICENSE", "sha256": "0" * 64}])
+        self.assertIn("contract.invalid_model_rights_evidence_url", self._codes(contract))
+        url = self._example()["ai"]["models"][0]["license_files"][0]["url"]
+        contract = self._with_model(license_files=[{"url": url, "sha256": "ABC"}])
+        self.assertIn("contract.invalid_model_rights", self._codes(contract))
+        contract = self._with_model(license_files=["LICENSE"])
+        self.assertIn("contract.invalid_model_rights_evidence_url", self._codes(contract))
+
+    def test_evidence_digest_mismatch_fails(self):
+        url = self._example()["ai"]["models"][0]["license_files"][0]["url"]
+        contract = self._with_model(license_files=[{"url": url, "sha256": "0" * 64}])
+        self.assertIn("contract.model_rights_evidence_digest_mismatch", self._codes(contract))
+
+    def test_unreachable_evidence_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = write_contract(tmp, self._example(), namespace="example", cap_id="example.detect-things")
+            errors: list = []
+            with patch(
+                "capability_validation.urllib.request.urlopen",
+                side_effect=capability_validation.urllib.error.URLError("404"),
+            ):
+                capability_validation.check_new_contract_model_rights(path, errors, root=Path(tmp))
+        self.assertIn("contract.model_rights_evidence_unreachable", [e["code"] for e in errors])
+
+    def test_fetch_can_be_disabled(self):
+        url = self._example()["ai"]["models"][0]["license_files"][0]["url"]
+        contract = self._with_model(license_files=[{"url": url, "sha256": "0" * 64}])
+        self.assertEqual(self._codes(contract, fetch=False), [])
+
+    def test_mutable_revision_fails(self):
+        self.assertIn("contract.model_rights_mutable_revision", self._codes(self._with_model(revision="main")))
+        contract = self._with_model(
+            huggingface_id=_DROP, revision=_DROP, source_url="https://github.com/example-org/tiny-ner/blob/v1.0/model.onnx"
+        )
+        self.assertIn("contract.model_rights_mutable_revision", self._codes(contract))
+
+    def test_missing_derivation_key_fails(self):
+        self.assertIn("contract.model_rights_missing_derivation", self._codes(self._with_model(derivation=_DROP)))
+
+    def test_malformed_derivation_fails(self):
+        self.assertIn("contract.invalid_model_derivation", self._codes(self._with_model(derivation="quantized")))
+        base = self._example()["ai"]["models"][0]["derivation"]
+        for change in (
+            {"transformations": []},
+            {"transformations": ["magic"]},
+            {"description": " "},
+            {"converted_sha256": "nope"},
+        ):
+            with self.subTest(change=change):
+                self.assertIn(
+                    "contract.invalid_model_derivation", self._codes(self._with_model(derivation={**base, **change}))
+                )
+        codes = self._codes(self._with_model(derivation={**base, "tool_url": "file:///tmp/x"}))
+        self.assertIn("contract.invalid_model_rights_url", codes)
+
+    def test_derivation_digest_not_in_model_weights_fails(self):
+        base = self._example()["ai"]["models"][0]["derivation"]
+        codes = self._codes(self._with_model(derivation={**base, "converted_sha256": "f" * 64}))
+        self.assertIn("contract.model_derivation_digest_unlisted", codes)
+
+    def test_malformed_data_obligations_fail(self):
+        self.assertIn("contract.invalid_model_data_obligations", self._codes(self._with_model(data_obligations={})))
+        self.assertIn("contract.invalid_model_data_obligations", self._codes(self._with_model(data_obligations=["x"])))
+        base = self._example()["ai"]["models"][0]["data_obligations"][0]
+        for change, code in (
+            ({"dataset": ""}, "contract.invalid_model_data_obligations"),
+            ({"kind": "pretraining"}, "contract.invalid_model_data_obligations"),
+            ({"source_url": "http://example.org"}, "contract.invalid_model_rights_url"),
+            ({"spdx_expression": ""}, "contract.invalid_model_data_obligations"),
+            ({"spdx_expression": "NOT A LICENSE ((("}, "contract.invalid_licensing_spdx"),
+        ):
+            with self.subTest(change=change):
+                self.assertIn(code, self._codes(self._with_model(data_obligations=[{**base, **change}])))
+
+    def test_malformed_rights_change_fails(self):
+        codes = self._codes(self._with_model(rights_change={"reason": "relicensed"}))
+        self.assertIn("contract.invalid_model_rights_change", codes)
+
+    # FR-011 drift ------------------------------------------------------------
+
+    def test_rights_drift_against_same_pinned_model_fails(self):
+        other = self._example()
+        changed = self._with_model(commercial_use="conditional")
+        codes = self._codes(changed, others=[("example.detect-things", "1.0.0", other)])
+        self.assertIn("contract.model_rights_drift", codes)
+
+    def test_rights_drift_across_capabilities_fails(self):
+        other = self._example()
+        other["id"] = "example.redact-things"
+        changed = self._with_model(spdx_expression="MIT")
+        codes = self._codes(changed, others=[("example.redact-things", "1.0.0", other)])
+        self.assertIn("contract.model_rights_drift", codes)
+
+    def test_rights_change_acknowledges_drift(self):
+        other = self._example()
+        changed = self._with_model(
+            commercial_use="conditional",
+            rights_change={"reason": "upstream added a usage policy", "evidence_url": "https://example.org/policy"},
+        )
+        codes = self._codes(changed, others=[("example.detect-things", "1.0.0", other)])
+        self.assertNotIn("contract.model_rights_drift", codes)
+
+    def test_pre_026_refs_only_constrain_fields_they_declare(self):
+        legacy = self._example()
+        legacy_ref = legacy["ai"]["models"][0]
+        legacy["ai"]["models"] = [
+            {k: legacy_ref[k] for k in ("id", "huggingface_id", "revision", "spdx_expression", "attribution_required")},
+            "some/string-ref",
+        ]
+        self.assertEqual(self._codes(self._example(), others=[("example.detect-things", "1.0.0", legacy)]), [])
+
+    def test_different_revision_is_not_drift(self):
+        other = self._with_model(revision="f" * 40, spdx_expression="MIT")
+        codes = self._codes(self._example(), others=[("example.detect-things", "1.0.0", other)])
+        self.assertNotIn("contract.model_rights_drift", codes)
+
+
+class _Drop:
+    pass
+
+
+_DROP = _Drop()
+
+
 if __name__ == "__main__":
     unittest.main()
