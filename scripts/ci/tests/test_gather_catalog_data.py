@@ -209,5 +209,39 @@ class ResolveCapabilityRiskTests(unittest.TestCase):
         self.assertEqual(seen["cmd"][:1], ["/opt/rcr"])
 
 
+class RevokedCatalogEntrySpec026Tests(unittest.TestCase):
+    """specs/026-model-rights-compliance FR-013 (registry#622): a revoked
+    version keeps its catalog entry and carries its revocation record."""
+
+    def test_revoked_and_active_versions_are_flagged(self):
+        mod = load_module()
+        revocation = {"reason": "takedown", "evidence_url": "https://x.org/t", "revoked_at": "2026-10-01T00:00:00Z"}
+        with tempfile.TemporaryDirectory() as tmp:
+            for version in ("1.0.0", "1.1.0"):
+                d = Path(tmp) / "capabilities" / "core" / "core.example" / version
+                d.mkdir(parents=True)
+                (d / "contract.json").write_text(
+                    json.dumps({"namespace": "core", "id": "core.example", "version": version})
+                )
+            (Path(tmp) / "capabilities" / "core" / "core.example" / "1.0.0" / "revoked.json").write_text(
+                json.dumps(revocation)
+            )
+            projection = {"risk": {}, "is_automatic_eligible": False, "risk_source": "default"}
+            cwd = os.getcwd()
+            os.chdir(tmp)
+            try:
+                with mock.patch.object(
+                    mod,
+                    "resolve_capability_risk",
+                    return_value={f"core/core.example@{v}": projection for v in ("1.0.0", "1.1.0")},
+                ), mock.patch.object(mod, "resolve_current_crate", return_value=None):
+                    entries = mod.gather_capabilities()
+            finally:
+                os.chdir(cwd)
+        by_version = {e["contract"]["version"]: e for e in entries}
+        self.assertEqual((by_version["1.0.0"]["revoked"], by_version["1.0.0"]["revocation"]), (True, revocation))
+        self.assertEqual((by_version["1.1.0"]["revoked"], by_version["1.1.0"]["revocation"]), (False, None))
+
+
 if __name__ == "__main__":
     unittest.main()

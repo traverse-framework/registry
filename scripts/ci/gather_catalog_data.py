@@ -235,6 +235,10 @@ def gather_capabilities() -> list:
     for contract_path in sorted(capabilities_dir.rglob("contract.json")):
         contract = json.loads(contract_path.read_text())
         deprecated = (contract_path.parent / "deprecated.json").is_file()
+        # specs/026-model-rights-compliance FR-013: a revoked version keeps
+        # its page (and full rights record) but is never presented as active.
+        revoked_path = contract_path.parent / "revoked.json"
+        revocation = json.loads(revoked_path.read_text()) if revoked_path.is_file() else None
         reference = f"{contract['namespace']}/{contract['id']}@{contract['version']}"
         risk = risk_by_reference.get(reference)
         if risk is None:
@@ -243,6 +247,8 @@ def gather_capabilities() -> list:
         entries.append(
             {
                 "deprecated": deprecated,
+                "revoked": revocation is not None,
+                "revocation": revocation,
                 "contract": contract,
                 "test_coverage": None,
                 "risk": risk["risk"],

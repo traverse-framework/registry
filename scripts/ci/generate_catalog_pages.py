@@ -169,6 +169,15 @@ def sidebar_row(label: str, value_html: str) -> str:
     )
 
 
+def status_badge_html(entry: dict) -> str:
+    """specs/026 FR-013: revoked wins over deprecated; active renders nothing."""
+    if entry.get("revoked"):
+        return '<span class="badge badge-danger">revoked</span>'
+    if entry.get("deprecated"):
+        return '<span class="badge badge-danger">deprecated</span>'
+    return ""
+
+
 def rights_badge_class(value: str) -> str:
     if value == "allowed":
         return "badge badge-success"
@@ -318,6 +327,90 @@ def model_ids_for_contract(contract: dict) -> list:
     return [model_id for model_id, _ref in model_refs_for_contract(contract)]
 
 
+MODEL_RIGHTS_FIELDS = (
+    ("commercial_use", "Commercial use"),
+    ("redistribution", "Redistribution"),
+    ("derivatives", "Derivatives"),
+)
+
+
+def model_usage_class(ref: dict) -> Optional[str]:
+    """specs/026-model-rights-compliance 'Derived usage class' -- the same
+    projection scripts/ci/build_index.py emits as `model_usage`. None when a
+    reference does not declare all three rights enums (pre-026 refs)."""
+    values = [ref.get(field) for field, _label in MODEL_RIGHTS_FIELDS]
+    if any(value not in ("allowed", "forbidden", "conditional", "unknown") for value in values):
+        return None
+    if all(value == "allowed" for value in values):
+        return "unrestricted"
+    if ref.get("commercial_use") == "forbidden":
+        return "evaluation-only"
+    return "conditional"
+
+
+def _evidence_file_links(files) -> str:
+    links = []
+    for item in files if isinstance(files, list) else []:
+        url = item.get("url") if isinstance(item, dict) else None
+        if isinstance(url, str) and url.startswith("https://"):
+            name = url.rsplit("/", 1)[-1]
+            links.append(f'<a href="{esc(url)}">{esc(name)}</a>')
+    return ", ".join(links)
+
+
+def _model_rights_rows(ref: dict) -> str:
+    """specs/026-model-rights-compliance rows for an object ModelRef: rights
+    enums, derived usage class, pinned LICENSE/NOTICE, derivation, data
+    obligations, verification and any rights change. A pre-026 reference
+    renders its rights as `unknown` (never as permission) and its data
+    obligations as not stated."""
+    rows = []
+    for field, label in MODEL_RIGHTS_FIELDS:
+        value = ref.get(field) or "unknown"
+        rows.append(sidebar_row(label, f'<span class="{rights_badge_class(value)}">{esc(value)}</span>'))
+    usage = model_usage_class(ref)
+    if usage is not None:
+        rows.append(sidebar_row("Usage class", f'<span class="badge">{esc(usage)}</span>'))
+    rows.append(sidebar_row("License text", _evidence_file_links(ref.get("license_files"))))
+    rows.append(sidebar_row("NOTICE", _evidence_file_links(ref.get("notice_files"))))
+    if "derivation" in ref:
+        derivation = ref["derivation"]
+        if isinstance(derivation, dict):
+            transformations = ", ".join(str(t) for t in derivation.get("transformations") or [])
+            rows.append(sidebar_row("Converted", esc(transformations)))
+            if derivation.get("description"):
+                rows.append(f'<p class="sidebar-note">{esc(str(derivation["description"]))}</p>')
+        else:
+            rows.append(sidebar_row("Converted", "no — shipped verbatim from upstream"))
+    obligations = ref.get("data_obligations")
+    if isinstance(obligations, list) and obligations:
+        for item in obligations:
+            if not isinstance(item, dict):
+                continue
+            dataset = esc(str(item.get("dataset") or ""))
+            source_url = item.get("source_url")
+            if isinstance(source_url, str) and source_url.startswith("https://"):
+                dataset = f'<a href="{esc(source_url)}">{dataset}</a>'
+            kind = esc(str(item.get("kind") or ""))
+            rows.append(sidebar_row(f"Data ({kind})", dataset))
+            if item.get("obligation"):
+                rows.append(f'<p class="sidebar-note">{esc(str(item["obligation"]))}</p>')
+    elif isinstance(obligations, list):
+        rows.append(sidebar_row("Data obligations", "none declared"))
+    else:
+        rows.append(sidebar_row("Data obligations", '<span class="t-muted">not stated by the publisher</span>'))
+    verification = ref.get("verification")
+    if isinstance(verification, dict) and verification.get("status"):
+        rows.append(sidebar_row("Verification", esc(str(verification["status"]))))
+    rights_change = ref.get("rights_change")
+    if isinstance(rights_change, dict) and rights_change.get("reason"):
+        rows.append(
+            f'<p class="sidebar-note">Rights changed from an earlier declaration: '
+            f'{esc(str(rights_change["reason"]))}</p>'
+        )
+    return "".join(rows)
+
+
 def _inline_model_ref_rows(model_id: str, ref: dict) -> str:
     """Sidebar rows for a contract's own object-shaped ai.models entry
     (spec 001 FR-017 amendment, Decision 124 / registry#571) -- pinned on
@@ -343,9 +436,10 @@ def _inline_model_ref_rows(model_id: str, ref: dict) -> str:
         rows.append(sidebar_row("Attribution", "required"))
     if ref.get("copyright"):
         rows.append(sidebar_row("Copyright", esc(str(ref["copyright"]))))
+    rows.append(_model_rights_rows(ref))
     rows.append(
         '<p class="sidebar-note">Pinned on this capability\'s own contract '
-        "(spec 001 FR-017 amendment, Decision 124).</p>"
+        "(spec 001 FR-017 / spec 026).</p>"
     )
     return "".join(rows)
 
@@ -400,9 +494,10 @@ def model_attribution_sidebar_html(contract: dict) -> str:
         for model_id, ref in refs
     ]
     note = (
-        "Third-party model rights (separate from Spec 025 capability License). "
-        "Permissive upstream licenses; keep required copyright/notices on redistribute. "
-        "See catalog/THIRD_PARTY_NOTICES.md."
+        "Third-party model rights, separate from the Spec 025 capability License. "
+        "Publisher-declared (spec 026), signed with the contract; not a legal certification. "
+        "unknown / conditional / forbidden are never permission. Ship any NOTICE when "
+        "redistributing. See catalog/THIRD_PARTY_NOTICES.md."
     )
     return (
         '<div class="sidebar-card"><div class="sidebar-card-title">Model licenses</div>'
@@ -422,8 +517,15 @@ def package_sidebar_html(
     ]
     if contract.get("lifecycle"):
         rows.append(sidebar_row("Lifecycle", f'<span class="badge">{esc(contract["lifecycle"])}</span>'))
-    if entry.get("deprecated"):
-        rows.append(sidebar_row("Status", '<span class="badge badge-danger">deprecated</span>'))
+    rows.append(sidebar_row("Status", status_badge_html(entry)))
+    revocation = entry.get("revocation")
+    if entry.get("revoked") and isinstance(revocation, dict):
+        rows.append(sidebar_row("Revoked", esc(str(revocation.get("revoked_at") or ""))))
+        evidence = revocation.get("evidence_url")
+        reason = esc(str(revocation.get("reason") or ""))
+        if isinstance(evidence, str) and evidence.startswith("https://"):
+            reason += f' (<a href="{esc(evidence)}">evidence</a>)'
+        rows.append(f'<p class="sidebar-note">Do not run: {reason}</p>')
 
     service_type = contract.get("service_type")
     if service_type:
@@ -614,8 +716,8 @@ def version_history_block(base_url: str, group_versions: list, current_reference
         badges = f'<span class="t-mono">v{esc(contract["version"])}</span>'
         if entry["reference"] == latest_reference:
             badges += ' <span class="badge badge-accent">latest</span>'
-        if entry["deprecated"]:
-            badges += ' <span class="badge badge-danger">deprecated</span>'
+        if status_badge_html(entry):
+            badges += " " + status_badge_html(entry)
         href = f"{base_url}/{capability_page_path(contract)}"
         is_current = entry["reference"] == current_reference
         row_class = "version-row current" if is_current else "version-row"
@@ -880,8 +982,8 @@ def render_capability_page(
     header_badges = [f'<span class="badge badge-accent">{esc(contract["namespace"])}</span>', f'<span class="badge">v{esc(contract["version"])}</span>']
     if contract.get("lifecycle"):
         header_badges.append(f'<span class="badge">{esc(contract["lifecycle"])}</span>')
-    if entry["deprecated"]:
-        header_badges.append('<span class="badge badge-danger">deprecated</span>')
+    if status_badge_html(entry):
+        header_badges.append(status_badge_html(entry))
 
     summary = contract.get("summary") or ""
     description = contract.get("description") or ""
