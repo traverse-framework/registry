@@ -142,6 +142,17 @@ pins/validates shape only -- it does not live-fetch Hugging Face or
 source_url at validation time (decision 124's "pin, don't live-fetch" CI
 posture; an optional advisory HF-drift check may come later, out of scope
 here).
+
+Also enforces specs/026-model-rights-compliance (decision-log entry 127,
+registry#620): every object-shaped ai.models entry on a newly-ADDED
+model-backed contract carries a full, fail-closed rights record -- rights
+enums with `unknown` rejected, hard contradictions, pinned LICENSE/NOTICE
+release assets fetched and digest-verified, an immutable upstream commit pin,
+an explicit `derivation` (object or null) cross-checked against
+model-weights.json, optional data obligations, and no unacknowledged rights
+drift against any other contract citing the same pinned model
+(check_new_contracts_declare_model_rights). Diff-based ADD-only, like every
+other forward gate here.
 """
 
 import hashlib
@@ -1470,6 +1481,475 @@ def check_new_contracts_declare_ai_models_object_shape(base_sha: str, head_sha: 
         status, path = parts[0], parts[-1]
         if status == "A" and path.endswith("contract.json"):
             check_new_contract_ai_models_object_shape(Path(path), errors)
+
+
+# specs/026-model-rights-compliance (decision-log entry 127): a newly-ADDED
+# model-backed contract's object-shaped ai.models entries must carry a full,
+# fail-closed model rights record. Diff-based ADD-only, same reason as every
+# other new-contract check: already-published ModelRefs predate these fields
+# and contracts are immutable.
+MODEL_RIGHTS_FIELDS = ("commercial_use", "redistribution", "derivatives")
+MODEL_DERIVATION_TRANSFORMATIONS = {
+    "quantize",
+    "format-convert",
+    "prune",
+    "distill",
+    "fine-tune",
+    "other",
+}
+MODEL_DATA_OBLIGATION_KINDS = {"training", "labels", "eval"}
+# FR-011: the fields whose disagreement between two references to the same
+# pinned model is "rights drift".
+MODEL_RIGHTS_DRIFT_FIELDS = ("spdx_expression", "attribution_required") + MODEL_RIGHTS_FIELDS
+# FR-008: an immutable upstream pin is a full git commit id (40 hex, or 64
+# for SHA-256 object format) -- never a branch or tag.
+COMMIT_ID_RE = re.compile(r"^(?:[0-9a-f]{40}|[0-9a-f]{64})$")
+COMMIT_ID_IN_URL_RE = re.compile(r"/(?:[0-9a-f]{40}|[0-9a-f]{64})(?:/|$)")
+MODEL_EVIDENCE_FETCH_TIMEOUT_SECONDS = 30
+
+
+def _model_pin(model_ref) -> "tuple | None":
+    """(id, pin) identifying one exact upstream model -- the key FR-011 drift
+    detection compares on. Revision when pinned to a hub, else source_url."""
+    if not isinstance(model_ref, dict) or not isinstance(model_ref.get("id"), str):
+        return None
+    pin = model_ref.get("revision") or model_ref.get("source_url")
+    if not isinstance(pin, str) or not pin:
+        return None
+    return (model_ref["id"], pin)
+
+
+def _fetch_sha256_hex(url: str) -> str:
+    request = urllib.request.Request(url, headers={"User-Agent": "traverse-registry-ci"})
+    hasher = hashlib.sha256()
+    with urllib.request.urlopen(request, timeout=MODEL_EVIDENCE_FETCH_TIMEOUT_SECONDS) as response:
+        while True:
+            chunk = response.read(65536)
+            if not chunk:
+                break
+            hasher.update(chunk)
+    return hasher.hexdigest()
+
+
+def _model_weight_digests(capability_id: str, root: Path) -> set:
+    """sha256 values declared in the capability crate's model-weights.json.
+    Empty when absent or unreadable -- the wasm32 gate already reports a
+    missing/malformed manifest; this only cross-checks derivation digests."""
+    manifest_path = (
+        root / "capability-src" / expected_capability_src_crate(capability_id) / MODEL_WEIGHTS_MANIFEST
+    )
+    try:
+        manifest = json.loads(manifest_path.read_text())
+    except Exception:
+        return set()
+    files = manifest.get("files") if isinstance(manifest, dict) else None
+    if not isinstance(files, list):
+        return set()
+    return {f.get("sha256") for f in files if isinstance(f, dict) and isinstance(f.get("sha256"), str)}
+
+
+def _check_evidence_files(label: str, files, required: bool, path: Path, errors: list, fetch: bool) -> None:
+    """FR-005: license_files / notice_files are [{url, sha256}] on this
+    registry's own Release assets, fetched and digest-verified."""
+    if files is None:
+        if required:
+            code = (
+                "contract.model_rights_missing_notice"
+                if label.endswith("notice_files")
+                else "contract.invalid_model_rights"
+            )
+            fail(errors, code, str(path), f"{label} is required (spec 026 FR-001)")
+        return
+    if not isinstance(files, list) or (required and not files):
+        fail(
+            errors,
+            "contract.invalid_model_rights",
+            str(path),
+            f"{label} must be a non-empty array of {{url, sha256}} (spec 026 FR-001)",
+        )
+        return
+    for i, entry in enumerate(files):
+        url = entry.get("url") if isinstance(entry, dict) else None
+        sha256 = entry.get("sha256") if isinstance(entry, dict) else None
+        if not isinstance(url, str) or not ARTIFACT_RELEASE_URL_RE.match(url):
+            fail(
+                errors,
+                "contract.invalid_model_rights_evidence_url",
+                str(path),
+                f"{label}[{i}].url must be a traverse-framework/registry artifacts/ "
+                "release asset (spec 026 FR-005)",
+            )
+            continue
+        if not isinstance(sha256, str) or not SHA256_HEX_RE.match(sha256):
+            fail(
+                errors,
+                "contract.invalid_model_rights",
+                str(path),
+                f"{label}[{i}].sha256 must be 64 lowercase hex characters (spec 026 FR-005)",
+            )
+            continue
+        if not fetch:
+            continue
+        try:
+            actual = _fetch_sha256_hex(url)
+        except (urllib.error.URLError, OSError, ValueError) as exc:
+            fail(
+                errors,
+                "contract.model_rights_evidence_unreachable",
+                str(path),
+                f"unable to fetch {label}[{i}].url '{url}': {exc} (spec 026 FR-005)",
+            )
+            continue
+        if actual != sha256:
+            fail(
+                errors,
+                "contract.model_rights_evidence_digest_mismatch",
+                str(path),
+                f"{label}[{i}] fetched from '{url}' hashes to {actual}, "
+                f"but the contract declares sha256={sha256} (spec 026 FR-005)",
+            )
+
+
+def _check_derivation(prefix: str, model_ref: dict, weight_digests: set, path: Path, errors: list) -> None:
+    """FR-006: `derivation` must be declared -- an object when the shipped
+    weights differ from the pinned upstream revision, or explicit null when
+    they are shipped verbatim. Requiring the key makes silence impossible: CI
+    cannot detect a conversion it is never told about."""
+    if "derivation" not in model_ref:
+        fail(
+            errors,
+            "contract.model_rights_missing_derivation",
+            str(path),
+            f"{prefix}.derivation is required: an object describing how the shipped "
+            "weights differ from upstream, or null if shipped verbatim (spec 026 FR-006)",
+        )
+        return
+    derivation = model_ref["derivation"]
+    if derivation is None:
+        return
+    if not isinstance(derivation, dict):
+        fail(errors, "contract.invalid_model_derivation", str(path), f"{prefix}.derivation must be an object or null")
+        return
+    transformations = derivation.get("transformations")
+    if (
+        not isinstance(transformations, list)
+        or not transformations
+        or any(t not in MODEL_DERIVATION_TRANSFORMATIONS for t in transformations)
+    ):
+        fail(
+            errors,
+            "contract.invalid_model_derivation",
+            str(path),
+            f"{prefix}.derivation.transformations must be a non-empty array of "
+            f"{sorted(MODEL_DERIVATION_TRANSFORMATIONS)} (spec 026 FR-006)",
+        )
+    description = derivation.get("description")
+    if not isinstance(description, str) or not description.strip():
+        fail(
+            errors,
+            "contract.invalid_model_derivation",
+            str(path),
+            f"{prefix}.derivation.description must be a non-empty string (spec 026 FR-006)",
+        )
+    tool_url = derivation.get("tool_url")
+    if tool_url is not None and not is_safe_https_url(tool_url):
+        fail(
+            errors,
+            "contract.invalid_model_rights_url",
+            str(path),
+            f"{prefix}.derivation.tool_url must be a safe https URL (spec 026 FR-008)",
+        )
+    converted = derivation.get("converted_sha256")
+    if not isinstance(converted, str) or not SHA256_HEX_RE.match(converted):
+        fail(
+            errors,
+            "contract.invalid_model_derivation",
+            str(path),
+            f"{prefix}.derivation.converted_sha256 must be 64 lowercase hex characters (spec 026 FR-006)",
+        )
+    elif converted not in weight_digests:
+        fail(
+            errors,
+            "contract.model_derivation_digest_unlisted",
+            str(path),
+            f"{prefix}.derivation.converted_sha256 {converted} is not a sha256 listed in the "
+            "capability crate's model-weights.json (spec 026 FR-006)",
+        )
+
+
+def _check_data_obligations(prefix: str, obligations, path: Path, errors: list) -> None:
+    """FR-007: optional; absence means 'not stated', never 'none'."""
+    if obligations is None:
+        return
+    if not isinstance(obligations, list):
+        fail(errors, "contract.invalid_model_data_obligations", str(path), f"{prefix}.data_obligations must be an array")
+        return
+    for i, entry in enumerate(obligations):
+        label = f"{prefix}.data_obligations[{i}]"
+        if not isinstance(entry, dict):
+            fail(errors, "contract.invalid_model_data_obligations", str(path), f"{label} must be an object")
+            continue
+        for key in ("dataset", "obligation"):
+            value = entry.get(key)
+            if not isinstance(value, str) or not value.strip():
+                fail(
+                    errors,
+                    "contract.invalid_model_data_obligations",
+                    str(path),
+                    f"{label}.{key} must be a non-empty string (spec 026 FR-007)",
+                )
+        if entry.get("kind") not in MODEL_DATA_OBLIGATION_KINDS:
+            fail(
+                errors,
+                "contract.invalid_model_data_obligations",
+                str(path),
+                f"{label}.kind must be one of {sorted(MODEL_DATA_OBLIGATION_KINDS)} (spec 026 FR-007)",
+            )
+        if not is_safe_https_url(entry.get("source_url")):
+            fail(
+                errors,
+                "contract.invalid_model_rights_url",
+                str(path),
+                f"{label}.source_url must be a safe https URL (spec 026 FR-008)",
+            )
+        spdx = entry.get("spdx_expression")
+        if spdx is not None:
+            if isinstance(spdx, str) and spdx.strip():
+                validate_spdx_expression(spdx.strip(), errors, path)
+            else:
+                fail(
+                    errors,
+                    "contract.invalid_model_data_obligations",
+                    str(path),
+                    f"{label}.spdx_expression must be a non-empty string when present",
+                )
+
+
+def check_model_ref_rights(
+    index: int, model_ref: dict, weight_digests: set, path: Path, errors: list, fetch: bool = True
+) -> None:
+    """specs/026 FR-001 through FR-010 for one object-shaped ai.models entry.
+    Base FR-017 shape (id, spdx syntax, attribution flag, pin) is still
+    validated by validate_contract; this adds the rights record on top."""
+    prefix = f"ai.models[{index}]"
+    for field in MODEL_RIGHTS_FIELDS:
+        value = model_ref.get(field)
+        if value == "unknown":
+            fail(
+                errors,
+                "contract.model_rights_unknown",
+                str(path),
+                f"{prefix}.{field} is 'unknown'; the Registry redistributes these weights, so "
+                "model rights must be researched and declared (spec 026 FR-002)",
+            )
+        elif value not in LICENSING_RIGHTS_VALUES:
+            fail(
+                errors,
+                "contract.invalid_model_rights",
+                str(path),
+                f"{prefix}.{field} must be one of {sorted(LICENSING_RIGHTS_VALUES - {'unknown'})} "
+                f"(spec 026 FR-001/FR-002), got {value!r}",
+            )
+
+    # Hard contradictions (spec 026 'Hard contradictions'; FR-004).
+    redistribution = model_ref.get("redistribution")
+    if redistribution == "forbidden":
+        fail(
+            errors,
+            "contract.model_rights_contradiction",
+            str(path),
+            f"{prefix}.redistribution is 'forbidden', but this Registry publicly hosts the "
+            "artifact that embeds the weights -- publishing is redistribution (spec 026 FR-004)",
+        )
+    if model_ref.get("derivatives") == "forbidden" and isinstance(model_ref.get("derivation"), dict):
+        fail(
+            errors,
+            "contract.model_rights_contradiction",
+            str(path),
+            f"{prefix}.derivatives is 'forbidden' but a derivation is declared (spec 026 FR-004)",
+        )
+    spdx = model_ref.get("spdx_expression")
+    if isinstance(spdx, str) and redistribution == "allowed":
+        hits = _spdx_tokens(spdx) & LICENSING_NON_REDISTRIBUTABLE_MARKERS
+        if hits:
+            fail(
+                errors,
+                "contract.model_rights_contradiction",
+                str(path),
+                f"{prefix}.redistribution is 'allowed' but spdx_expression contains "
+                f"non-redistributable marker(s) {sorted(hits)} (spec 026 FR-004)",
+            )
+
+    verification = model_ref.get("verification")
+    if not isinstance(verification, dict):
+        fail(
+            errors,
+            "contract.invalid_model_rights_verification",
+            str(path),
+            f"{prefix}.verification must be an object with status 'maintainer-declared' (spec 026 FR-001)",
+        )
+        verification = {}
+    else:
+        status = verification.get("status")
+        if status not in LICENSING_VERIFICATION_STATUSES_V1:
+            reserved = " (reserved until a review process exists)" if status in LICENSING_VERIFICATION_STATUSES_RESERVED else ""
+            fail(
+                errors,
+                "contract.invalid_model_rights_verification",
+                str(path),
+                f"{prefix}.verification.status must be 'maintainer-declared', got {status!r}"
+                f"{reserved} (spec 026 FR-009)",
+            )
+        evidence_url = verification.get("evidence_url")
+        if evidence_url is not None and not is_safe_https_url(evidence_url):
+            fail(
+                errors,
+                "contract.invalid_model_rights_url",
+                str(path),
+                f"{prefix}.verification.evidence_url must be a safe https URL (spec 026 FR-008)",
+            )
+    if isinstance(spdx, str) and "LicenseRef-" in spdx and not is_safe_https_url(verification.get("evidence_url")):
+        fail(
+            errors,
+            "contract.model_rights_licenseref_needs_evidence",
+            str(path),
+            f"{prefix}: a LicenseRef-* spdx_expression requires verification.evidence_url "
+            "(spec 026 FR-003)",
+        )
+
+    _check_evidence_files(f"{prefix}.license_files", model_ref.get("license_files"), True, path, errors, fetch)
+    _check_evidence_files(
+        f"{prefix}.notice_files",
+        model_ref.get("notice_files"),
+        model_ref.get("attribution_required") is True,
+        path,
+        errors,
+        fetch,
+    )
+
+    # FR-008: immutable upstream pin.
+    revision = model_ref.get("revision")
+    source_url = model_ref.get("source_url")
+    if revision is not None:
+        pinned = isinstance(revision, str) and bool(COMMIT_ID_RE.match(revision))
+    else:
+        pinned = isinstance(source_url, str) and bool(COMMIT_ID_IN_URL_RE.search(source_url))
+    if not pinned:
+        fail(
+            errors,
+            "contract.model_rights_mutable_revision",
+            str(path),
+            f"{prefix} must pin an immutable upstream commit: revision must be a full commit id, "
+            "or source_url must contain one -- branches and tags are mutable (spec 026 FR-008)",
+        )
+
+    _check_derivation(prefix, model_ref, weight_digests, path, errors)
+    _check_data_obligations(prefix, model_ref.get("data_obligations"), path, errors)
+
+    rights_change = model_ref.get("rights_change")
+    if rights_change is not None and not (
+        isinstance(rights_change, dict)
+        and isinstance(rights_change.get("reason"), str)
+        and rights_change["reason"].strip()
+        and is_safe_https_url(rights_change.get("evidence_url"))
+    ):
+        fail(
+            errors,
+            "contract.invalid_model_rights_change",
+            str(path),
+            f"{prefix}.rights_change must be {{reason, evidence_url}} with a non-empty reason "
+            "and a safe https evidence_url (spec 026 FR-011)",
+        )
+
+
+def check_new_contract_model_rights(path: Path, errors: list, root: Path = Path("."), fetch: bool = True) -> None:
+    """specs/026-model-rights-compliance: every object-shaped ai.models entry
+    on a newly-ADDED model-backed contract carries the full rights record.
+    Legacy string[] refs are already rejected on new contracts by
+    check_new_contract_ai_models_object_shape, so they are skipped here."""
+    try:
+        contract = json.loads(path.read_text())
+    except Exception:
+        return
+    ai = contract.get("ai")
+    if not isinstance(ai, dict) or ai.get("model_backed") is not True:
+        return
+    models = ai.get("models")
+    if not isinstance(models, list):
+        return
+    weight_digests = _model_weight_digests(str(contract.get("id") or ""), root)
+    for index, model_ref in enumerate(models):
+        if isinstance(model_ref, dict):
+            check_model_ref_rights(index, model_ref, weight_digests, path, errors, fetch)
+
+
+def check_new_contract_model_rights_drift(path: Path, errors: list, root: Path = Path(".")) -> None:
+    """specs/026 FR-011: one pinned model has one rights truth registry-wide.
+    Compares each object ai.models entry against every other published
+    contract citing the same model id + pin (which covers both earlier
+    versions of this capability and other capabilities). Only fields both
+    sides declare are compared, so pre-026 refs constrain the fields they
+    have (SPDX, attribution) without blocking the new rights enums."""
+    try:
+        contract = json.loads(path.read_text())
+    except Exception:
+        return
+    ai = contract.get("ai")
+    models = ai.get("models") if isinstance(ai, dict) else None
+    if not isinstance(models, list):
+        return
+    own = path.resolve()
+    others = []
+    for other_path in sorted((root / "capabilities").rglob("contract.json")):
+        if other_path.resolve() == own:
+            continue
+        try:
+            other = json.loads(other_path.read_text())
+        except Exception:
+            continue
+        other_ai = other.get("ai")
+        other_models = other_ai.get("models") if isinstance(other_ai, dict) else None
+        if isinstance(other_models, list):
+            others.extend((other_path, m) for m in other_models if isinstance(m, dict))
+    for index, model_ref in enumerate(models):
+        key = _model_pin(model_ref)
+        if key is None or model_ref.get("rights_change") is not None:
+            continue
+        for other_path, other_ref in others:
+            if _model_pin(other_ref) != key:
+                continue
+            differing = [
+                field
+                for field in MODEL_RIGHTS_DRIFT_FIELDS
+                if field in model_ref and field in other_ref and model_ref[field] != other_ref[field]
+            ]
+            if differing:
+                fail(
+                    errors,
+                    "contract.model_rights_drift",
+                    str(path),
+                    f"ai.models[{index}] ({key[0]}) declares {differing} differently from "
+                    f"{other_path.as_posix()} for the same pinned model; add "
+                    "rights_change {reason, evidence_url} to make the change explicit "
+                    "(spec 026 FR-011)",
+                )
+                break
+
+
+def check_new_contracts_declare_model_rights(base_sha: str, head_sha: str, errors: list) -> None:
+    """Only validates newly-ADDED contract.json files (spec 026 forward gate)."""
+    diff = subprocess.check_output(
+        ["git", "diff", "--name-status", f"{base_sha}...{head_sha}", "--", "capabilities/"],
+        text=True,
+    )
+    for line in diff.splitlines():
+        if not line.strip():
+            continue
+        parts = line.split("\t")
+        status, path = parts[0], parts[-1]
+        if status == "A" and path.endswith("contract.json"):
+            check_new_contract_model_rights(Path(path), errors)
+            check_new_contract_model_rights_drift(Path(path), errors)
 
 
 def _risk_shape_error(risk):
@@ -3029,6 +3509,10 @@ def main() -> int:
             fail(errors, "git.diff_failed", "capabilities/", f"Unable to compute diff: {exc}")
         try:
             check_new_contracts_declare_ai_models_object_shape(base_sha, head_sha, errors)
+        except subprocess.CalledProcessError as exc:
+            fail(errors, "git.diff_failed", "capabilities/", f"Unable to compute diff: {exc}")
+        try:
+            check_new_contracts_declare_model_rights(base_sha, head_sha, errors)
         except subprocess.CalledProcessError as exc:
             fail(errors, "git.diff_failed", "capabilities/", f"Unable to compute diff: {exc}")
         try:

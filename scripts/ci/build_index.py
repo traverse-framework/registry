@@ -62,6 +62,12 @@ entry 104): each capability entry carries the contract's optional `ai`
 object verbatim (null when omitted) so an agent-facing consumer can filter
 model-backed capabilities.
 
+Also implements specs/026-model-rights-compliance FR-013/FR-014 (decision-log
+entry 127): each capability entry gains `status` (`active` | `deprecated` |
+`revoked`, from sibling `deprecated.json` / `revoked.json`) and `model_usage`,
+a derived `{id, usage_class}` per object ModelRef declaring all three rights
+enums. The full ModelRef rights record itself rides in `ai`, verbatim.
+
 Usage: build_index.py <previous_index_version_or_0> <source_commit_sha> <output_path> [repo_slug]
 """
 
@@ -74,6 +80,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 DEFAULT_REPO_SLUG = "traverse-framework/registry"
+# specs/026-model-rights-compliance: rights enums a ModelRef declares.
+MODEL_RIGHTS_FIELDS = ("commercial_use", "redistribution", "derivatives")
+RIGHTS_VALUES = {"allowed", "forbidden", "conditional", "unknown"}
 
 
 class IndexBuildError(Exception):
@@ -146,6 +155,32 @@ def resolve_capability_risk() -> dict:
     }
 
 
+def model_usage(ai) -> list:
+    """specs/026-model-rights-compliance 'Derived usage class': one
+    {id, usage_class} per object-shaped ai.models entry that declares all
+    three rights enums. A projection only -- the full ModelRef rights record
+    is carried verbatim in `ai`; legacy string / pre-026 refs are omitted
+    rather than guessed."""
+    models = ai.get("models") if isinstance(ai, dict) else None
+    if not isinstance(models, list):
+        return []
+    usage = []
+    for model_ref in models:
+        if not isinstance(model_ref, dict):
+            continue
+        values = [model_ref.get(field) for field in MODEL_RIGHTS_FIELDS]
+        if any(value not in RIGHTS_VALUES for value in values):
+            continue
+        if all(value == "allowed" for value in values):
+            usage_class = "unrestricted"
+        elif model_ref.get("commercial_use") == "forbidden":
+            usage_class = "evaluation-only"
+        else:
+            usage_class = "conditional"
+        usage.append({"id": model_ref.get("id"), "usage_class": usage_class})
+    return usage
+
+
 def build_index(previous_index_version: int, source_commit: str, repo_slug: str = DEFAULT_REPO_SLUG) -> dict:
     capabilities_dir = Path("capabilities")
     entries = []
@@ -165,13 +200,14 @@ def build_index(previous_index_version: int, source_commit: str, repo_slug: str 
 
             deprecated_path = contract_path.parent / "deprecated.json"
             deprecated = deprecated_path.is_file()
+            revoked = (contract_path.parent / "revoked.json").is_file()
 
             artifact = contract.get("artifact") or {}
             artifact_digest = artifact.get("digest")
             artifact_url = artifact.get("url")
 
             if not artifact_digest or not artifact_url:
-                if deprecated:
+                if deprecated or revoked:
                     # Permanently broken and unfixable (contracts are
                     # immutable) -- omit from the index rather than emit
                     # null fields that would crash every consumer's parse.
@@ -206,6 +242,11 @@ def build_index(previous_index_version: int, source_commit: str, repo_slug: str 
                 # verbatim (null when the contract omits it) so an agent-facing
                 # consumer can filter model-backed capabilities.
                 "ai": contract.get("ai"),
+                # specs/026-model-rights-compliance FR-013/FR-014: lifecycle
+                # status alongside the legacy `deprecated` bool. Revoked wins
+                # over deprecated; neither is ever presented as active.
+                "status": "revoked" if revoked else ("deprecated" if deprecated else "active"),
+                "model_usage": model_usage(contract.get("ai")),
             }
 
             # specs/025-capability-licensing-metadata FR-009: normalized rights

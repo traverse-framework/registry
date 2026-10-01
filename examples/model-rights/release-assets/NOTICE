@@ -1,0 +1,7 @@
+example-org/tiny-ner (revision 0123456789abcdef0123456789abcdef01234567)
+Copyright 2026 The example-org/tiny-ner authors.
+Licensed under the Apache License, Version 2.0.
+
+This product redistributes int8-quantized weights derived from the model
+above, converted by the Traverse Registry maintainers. Labels were trained on
+an example dataset; see the contract's data_obligations for its terms.

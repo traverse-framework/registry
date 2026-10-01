@@ -1,0 +1,63 @@
+{
+  "id": "example.detect-things",
+  "namespace": "example",
+  "owner": { "team": "traverse-registry-maintainers" },
+  "version": "1.0.0",
+  "summary": "Example model-backed capability carrying a complete spec 026 model rights record.",
+  "licensing": {
+    "spdx_expression": "Apache-2.0",
+    "commercial_use": "allowed",
+    "redistribution": "allowed",
+    "attribution_required": true,
+    "license_files": ["LICENSE"],
+    "source_url": "https://github.com/traverse-framework/registry/blob/main/LICENSE",
+    "verification": { "status": "maintainer-declared" }
+  },
+  "provenance": {
+    "source": "derived",
+    "author": "traverse-registry-maintainers",
+    "created_at": "2026-10-01T00:00:00Z",
+    "spec_ref": "specs/026-model-rights-compliance SC-005 example package"
+  },
+  "ai": {
+    "model_backed": true,
+    "models": [
+      {
+        "id": "example-org/tiny-ner",
+        "huggingface_id": "example-org/tiny-ner",
+        "revision": "0123456789abcdef0123456789abcdef01234567",
+        "spdx_expression": "Apache-2.0",
+        "attribution_required": true,
+        "copyright": "Copyright 2026 The example-org/tiny-ner authors",
+        "commercial_use": "allowed",
+        "redistribution": "allowed",
+        "derivatives": "allowed",
+        "license_files": [
+          { "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/example.detect-things-1.0.0/LICENSE", "sha256": "9825422b749bf6a6ccaf89c5f7dc79c8214428620ac35a688b77871220e66b5c" }
+        ],
+        "notice_files": [
+          { "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/example.detect-things-1.0.0/NOTICE", "sha256": "6372f5e776aaecd97c90546b91418fa2995149f8ae28fe0ff6588738f2d25f42" }
+        ],
+        "derivation": {
+          "transformations": ["quantize", "format-convert"],
+          "description": "Per-row int8 quantization of every Linear weight, packed into a flat little-endian .bin layout.",
+          "tool_url": "https://github.com/traverse-framework/registry/tree/0123456789abcdef0123456789abcdef01234567/capability-src/example-detect-things/data",
+          "converted_sha256": "27625f3440cb0e4b44f9d2b3a0db29ffd8cc7086168e690ed9918d200a9d5e6f"
+        },
+        "data_obligations": [
+          {
+            "dataset": "example-ner-corpus",
+            "kind": "labels",
+            "spdx_expression": "CC-BY-4.0",
+            "obligation": "Attribute the corpus authors when redistributing outputs derived from its labels.",
+            "source_url": "https://example.org/example-ner-corpus"
+          }
+        ],
+        "verification": {
+          "status": "maintainer-declared",
+          "evidence_url": "https://huggingface.co/example-org/tiny-ner/blob/0123456789abcdef0123456789abcdef01234567/README.md"
+        }
+      }
+    ]
+  }
+}

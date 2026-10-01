@@ -798,6 +798,9 @@ mod tests {
             redistribution: "unknown".to_string(),
             verification_status: "unknown".to_string(),
             license_expression: None,
+            ai: None,
+            status: None,
+            model_usage: Vec::new(),
         }
     }
 

@@ -488,5 +488,87 @@ class BuildIndexEventFR016Tests(unittest.TestCase):
             self.assertEqual(len(index["events"]), 1)
 
 
+MODEL_RIGHTS_EXAMPLE_CONTRACT = (
+    Path(__file__).resolve().parents[3]
+    / "examples" / "model-rights" / "capabilities" / "example" / "example.detect-things" / "1.0.0" / "contract.json"
+)
+
+
+class BuildIndexModelRightsSpec026Tests(unittest.TestCase):
+    """specs/026-model-rights-compliance FR-013/FR-014 (registry#620)."""
+
+    def _index_for(self, contract: dict, markers=()) -> dict:
+        with tempfile.TemporaryDirectory() as tmp:
+            path = write_contract(tmp, contract)
+            for marker in markers:
+                (path.parent / marker).write_text("{}")
+            cwd = os.getcwd()
+            os.chdir(tmp)
+            try:
+                return build_index_module.build_index(0, "deadbeef")["capabilities"][0]
+            finally:
+                os.chdir(cwd)
+
+    def _example(self) -> dict:
+        contract = json.loads(MODEL_RIGHTS_EXAMPLE_CONTRACT.read_text())
+        contract["artifact"] = valid_contract()["artifact"]
+        return contract
+
+    def test_full_rights_record_round_trips_unchanged(self):
+        contract = self._example()
+        entry = self._index_for(contract)
+        # The index is JSON: prove a serialize/parse cycle preserves every field.
+        round_tripped = json.loads(json.dumps(entry))
+        self.assertEqual(round_tripped["ai"], contract["ai"])
+
+    def test_usage_class_is_derived_from_rights_enums(self):
+        cases = (
+            ({}, "unrestricted"),
+            ({"commercial_use": "forbidden"}, "evaluation-only"),
+            ({"derivatives": "conditional"}, "conditional"),
+            ({"redistribution": "forbidden"}, "conditional"),
+        )
+        for change, expected in cases:
+            with self.subTest(change=change):
+                contract = self._example()
+                contract["ai"]["models"][0].update(change)
+                self.assertEqual(
+                    self._index_for(contract)["model_usage"],
+                    [{"id": "example-org/tiny-ner", "usage_class": expected}],
+                )
+
+    def test_refs_without_all_rights_enums_are_not_guessed(self):
+        contract = self._example()
+        ref = contract["ai"]["models"][0]
+        contract["ai"]["models"] = [
+            "legacy/string-ref",
+            {k: ref[k] for k in ("id", "spdx_expression", "attribution_required", "revision")},
+        ]
+        self.assertEqual(self._index_for(contract)["model_usage"], [])
+        self.assertEqual(self._index_for(valid_contract())["model_usage"], [])
+
+    def test_status_reflects_lifecycle_markers(self):
+        self.assertEqual(self._index_for(self._example())["status"], "active")
+        deprecated = self._index_for(self._example(), markers=["deprecated.json"])
+        self.assertEqual((deprecated["status"], deprecated["deprecated"]), ("deprecated", True))
+        revoked = self._index_for(self._example(), markers=["deprecated.json", "revoked.json"])
+        self.assertEqual(revoked["status"], "revoked")
+        self.assertEqual(revoked["ai"], self._example()["ai"])
+
+    def test_revoked_contract_missing_artifact_is_excluded_not_failed(self):
+        contract = self._example()
+        del contract["artifact"]
+        with tempfile.TemporaryDirectory() as tmp:
+            path = write_contract(tmp, contract)
+            (path.parent / "revoked.json").write_text("{}")
+            cwd = os.getcwd()
+            os.chdir(tmp)
+            try:
+                index = build_index_module.build_index(0, "deadbeef")
+            finally:
+                os.chdir(cwd)
+        self.assertEqual(index["capabilities"], [])
+
+
 if __name__ == "__main__":
     unittest.main()
