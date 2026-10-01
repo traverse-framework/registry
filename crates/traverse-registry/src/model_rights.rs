@@ -211,6 +211,15 @@ pub enum ModelUsageClass {
     Conditional,
 }
 
+/// Index entry `revocation` (FR-013): the `revoked.json` record carried
+/// alongside a revoked version's full rights record.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
+pub struct PublicRevocation {
+    pub reason: String,
+    pub evidence_url: String,
+    pub revoked_at: String,
+}
+
 /// Index entry `status` (FR-013/FR-014). Revoked is never active.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(rename_all = "snake_case")]

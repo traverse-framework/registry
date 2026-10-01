@@ -22,6 +22,28 @@ digest verification alone proves integrity, not authenticity.
 - **`scripts/ci/capability_validation.py`** — validates the shape of any
   `signature.json` that exists and forbids modifying one once written.
 
+### Contract signature (spec 026 FR-012, registry#621)
+
+Every `signature.json` written since spec 026 v1.1.0 also authenticates the
+contract (and therefore its licensing and `ai.models` rights record), not only
+the WASM:
+
+- `contract_sha256` — SHA-256 of the **exact committed `contract.json` bytes**,
+  as 64 lowercase hex. This is the index's `contract_digest` without its
+  `sha256:` prefix. There is no canonicalization: contracts are immutable, so
+  the committed bytes are the signed bytes (decision-log entry 128 explains why
+  canonical JSON was rejected).
+- `contract_signature_hex` — Ed25519 signature, by the same key, over those 32
+  raw digest bytes.
+
+CI recomputes the digest and verifies the signature for any `signature.json`
+carrying the fields (`signature.contract_digest_mismatch`,
+`signature.bad_contract_signature`), and requires them on every newly added
+`signature.json` (`signature.missing_contract_signature`). Signatures written
+before spec 026 have neither field and stay valid; they are never re-signed.
+Revoked versions (`revoked.json`, spec 026 FR-013) are skipped by the signer
+and by the completeness check, like deprecated ones.
+
 The job is **inert** until the two owner-only steps below are done: with no
 signing key configured it exits 0 after printing a "key not provisioned" notice
 (same posture as `deploy-catalog` before GitHub Pages was enabled).
@@ -134,6 +156,22 @@ url = json.load(open(f"{d}/contract.json"))["artifact"]["url"]
 data = urllib.request.urlopen(url).read()
 Ed25519PublicKey.from_public_bytes(bytes.fromhex(sig["public_key_hex"])) \
     .verify(bytes.fromhex(sig["signature_hex"]), data)
+print("OK")
+EOF
+```
+
+To verify the contract signature on a spec 026 `signature.json`:
+
+```bash
+python3 - <<'EOF'
+import hashlib, json
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
+d = "capabilities/<ns>/<id>/<version>"
+sig = json.load(open(f"{d}/signature.json"))
+digest = hashlib.sha256(open(f"{d}/contract.json", "rb").read()).digest()
+assert digest.hex() == sig["contract_sha256"]
+Ed25519PublicKey.from_public_bytes(bytes.fromhex(sig["public_key_hex"])) \
+    .verify(bytes.fromhex(sig["contract_signature_hex"]), digest)
 print("OK")
 EOF
 ```

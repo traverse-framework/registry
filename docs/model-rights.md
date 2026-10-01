@@ -32,6 +32,28 @@ Release as the WASM artifact before you open the PR. Already-published
 versions are never re-judged; to bring one into compliance, publish a new
 MINOR version.
 
+## Signing and revocation
+
+- **Contract signature.** Every new `signature.json` covers the exact committed
+  `contract.json` bytes (`contract_sha256` + `contract_signature_hex`). That
+  authenticates the whole rights record above. See
+  [`artifact-signing.md`](artifact-signing.md#contract-signature-spec-026-fr-012-registry621).
+- **Revocation.** To withdraw a version, for example after an upstream takedown
+  or relicensing, add a sibling `revoked.json` by PR:
+
+  ```json
+  {
+    "reason": "Upstream relicensed the weights under non-redistributable terms.",
+    "evidence_url": "https://huggingface.co/<org>/<model>/discussions/<n>",
+    "revoked_at": "2026-10-01T00:00:00Z"
+  }
+  ```
+
+  CI validates its shape (`revocation.invalid`, `revocation.orphaned`) and
+  treats it as immutable once merged (`capabilities.revocation_modified`). The
+  contract and artifact are never touched. The index keeps the entry with
+  `status: "revoked"`, a `revocation` record, and its full rights record.
+
 ## Consumer obligations
 
 - **Deny by default.** Treat `conditional` as "read the license", never as
