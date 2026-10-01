@@ -2763,6 +2763,149 @@ class ModelRightsComplianceTests(unittest.TestCase):
         self.assertNotIn("contract.model_rights_drift", codes)
 
 
+class ContractSignatureSpec026Tests(unittest.TestCase):
+    """specs/026-model-rights-compliance FR-012 v1.1.0 (registry#621): the
+    contract signature covers the exact committed contract.json bytes."""
+
+    SEED = bytes.fromhex("22" * 32)
+
+    def _signed(self, tmp, *, tamper=None, **overrides):
+        from cryptography.hazmat.primitives import serialization
+        from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+
+        signer = Ed25519PrivateKey.from_private_bytes(self.SEED)
+        sig_path = SignatureFileShapeTests()._write(tmp, _valid_signature_record())
+        contract_path = sig_path.parent / "contract.json"
+        digest = hashlib.sha256(contract_path.read_bytes()).digest()
+        record = {
+            **_valid_signature_record(),
+            "public_key_hex": signer.public_key()
+            .public_bytes(serialization.Encoding.Raw, serialization.PublicFormat.Raw)
+            .hex(),
+            "contract_sha256": digest.hex(),
+            "contract_signature_hex": signer.sign(digest).hex(),
+        }
+        record.update(overrides)
+        for key in [k for k, v in record.items() if v is _DROP]:
+            del record[key]
+        sig_path.write_text(json.dumps(record))
+        if tamper is not None:
+            contract_path.write_bytes(tamper(contract_path.read_bytes()))
+        errors: list = []
+        capability_validation.validate_signature_file(sig_path, errors)
+        return [e["code"] for e in errors]
+
+    def test_valid_contract_signature_passes(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            self.assertEqual(self._signed(tmp), [])
+
+    def test_pre_026_signature_without_contract_fields_still_passes(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            self.assertEqual(self._signed(tmp, contract_sha256=_DROP, contract_signature_hex=_DROP), [])
+
+    def test_changing_any_contract_byte_breaks_it(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            codes = self._signed(tmp, tamper=lambda raw: raw + b" ")
+        self.assertIn("signature.contract_digest_mismatch", codes)
+
+    def test_signature_over_a_different_digest_is_rejected(self):
+        from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+
+        forged = Ed25519PrivateKey.from_private_bytes(self.SEED).sign(b"\x00" * 32).hex()
+        with tempfile.TemporaryDirectory() as tmp:
+            self.assertIn("signature.bad_contract_signature", self._signed(tmp, contract_signature_hex=forged))
+
+    def test_signature_under_another_key_is_rejected(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            self.assertIn("signature.bad_contract_signature", self._signed(tmp, public_key_hex="ab" * 32))
+
+    def test_half_present_or_malformed_fields_are_rejected(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            self.assertIn("signature.missing_contract_signature", self._signed(tmp, contract_signature_hex=_DROP))
+        with tempfile.TemporaryDirectory() as tmp:
+            self.assertIn("signature.bad_contract_sha256", self._signed(tmp, contract_sha256="XYZ"))
+        with tempfile.TemporaryDirectory() as tmp:
+            self.assertIn("signature.bad_contract_signature", self._signed(tmp, contract_signature_hex="00"))
+
+    def test_missing_verifier_fails_closed(self):
+        with tempfile.TemporaryDirectory() as tmp, patch.object(capability_validation, "Ed25519PublicKey", None):
+            self.assertIn("signature.verifier_unavailable", self._signed(tmp))
+
+    def test_newly_added_signature_must_cover_contract(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            sig_path = SignatureFileShapeTests()._write(tmp, _valid_signature_record())
+            errors: list = []
+            with patch("subprocess.check_output", return_value=f"A\t{sig_path}\nA\t{sig_path.parent / 'contract.json'}\n"):
+                capability_validation.check_new_signatures_cover_contract("BASE", "HEAD", errors)
+            self.assertEqual([e["code"] for e in errors], ["signature.missing_contract_signature"])
+            sig_path.write_text(json.dumps({**_valid_signature_record(), "contract_sha256": "a", "contract_signature_hex": "b"}))
+            errors = []
+            with patch("subprocess.check_output", return_value=f"A\t{sig_path}\n"):
+                capability_validation.check_new_signatures_cover_contract("BASE", "HEAD", errors)
+            self.assertEqual(errors, [])
+
+
+class RevocationSpec026Tests(unittest.TestCase):
+    """specs/026-model-rights-compliance FR-013 (registry#621)."""
+
+    VALID = {
+        "reason": "Upstream relicensed the weights under non-redistributable terms.",
+        "evidence_url": "https://huggingface.co/example-org/tiny-ner/discussions/1",
+        "revoked_at": "2026-10-01T00:00:00Z",
+    }
+
+    def _codes(self, record, *, with_contract=True, raw=None):
+        with tempfile.TemporaryDirectory() as tmp:
+            version_dir = Path(tmp) / "capabilities" / "core" / "core.example" / "1.0.0"
+            version_dir.mkdir(parents=True)
+            if with_contract:
+                (version_dir / "contract.json").write_text(json.dumps(valid_contract()))
+            path = version_dir / "revoked.json"
+            path.write_text(raw if raw is not None else json.dumps(record))
+            errors: list = []
+            capability_validation.validate_revocation_file(path, errors)
+            return [e["code"] for e in errors]
+
+    def test_valid_revocation_passes(self):
+        self.assertEqual(self._codes(self.VALID), [])
+
+    def test_malformed_revocations_fail(self):
+        self.assertEqual(self._codes(None, raw="{nope"), ["revocation.invalid_json"])
+        self.assertEqual(self._codes(["x"]), ["revocation.invalid_json"])
+        self.assertIn("revocation.orphaned", self._codes(self.VALID, with_contract=False))
+        for change in ({"reason": " "}, {"evidence_url": "http://x"}, {"revoked_at": "yesterday"}):
+            with self.subTest(change=change):
+                self.assertEqual(self._codes({**self.VALID, **change}), ["revocation.invalid"])
+
+    def test_revoked_json_is_immutable_once_merged(self):
+        path = "capabilities/core/core.example/1.0.0/revoked.json"
+
+        def fake_check_output(cmd, text=True):
+            return f"M\t{path}\n" if "capabilities/" in cmd else ""
+
+        errors: list = []
+        with patch("subprocess.check_output", side_effect=fake_check_output):
+            capability_validation.check_immutability("BASE", "HEAD", errors)
+        self.assertIn("capabilities.revocation_modified", [e["code"] for e in errors])
+
+    def test_revoked_version_needs_no_signature(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            version_dir = Path(tmp) / "capabilities" / "core" / "core.example" / "1.0.0"
+            version_dir.mkdir(parents=True)
+            contract = {**valid_contract(), "artifact": {"digest": "sha256:" + "0" * 64, "url": "https://x"}}
+            (version_dir / "contract.json").write_text(json.dumps(contract))
+            (version_dir / "revoked.json").write_text(json.dumps(self.VALID))
+            (Path(tmp) / "capabilities" / ".signatures-enforced").write_text("")
+            cwd = os.getcwd()
+            os.chdir(tmp)
+            try:
+                errors: list = []
+                capability_validation.check_signature_siblings(errors)
+            finally:
+                os.chdir(cwd)
+        self.assertEqual(errors, [])
+
+
 class _Drop:
     pass
 

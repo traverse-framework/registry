@@ -7,6 +7,7 @@ Needs the `cryptography` package (CI's sign-artifacts-tests job installs it).
 Run with: python3 -m unittest scripts/ci/tests/test_sign_artifacts.py
 """
 
+import hashlib
 import importlib.util
 import json
 import os
@@ -27,7 +28,9 @@ spec.loader.exec_module(sign_artifacts)
 TEST_SEED_HEX = "11" * 32
 
 
-def write_version(root: Path, cap_id: str, version: str, *, artifact=True, deprecated=False, signed=False) -> Path:
+def write_version(
+    root: Path, cap_id: str, version: str, *, artifact=True, deprecated=False, signed=False, revoked=False
+) -> Path:
     version_dir = root / "capabilities" / cap_id.split(".")[0] / cap_id / version
     version_dir.mkdir(parents=True, exist_ok=True)
     contract = {"id": cap_id, "namespace": cap_id.split(".")[0], "version": version}
@@ -39,6 +42,8 @@ def write_version(root: Path, cap_id: str, version: str, *, artifact=True, depre
     (version_dir / "contract.json").write_text(json.dumps(contract))
     if deprecated:
         (version_dir / "deprecated.json").write_text(json.dumps({"reason": "test"}))
+    if revoked:
+        (version_dir / "revoked.json").write_text(json.dumps({"reason": "test"}))
     if signed:
         (version_dir / "signature.json").write_text(json.dumps({"scheme": "ed25519"}))
     return version_dir
@@ -78,12 +83,41 @@ class WriteSignatureTests(unittest.TestCase):
             version_dir = write_version(Path(tmp), "core.example", "1.0.0")
             out = sign_artifacts._write_signature(version_dir, signer, data)
             record = json.loads(out.read_text())
-            self.assertEqual(set(record), {"scheme", "public_key_hex", "signature_hex", "sigstore_bundle_ref", "signed_at"})
+            self.assertEqual(
+                set(record),
+                {
+                    "scheme",
+                    "public_key_hex",
+                    "signature_hex",
+                    "contract_sha256",
+                    "contract_signature_hex",
+                    "sigstore_bundle_ref",
+                    "signed_at",
+                },
+            )
             self.assertEqual(record["scheme"], "ed25519")
             self.assertIsNone(record["sigstore_bundle_ref"])
             self.assertTrue(record["signed_at"].endswith("Z"))
             pub = Ed25519PublicKey.from_public_bytes(bytes.fromhex(record["public_key_hex"]))
             pub.verify(bytes.fromhex(record["signature_hex"]), data)
+
+    def test_contract_signature_covers_exact_committed_bytes(self):
+        """specs/026 FR-012 v1.1.0: contract_sha256 is the raw-bytes digest
+        (the index's contract_digest) and the signature is over that digest."""
+        from cryptography.exceptions import InvalidSignature
+
+        signer = sign_artifacts._load_signer(TEST_SEED_HEX)
+        with tempfile.TemporaryDirectory() as tmp:
+            version_dir = write_version(Path(tmp), "core.example", "1.0.0")
+            raw = (version_dir / "contract.json").read_bytes()
+            record = json.loads(sign_artifacts._write_signature(version_dir, signer, b"wasm").read_text())
+        digest = hashlib.sha256(raw).digest()
+        self.assertEqual(record["contract_sha256"], digest.hex())
+        pub = Ed25519PublicKey.from_public_bytes(bytes.fromhex(record["public_key_hex"]))
+        pub.verify(bytes.fromhex(record["contract_signature_hex"]), digest)
+        tampered = hashlib.sha256(raw.replace(b"1.0.0", b"1.0.1")).digest()
+        with self.assertRaises(InvalidSignature):
+            pub.verify(bytes.fromhex(record["contract_signature_hex"]), tampered)
 
 
 class NeedsSignatureTests(unittest.TestCase):
@@ -102,6 +136,9 @@ class NeedsSignatureTests(unittest.TestCase):
 
     def test_deprecated_version_is_skipped(self):
         self.assertFalse(self._needs(deprecated=True))
+
+    def test_revoked_version_is_skipped(self):
+        self.assertFalse(self._needs(revoked=True))
 
     def test_workflow_backed_version_is_skipped(self):
         self.assertFalse(self._needs(artifact=False))

@@ -801,6 +801,7 @@ mod tests {
             ai: None,
             status: None,
             model_usage: Vec::new(),
+            revocation: None,
         }
     }
 

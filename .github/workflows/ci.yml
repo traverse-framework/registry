@@ -97,6 +97,11 @@ jobs:
       - name: Install SPDX license-expression pin
         run: pip install "license-expression==30.4.4"
 
+      # specs/026-model-rights-compliance FR-012 (registry#621): verify the
+      # Ed25519 contract signature in any signature.json that carries one.
+      - name: Install contract-signature verifier
+        run: pip install cryptography
+
       - name: Run capability validation unit tests
         run: python3 -m unittest scripts/ci/tests/test_capability_validation.py -v
 
