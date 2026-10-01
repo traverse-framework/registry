@@ -384,6 +384,20 @@
       ]
     },
     {
+      "id": "026-model-rights-compliance",
+      "version": "1.0.0",
+      "status": "approved",
+      "immutable": true,
+      "path": "specs/026-model-rights-compliance/spec.md",
+      "governs": [
+        "capabilities/",
+        "scripts/ci/capability_validation.py",
+        "scripts/ci/build_index.py",
+        "scripts/ci/sign_artifacts.py",
+        "specs/026-model-rights-compliance/"
+      ]
+    },
+    {
       "id": "997-application-selected-preparation",
       "version": "1.1.0",
       "status": "approved",
