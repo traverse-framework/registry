@@ -47,6 +47,14 @@ That is how a publisher sees these errors before a Registry PR exists.
 Fixtures tagged `ci_only` cover the checks only CI can run: evidence digest
 fetches and the `model-weights.json` cross-check.
 
+SPDX ids resolve against
+[`scripts/ci/fixtures/spdx_symbols.json`](../scripts/ci/fixtures/spdx_symbols.json):
+every license and exception name, keys and aliases, that the pinned
+`license-expression` knows. The CLI vendors that table too, so both sides
+classify ids identically, including which ids are exceptions that are only
+valid after `WITH`. The corpus test fails if the table is stale; bumping the
+`license-expression` pin means regenerating it.
+
 **When you change an `ai` rule, add or update fixtures in the same PR** and
 bump `corpus_version`. Use a minor bump for a new fixture, and a major bump
 when an existing fixture's verdict changes. A rule change without a fixture

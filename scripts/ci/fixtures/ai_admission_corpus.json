@@ -1,6 +1,6 @@
 {
-  "corpus_version": "1.0.0",
-  "description": "Registry-owned accept/reject fixtures for the contract `ai` admission rules (spec 001 FR-017, spec 026). Each fixture is evaluated on a minimal contract carrying only the fixture's `ai` value (no `ai` key when the fixture has none). `existing` runs only the whole-tree ai check; `newly_added` also runs the new-contract forward gates (object shape, spec 026 rights). `contract_decidable` fixtures assume every ci_only check passes: no network fetch, and every declared derivation.converted_sha256 is listed in model-weights.json. `ci_only` fixtures supply that context in `ci_context`. Cross-contract rights drift is not modelled. `expect_codes` is the sorted set of distinct CI error codes; `expect` is `accept` exactly when it is empty. Downstream: traverse-cli `capability publish` must agree with every `contract_decidable` + `newly_added` fixture (traverse Spec 056 v1.1.0 FR-019).",
+  "corpus_version": "1.1.0",
+  "description": "Registry-owned accept/reject fixtures for the contract `ai` admission rules (spec 001 FR-017, spec 026). Each fixture is evaluated on a minimal contract carrying only the fixture's `ai` value (no `ai` key when the fixture has none). `existing` runs only the whole-tree ai check; `newly_added` also runs the new-contract forward gates (object shape, spec 026 rights). `contract_decidable` fixtures assume every ci_only check passes: no network fetch, and every declared derivation.converted_sha256 is listed in model-weights.json. `ci_only` fixtures supply that context in `ci_context`. Cross-contract rights drift is not modelled. `expect_codes` is the sorted set of distinct CI error codes; `expect` is `accept` exactly when it is empty. Downstream: traverse-cli `capability publish` must agree with every `contract_decidable` + `newly_added` fixture (traverse Spec 056 v1.1.0 FR-019). SPDX ids resolve against scripts/ci/fixtures/spdx_symbols.json, the pinned license-expression symbol table (licenses and exceptions, keys and aliases, matched case-insensitively).",
   "governing_specs": [
     "001-registry-foundation FR-017",
     "026-model-rights-compliance"
@@ -1918,6 +1918,529 @@
       ]
     },
     {
+      "name": "spdx-trailing-and",
+      "description": "A dangling trailing operator is malformed (decision-log entry 130).",
+      "tier": "contract_decidable",
+      "evaluated_as": "newly_added",
+      "ai": {
+        "model_backed": true,
+        "models": [
+          {
+            "id": "example-model",
+            "spdx_expression": "MIT AND Apache-2.0 AND",
+            "attribution_required": true,
+            "huggingface_id": "example-org/example-model",
+            "revision": "0123456789abcdef0123456789abcdef01234567",
+            "commercial_use": "allowed",
+            "redistribution": "allowed",
+            "derivatives": "allowed",
+            "license_files": [
+              {
+                "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/example.detect-things-1.0.0/LICENSE",
+                "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+              }
+            ],
+            "notice_files": [
+              {
+                "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/example.detect-things-1.0.0/NOTICE",
+                "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+              }
+            ],
+            "verification": {
+              "status": "maintainer-declared"
+            },
+            "derivation": null
+          }
+        ]
+      },
+      "expect": "reject",
+      "expect_codes": [
+        "contract.invalid_ai",
+        "contract.invalid_licensing_spdx"
+      ]
+    },
+    {
+      "name": "spdx-trailing-or-lowercase",
+      "tier": "contract_decidable",
+      "evaluated_as": "newly_added",
+      "ai": {
+        "model_backed": true,
+        "models": [
+          {
+            "id": "example-model",
+            "spdx_expression": "MIT OR Apache-2.0 or",
+            "attribution_required": true,
+            "huggingface_id": "example-org/example-model",
+            "revision": "0123456789abcdef0123456789abcdef01234567",
+            "commercial_use": "allowed",
+            "redistribution": "allowed",
+            "derivatives": "allowed",
+            "license_files": [
+              {
+                "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/example.detect-things-1.0.0/LICENSE",
+                "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+              }
+            ],
+            "notice_files": [
+              {
+                "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/example.detect-things-1.0.0/NOTICE",
+                "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+              }
+            ],
+            "verification": {
+              "status": "maintainer-declared"
+            },
+            "derivation": null
+          }
+        ]
+      },
+      "expect": "reject",
+      "expect_codes": [
+        "contract.invalid_ai",
+        "contract.invalid_licensing_spdx"
+      ]
+    },
+    {
+      "name": "spdx-exception-as-license",
+      "description": "Ids the pinned license-expression classifies as exceptions are only valid after WITH.",
+      "tier": "contract_decidable",
+      "evaluated_as": "newly_added",
+      "ai": {
+        "model_backed": true,
+        "models": [
+          {
+            "id": "example-model",
+            "spdx_expression": "eCos-2.0",
+            "attribution_required": true,
+            "huggingface_id": "example-org/example-model",
+            "revision": "0123456789abcdef0123456789abcdef01234567",
+            "commercial_use": "allowed",
+            "redistribution": "allowed",
+            "derivatives": "allowed",
+            "license_files": [
+              {
+                "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/example.detect-things-1.0.0/LICENSE",
+                "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+              }
+            ],
+            "notice_files": [
+              {
+                "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/example.detect-things-1.0.0/NOTICE",
+                "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+              }
+            ],
+            "verification": {
+              "status": "maintainer-declared"
+            },
+            "derivation": null
+          }
+        ]
+      },
+      "expect": "reject",
+      "expect_codes": [
+        "contract.invalid_ai",
+        "contract.invalid_licensing_spdx"
+      ]
+    },
+    {
+      "name": "spdx-exception-as-license-spdx-listed",
+      "tier": "contract_decidable",
+      "evaluated_as": "newly_added",
+      "ai": {
+        "model_backed": true,
+        "models": [
+          {
+            "id": "example-model",
+            "spdx_expression": "MPL-2.0-no-copyleft-exception",
+            "attribution_required": true,
+            "huggingface_id": "example-org/example-model",
+            "revision": "0123456789abcdef0123456789abcdef01234567",
+            "commercial_use": "allowed",
+            "redistribution": "allowed",
+            "derivatives": "allowed",
+            "license_files": [
+              {
+                "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/example.detect-things-1.0.0/LICENSE",
+                "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+              }
+            ],
+            "notice_files": [
+              {
+                "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/example.detect-things-1.0.0/NOTICE",
+                "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+              }
+            ],
+            "verification": {
+              "status": "maintainer-declared"
+            },
+            "derivation": null
+          }
+        ]
+      },
+      "expect": "reject",
+      "expect_codes": [
+        "contract.invalid_ai",
+        "contract.invalid_licensing_spdx"
+      ]
+    },
+    {
+      "name": "spdx-scancode-exception-as-license",
+      "tier": "contract_decidable",
+      "evaluated_as": "newly_added",
+      "ai": {
+        "model_backed": true,
+        "models": [
+          {
+            "id": "example-model",
+            "spdx_expression": "LicenseRef-scancode-openjdk-exception",
+            "attribution_required": true,
+            "huggingface_id": "example-org/example-model",
+            "revision": "0123456789abcdef0123456789abcdef01234567",
+            "commercial_use": "allowed",
+            "redistribution": "allowed",
+            "derivatives": "allowed",
+            "license_files": [
+              {
+                "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/example.detect-things-1.0.0/LICENSE",
+                "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+              }
+            ],
+            "notice_files": [
+              {
+                "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/example.detect-things-1.0.0/NOTICE",
+                "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+              }
+            ],
+            "verification": {
+              "status": "maintainer-declared"
+            },
+            "derivation": null
+          }
+        ]
+      },
+      "expect": "reject",
+      "expect_codes": [
+        "contract.invalid_ai",
+        "contract.invalid_licensing_spdx",
+        "contract.model_rights_licenseref_needs_evidence"
+      ]
+    },
+    {
+      "name": "spdx-with-scancode-exception",
+      "tier": "contract_decidable",
+      "evaluated_as": "newly_added",
+      "ai": {
+        "model_backed": true,
+        "models": [
+          {
+            "id": "example-model",
+            "spdx_expression": "GPL-2.0-only WITH LicenseRef-scancode-oracle-openjdk-exception-2.0",
+            "attribution_required": true,
+            "huggingface_id": "example-org/example-model",
+            "revision": "0123456789abcdef0123456789abcdef01234567",
+            "commercial_use": "allowed",
+            "redistribution": "allowed",
+            "derivatives": "allowed",
+            "license_files": [
+              {
+                "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/example.detect-things-1.0.0/LICENSE",
+                "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+              }
+            ],
+            "notice_files": [
+              {
+                "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/example.detect-things-1.0.0/NOTICE",
+                "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+              }
+            ],
+            "verification": {
+              "status": "maintainer-declared"
+            },
+            "derivation": null
+          }
+        ]
+      },
+      "expect": "reject",
+      "expect_codes": [
+        "contract.model_rights_licenseref_needs_evidence"
+      ]
+    },
+    {
+      "name": "spdx-with-deprecated-exception-id",
+      "tier": "contract_decidable",
+      "evaluated_as": "newly_added",
+      "ai": {
+        "model_backed": true,
+        "models": [
+          {
+            "id": "example-model",
+            "spdx_expression": "Apache-2.0 WITH GPL-3.0-with-GCC-exception",
+            "attribution_required": true,
+            "huggingface_id": "example-org/example-model",
+            "revision": "0123456789abcdef0123456789abcdef01234567",
+            "commercial_use": "allowed",
+            "redistribution": "allowed",
+            "derivatives": "allowed",
+            "license_files": [
+              {
+                "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/example.detect-things-1.0.0/LICENSE",
+                "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+              }
+            ],
+            "notice_files": [
+              {
+                "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/example.detect-things-1.0.0/NOTICE",
+                "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+              }
+            ],
+            "verification": {
+              "status": "maintainer-declared"
+            },
+            "derivation": null
+          }
+        ]
+      },
+      "expect": "accept",
+      "expect_codes": []
+    },
+    {
+      "name": "spdx-with-lowercase-exception",
+      "tier": "contract_decidable",
+      "evaluated_as": "newly_added",
+      "ai": {
+        "model_backed": true,
+        "models": [
+          {
+            "id": "example-model",
+            "spdx_expression": "GPL-2.0-only WITH classpath-exception-2.0",
+            "attribution_required": true,
+            "huggingface_id": "example-org/example-model",
+            "revision": "0123456789abcdef0123456789abcdef01234567",
+            "commercial_use": "allowed",
+            "redistribution": "allowed",
+            "derivatives": "allowed",
+            "license_files": [
+              {
+                "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/example.detect-things-1.0.0/LICENSE",
+                "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+              }
+            ],
+            "notice_files": [
+              {
+                "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/example.detect-things-1.0.0/NOTICE",
+                "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+              }
+            ],
+            "verification": {
+              "status": "maintainer-declared"
+            },
+            "derivation": null
+          }
+        ]
+      },
+      "expect": "accept",
+      "expect_codes": []
+    },
+    {
+      "name": "spdx-multiword-alias",
+      "description": "The pinned license-expression recognises multi-word aliases.",
+      "tier": "contract_decidable",
+      "evaluated_as": "newly_added",
+      "ai": {
+        "model_backed": true,
+        "models": [
+          {
+            "id": "example-model",
+            "spdx_expression": "GPL 2.0",
+            "attribution_required": true,
+            "huggingface_id": "example-org/example-model",
+            "revision": "0123456789abcdef0123456789abcdef01234567",
+            "commercial_use": "allowed",
+            "redistribution": "allowed",
+            "derivatives": "allowed",
+            "license_files": [
+              {
+                "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/example.detect-things-1.0.0/LICENSE",
+                "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+              }
+            ],
+            "notice_files": [
+              {
+                "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/example.detect-things-1.0.0/NOTICE",
+                "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+              }
+            ],
+            "verification": {
+              "status": "maintainer-declared"
+            },
+            "derivation": null
+          }
+        ]
+      },
+      "expect": "accept",
+      "expect_codes": []
+    },
+    {
+      "name": "spdx-short-alias",
+      "tier": "contract_decidable",
+      "evaluated_as": "newly_added",
+      "ai": {
+        "model_backed": true,
+        "models": [
+          {
+            "id": "example-model",
+            "spdx_expression": "bsd-2",
+            "attribution_required": true,
+            "huggingface_id": "example-org/example-model",
+            "revision": "0123456789abcdef0123456789abcdef01234567",
+            "commercial_use": "allowed",
+            "redistribution": "allowed",
+            "derivatives": "allowed",
+            "license_files": [
+              {
+                "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/example.detect-things-1.0.0/LICENSE",
+                "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+              }
+            ],
+            "notice_files": [
+              {
+                "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/example.detect-things-1.0.0/NOTICE",
+                "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+              }
+            ],
+            "verification": {
+              "status": "maintainer-declared"
+            },
+            "derivation": null
+          }
+        ]
+      },
+      "expect": "accept",
+      "expect_codes": []
+    },
+    {
+      "name": "spdx-lowercase-licenseref-alias",
+      "description": "A known LicenseRef-* alias matches case-insensitively; an unknown one must keep the LicenseRef- prefix case.",
+      "tier": "contract_decidable",
+      "evaluated_as": "newly_added",
+      "ai": {
+        "model_backed": true,
+        "models": [
+          {
+            "id": "example-model",
+            "spdx_expression": "licenseref-mit-tc",
+            "attribution_required": true,
+            "huggingface_id": "example-org/example-model",
+            "revision": "0123456789abcdef0123456789abcdef01234567",
+            "commercial_use": "allowed",
+            "redistribution": "allowed",
+            "derivatives": "allowed",
+            "license_files": [
+              {
+                "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/example.detect-things-1.0.0/LICENSE",
+                "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+              }
+            ],
+            "notice_files": [
+              {
+                "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/example.detect-things-1.0.0/NOTICE",
+                "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+              }
+            ],
+            "verification": {
+              "status": "maintainer-declared"
+            },
+            "derivation": null
+          }
+        ]
+      },
+      "expect": "accept",
+      "expect_codes": []
+    },
+    {
+      "name": "spdx-lowercase-unknown-licenseref",
+      "tier": "contract_decidable",
+      "evaluated_as": "newly_added",
+      "ai": {
+        "model_backed": true,
+        "models": [
+          {
+            "id": "example-model",
+            "spdx_expression": "licenseref-example-model",
+            "attribution_required": true,
+            "huggingface_id": "example-org/example-model",
+            "revision": "0123456789abcdef0123456789abcdef01234567",
+            "commercial_use": "allowed",
+            "redistribution": "allowed",
+            "derivatives": "allowed",
+            "license_files": [
+              {
+                "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/example.detect-things-1.0.0/LICENSE",
+                "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+              }
+            ],
+            "notice_files": [
+              {
+                "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/example.detect-things-1.0.0/NOTICE",
+                "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+              }
+            ],
+            "verification": {
+              "status": "maintainer-declared"
+            },
+            "derivation": null
+          }
+        ]
+      },
+      "expect": "reject",
+      "expect_codes": [
+        "contract.invalid_ai",
+        "contract.invalid_licensing_spdx"
+      ]
+    },
+    {
+      "name": "spdx-id-missing-from-pinned-db",
+      "description": "Only ids known to the pinned license-expression are accepted.",
+      "tier": "contract_decidable",
+      "evaluated_as": "newly_added",
+      "ai": {
+        "model_backed": true,
+        "models": [
+          {
+            "id": "example-model",
+            "spdx_expression": "OpenMDW-1.0",
+            "attribution_required": true,
+            "huggingface_id": "example-org/example-model",
+            "revision": "0123456789abcdef0123456789abcdef01234567",
+            "commercial_use": "allowed",
+            "redistribution": "allowed",
+            "derivatives": "allowed",
+            "license_files": [
+              {
+                "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/example.detect-things-1.0.0/LICENSE",
+                "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+              }
+            ],
+            "notice_files": [
+              {
+                "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/example.detect-things-1.0.0/NOTICE",
+                "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+              }
+            ],
+            "verification": {
+              "status": "maintainer-declared"
+            },
+            "derivation": null
+          }
+        ]
+      },
+      "expect": "reject",
+      "expect_codes": [
+        "contract.invalid_ai",
+        "contract.invalid_licensing_spdx"
+      ]
+    },
+    {
       "name": "rights-conditional",
       "tier": "contract_decidable",
       "evaluated_as": "newly_added",
@@ -3681,5 +4204,6 @@
       "expect": "accept",
       "expect_codes": []
     }
-  ]
+  ],
+  "spdx_symbols": "scripts/ci/fixtures/spdx_symbols.json"
 }

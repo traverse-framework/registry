@@ -22,6 +22,7 @@ from unittest.mock import patch
 
 MODULE_PATH = Path(__file__).resolve().parents[1] / "capability_validation.py"
 CORPUS_PATH = Path(__file__).resolve().parents[1] / "fixtures" / "ai_admission_corpus.json"
+SPDX_SYMBOLS_PATH = Path(__file__).resolve().parents[1] / "fixtures" / "spdx_symbols.json"
 spec = importlib.util.spec_from_file_location("capability_validation", MODULE_PATH)
 capability_validation = importlib.util.module_from_spec(spec)
 sys.modules["capability_validation"] = capability_validation
@@ -114,6 +115,15 @@ class AiAdmissionCorpusTest(unittest.TestCase):
                     self.assertNotIn("ci_context", fixture)
                 else:
                     self.assertIn("ci_context", fixture)
+
+    def test_spdx_symbol_export_is_current(self):
+        """The exported table must equal the pinned license-expression's
+        symbols. Regenerate after bumping LICENSE_EXPRESSION_PIN with:
+        python3 -c "import json,sys; sys.path.insert(0,'scripts/ci'); import capability_validation as cv;
+        open('scripts/ci/fixtures/spdx_symbols.json','w').write(json.dumps(cv.spdx_symbol_table(), indent=0, ensure_ascii=False) + '\\n')"
+        """
+        self.assertEqual(json.loads(SPDX_SYMBOLS_PATH.read_text()), capability_validation.spdx_symbol_table())
+        self.assertEqual(self.corpus["spdx_symbols"], "scripts/ci/fixtures/spdx_symbols.json")
 
     def test_validator_agrees_with_every_fixture(self):
         for fixture in self.corpus["fixtures"]:
