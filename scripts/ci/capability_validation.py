@@ -296,7 +296,39 @@ def _spdx_tokens(expression: str) -> set:
     return {tok for tok in re.split(r"[^A-Za-z0-9.+-]+", expression) if tok}
 
 
+def spdx_symbol_table() -> dict:
+    """Every license and exception name (keys and aliases) the pinned
+    license-expression knows. Exported to
+    scripts/ci/fixtures/spdx_symbols.json so traverse-cli `capability
+    publish` resolves SPDX ids exactly as this gate does (decision-log entry
+    130); test_ai_admission_corpus.py proves the export is current."""
+    licensing = get_spdx_licensing()
+    licenses, exceptions = set(), set()
+    for symbol in licensing.known_symbols.values():
+        names = {symbol.key, *(symbol.aliases or ())}
+        (exceptions if symbol.is_exception else licenses).update(names)
+    return {
+        "license_expression_version": LICENSE_EXPRESSION_PIN,
+        "licenses": sorted(licenses),
+        "exceptions": sorted(exceptions),
+    }
+
+
 def validate_spdx_expression(expression: str, errors: list, path: Path) -> None:
+    # license-expression silently drops a trailing AND/OR after two or more
+    # operands ("MIT AND Apache-2.0 AND" parses as "MIT AND Apache-2.0").
+    # A dangling operator is malformed SPDX, so reject it explicitly
+    # (decision-log entry 130).
+    words = [word for word in re.split(r"[\s()]+", expression) if word]
+    if words and words[-1].lower() in {"and", "or", "with"}:
+        fail(
+            errors,
+            "contract.invalid_licensing_spdx",
+            str(path),
+            f"licensing.spdx_expression ends with a dangling '{words[-1]}' operator "
+            "(spec 025 FR-003)",
+        )
+        return
     if get_spdx_licensing is None:
         fail(
             errors,
