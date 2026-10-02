@@ -32,6 +32,27 @@ Release as the WASM artifact before you open the PR. Already-published
 versions are never re-judged; to bring one into compliance, publish a new
 MINOR version.
 
+## Admission fixture corpus
+
+[`scripts/ci/fixtures/ai_admission_corpus.json`](../scripts/ci/fixtures/ai_admission_corpus.json)
+lists accept/reject `ai` objects together with the exact error codes that
+`capability_validation.py` produces for them. It covers both spec 001
+FR-017 and the rights record above. The test
+`scripts/ci/tests/test_ai_admission_corpus.py` runs every fixture through
+the validator, so any change in CI's verdict on a fixture fails the build.
+
+`traverse-cli capability publish` vendors a pinned copy and must agree with
+every fixture tagged `contract_decidable` and evaluated as `newly_added`.
+That is how a publisher sees these errors before a Registry PR exists.
+Fixtures tagged `ci_only` cover the checks only CI can run: evidence digest
+fetches and the `model-weights.json` cross-check.
+
+**When you change an `ai` rule, add or update fixtures in the same PR** and
+bump `corpus_version`. Use a minor bump for a new fixture, and a major bump
+when an existing fixture's verdict changes. A rule change without a fixture
+change is incomplete. The Traverse pin is then bumped deliberately in a
+Traverse PR.
+
 ## Signing and revocation
 
 - **Contract signature.** Every new `signature.json` covers the exact committed
