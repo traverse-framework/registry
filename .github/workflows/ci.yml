@@ -105,6 +105,11 @@ jobs:
       - name: Run capability validation unit tests
         run: python3 -m unittest scripts/ci/tests/test_capability_validation.py -v
 
+      # decision-log entry 129 (registry#627): the ai admission fixture corpus
+      # that traverse-cli `capability publish` vendors for local parity.
+      - name: Run ai admission corpus parity test
+        run: python3 -m unittest scripts/ci/tests/test_ai_admission_corpus.py -v
+
       # specs/022-publication-lifecycle-measurement (registry#354, decision-log
       # entry 83). Rides this already-required job rather than a new required
       # check -- making a new job required is an owner-only branch-protection

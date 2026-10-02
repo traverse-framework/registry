@@ -575,6 +575,61 @@ def _ai_models_shape_ok(models: list, path: Path, errors: list) -> bool:
     return ok
 
 
+def validate_ai_declaration(path: Path, contract: dict, errors: list) -> None:
+    """Whole-tree spec 001 FR-017 check of a contract's optional `ai` object.
+    Split out of validate_contract so the ai admission fixture corpus
+    (scripts/ci/fixtures/ai_admission_corpus.json, decision-log entry 129)
+    can drive exactly the code CI runs."""
+    # spec 001 FR-017 (added decision-log entry 104; amended decision-log
+    # entry 124 / registry#571): optional `ai` object marking a model-backed
+    # capability ("agent"). Whole-tree check like service_type -- accepts
+    # BOTH the legacy `models: string[]` shape (grandfathered forever, since
+    # already-published immutable versions can never be edited to the new
+    # shape) and the new `models: object[]` shape (pinned HF/provenance
+    # attribution: id, spdx_expression, attribution_required, plus either
+    # huggingface_id+revision or source_url). Newly-ADDED contracts are
+    # additionally REQUIRED to use the object shape -- see
+    # check_new_contracts_declare_ai_models_object_shape's forward gate.
+    ai = contract.get("ai")
+    if ai is not None:
+        if not isinstance(ai, dict):
+            fail(
+                errors,
+                "contract.invalid_ai",
+                str(path),
+                "contract 'ai' must be an object {model_backed: boolean, models?: string[] | object[]} (spec 001 FR-017)",
+            )
+        else:
+            model_backed = ai.get("model_backed")
+            models = ai.get("models")
+            models_well_formed = models is None or (
+                isinstance(models, list) and _ai_models_shape_ok(models, path, errors)
+            )
+            if not isinstance(model_backed, bool):
+                fail(
+                    errors,
+                    "contract.invalid_ai",
+                    str(path),
+                    "ai.model_backed must be a boolean (spec 001 FR-017)",
+                )
+            if models is not None and not isinstance(models, list):
+                fail(
+                    errors,
+                    "contract.invalid_ai",
+                    str(path),
+                    "ai.models must be an array of non-empty strings or model-reference objects (spec 001 FR-017)",
+                )
+            if model_backed is True and not (
+                models_well_formed and isinstance(models, list) and len(models) > 0
+            ):
+                fail(
+                    errors,
+                    "contract.invalid_ai",
+                    str(path),
+                    "ai.model_backed: true requires a non-empty ai.models array (spec 001 FR-017)",
+                )
+
+
 def validate_contract(path: Path, errors: list) -> None:
     try:
         contract = json.loads(path.read_text())
@@ -646,54 +701,7 @@ def validate_contract(path: Path, errors: list) -> None:
             "(traverse-framework/traverse spec 014-service-type-taxonomy)",
         )
 
-    # spec 001 FR-017 (added decision-log entry 104; amended decision-log
-    # entry 124 / registry#571): optional `ai` object marking a model-backed
-    # capability ("agent"). Whole-tree check like service_type -- accepts
-    # BOTH the legacy `models: string[]` shape (grandfathered forever, since
-    # already-published immutable versions can never be edited to the new
-    # shape) and the new `models: object[]` shape (pinned HF/provenance
-    # attribution: id, spdx_expression, attribution_required, plus either
-    # huggingface_id+revision or source_url). Newly-ADDED contracts are
-    # additionally REQUIRED to use the object shape -- see
-    # check_new_contracts_declare_ai_models_object_shape's forward gate.
-    ai = contract.get("ai")
-    if ai is not None:
-        if not isinstance(ai, dict):
-            fail(
-                errors,
-                "contract.invalid_ai",
-                str(path),
-                "contract 'ai' must be an object {model_backed: boolean, models?: string[] | object[]} (spec 001 FR-017)",
-            )
-        else:
-            model_backed = ai.get("model_backed")
-            models = ai.get("models")
-            models_well_formed = models is None or (
-                isinstance(models, list) and _ai_models_shape_ok(models, path, errors)
-            )
-            if not isinstance(model_backed, bool):
-                fail(
-                    errors,
-                    "contract.invalid_ai",
-                    str(path),
-                    "ai.model_backed must be a boolean (spec 001 FR-017)",
-                )
-            if models is not None and not isinstance(models, list):
-                fail(
-                    errors,
-                    "contract.invalid_ai",
-                    str(path),
-                    "ai.models must be an array of non-empty strings or model-reference objects (spec 001 FR-017)",
-                )
-            if model_backed is True and not (
-                models_well_formed and isinstance(models, list) and len(models) > 0
-            ):
-                fail(
-                    errors,
-                    "contract.invalid_ai",
-                    str(path),
-                    "ai.model_backed: true requires a non-empty ai.models array (spec 001 FR-017)",
-                )
+    validate_ai_declaration(path, contract, errors)
 
     # specs/025-capability-licensing-metadata: optional `licensing` object.
     # Whole-tree when present (like `ai`); required-on-new-versions is a
@@ -1641,7 +1649,7 @@ def _check_derivation(prefix: str, model_ref: dict, weight_digests: set, path: P
     if (
         not isinstance(transformations, list)
         or not transformations
-        or any(t not in MODEL_DERIVATION_TRANSFORMATIONS for t in transformations)
+        or any(not isinstance(t, str) or t not in MODEL_DERIVATION_TRANSFORMATIONS for t in transformations)
     ):
         fail(
             errors,
@@ -1705,7 +1713,8 @@ def _check_data_obligations(prefix: str, obligations, path: Path, errors: list) 
                     str(path),
                     f"{label}.{key} must be a non-empty string (spec 026 FR-007)",
                 )
-        if entry.get("kind") not in MODEL_DATA_OBLIGATION_KINDS:
+        kind = entry.get("kind")
+        if not isinstance(kind, str) or kind not in MODEL_DATA_OBLIGATION_KINDS:
             fail(
                 errors,
                 "contract.invalid_model_data_obligations",
@@ -1749,7 +1758,7 @@ def check_model_ref_rights(
                 f"{prefix}.{field} is 'unknown'; the Registry redistributes these weights, so "
                 "model rights must be researched and declared (spec 026 FR-002)",
             )
-        elif value not in LICENSING_RIGHTS_VALUES:
+        elif not isinstance(value, str) or value not in LICENSING_RIGHTS_VALUES:
             fail(
                 errors,
                 "contract.invalid_model_rights",
@@ -1798,8 +1807,12 @@ def check_model_ref_rights(
         verification = {}
     else:
         status = verification.get("status")
-        if status not in LICENSING_VERIFICATION_STATUSES_V1:
-            reserved = " (reserved until a review process exists)" if status in LICENSING_VERIFICATION_STATUSES_RESERVED else ""
+        if not isinstance(status, str) or status not in LICENSING_VERIFICATION_STATUSES_V1:
+            reserved = (
+                " (reserved until a review process exists)"
+                if isinstance(status, str) and status in LICENSING_VERIFICATION_STATUSES_RESERVED
+                else ""
+            )
             fail(
                 errors,
                 "contract.invalid_model_rights_verification",

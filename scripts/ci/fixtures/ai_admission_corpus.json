@@ -1,0 +1,3685 @@
+{
+  "corpus_version": "1.0.0",
+  "description": "Registry-owned accept/reject fixtures for the contract `ai` admission rules (spec 001 FR-017, spec 026). Each fixture is evaluated on a minimal contract carrying only the fixture's `ai` value (no `ai` key when the fixture has none). `existing` runs only the whole-tree ai check; `newly_added` also runs the new-contract forward gates (object shape, spec 026 rights). `contract_decidable` fixtures assume every ci_only check passes: no network fetch, and every declared derivation.converted_sha256 is listed in model-weights.json. `ci_only` fixtures supply that context in `ci_context`. Cross-contract rights drift is not modelled. `expect_codes` is the sorted set of distinct CI error codes; `expect` is `accept` exactly when it is empty. Downstream: traverse-cli `capability publish` must agree with every `contract_decidable` + `newly_added` fixture (traverse Spec 056 v1.1.0 FR-019).",
+  "governing_specs": [
+    "001-registry-foundation FR-017",
+    "026-model-rights-compliance"
+  ],
+  "decision": "decision-log entry 129 (traverse Decision 109)",
+  "license_expression_version": "30.4.4",
+  "ci_only_codes": [
+    "contract.model_derivation_digest_unlisted",
+    "contract.model_rights_drift",
+    "contract.model_rights_evidence_digest_mismatch",
+    "contract.model_rights_evidence_unreachable"
+  ],
+  "fixtures": [
+    {
+      "name": "ai-absent",
+      "description": "No ai object: a plain deterministic capability.",
+      "tier": "contract_decidable",
+      "evaluated_as": "newly_added",
+      "expect": "accept",
+      "expect_codes": []
+    },
+    {
+      "name": "ai-null",
+      "description": "null is treated exactly like an absent ai object.",
+      "tier": "contract_decidable",
+      "evaluated_as": "newly_added",
+      "ai": null,
+      "expect": "accept",
+      "expect_codes": []
+    },
+    {
+      "name": "ai-not-object-string",
+      "tier": "contract_decidable",
+      "evaluated_as": "newly_added",
+      "ai": "model",
+      "expect": "reject",
+      "expect_codes": [
+        "contract.invalid_ai"
+      ]
+    },
+    {
+      "name": "ai-not-object-array",
+      "tier": "contract_decidable",
+      "evaluated_as": "newly_added",
+      "ai": [],
+      "expect": "reject",
+      "expect_codes": [
+        "contract.invalid_ai"
+      ]
+    },
+    {
+      "name": "model-backed-missing",
+      "tier": "contract_decidable",
+      "evaluated_as": "newly_added",
+      "ai": {},
+      "expect": "reject",
+      "expect_codes": [
+        "contract.invalid_ai"
+      ]
+    },
+    {
+      "name": "model-backed-missing-with-models",
+      "tier": "contract_decidable",
+      "evaluated_as": "newly_added",
+      "ai": {
+        "models": []
+      },
+      "expect": "reject",
+      "expect_codes": [
+        "contract.invalid_ai"
+      ]
+    },
+    {
+      "name": "model-backed-not-boolean",
+      "tier": "contract_decidable",
+      "evaluated_as": "newly_added",
+      "ai": {
+        "model_backed": "true"
+      },
+      "expect": "reject",
+      "expect_codes": [
+        "contract.invalid_ai"
+      ]
+    },
+    {
+      "name": "non-model-backed-no-models",
+      "tier": "contract_decidable",
+      "evaluated_as": "newly_added",
+      "ai": {
+        "model_backed": false
+      },
+      "expect": "accept",
+      "expect_codes": []
+    },
+    {
+      "name": "non-model-backed-empty-models",
+      "tier": "contract_decidable",
+      "evaluated_as": "newly_added",
+      "ai": {
+        "model_backed": false,
+        "models": []
+      },
+      "expect": "accept",
+      "expect_codes": []
+    },
+    {
+      "name": "non-model-backed-legacy-strings",
+      "tier": "contract_decidable",
+      "evaluated_as": "newly_added",
+      "ai": {
+        "model_backed": false,
+        "models": [
+          "example-org/example-model"
+        ]
+      },
+      "expect": "accept",
+      "expect_codes": []
+    },
+    {
+      "name": "non-model-backed-legacy-blank-string",
+      "tier": "contract_decidable",
+      "evaluated_as": "newly_added",
+      "ai": {
+        "model_backed": false,
+        "models": [
+          " "
+        ]
+      },
+      "expect": "reject",
+      "expect_codes": [
+        "contract.invalid_ai"
+      ]
+    },
+    {
+      "name": "non-model-backed-non-string-entry",
+      "tier": "contract_decidable",
+      "evaluated_as": "newly_added",
+      "ai": {
+        "model_backed": false,
+        "models": [
+          42
+        ]
+      },
+      "expect": "reject",
+      "expect_codes": [
+        "contract.invalid_ai"
+      ]
+    },
+    {
+      "name": "non-model-backed-object-without-rights",
+      "description": "Spec 026 rights apply only to model_backed: true contracts.",
+      "tier": "contract_decidable",
+      "evaluated_as": "newly_added",
+      "ai": {
+        "model_backed": false,
+        "models": [
+          {
+            "id": "example-model",
+            "spdx_expression": "Apache-2.0",
+            "attribution_required": true,
+            "huggingface_id": "example-org/example-model",
+            "revision": "0123456789abcdef0123456789abcdef01234567"
+          }
+        ]
+      },
+      "expect": "accept",
+      "expect_codes": []
+    },
+    {
+      "name": "model-backed-models-absent",
+      "tier": "contract_decidable",
+      "evaluated_as": "newly_added",
+      "ai": {
+        "model_backed": true
+      },
+      "expect": "reject",
+      "expect_codes": [
+        "contract.invalid_ai"
+      ]
+    },
+    {
+      "name": "model-backed-models-empty",
+      "tier": "contract_decidable",
+      "evaluated_as": "newly_added",
+      "ai": {
+        "model_backed": true,
+        "models": []
+      },
+      "expect": "reject",
+      "expect_codes": [
+        "contract.invalid_ai"
+      ]
+    },
+    {
+      "name": "model-backed-models-not-array",
+      "tier": "contract_decidable",
+      "evaluated_as": "newly_added",
+      "ai": {
+        "model_backed": true,
+        "models": "example-org/example-model"
+      },
+      "expect": "reject",
+      "expect_codes": [
+        "contract.invalid_ai"
+      ]
+    },
+    {
+      "name": "model-backed-legacy-strings-new",
+      "description": "Legacy string[] is grandfathered on existing contracts only.",
+      "tier": "contract_decidable",
+      "evaluated_as": "newly_added",
+      "ai": {
+        "model_backed": true,
+        "models": [
+          "example-org/example-model"
+        ]
+      },
+      "expect": "reject",
+      "expect_codes": [
+        "contract.ai_models_legacy_shape_on_new_contract"
+      ]
+    },
+    {
+      "name": "model-backed-legacy-strings-existing",
+      "tier": "contract_decidable",
+      "evaluated_as": "existing",
+      "ai": {
+        "model_backed": true,
+        "models": [
+          "example-org/example-model"
+        ]
+      },
+      "expect": "accept",
+      "expect_codes": []
+    },
+    {
+      "name": "model-backed-pre-026-object-existing",
+      "tier": "contract_decidable",
+      "evaluated_as": "existing",
+      "ai": {
+        "model_backed": true,
+        "models": [
+          {
+            "id": "example-model",
+            "spdx_expression": "Apache-2.0",
+            "attribution_required": true,
+            "huggingface_id": "example-org/example-model",
+            "revision": "0123456789abcdef0123456789abcdef01234567"
+          }
+        ]
+      },
+      "expect": "accept",
+      "expect_codes": []
+    },
+    {
+      "name": "model-backed-mixed-shapes",
+      "tier": "contract_decidable",
+      "evaluated_as": "newly_added",
+      "ai": {
+        "model_backed": true,
+        "models": [
+          {
+            "id": "example-model",
+            "spdx_expression": "Apache-2.0",
+            "attribution_required": true,
+            "huggingface_id": "example-org/example-model",
+            "revision": "0123456789abcdef0123456789abcdef01234567",
+            "commercial_use": "allowed",
+            "redistribution": "allowed",
+            "derivatives": "allowed",
+            "license_files": [
+              {
+                "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/example.detect-things-1.0.0/LICENSE",
+                "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+              }
+            ],
+            "notice_files": [
+              {
+                "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/example.detect-things-1.0.0/NOTICE",
+                "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+              }
+            ],
+            "verification": {
+              "status": "maintainer-declared"
+            },
+            "derivation": null
+          },
+          "example-org/example-model"
+        ]
+      },
+      "expect": "reject",
+      "expect_codes": [
+        "contract.ai_models_legacy_shape_on_new_contract",
+        "contract.invalid_ai"
+      ]
+    },
+    {
+      "name": "model-backed-empty-object",
+      "tier": "contract_decidable",
+      "evaluated_as": "newly_added",
+      "ai": {
+        "model_backed": true,
+        "models": [
+          {}
+        ]
+      },
+      "expect": "reject",
+      "expect_codes": [
+        "contract.invalid_ai",
+        "contract.invalid_model_rights",
+        "contract.invalid_model_rights_verification",
+        "contract.model_rights_missing_derivation",
+        "contract.model_rights_mutable_revision"
+      ]
+    },
+    {
+      "name": "model-backed-invalid-existing",
+      "tier": "contract_decidable",
+      "evaluated_as": "existing",
+      "ai": {
+        "model_backed": true,
+        "models": []
+      },
+      "expect": "reject",
+      "expect_codes": [
+        "contract.invalid_ai"
+      ]
+    },
+    {
+      "name": "valid-hf-pin",
+      "tier": "contract_decidable",
+      "evaluated_as": "newly_added",
+      "ai": {
+        "model_backed": true,
+        "models": [
+          {
+            "id": "example-model",
+            "spdx_expression": "Apache-2.0",
+            "attribution_required": true,
+            "huggingface_id": "example-org/example-model",
+            "revision": "0123456789abcdef0123456789abcdef01234567",
+            "commercial_use": "allowed",
+            "redistribution": "allowed",
+            "derivatives": "allowed",
+            "license_files": [
+              {
+                "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/example.detect-things-1.0.0/LICENSE",
+                "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+              }
+            ],
+            "notice_files": [
+              {
+                "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/example.detect-things-1.0.0/NOTICE",
+                "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+              }
+            ],
+            "verification": {
+              "status": "maintainer-declared"
+            },
+            "derivation": null
+          }
+        ]
+      },
+      "expect": "accept",
+      "expect_codes": []
+    },
+    {
+      "name": "valid-hf-pin-64-hex",
+      "tier": "contract_decidable",
+      "evaluated_as": "newly_added",
+      "ai": {
+        "model_backed": true,
+        "models": [
+          {
+            "id": "example-model",
+            "spdx_expression": "Apache-2.0",
+            "attribution_required": true,
+            "huggingface_id": "example-org/example-model",
+            "revision": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+            "commercial_use": "allowed",
+            "redistribution": "allowed",
+            "derivatives": "allowed",
+            "license_files": [
+              {
+                "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/example.detect-things-1.0.0/LICENSE",
+                "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+              }
+            ],
+            "notice_files": [
+              {
+                "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/example.detect-things-1.0.0/NOTICE",
+                "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+              }
+            ],
+            "verification": {
+              "status": "maintainer-declared"
+            },
+            "derivation": null
+          }
+        ]
+      },
+      "expect": "accept",
+      "expect_codes": []
+    },
+    {
+      "name": "valid-source-url-commit",
+      "tier": "contract_decidable",
+      "evaluated_as": "newly_added",
+      "ai": {
+        "model_backed": true,
+        "models": [
+          {
+            "id": "example-model",
+            "spdx_expression": "Apache-2.0",
+            "attribution_required": true,
+            "commercial_use": "allowed",
+            "redistribution": "allowed",
+            "derivatives": "allowed",
+            "license_files": [
+              {
+                "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/example.detect-things-1.0.0/LICENSE",
+                "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+              }
+            ],
+            "notice_files": [
+              {
+                "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/example.detect-things-1.0.0/NOTICE",
+                "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+              }
+            ],
+            "verification": {
+              "status": "maintainer-declared"
+            },
+            "derivation": null,
+            "source_url": "https://github.com/example-org/example-model/blob/0123456789abcdef0123456789abcdef01234567/model.onnx"
+          }
+        ]
+      },
+      "expect": "accept",
+      "expect_codes": []
+    },
+    {
+      "name": "valid-source-url-uppercase-scheme",
+      "tier": "contract_decidable",
+      "evaluated_as": "newly_added",
+      "ai": {
+        "model_backed": true,
+        "models": [
+          {
+            "id": "example-model",
+            "spdx_expression": "Apache-2.0",
+            "attribution_required": true,
+            "commercial_use": "allowed",
+            "redistribution": "allowed",
+            "derivatives": "allowed",
+            "license_files": [
+              {
+                "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/example.detect-things-1.0.0/LICENSE",
+                "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+              }
+            ],
+            "notice_files": [
+              {
+                "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/example.detect-things-1.0.0/NOTICE",
+                "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+              }
+            ],
+            "verification": {
+              "status": "maintainer-declared"
+            },
+            "derivation": null,
+            "source_url": "HTTPS://github.com/example-org/example-model/blob/0123456789abcdef0123456789abcdef01234567/model.onnx"
+          }
+        ]
+      },
+      "expect": "accept",
+      "expect_codes": []
+    },
+    {
+      "name": "valid-two-models",
+      "tier": "contract_decidable",
+      "evaluated_as": "newly_added",
+      "ai": {
+        "model_backed": true,
+        "models": [
+          {
+            "id": "example-model",
+            "spdx_expression": "Apache-2.0",
+            "attribution_required": true,
+            "huggingface_id": "example-org/example-model",
+            "revision": "0123456789abcdef0123456789abcdef01234567",
+            "commercial_use": "allowed",
+            "redistribution": "allowed",
+            "derivatives": "allowed",
+            "license_files": [
+              {
+                "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/example.detect-things-1.0.0/LICENSE",
+                "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+              }
+            ],
+            "notice_files": [
+              {
+                "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/example.detect-things-1.0.0/NOTICE",
+                "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+              }
+            ],
+            "verification": {
+              "status": "maintainer-declared"
+            },
+            "derivation": null
+          },
+          {
+            "id": "second-model",
+            "spdx_expression": "Apache-2.0",
+            "attribution_required": true,
+            "huggingface_id": "example-org/second",
+            "revision": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+            "commercial_use": "allowed",
+            "redistribution": "allowed",
+            "derivatives": "allowed",
+            "license_files": [
+              {
+                "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/example.detect-things-1.0.0/LICENSE",
+                "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+              }
+            ],
+            "notice_files": [
+              {
+                "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/example.detect-things-1.0.0/NOTICE",
+                "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+              }
+            ],
+            "verification": {
+              "status": "maintainer-declared"
+            },
+            "derivation": null
+          }
+        ]
+      },
+      "expect": "accept",
+      "expect_codes": []
+    },
+    {
+      "name": "valid-no-attribution-no-notice",
+      "tier": "contract_decidable",
+      "evaluated_as": "newly_added",
+      "ai": {
+        "model_backed": true,
+        "models": [
+          {
+            "id": "example-model",
+            "spdx_expression": "Apache-2.0",
+            "attribution_required": false,
+            "huggingface_id": "example-org/example-model",
+            "revision": "0123456789abcdef0123456789abcdef01234567",
+            "commercial_use": "allowed",
+            "redistribution": "allowed",
+            "derivatives": "allowed",
+            "license_files": [
+              {
+                "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/example.detect-things-1.0.0/LICENSE",
+                "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+              }
+            ],
+            "verification": {
+              "status": "maintainer-declared"
+            },
+            "derivation": null
+          }
+        ]
+      },
+      "expect": "accept",
+      "expect_codes": []
+    },
+    {
+      "name": "valid-copyright-string",
+      "tier": "contract_decidable",
+      "evaluated_as": "newly_added",
+      "ai": {
+        "model_backed": true,
+        "models": [
+          {
+            "id": "example-model",
+            "spdx_expression": "Apache-2.0",
+            "attribution_required": true,
+            "huggingface_id": "example-org/example-model",
+            "revision": "0123456789abcdef0123456789abcdef01234567",
+            "commercial_use": "allowed",
+            "redistribution": "allowed",
+            "derivatives": "allowed",
+            "license_files": [
+              {
+                "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/example.detect-things-1.0.0/LICENSE",
+                "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+              }
+            ],
+            "notice_files": [
+              {
+                "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/example.detect-things-1.0.0/NOTICE",
+                "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+              }
+            ],
+            "verification": {
+              "status": "maintainer-declared"
+            },
+            "derivation": null,
+            "copyright": "Example Authors"
+          }
+        ]
+      },
+      "expect": "accept",
+      "expect_codes": []
+    },
+    {
+      "name": "valid-copyright-null",
+      "tier": "contract_decidable",
+      "evaluated_as": "newly_added",
+      "ai": {
+        "model_backed": true,
+        "models": [
+          {
+            "id": "example-model",
+            "spdx_expression": "Apache-2.0",
+            "attribution_required": true,
+            "huggingface_id": "example-org/example-model",
+            "revision": "0123456789abcdef0123456789abcdef01234567",
+            "commercial_use": "allowed",
+            "redistribution": "allowed",
+            "derivatives": "allowed",
+            "license_files": [
+              {
+                "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/example.detect-things-1.0.0/LICENSE",
+                "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+              }
+            ],
+            "notice_files": [
+              {
+                "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/example.detect-things-1.0.0/NOTICE",
+                "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+              }
+            ],
+            "verification": {
+              "status": "maintainer-declared"
+            },
+            "derivation": null,
+            "copyright": null
+          }
+        ]
+      },
+      "expect": "accept",
+      "expect_codes": []
+    },
+    {
+      "name": "valid-hf-id-non-string-with-source-url",
+      "description": "With source_url present, a non-string huggingface_id is not itself an error.",
+      "tier": "contract_decidable",
+      "evaluated_as": "newly_added",
+      "ai": {
+        "model_backed": true,
+        "models": [
+          {
+            "id": "example-model",
+            "spdx_expression": "Apache-2.0",
+            "attribution_required": true,
+            "huggingface_id": 42,
+            "commercial_use": "allowed",
+            "redistribution": "allowed",
+            "derivatives": "allowed",
+            "license_files": [
+              {
+                "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/example.detect-things-1.0.0/LICENSE",
+                "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+              }
+            ],
+            "notice_files": [
+              {
+                "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/example.detect-things-1.0.0/NOTICE",
+                "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+              }
+            ],
+            "verification": {
+              "status": "maintainer-declared"
+            },
+            "derivation": null,
+            "source_url": "https://github.com/example-org/example-model/blob/0123456789abcdef0123456789abcdef01234567/model.onnx"
+          }
+        ]
+      },
+      "expect": "accept",
+      "expect_codes": []
+    },
+    {
+      "name": "id-missing",
+      "tier": "contract_decidable",
+      "evaluated_as": "newly_added",
+      "ai": {
+        "model_backed": true,
+        "models": [
+          {
+            "spdx_expression": "Apache-2.0",
+            "attribution_required": true,
+            "huggingface_id": "example-org/example-model",
+            "revision": "0123456789abcdef0123456789abcdef01234567",
+            "commercial_use": "allowed",
+            "redistribution": "allowed",
+            "derivatives": "allowed",
+            "license_files": [
+              {
+                "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/example.detect-things-1.0.0/LICENSE",
+                "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+              }
+            ],
+            "notice_files": [
+              {
+                "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/example.detect-things-1.0.0/NOTICE",
+                "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+              }
+            ],
+            "verification": {
+              "status": "maintainer-declared"
+            },
+            "derivation": null
+          }
+        ]
+      },
+      "expect": "reject",
+      "expect_codes": [
+        "contract.invalid_ai"
+      ]
+    },
+    {
+      "name": "id-blank",
+      "tier": "contract_decidable",
+      "evaluated_as": "newly_added",
+      "ai": {
+        "model_backed": true,
+        "models": [
+          {
+            "id": "  ",
+            "spdx_expression": "Apache-2.0",
+            "attribution_required": true,
+            "huggingface_id": "example-org/example-model",
+            "revision": "0123456789abcdef0123456789abcdef01234567",
+            "commercial_use": "allowed",
+            "redistribution": "allowed",
+            "derivatives": "allowed",
+            "license_files": [
+              {
+                "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/example.detect-things-1.0.0/LICENSE",
+                "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+              }
+            ],
+            "notice_files": [
+              {
+                "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/example.detect-things-1.0.0/NOTICE",
+                "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+              }
+            ],
+            "verification": {
+              "status": "maintainer-declared"
+            },
+            "derivation": null
+          }
+        ]
+      },
+      "expect": "reject",
+      "expect_codes": [
+        "contract.invalid_ai"
+      ]
+    },
+    {
+      "name": "spdx-missing",
+      "tier": "contract_decidable",
+      "evaluated_as": "newly_added",
+      "ai": {
+        "model_backed": true,
+        "models": [
+          {
+            "id": "example-model",
+            "attribution_required": true,
+            "huggingface_id": "example-org/example-model",
+            "revision": "0123456789abcdef0123456789abcdef01234567",
+            "commercial_use": "allowed",
+            "redistribution": "allowed",
+            "derivatives": "allowed",
+            "license_files": [
+              {
+                "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/example.detect-things-1.0.0/LICENSE",
+                "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+              }
+            ],
+            "notice_files": [
+              {
+                "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/example.detect-things-1.0.0/NOTICE",
+                "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+              }
+            ],
+            "verification": {
+              "status": "maintainer-declared"
+            },
+            "derivation": null
+          }
+        ]
+      },
+      "expect": "reject",
+      "expect_codes": [
+        "contract.invalid_ai"
+      ]
+    },
+    {
+      "name": "spdx-blank",
+      "tier": "contract_decidable",
+      "evaluated_as": "newly_added",
+      "ai": {
+        "model_backed": true,
+        "models": [
+          {
+            "id": "example-model",
+            "spdx_expression": "",
+            "attribution_required": true,
+            "huggingface_id": "example-org/example-model",
+            "revision": "0123456789abcdef0123456789abcdef01234567",
+            "commercial_use": "allowed",
+            "redistribution": "allowed",
+            "derivatives": "allowed",
+            "license_files": [
+              {
+                "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/example.detect-things-1.0.0/LICENSE",
+                "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+              }
+            ],
+            "notice_files": [
+              {
+                "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/example.detect-things-1.0.0/NOTICE",
+                "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+              }
+            ],
+            "verification": {
+              "status": "maintainer-declared"
+            },
+            "derivation": null
+          }
+        ]
+      },
+      "expect": "reject",
+      "expect_codes": [
+        "contract.invalid_ai"
+      ]
+    },
+    {
+      "name": "attribution-required-not-boolean",
+      "tier": "contract_decidable",
+      "evaluated_as": "newly_added",
+      "ai": {
+        "model_backed": true,
+        "models": [
+          {
+            "id": "example-model",
+            "spdx_expression": "Apache-2.0",
+            "attribution_required": "yes",
+            "huggingface_id": "example-org/example-model",
+            "revision": "0123456789abcdef0123456789abcdef01234567",
+            "commercial_use": "allowed",
+            "redistribution": "allowed",
+            "derivatives": "allowed",
+            "license_files": [
+              {
+                "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/example.detect-things-1.0.0/LICENSE",
+                "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+              }
+            ],
+            "notice_files": [
+              {
+                "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/example.detect-things-1.0.0/NOTICE",
+                "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+              }
+            ],
+            "verification": {
+              "status": "maintainer-declared"
+            },
+            "derivation": null
+          }
+        ]
+      },
+      "expect": "reject",
+      "expect_codes": [
+        "contract.invalid_ai"
+      ]
+    },
+    {
+      "name": "pin-missing",
+      "tier": "contract_decidable",
+      "evaluated_as": "newly_added",
+      "ai": {
+        "model_backed": true,
+        "models": [
+          {
+            "id": "example-model",
+            "spdx_expression": "Apache-2.0",
+            "attribution_required": true,
+            "commercial_use": "allowed",
+            "redistribution": "allowed",
+            "derivatives": "allowed",
+            "license_files": [
+              {
+                "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/example.detect-things-1.0.0/LICENSE",
+                "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+              }
+            ],
+            "notice_files": [
+              {
+                "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/example.detect-things-1.0.0/NOTICE",
+                "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+              }
+            ],
+            "verification": {
+              "status": "maintainer-declared"
+            },
+            "derivation": null
+          }
+        ]
+      },
+      "expect": "reject",
+      "expect_codes": [
+        "contract.invalid_ai",
+        "contract.model_rights_mutable_revision"
+      ]
+    },
+    {
+      "name": "hf-id-without-revision",
+      "tier": "contract_decidable",
+      "evaluated_as": "newly_added",
+      "ai": {
+        "model_backed": true,
+        "models": [
+          {
+            "id": "example-model",
+            "spdx_expression": "Apache-2.0",
+            "attribution_required": true,
+            "huggingface_id": "example-org/example-model",
+            "commercial_use": "allowed",
+            "redistribution": "allowed",
+            "derivatives": "allowed",
+            "license_files": [
+              {
+                "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/example.detect-things-1.0.0/LICENSE",
+                "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+              }
+            ],
+            "notice_files": [
+              {
+                "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/example.detect-things-1.0.0/NOTICE",
+                "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+              }
+            ],
+            "verification": {
+              "status": "maintainer-declared"
+            },
+            "derivation": null
+          }
+        ]
+      },
+      "expect": "reject",
+      "expect_codes": [
+        "contract.invalid_ai",
+        "contract.model_rights_mutable_revision"
+      ]
+    },
+    {
+      "name": "revision-blank",
+      "tier": "contract_decidable",
+      "evaluated_as": "newly_added",
+      "ai": {
+        "model_backed": true,
+        "models": [
+          {
+            "id": "example-model",
+            "spdx_expression": "Apache-2.0",
+            "attribution_required": true,
+            "huggingface_id": "example-org/example-model",
+            "revision": " ",
+            "commercial_use": "allowed",
+            "redistribution": "allowed",
+            "derivatives": "allowed",
+            "license_files": [
+              {
+                "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/example.detect-things-1.0.0/LICENSE",
+                "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+              }
+            ],
+            "notice_files": [
+              {
+                "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/example.detect-things-1.0.0/NOTICE",
+                "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+              }
+            ],
+            "verification": {
+              "status": "maintainer-declared"
+            },
+            "derivation": null
+          }
+        ]
+      },
+      "expect": "reject",
+      "expect_codes": [
+        "contract.invalid_ai",
+        "contract.model_rights_mutable_revision"
+      ]
+    },
+    {
+      "name": "source-url-http",
+      "tier": "contract_decidable",
+      "evaluated_as": "newly_added",
+      "ai": {
+        "model_backed": true,
+        "models": [
+          {
+            "id": "example-model",
+            "spdx_expression": "Apache-2.0",
+            "attribution_required": true,
+            "commercial_use": "allowed",
+            "redistribution": "allowed",
+            "derivatives": "allowed",
+            "license_files": [
+              {
+                "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/example.detect-things-1.0.0/LICENSE",
+                "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+              }
+            ],
+            "notice_files": [
+              {
+                "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/example.detect-things-1.0.0/NOTICE",
+                "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+              }
+            ],
+            "verification": {
+              "status": "maintainer-declared"
+            },
+            "derivation": null,
+            "source_url": "http://github.com/example-org/example-model/blob/0123456789abcdef0123456789abcdef01234567/model.onnx"
+          }
+        ]
+      },
+      "expect": "reject",
+      "expect_codes": [
+        "contract.invalid_ai"
+      ]
+    },
+    {
+      "name": "source-url-credentials",
+      "tier": "contract_decidable",
+      "evaluated_as": "newly_added",
+      "ai": {
+        "model_backed": true,
+        "models": [
+          {
+            "id": "example-model",
+            "spdx_expression": "Apache-2.0",
+            "attribution_required": true,
+            "commercial_use": "allowed",
+            "redistribution": "allowed",
+            "derivatives": "allowed",
+            "license_files": [
+              {
+                "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/example.detect-things-1.0.0/LICENSE",
+                "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+              }
+            ],
+            "notice_files": [
+              {
+                "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/example.detect-things-1.0.0/NOTICE",
+                "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+              }
+            ],
+            "verification": {
+              "status": "maintainer-declared"
+            },
+            "derivation": null,
+            "source_url": "https://user:secret@github.com/example-org/example-model/blob/0123456789abcdef0123456789abcdef01234567/model.onnx"
+          }
+        ]
+      },
+      "expect": "reject",
+      "expect_codes": [
+        "contract.invalid_ai"
+      ]
+    },
+    {
+      "name": "source-url-relative",
+      "tier": "contract_decidable",
+      "evaluated_as": "newly_added",
+      "ai": {
+        "model_backed": true,
+        "models": [
+          {
+            "id": "example-model",
+            "spdx_expression": "Apache-2.0",
+            "attribution_required": true,
+            "commercial_use": "allowed",
+            "redistribution": "allowed",
+            "derivatives": "allowed",
+            "license_files": [
+              {
+                "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/example.detect-things-1.0.0/LICENSE",
+                "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+              }
+            ],
+            "notice_files": [
+              {
+                "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/example.detect-things-1.0.0/NOTICE",
+                "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+              }
+            ],
+            "verification": {
+              "status": "maintainer-declared"
+            },
+            "derivation": null,
+            "source_url": "/models/0123456789abcdef0123456789abcdef01234567"
+          }
+        ]
+      },
+      "expect": "reject",
+      "expect_codes": [
+        "contract.invalid_ai"
+      ]
+    },
+    {
+      "name": "copyright-not-string",
+      "tier": "contract_decidable",
+      "evaluated_as": "newly_added",
+      "ai": {
+        "model_backed": true,
+        "models": [
+          {
+            "id": "example-model",
+            "spdx_expression": "Apache-2.0",
+            "attribution_required": true,
+            "huggingface_id": "example-org/example-model",
+            "revision": "0123456789abcdef0123456789abcdef01234567",
+            "commercial_use": "allowed",
+            "redistribution": "allowed",
+            "derivatives": "allowed",
+            "license_files": [
+              {
+                "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/example.detect-things-1.0.0/LICENSE",
+                "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+              }
+            ],
+            "notice_files": [
+              {
+                "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/example.detect-things-1.0.0/NOTICE",
+                "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+              }
+            ],
+            "verification": {
+              "status": "maintainer-declared"
+            },
+            "derivation": null,
+            "copyright": 42
+          }
+        ]
+      },
+      "expect": "reject",
+      "expect_codes": [
+        "contract.invalid_ai"
+      ]
+    },
+    {
+      "name": "revision-branch",
+      "tier": "contract_decidable",
+      "evaluated_as": "newly_added",
+      "ai": {
+        "model_backed": true,
+        "models": [
+          {
+            "id": "example-model",
+            "spdx_expression": "Apache-2.0",
+            "attribution_required": true,
+            "huggingface_id": "example-org/example-model",
+            "revision": "main",
+            "commercial_use": "allowed",
+            "redistribution": "allowed",
+            "derivatives": "allowed",
+            "license_files": [
+              {
+                "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/example.detect-things-1.0.0/LICENSE",
+                "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+              }
+            ],
+            "notice_files": [
+              {
+                "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/example.detect-things-1.0.0/NOTICE",
+                "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+              }
+            ],
+            "verification": {
+              "status": "maintainer-declared"
+            },
+            "derivation": null
+          }
+        ]
+      },
+      "expect": "reject",
+      "expect_codes": [
+        "contract.model_rights_mutable_revision"
+      ]
+    },
+    {
+      "name": "revision-tag",
+      "tier": "contract_decidable",
+      "evaluated_as": "newly_added",
+      "ai": {
+        "model_backed": true,
+        "models": [
+          {
+            "id": "example-model",
+            "spdx_expression": "Apache-2.0",
+            "attribution_required": true,
+            "huggingface_id": "example-org/example-model",
+            "revision": "v1.0",
+            "commercial_use": "allowed",
+            "redistribution": "allowed",
+            "derivatives": "allowed",
+            "license_files": [
+              {
+                "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/example.detect-things-1.0.0/LICENSE",
+                "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+              }
+            ],
+            "notice_files": [
+              {
+                "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/example.detect-things-1.0.0/NOTICE",
+                "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+              }
+            ],
+            "verification": {
+              "status": "maintainer-declared"
+            },
+            "derivation": null
+          }
+        ]
+      },
+      "expect": "reject",
+      "expect_codes": [
+        "contract.model_rights_mutable_revision"
+      ]
+    },
+    {
+      "name": "revision-short-hex",
+      "tier": "contract_decidable",
+      "evaluated_as": "newly_added",
+      "ai": {
+        "model_backed": true,
+        "models": [
+          {
+            "id": "example-model",
+            "spdx_expression": "Apache-2.0",
+            "attribution_required": true,
+            "huggingface_id": "example-org/example-model",
+            "revision": "0123456",
+            "commercial_use": "allowed",
+            "redistribution": "allowed",
+            "derivatives": "allowed",
+            "license_files": [
+              {
+                "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/example.detect-things-1.0.0/LICENSE",
+                "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+              }
+            ],
+            "notice_files": [
+              {
+                "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/example.detect-things-1.0.0/NOTICE",
+                "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+              }
+            ],
+            "verification": {
+              "status": "maintainer-declared"
+            },
+            "derivation": null
+          }
+        ]
+      },
+      "expect": "reject",
+      "expect_codes": [
+        "contract.model_rights_mutable_revision"
+      ]
+    },
+    {
+      "name": "revision-uppercase-hex",
+      "tier": "contract_decidable",
+      "evaluated_as": "newly_added",
+      "ai": {
+        "model_backed": true,
+        "models": [
+          {
+            "id": "example-model",
+            "spdx_expression": "Apache-2.0",
+            "attribution_required": true,
+            "huggingface_id": "example-org/example-model",
+            "revision": "0123456789ABCDEF0123456789ABCDEF01234567",
+            "commercial_use": "allowed",
+            "redistribution": "allowed",
+            "derivatives": "allowed",
+            "license_files": [
+              {
+                "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/example.detect-things-1.0.0/LICENSE",
+                "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+              }
+            ],
+            "notice_files": [
+              {
+                "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/example.detect-things-1.0.0/NOTICE",
+                "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+              }
+            ],
+            "verification": {
+              "status": "maintainer-declared"
+            },
+            "derivation": null
+          }
+        ]
+      },
+      "expect": "reject",
+      "expect_codes": [
+        "contract.model_rights_mutable_revision"
+      ]
+    },
+    {
+      "name": "source-url-without-commit",
+      "tier": "contract_decidable",
+      "evaluated_as": "newly_added",
+      "ai": {
+        "model_backed": true,
+        "models": [
+          {
+            "id": "example-model",
+            "spdx_expression": "Apache-2.0",
+            "attribution_required": true,
+            "commercial_use": "allowed",
+            "redistribution": "allowed",
+            "derivatives": "allowed",
+            "license_files": [
+              {
+                "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/example.detect-things-1.0.0/LICENSE",
+                "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+              }
+            ],
+            "notice_files": [
+              {
+                "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/example.detect-things-1.0.0/NOTICE",
+                "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+              }
+            ],
+            "verification": {
+              "status": "maintainer-declared"
+            },
+            "derivation": null,
+            "source_url": "https://models.example.test/classifier"
+          }
+        ]
+      },
+      "expect": "reject",
+      "expect_codes": [
+        "contract.model_rights_mutable_revision"
+      ]
+    },
+    {
+      "name": "spdx-compound-or",
+      "tier": "contract_decidable",
+      "evaluated_as": "newly_added",
+      "ai": {
+        "model_backed": true,
+        "models": [
+          {
+            "id": "example-model",
+            "spdx_expression": "MIT OR Apache-2.0",
+            "attribution_required": true,
+            "huggingface_id": "example-org/example-model",
+            "revision": "0123456789abcdef0123456789abcdef01234567",
+            "commercial_use": "allowed",
+            "redistribution": "allowed",
+            "derivatives": "allowed",
+            "license_files": [
+              {
+                "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/example.detect-things-1.0.0/LICENSE",
+                "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+              }
+            ],
+            "notice_files": [
+              {
+                "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/example.detect-things-1.0.0/NOTICE",
+                "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+              }
+            ],
+            "verification": {
+              "status": "maintainer-declared"
+            },
+            "derivation": null
+          }
+        ]
+      },
+      "expect": "accept",
+      "expect_codes": []
+    },
+    {
+      "name": "spdx-with-exception",
+      "tier": "contract_decidable",
+      "evaluated_as": "newly_added",
+      "ai": {
+        "model_backed": true,
+        "models": [
+          {
+            "id": "example-model",
+            "spdx_expression": "Apache-2.0 WITH LLVM-exception",
+            "attribution_required": true,
+            "huggingface_id": "example-org/example-model",
+            "revision": "0123456789abcdef0123456789abcdef01234567",
+            "commercial_use": "allowed",
+            "redistribution": "allowed",
+            "derivatives": "allowed",
+            "license_files": [
+              {
+                "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/example.detect-things-1.0.0/LICENSE",
+                "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+              }
+            ],
+            "notice_files": [
+              {
+                "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/example.detect-things-1.0.0/NOTICE",
+                "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+              }
+            ],
+            "verification": {
+              "status": "maintainer-declared"
+            },
+            "derivation": null
+          }
+        ]
+      },
+      "expect": "accept",
+      "expect_codes": []
+    },
+    {
+      "name": "spdx-lowercase-id",
+      "tier": "contract_decidable",
+      "evaluated_as": "newly_added",
+      "ai": {
+        "model_backed": true,
+        "models": [
+          {
+            "id": "example-model",
+            "spdx_expression": "mit",
+            "attribution_required": true,
+            "huggingface_id": "example-org/example-model",
+            "revision": "0123456789abcdef0123456789abcdef01234567",
+            "commercial_use": "allowed",
+            "redistribution": "allowed",
+            "derivatives": "allowed",
+            "license_files": [
+              {
+                "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/example.detect-things-1.0.0/LICENSE",
+                "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+              }
+            ],
+            "notice_files": [
+              {
+                "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/example.detect-things-1.0.0/NOTICE",
+                "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+              }
+            ],
+            "verification": {
+              "status": "maintainer-declared"
+            },
+            "derivation": null
+          }
+        ]
+      },
+      "expect": "accept",
+      "expect_codes": []
+    },
+    {
+      "name": "spdx-lowercase-operator",
+      "tier": "contract_decidable",
+      "evaluated_as": "newly_added",
+      "ai": {
+        "model_backed": true,
+        "models": [
+          {
+            "id": "example-model",
+            "spdx_expression": "MIT or Apache-2.0",
+            "attribution_required": true,
+            "huggingface_id": "example-org/example-model",
+            "revision": "0123456789abcdef0123456789abcdef01234567",
+            "commercial_use": "allowed",
+            "redistribution": "allowed",
+            "derivatives": "allowed",
+            "license_files": [
+              {
+                "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/example.detect-things-1.0.0/LICENSE",
+                "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+              }
+            ],
+            "notice_files": [
+              {
+                "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/example.detect-things-1.0.0/NOTICE",
+                "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+              }
+            ],
+            "verification": {
+              "status": "maintainer-declared"
+            },
+            "derivation": null
+          }
+        ]
+      },
+      "expect": "accept",
+      "expect_codes": []
+    },
+    {
+      "name": "spdx-parenthesized",
+      "tier": "contract_decidable",
+      "evaluated_as": "newly_added",
+      "ai": {
+        "model_backed": true,
+        "models": [
+          {
+            "id": "example-model",
+            "spdx_expression": "(MIT OR Apache-2.0) AND BSD-3-Clause",
+            "attribution_required": true,
+            "huggingface_id": "example-org/example-model",
+            "revision": "0123456789abcdef0123456789abcdef01234567",
+            "commercial_use": "allowed",
+            "redistribution": "allowed",
+            "derivatives": "allowed",
+            "license_files": [
+              {
+                "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/example.detect-things-1.0.0/LICENSE",
+                "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+              }
+            ],
+            "notice_files": [
+              {
+                "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/example.detect-things-1.0.0/NOTICE",
+                "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+              }
+            ],
+            "verification": {
+              "status": "maintainer-declared"
+            },
+            "derivation": null
+          }
+        ]
+      },
+      "expect": "accept",
+      "expect_codes": []
+    },
+    {
+      "name": "spdx-deprecated-id",
+      "tier": "contract_decidable",
+      "evaluated_as": "newly_added",
+      "ai": {
+        "model_backed": true,
+        "models": [
+          {
+            "id": "example-model",
+            "spdx_expression": "AGPL-3.0",
+            "attribution_required": true,
+            "huggingface_id": "example-org/example-model",
+            "revision": "0123456789abcdef0123456789abcdef01234567",
+            "commercial_use": "allowed",
+            "redistribution": "allowed",
+            "derivatives": "allowed",
+            "license_files": [
+              {
+                "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/example.detect-things-1.0.0/LICENSE",
+                "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+              }
+            ],
+            "notice_files": [
+              {
+                "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/example.detect-things-1.0.0/NOTICE",
+                "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+              }
+            ],
+            "verification": {
+              "status": "maintainer-declared"
+            },
+            "derivation": null
+          }
+        ]
+      },
+      "expect": "accept",
+      "expect_codes": []
+    },
+    {
+      "name": "spdx-noncommercial-id",
+      "tier": "contract_decidable",
+      "evaluated_as": "newly_added",
+      "ai": {
+        "model_backed": true,
+        "models": [
+          {
+            "id": "example-model",
+            "spdx_expression": "CC-BY-NC-4.0",
+            "attribution_required": true,
+            "huggingface_id": "example-org/example-model",
+            "revision": "0123456789abcdef0123456789abcdef01234567",
+            "commercial_use": "allowed",
+            "redistribution": "allowed",
+            "derivatives": "allowed",
+            "license_files": [
+              {
+                "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/example.detect-things-1.0.0/LICENSE",
+                "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+              }
+            ],
+            "notice_files": [
+              {
+                "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/example.detect-things-1.0.0/NOTICE",
+                "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+              }
+            ],
+            "verification": {
+              "status": "maintainer-declared"
+            },
+            "derivation": null
+          }
+        ]
+      },
+      "expect": "accept",
+      "expect_codes": []
+    },
+    {
+      "name": "spdx-unknown-id",
+      "tier": "contract_decidable",
+      "evaluated_as": "newly_added",
+      "ai": {
+        "model_backed": true,
+        "models": [
+          {
+            "id": "example-model",
+            "spdx_expression": "Apache2",
+            "attribution_required": true,
+            "huggingface_id": "example-org/example-model",
+            "revision": "0123456789abcdef0123456789abcdef01234567",
+            "commercial_use": "allowed",
+            "redistribution": "allowed",
+            "derivatives": "allowed",
+            "license_files": [
+              {
+                "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/example.detect-things-1.0.0/LICENSE",
+                "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+              }
+            ],
+            "notice_files": [
+              {
+                "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/example.detect-things-1.0.0/NOTICE",
+                "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+              }
+            ],
+            "verification": {
+              "status": "maintainer-declared"
+            },
+            "derivation": null
+          }
+        ]
+      },
+      "expect": "reject",
+      "expect_codes": [
+        "contract.invalid_ai",
+        "contract.invalid_licensing_spdx"
+      ]
+    },
+    {
+      "name": "spdx-dangling-operator",
+      "tier": "contract_decidable",
+      "evaluated_as": "newly_added",
+      "ai": {
+        "model_backed": true,
+        "models": [
+          {
+            "id": "example-model",
+            "spdx_expression": "MIT AND",
+            "attribution_required": true,
+            "huggingface_id": "example-org/example-model",
+            "revision": "0123456789abcdef0123456789abcdef01234567",
+            "commercial_use": "allowed",
+            "redistribution": "allowed",
+            "derivatives": "allowed",
+            "license_files": [
+              {
+                "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/example.detect-things-1.0.0/LICENSE",
+                "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+              }
+            ],
+            "notice_files": [
+              {
+                "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/example.detect-things-1.0.0/NOTICE",
+                "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+              }
+            ],
+            "verification": {
+              "status": "maintainer-declared"
+            },
+            "derivation": null
+          }
+        ]
+      },
+      "expect": "reject",
+      "expect_codes": [
+        "contract.invalid_ai",
+        "contract.invalid_licensing_spdx"
+      ]
+    },
+    {
+      "name": "spdx-slash-or",
+      "tier": "contract_decidable",
+      "evaluated_as": "newly_added",
+      "ai": {
+        "model_backed": true,
+        "models": [
+          {
+            "id": "example-model",
+            "spdx_expression": "MIT/Apache-2.0",
+            "attribution_required": true,
+            "huggingface_id": "example-org/example-model",
+            "revision": "0123456789abcdef0123456789abcdef01234567",
+            "commercial_use": "allowed",
+            "redistribution": "allowed",
+            "derivatives": "allowed",
+            "license_files": [
+              {
+                "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/example.detect-things-1.0.0/LICENSE",
+                "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+              }
+            ],
+            "notice_files": [
+              {
+                "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/example.detect-things-1.0.0/NOTICE",
+                "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+              }
+            ],
+            "verification": {
+              "status": "maintainer-declared"
+            },
+            "derivation": null
+          }
+        ]
+      },
+      "expect": "reject",
+      "expect_codes": [
+        "contract.invalid_ai",
+        "contract.invalid_licensing_spdx"
+      ]
+    },
+    {
+      "name": "spdx-unknown-exception",
+      "tier": "contract_decidable",
+      "evaluated_as": "newly_added",
+      "ai": {
+        "model_backed": true,
+        "models": [
+          {
+            "id": "example-model",
+            "spdx_expression": "Apache-2.0 WITH Foo-exception",
+            "attribution_required": true,
+            "huggingface_id": "example-org/example-model",
+            "revision": "0123456789abcdef0123456789abcdef01234567",
+            "commercial_use": "allowed",
+            "redistribution": "allowed",
+            "derivatives": "allowed",
+            "license_files": [
+              {
+                "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/example.detect-things-1.0.0/LICENSE",
+                "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+              }
+            ],
+            "notice_files": [
+              {
+                "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/example.detect-things-1.0.0/NOTICE",
+                "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+              }
+            ],
+            "verification": {
+              "status": "maintainer-declared"
+            },
+            "derivation": null
+          }
+        ]
+      },
+      "expect": "reject",
+      "expect_codes": [
+        "contract.invalid_ai",
+        "contract.invalid_licensing_spdx"
+      ]
+    },
+    {
+      "name": "spdx-unknown-hf-license",
+      "tier": "contract_decidable",
+      "evaluated_as": "newly_added",
+      "ai": {
+        "model_backed": true,
+        "models": [
+          {
+            "id": "example-model",
+            "spdx_expression": "openrail++",
+            "attribution_required": true,
+            "huggingface_id": "example-org/example-model",
+            "revision": "0123456789abcdef0123456789abcdef01234567",
+            "commercial_use": "allowed",
+            "redistribution": "allowed",
+            "derivatives": "allowed",
+            "license_files": [
+              {
+                "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/example.detect-things-1.0.0/LICENSE",
+                "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+              }
+            ],
+            "notice_files": [
+              {
+                "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/example.detect-things-1.0.0/NOTICE",
+                "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+              }
+            ],
+            "verification": {
+              "status": "maintainer-declared"
+            },
+            "derivation": null
+          }
+        ]
+      },
+      "expect": "reject",
+      "expect_codes": [
+        "contract.invalid_ai",
+        "contract.invalid_licensing_spdx"
+      ]
+    },
+    {
+      "name": "spdx-licenseref-with-evidence",
+      "tier": "contract_decidable",
+      "evaluated_as": "newly_added",
+      "ai": {
+        "model_backed": true,
+        "models": [
+          {
+            "id": "example-model",
+            "spdx_expression": "LicenseRef-Example-Model",
+            "attribution_required": true,
+            "huggingface_id": "example-org/example-model",
+            "revision": "0123456789abcdef0123456789abcdef01234567",
+            "commercial_use": "allowed",
+            "redistribution": "allowed",
+            "derivatives": "allowed",
+            "license_files": [
+              {
+                "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/example.detect-things-1.0.0/LICENSE",
+                "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+              }
+            ],
+            "notice_files": [
+              {
+                "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/example.detect-things-1.0.0/NOTICE",
+                "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+              }
+            ],
+            "verification": {
+              "status": "maintainer-declared",
+              "evidence_url": "https://example.org/model-license"
+            },
+            "derivation": null
+          }
+        ]
+      },
+      "expect": "accept",
+      "expect_codes": []
+    },
+    {
+      "name": "spdx-licenseref-without-evidence",
+      "tier": "contract_decidable",
+      "evaluated_as": "newly_added",
+      "ai": {
+        "model_backed": true,
+        "models": [
+          {
+            "id": "example-model",
+            "spdx_expression": "LicenseRef-Example-Model",
+            "attribution_required": true,
+            "huggingface_id": "example-org/example-model",
+            "revision": "0123456789abcdef0123456789abcdef01234567",
+            "commercial_use": "allowed",
+            "redistribution": "allowed",
+            "derivatives": "allowed",
+            "license_files": [
+              {
+                "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/example.detect-things-1.0.0/LICENSE",
+                "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+              }
+            ],
+            "notice_files": [
+              {
+                "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/example.detect-things-1.0.0/NOTICE",
+                "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+              }
+            ],
+            "verification": {
+              "status": "maintainer-declared"
+            },
+            "derivation": null
+          }
+        ]
+      },
+      "expect": "reject",
+      "expect_codes": [
+        "contract.model_rights_licenseref_needs_evidence"
+      ]
+    },
+    {
+      "name": "rights-conditional",
+      "tier": "contract_decidable",
+      "evaluated_as": "newly_added",
+      "ai": {
+        "model_backed": true,
+        "models": [
+          {
+            "id": "example-model",
+            "spdx_expression": "Apache-2.0",
+            "attribution_required": true,
+            "huggingface_id": "example-org/example-model",
+            "revision": "0123456789abcdef0123456789abcdef01234567",
+            "commercial_use": "conditional",
+            "redistribution": "allowed",
+            "derivatives": "conditional",
+            "license_files": [
+              {
+                "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/example.detect-things-1.0.0/LICENSE",
+                "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+              }
+            ],
+            "notice_files": [
+              {
+                "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/example.detect-things-1.0.0/NOTICE",
+                "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+              }
+            ],
+            "verification": {
+              "status": "maintainer-declared"
+            },
+            "derivation": null
+          }
+        ]
+      },
+      "expect": "accept",
+      "expect_codes": []
+    },
+    {
+      "name": "rights-unknown",
+      "tier": "contract_decidable",
+      "evaluated_as": "newly_added",
+      "ai": {
+        "model_backed": true,
+        "models": [
+          {
+            "id": "example-model",
+            "spdx_expression": "Apache-2.0",
+            "attribution_required": true,
+            "huggingface_id": "example-org/example-model",
+            "revision": "0123456789abcdef0123456789abcdef01234567",
+            "commercial_use": "unknown",
+            "redistribution": "allowed",
+            "derivatives": "allowed",
+            "license_files": [
+              {
+                "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/example.detect-things-1.0.0/LICENSE",
+                "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+              }
+            ],
+            "notice_files": [
+              {
+                "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/example.detect-things-1.0.0/NOTICE",
+                "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+              }
+            ],
+            "verification": {
+              "status": "maintainer-declared"
+            },
+            "derivation": null
+          }
+        ]
+      },
+      "expect": "reject",
+      "expect_codes": [
+        "contract.model_rights_unknown"
+      ]
+    },
+    {
+      "name": "rights-missing",
+      "tier": "contract_decidable",
+      "evaluated_as": "newly_added",
+      "ai": {
+        "model_backed": true,
+        "models": [
+          {
+            "id": "example-model",
+            "spdx_expression": "Apache-2.0",
+            "attribution_required": true,
+            "huggingface_id": "example-org/example-model",
+            "revision": "0123456789abcdef0123456789abcdef01234567",
+            "commercial_use": "allowed",
+            "redistribution": "allowed",
+            "license_files": [
+              {
+                "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/example.detect-things-1.0.0/LICENSE",
+                "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+              }
+            ],
+            "notice_files": [
+              {
+                "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/example.detect-things-1.0.0/NOTICE",
+                "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+              }
+            ],
+            "verification": {
+              "status": "maintainer-declared"
+            },
+            "derivation": null
+          }
+        ]
+      },
+      "expect": "reject",
+      "expect_codes": [
+        "contract.invalid_model_rights"
+      ]
+    },
+    {
+      "name": "rights-invalid-value",
+      "tier": "contract_decidable",
+      "evaluated_as": "newly_added",
+      "ai": {
+        "model_backed": true,
+        "models": [
+          {
+            "id": "example-model",
+            "spdx_expression": "Apache-2.0",
+            "attribution_required": true,
+            "huggingface_id": "example-org/example-model",
+            "revision": "0123456789abcdef0123456789abcdef01234567",
+            "commercial_use": "allowed",
+            "redistribution": "yes",
+            "derivatives": "allowed",
+            "license_files": [
+              {
+                "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/example.detect-things-1.0.0/LICENSE",
+                "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+              }
+            ],
+            "notice_files": [
+              {
+                "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/example.detect-things-1.0.0/NOTICE",
+                "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+              }
+            ],
+            "verification": {
+              "status": "maintainer-declared"
+            },
+            "derivation": null
+          }
+        ]
+      },
+      "expect": "reject",
+      "expect_codes": [
+        "contract.invalid_model_rights"
+      ]
+    },
+    {
+      "name": "rights-non-string-value",
+      "tier": "contract_decidable",
+      "evaluated_as": "newly_added",
+      "ai": {
+        "model_backed": true,
+        "models": [
+          {
+            "id": "example-model",
+            "spdx_expression": "Apache-2.0",
+            "attribution_required": true,
+            "huggingface_id": "example-org/example-model",
+            "revision": "0123456789abcdef0123456789abcdef01234567",
+            "commercial_use": [
+              "allowed"
+            ],
+            "redistribution": "allowed",
+            "derivatives": "allowed",
+            "license_files": [
+              {
+                "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/example.detect-things-1.0.0/LICENSE",
+                "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+              }
+            ],
+            "notice_files": [
+              {
+                "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/example.detect-things-1.0.0/NOTICE",
+                "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+              }
+            ],
+            "verification": {
+              "status": "maintainer-declared"
+            },
+            "derivation": null
+          }
+        ]
+      },
+      "expect": "reject",
+      "expect_codes": [
+        "contract.invalid_model_rights"
+      ]
+    },
+    {
+      "name": "rights-redistribution-forbidden",
+      "tier": "contract_decidable",
+      "evaluated_as": "newly_added",
+      "ai": {
+        "model_backed": true,
+        "models": [
+          {
+            "id": "example-model",
+            "spdx_expression": "Apache-2.0",
+            "attribution_required": true,
+            "huggingface_id": "example-org/example-model",
+            "revision": "0123456789abcdef0123456789abcdef01234567",
+            "commercial_use": "allowed",
+            "redistribution": "forbidden",
+            "derivatives": "allowed",
+            "license_files": [
+              {
+                "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/example.detect-things-1.0.0/LICENSE",
+                "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+              }
+            ],
+            "notice_files": [
+              {
+                "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/example.detect-things-1.0.0/NOTICE",
+                "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+              }
+            ],
+            "verification": {
+              "status": "maintainer-declared"
+            },
+            "derivation": null
+          }
+        ]
+      },
+      "expect": "reject",
+      "expect_codes": [
+        "contract.model_rights_contradiction"
+      ]
+    },
+    {
+      "name": "rights-derivatives-forbidden-with-derivation",
+      "tier": "contract_decidable",
+      "evaluated_as": "newly_added",
+      "ai": {
+        "model_backed": true,
+        "models": [
+          {
+            "id": "example-model",
+            "spdx_expression": "Apache-2.0",
+            "attribution_required": true,
+            "huggingface_id": "example-org/example-model",
+            "revision": "0123456789abcdef0123456789abcdef01234567",
+            "commercial_use": "allowed",
+            "redistribution": "allowed",
+            "derivatives": "forbidden",
+            "license_files": [
+              {
+                "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/example.detect-things-1.0.0/LICENSE",
+                "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+              }
+            ],
+            "notice_files": [
+              {
+                "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/example.detect-things-1.0.0/NOTICE",
+                "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+              }
+            ],
+            "verification": {
+              "status": "maintainer-declared"
+            },
+            "derivation": {
+              "transformations": [
+                "quantize"
+              ],
+              "description": "int8",
+              "converted_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            }
+          }
+        ]
+      },
+      "expect": "reject",
+      "expect_codes": [
+        "contract.model_rights_contradiction"
+      ]
+    },
+    {
+      "name": "rights-proprietary-marker-redistributable",
+      "tier": "contract_decidable",
+      "evaluated_as": "newly_added",
+      "ai": {
+        "model_backed": true,
+        "models": [
+          {
+            "id": "example-model",
+            "spdx_expression": "LicenseRef-Proprietary",
+            "attribution_required": true,
+            "huggingface_id": "example-org/example-model",
+            "revision": "0123456789abcdef0123456789abcdef01234567",
+            "commercial_use": "allowed",
+            "redistribution": "allowed",
+            "derivatives": "allowed",
+            "license_files": [
+              {
+                "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/example.detect-things-1.0.0/LICENSE",
+                "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+              }
+            ],
+            "notice_files": [
+              {
+                "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/example.detect-things-1.0.0/NOTICE",
+                "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+              }
+            ],
+            "verification": {
+              "status": "maintainer-declared",
+              "evidence_url": "https://example.org/license"
+            },
+            "derivation": null
+          }
+        ]
+      },
+      "expect": "reject",
+      "expect_codes": [
+        "contract.model_rights_contradiction"
+      ]
+    },
+    {
+      "name": "verification-missing",
+      "tier": "contract_decidable",
+      "evaluated_as": "newly_added",
+      "ai": {
+        "model_backed": true,
+        "models": [
+          {
+            "id": "example-model",
+            "spdx_expression": "Apache-2.0",
+            "attribution_required": true,
+            "huggingface_id": "example-org/example-model",
+            "revision": "0123456789abcdef0123456789abcdef01234567",
+            "commercial_use": "allowed",
+            "redistribution": "allowed",
+            "derivatives": "allowed",
+            "license_files": [
+              {
+                "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/example.detect-things-1.0.0/LICENSE",
+                "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+              }
+            ],
+            "notice_files": [
+              {
+                "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/example.detect-things-1.0.0/NOTICE",
+                "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+              }
+            ],
+            "derivation": null
+          }
+        ]
+      },
+      "expect": "reject",
+      "expect_codes": [
+        "contract.invalid_model_rights_verification"
+      ]
+    },
+    {
+      "name": "verification-reserved-status",
+      "tier": "contract_decidable",
+      "evaluated_as": "newly_added",
+      "ai": {
+        "model_backed": true,
+        "models": [
+          {
+            "id": "example-model",
+            "spdx_expression": "Apache-2.0",
+            "attribution_required": true,
+            "huggingface_id": "example-org/example-model",
+            "revision": "0123456789abcdef0123456789abcdef01234567",
+            "commercial_use": "allowed",
+            "redistribution": "allowed",
+            "derivatives": "allowed",
+            "license_files": [
+              {
+                "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/example.detect-things-1.0.0/LICENSE",
+                "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+              }
+            ],
+            "notice_files": [
+              {
+                "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/example.detect-things-1.0.0/NOTICE",
+                "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+              }
+            ],
+            "verification": {
+              "status": "registry-reviewed"
+            },
+            "derivation": null
+          }
+        ]
+      },
+      "expect": "reject",
+      "expect_codes": [
+        "contract.invalid_model_rights_verification"
+      ]
+    },
+    {
+      "name": "verification-non-string-status",
+      "tier": "contract_decidable",
+      "evaluated_as": "newly_added",
+      "ai": {
+        "model_backed": true,
+        "models": [
+          {
+            "id": "example-model",
+            "spdx_expression": "Apache-2.0",
+            "attribution_required": true,
+            "huggingface_id": "example-org/example-model",
+            "revision": "0123456789abcdef0123456789abcdef01234567",
+            "commercial_use": "allowed",
+            "redistribution": "allowed",
+            "derivatives": "allowed",
+            "license_files": [
+              {
+                "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/example.detect-things-1.0.0/LICENSE",
+                "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+              }
+            ],
+            "notice_files": [
+              {
+                "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/example.detect-things-1.0.0/NOTICE",
+                "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+              }
+            ],
+            "verification": {
+              "status": [
+                "maintainer-declared"
+              ]
+            },
+            "derivation": null
+          }
+        ]
+      },
+      "expect": "reject",
+      "expect_codes": [
+        "contract.invalid_model_rights_verification"
+      ]
+    },
+    {
+      "name": "verification-evidence-url-http",
+      "tier": "contract_decidable",
+      "evaluated_as": "newly_added",
+      "ai": {
+        "model_backed": true,
+        "models": [
+          {
+            "id": "example-model",
+            "spdx_expression": "Apache-2.0",
+            "attribution_required": true,
+            "huggingface_id": "example-org/example-model",
+            "revision": "0123456789abcdef0123456789abcdef01234567",
+            "commercial_use": "allowed",
+            "redistribution": "allowed",
+            "derivatives": "allowed",
+            "license_files": [
+              {
+                "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/example.detect-things-1.0.0/LICENSE",
+                "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+              }
+            ],
+            "notice_files": [
+              {
+                "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/example.detect-things-1.0.0/NOTICE",
+                "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+              }
+            ],
+            "verification": {
+              "status": "maintainer-declared",
+              "evidence_url": "http://example.org/license"
+            },
+            "derivation": null
+          }
+        ]
+      },
+      "expect": "reject",
+      "expect_codes": [
+        "contract.invalid_model_rights_url"
+      ]
+    },
+    {
+      "name": "license-files-missing",
+      "tier": "contract_decidable",
+      "evaluated_as": "newly_added",
+      "ai": {
+        "model_backed": true,
+        "models": [
+          {
+            "id": "example-model",
+            "spdx_expression": "Apache-2.0",
+            "attribution_required": true,
+            "huggingface_id": "example-org/example-model",
+            "revision": "0123456789abcdef0123456789abcdef01234567",
+            "commercial_use": "allowed",
+            "redistribution": "allowed",
+            "derivatives": "allowed",
+            "notice_files": [
+              {
+                "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/example.detect-things-1.0.0/NOTICE",
+                "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+              }
+            ],
+            "verification": {
+              "status": "maintainer-declared"
+            },
+            "derivation": null
+          }
+        ]
+      },
+      "expect": "reject",
+      "expect_codes": [
+        "contract.invalid_model_rights"
+      ]
+    },
+    {
+      "name": "license-files-empty",
+      "tier": "contract_decidable",
+      "evaluated_as": "newly_added",
+      "ai": {
+        "model_backed": true,
+        "models": [
+          {
+            "id": "example-model",
+            "spdx_expression": "Apache-2.0",
+            "attribution_required": true,
+            "huggingface_id": "example-org/example-model",
+            "revision": "0123456789abcdef0123456789abcdef01234567",
+            "commercial_use": "allowed",
+            "redistribution": "allowed",
+            "derivatives": "allowed",
+            "license_files": [],
+            "notice_files": [
+              {
+                "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/example.detect-things-1.0.0/NOTICE",
+                "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+              }
+            ],
+            "verification": {
+              "status": "maintainer-declared"
+            },
+            "derivation": null
+          }
+        ]
+      },
+      "expect": "reject",
+      "expect_codes": [
+        "contract.invalid_model_rights"
+      ]
+    },
+    {
+      "name": "license-files-foreign-host",
+      "tier": "contract_decidable",
+      "evaluated_as": "newly_added",
+      "ai": {
+        "model_backed": true,
+        "models": [
+          {
+            "id": "example-model",
+            "spdx_expression": "Apache-2.0",
+            "attribution_required": true,
+            "huggingface_id": "example-org/example-model",
+            "revision": "0123456789abcdef0123456789abcdef01234567",
+            "commercial_use": "allowed",
+            "redistribution": "allowed",
+            "derivatives": "allowed",
+            "license_files": [
+              {
+                "url": "https://example.org/LICENSE",
+                "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+              }
+            ],
+            "notice_files": [
+              {
+                "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/example.detect-things-1.0.0/NOTICE",
+                "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+              }
+            ],
+            "verification": {
+              "status": "maintainer-declared"
+            },
+            "derivation": null
+          }
+        ]
+      },
+      "expect": "reject",
+      "expect_codes": [
+        "contract.invalid_model_rights_evidence_url"
+      ]
+    },
+    {
+      "name": "license-files-bad-sha",
+      "tier": "contract_decidable",
+      "evaluated_as": "newly_added",
+      "ai": {
+        "model_backed": true,
+        "models": [
+          {
+            "id": "example-model",
+            "spdx_expression": "Apache-2.0",
+            "attribution_required": true,
+            "huggingface_id": "example-org/example-model",
+            "revision": "0123456789abcdef0123456789abcdef01234567",
+            "commercial_use": "allowed",
+            "redistribution": "allowed",
+            "derivatives": "allowed",
+            "license_files": [
+              {
+                "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/example.detect-things-1.0.0/LICENSE",
+                "sha256": "ABC"
+              }
+            ],
+            "notice_files": [
+              {
+                "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/example.detect-things-1.0.0/NOTICE",
+                "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+              }
+            ],
+            "verification": {
+              "status": "maintainer-declared"
+            },
+            "derivation": null
+          }
+        ]
+      },
+      "expect": "reject",
+      "expect_codes": [
+        "contract.invalid_model_rights"
+      ]
+    },
+    {
+      "name": "notice-files-missing-attribution-required",
+      "tier": "contract_decidable",
+      "evaluated_as": "newly_added",
+      "ai": {
+        "model_backed": true,
+        "models": [
+          {
+            "id": "example-model",
+            "spdx_expression": "Apache-2.0",
+            "attribution_required": true,
+            "huggingface_id": "example-org/example-model",
+            "revision": "0123456789abcdef0123456789abcdef01234567",
+            "commercial_use": "allowed",
+            "redistribution": "allowed",
+            "derivatives": "allowed",
+            "license_files": [
+              {
+                "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/example.detect-things-1.0.0/LICENSE",
+                "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+              }
+            ],
+            "verification": {
+              "status": "maintainer-declared"
+            },
+            "derivation": null
+          }
+        ]
+      },
+      "expect": "reject",
+      "expect_codes": [
+        "contract.model_rights_missing_notice"
+      ]
+    },
+    {
+      "name": "notice-files-not-array",
+      "tier": "contract_decidable",
+      "evaluated_as": "newly_added",
+      "ai": {
+        "model_backed": true,
+        "models": [
+          {
+            "id": "example-model",
+            "spdx_expression": "Apache-2.0",
+            "attribution_required": true,
+            "huggingface_id": "example-org/example-model",
+            "revision": "0123456789abcdef0123456789abcdef01234567",
+            "commercial_use": "allowed",
+            "redistribution": "allowed",
+            "derivatives": "allowed",
+            "license_files": [
+              {
+                "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/example.detect-things-1.0.0/LICENSE",
+                "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+              }
+            ],
+            "notice_files": "NOTICE",
+            "verification": {
+              "status": "maintainer-declared"
+            },
+            "derivation": null
+          }
+        ]
+      },
+      "expect": "reject",
+      "expect_codes": [
+        "contract.invalid_model_rights"
+      ]
+    },
+    {
+      "name": "derivation-object-valid",
+      "description": "contract_decidable assumes converted_sha256 is listed in model-weights.json (a ci_only check).",
+      "tier": "contract_decidable",
+      "evaluated_as": "newly_added",
+      "ai": {
+        "model_backed": true,
+        "models": [
+          {
+            "id": "example-model",
+            "spdx_expression": "Apache-2.0",
+            "attribution_required": true,
+            "huggingface_id": "example-org/example-model",
+            "revision": "0123456789abcdef0123456789abcdef01234567",
+            "commercial_use": "allowed",
+            "redistribution": "allowed",
+            "derivatives": "allowed",
+            "license_files": [
+              {
+                "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/example.detect-things-1.0.0/LICENSE",
+                "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+              }
+            ],
+            "notice_files": [
+              {
+                "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/example.detect-things-1.0.0/NOTICE",
+                "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+              }
+            ],
+            "verification": {
+              "status": "maintainer-declared"
+            },
+            "derivation": {
+              "transformations": [
+                "quantize",
+                "format-convert"
+              ],
+              "description": "int8 ONNX export",
+              "tool_url": "https://github.com/example/tool",
+              "converted_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            }
+          }
+        ]
+      },
+      "expect": "accept",
+      "expect_codes": []
+    },
+    {
+      "name": "derivation-missing",
+      "tier": "contract_decidable",
+      "evaluated_as": "newly_added",
+      "ai": {
+        "model_backed": true,
+        "models": [
+          {
+            "id": "example-model",
+            "spdx_expression": "Apache-2.0",
+            "attribution_required": true,
+            "huggingface_id": "example-org/example-model",
+            "revision": "0123456789abcdef0123456789abcdef01234567",
+            "commercial_use": "allowed",
+            "redistribution": "allowed",
+            "derivatives": "allowed",
+            "license_files": [
+              {
+                "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/example.detect-things-1.0.0/LICENSE",
+                "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+              }
+            ],
+            "notice_files": [
+              {
+                "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/example.detect-things-1.0.0/NOTICE",
+                "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+              }
+            ],
+            "verification": {
+              "status": "maintainer-declared"
+            }
+          }
+        ]
+      },
+      "expect": "reject",
+      "expect_codes": [
+        "contract.model_rights_missing_derivation"
+      ]
+    },
+    {
+      "name": "derivation-not-object",
+      "tier": "contract_decidable",
+      "evaluated_as": "newly_added",
+      "ai": {
+        "model_backed": true,
+        "models": [
+          {
+            "id": "example-model",
+            "spdx_expression": "Apache-2.0",
+            "attribution_required": true,
+            "huggingface_id": "example-org/example-model",
+            "revision": "0123456789abcdef0123456789abcdef01234567",
+            "commercial_use": "allowed",
+            "redistribution": "allowed",
+            "derivatives": "allowed",
+            "license_files": [
+              {
+                "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/example.detect-things-1.0.0/LICENSE",
+                "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+              }
+            ],
+            "notice_files": [
+              {
+                "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/example.detect-things-1.0.0/NOTICE",
+                "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+              }
+            ],
+            "verification": {
+              "status": "maintainer-declared"
+            },
+            "derivation": "quantized"
+          }
+        ]
+      },
+      "expect": "reject",
+      "expect_codes": [
+        "contract.invalid_model_derivation"
+      ]
+    },
+    {
+      "name": "derivation-empty-transformations",
+      "tier": "contract_decidable",
+      "evaluated_as": "newly_added",
+      "ai": {
+        "model_backed": true,
+        "models": [
+          {
+            "id": "example-model",
+            "spdx_expression": "Apache-2.0",
+            "attribution_required": true,
+            "huggingface_id": "example-org/example-model",
+            "revision": "0123456789abcdef0123456789abcdef01234567",
+            "commercial_use": "allowed",
+            "redistribution": "allowed",
+            "derivatives": "allowed",
+            "license_files": [
+              {
+                "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/example.detect-things-1.0.0/LICENSE",
+                "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+              }
+            ],
+            "notice_files": [
+              {
+                "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/example.detect-things-1.0.0/NOTICE",
+                "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+              }
+            ],
+            "verification": {
+              "status": "maintainer-declared"
+            },
+            "derivation": {
+              "transformations": [],
+              "description": "x",
+              "converted_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            }
+          }
+        ]
+      },
+      "expect": "reject",
+      "expect_codes": [
+        "contract.invalid_model_derivation"
+      ]
+    },
+    {
+      "name": "derivation-unknown-transformation",
+      "tier": "contract_decidable",
+      "evaluated_as": "newly_added",
+      "ai": {
+        "model_backed": true,
+        "models": [
+          {
+            "id": "example-model",
+            "spdx_expression": "Apache-2.0",
+            "attribution_required": true,
+            "huggingface_id": "example-org/example-model",
+            "revision": "0123456789abcdef0123456789abcdef01234567",
+            "commercial_use": "allowed",
+            "redistribution": "allowed",
+            "derivatives": "allowed",
+            "license_files": [
+              {
+                "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/example.detect-things-1.0.0/LICENSE",
+                "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+              }
+            ],
+            "notice_files": [
+              {
+                "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/example.detect-things-1.0.0/NOTICE",
+                "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+              }
+            ],
+            "verification": {
+              "status": "maintainer-declared"
+            },
+            "derivation": {
+              "transformations": [
+                "compress"
+              ],
+              "description": "x",
+              "converted_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            }
+          }
+        ]
+      },
+      "expect": "reject",
+      "expect_codes": [
+        "contract.invalid_model_derivation"
+      ]
+    },
+    {
+      "name": "derivation-non-string-transformation",
+      "tier": "contract_decidable",
+      "evaluated_as": "newly_added",
+      "ai": {
+        "model_backed": true,
+        "models": [
+          {
+            "id": "example-model",
+            "spdx_expression": "Apache-2.0",
+            "attribution_required": true,
+            "huggingface_id": "example-org/example-model",
+            "revision": "0123456789abcdef0123456789abcdef01234567",
+            "commercial_use": "allowed",
+            "redistribution": "allowed",
+            "derivatives": "allowed",
+            "license_files": [
+              {
+                "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/example.detect-things-1.0.0/LICENSE",
+                "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+              }
+            ],
+            "notice_files": [
+              {
+                "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/example.detect-things-1.0.0/NOTICE",
+                "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+              }
+            ],
+            "verification": {
+              "status": "maintainer-declared"
+            },
+            "derivation": {
+              "transformations": [
+                {
+                  "kind": "quantize"
+                }
+              ],
+              "description": "x",
+              "converted_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            }
+          }
+        ]
+      },
+      "expect": "reject",
+      "expect_codes": [
+        "contract.invalid_model_derivation"
+      ]
+    },
+    {
+      "name": "derivation-blank-description",
+      "tier": "contract_decidable",
+      "evaluated_as": "newly_added",
+      "ai": {
+        "model_backed": true,
+        "models": [
+          {
+            "id": "example-model",
+            "spdx_expression": "Apache-2.0",
+            "attribution_required": true,
+            "huggingface_id": "example-org/example-model",
+            "revision": "0123456789abcdef0123456789abcdef01234567",
+            "commercial_use": "allowed",
+            "redistribution": "allowed",
+            "derivatives": "allowed",
+            "license_files": [
+              {
+                "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/example.detect-things-1.0.0/LICENSE",
+                "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+              }
+            ],
+            "notice_files": [
+              {
+                "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/example.detect-things-1.0.0/NOTICE",
+                "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+              }
+            ],
+            "verification": {
+              "status": "maintainer-declared"
+            },
+            "derivation": {
+              "transformations": [
+                "other"
+              ],
+              "description": " ",
+              "converted_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            }
+          }
+        ]
+      },
+      "expect": "reject",
+      "expect_codes": [
+        "contract.invalid_model_derivation"
+      ]
+    },
+    {
+      "name": "derivation-bad-sha",
+      "tier": "contract_decidable",
+      "evaluated_as": "newly_added",
+      "ai": {
+        "model_backed": true,
+        "models": [
+          {
+            "id": "example-model",
+            "spdx_expression": "Apache-2.0",
+            "attribution_required": true,
+            "huggingface_id": "example-org/example-model",
+            "revision": "0123456789abcdef0123456789abcdef01234567",
+            "commercial_use": "allowed",
+            "redistribution": "allowed",
+            "derivatives": "allowed",
+            "license_files": [
+              {
+                "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/example.detect-things-1.0.0/LICENSE",
+                "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+              }
+            ],
+            "notice_files": [
+              {
+                "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/example.detect-things-1.0.0/NOTICE",
+                "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+              }
+            ],
+            "verification": {
+              "status": "maintainer-declared"
+            },
+            "derivation": {
+              "transformations": [
+                "quantize"
+              ],
+              "description": "x",
+              "converted_sha256": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            }
+          }
+        ]
+      },
+      "expect": "reject",
+      "expect_codes": [
+        "contract.invalid_model_derivation"
+      ]
+    },
+    {
+      "name": "derivation-tool-url-http",
+      "tier": "contract_decidable",
+      "evaluated_as": "newly_added",
+      "ai": {
+        "model_backed": true,
+        "models": [
+          {
+            "id": "example-model",
+            "spdx_expression": "Apache-2.0",
+            "attribution_required": true,
+            "huggingface_id": "example-org/example-model",
+            "revision": "0123456789abcdef0123456789abcdef01234567",
+            "commercial_use": "allowed",
+            "redistribution": "allowed",
+            "derivatives": "allowed",
+            "license_files": [
+              {
+                "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/example.detect-things-1.0.0/LICENSE",
+                "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+              }
+            ],
+            "notice_files": [
+              {
+                "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/example.detect-things-1.0.0/NOTICE",
+                "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+              }
+            ],
+            "verification": {
+              "status": "maintainer-declared"
+            },
+            "derivation": {
+              "transformations": [
+                "quantize"
+              ],
+              "description": "x",
+              "tool_url": "http://example.org/tool",
+              "converted_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            }
+          }
+        ]
+      },
+      "expect": "reject",
+      "expect_codes": [
+        "contract.invalid_model_rights_url"
+      ]
+    },
+    {
+      "name": "data-obligations-valid",
+      "tier": "contract_decidable",
+      "evaluated_as": "newly_added",
+      "ai": {
+        "model_backed": true,
+        "models": [
+          {
+            "id": "example-model",
+            "spdx_expression": "Apache-2.0",
+            "attribution_required": true,
+            "huggingface_id": "example-org/example-model",
+            "revision": "0123456789abcdef0123456789abcdef01234567",
+            "commercial_use": "allowed",
+            "redistribution": "allowed",
+            "derivatives": "allowed",
+            "license_files": [
+              {
+                "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/example.detect-things-1.0.0/LICENSE",
+                "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+              }
+            ],
+            "notice_files": [
+              {
+                "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/example.detect-things-1.0.0/NOTICE",
+                "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+              }
+            ],
+            "verification": {
+              "status": "maintainer-declared"
+            },
+            "derivation": null,
+            "data_obligations": [
+              {
+                "dataset": "Example Corpus",
+                "kind": "training",
+                "obligation": "Attribute the corpus.",
+                "source_url": "https://example.org/corpus",
+                "spdx_expression": "CC-BY-4.0"
+              }
+            ]
+          }
+        ]
+      },
+      "expect": "accept",
+      "expect_codes": []
+    },
+    {
+      "name": "data-obligations-not-array",
+      "tier": "contract_decidable",
+      "evaluated_as": "newly_added",
+      "ai": {
+        "model_backed": true,
+        "models": [
+          {
+            "id": "example-model",
+            "spdx_expression": "Apache-2.0",
+            "attribution_required": true,
+            "huggingface_id": "example-org/example-model",
+            "revision": "0123456789abcdef0123456789abcdef01234567",
+            "commercial_use": "allowed",
+            "redistribution": "allowed",
+            "derivatives": "allowed",
+            "license_files": [
+              {
+                "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/example.detect-things-1.0.0/LICENSE",
+                "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+              }
+            ],
+            "notice_files": [
+              {
+                "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/example.detect-things-1.0.0/NOTICE",
+                "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+              }
+            ],
+            "verification": {
+              "status": "maintainer-declared"
+            },
+            "derivation": null,
+            "data_obligations": {
+              "dataset": "x"
+            }
+          }
+        ]
+      },
+      "expect": "reject",
+      "expect_codes": [
+        "contract.invalid_model_data_obligations"
+      ]
+    },
+    {
+      "name": "data-obligations-entry-not-object",
+      "tier": "contract_decidable",
+      "evaluated_as": "newly_added",
+      "ai": {
+        "model_backed": true,
+        "models": [
+          {
+            "id": "example-model",
+            "spdx_expression": "Apache-2.0",
+            "attribution_required": true,
+            "huggingface_id": "example-org/example-model",
+            "revision": "0123456789abcdef0123456789abcdef01234567",
+            "commercial_use": "allowed",
+            "redistribution": "allowed",
+            "derivatives": "allowed",
+            "license_files": [
+              {
+                "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/example.detect-things-1.0.0/LICENSE",
+                "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+              }
+            ],
+            "notice_files": [
+              {
+                "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/example.detect-things-1.0.0/NOTICE",
+                "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+              }
+            ],
+            "verification": {
+              "status": "maintainer-declared"
+            },
+            "derivation": null,
+            "data_obligations": [
+              "x"
+            ]
+          }
+        ]
+      },
+      "expect": "reject",
+      "expect_codes": [
+        "contract.invalid_model_data_obligations"
+      ]
+    },
+    {
+      "name": "data-obligations-bad-kind",
+      "tier": "contract_decidable",
+      "evaluated_as": "newly_added",
+      "ai": {
+        "model_backed": true,
+        "models": [
+          {
+            "id": "example-model",
+            "spdx_expression": "Apache-2.0",
+            "attribution_required": true,
+            "huggingface_id": "example-org/example-model",
+            "revision": "0123456789abcdef0123456789abcdef01234567",
+            "commercial_use": "allowed",
+            "redistribution": "allowed",
+            "derivatives": "allowed",
+            "license_files": [
+              {
+                "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/example.detect-things-1.0.0/LICENSE",
+                "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+              }
+            ],
+            "notice_files": [
+              {
+                "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/example.detect-things-1.0.0/NOTICE",
+                "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+              }
+            ],
+            "verification": {
+              "status": "maintainer-declared"
+            },
+            "derivation": null,
+            "data_obligations": [
+              {
+                "dataset": "Example Corpus",
+                "kind": "pretraining",
+                "obligation": "Attribute the corpus.",
+                "source_url": "https://example.org/corpus",
+                "spdx_expression": "CC-BY-4.0"
+              }
+            ]
+          }
+        ]
+      },
+      "expect": "reject",
+      "expect_codes": [
+        "contract.invalid_model_data_obligations"
+      ]
+    },
+    {
+      "name": "data-obligations-non-string-kind",
+      "tier": "contract_decidable",
+      "evaluated_as": "newly_added",
+      "ai": {
+        "model_backed": true,
+        "models": [
+          {
+            "id": "example-model",
+            "spdx_expression": "Apache-2.0",
+            "attribution_required": true,
+            "huggingface_id": "example-org/example-model",
+            "revision": "0123456789abcdef0123456789abcdef01234567",
+            "commercial_use": "allowed",
+            "redistribution": "allowed",
+            "derivatives": "allowed",
+            "license_files": [
+              {
+                "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/example.detect-things-1.0.0/LICENSE",
+                "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+              }
+            ],
+            "notice_files": [
+              {
+                "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/example.detect-things-1.0.0/NOTICE",
+                "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+              }
+            ],
+            "verification": {
+              "status": "maintainer-declared"
+            },
+            "derivation": null,
+            "data_obligations": [
+              {
+                "dataset": "Example Corpus",
+                "kind": [
+                  "training"
+                ],
+                "obligation": "Attribute the corpus.",
+                "source_url": "https://example.org/corpus",
+                "spdx_expression": "CC-BY-4.0"
+              }
+            ]
+          }
+        ]
+      },
+      "expect": "reject",
+      "expect_codes": [
+        "contract.invalid_model_data_obligations"
+      ]
+    },
+    {
+      "name": "data-obligations-missing-source-url",
+      "tier": "contract_decidable",
+      "evaluated_as": "newly_added",
+      "ai": {
+        "model_backed": true,
+        "models": [
+          {
+            "id": "example-model",
+            "spdx_expression": "Apache-2.0",
+            "attribution_required": true,
+            "huggingface_id": "example-org/example-model",
+            "revision": "0123456789abcdef0123456789abcdef01234567",
+            "commercial_use": "allowed",
+            "redistribution": "allowed",
+            "derivatives": "allowed",
+            "license_files": [
+              {
+                "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/example.detect-things-1.0.0/LICENSE",
+                "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+              }
+            ],
+            "notice_files": [
+              {
+                "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/example.detect-things-1.0.0/NOTICE",
+                "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+              }
+            ],
+            "verification": {
+              "status": "maintainer-declared"
+            },
+            "derivation": null,
+            "data_obligations": [
+              {
+                "dataset": "Example Corpus",
+                "kind": "training",
+                "obligation": "Attribute the corpus.",
+                "spdx_expression": "CC-BY-4.0"
+              }
+            ]
+          }
+        ]
+      },
+      "expect": "reject",
+      "expect_codes": [
+        "contract.invalid_model_rights_url"
+      ]
+    },
+    {
+      "name": "data-obligations-invalid-spdx",
+      "tier": "contract_decidable",
+      "evaluated_as": "newly_added",
+      "ai": {
+        "model_backed": true,
+        "models": [
+          {
+            "id": "example-model",
+            "spdx_expression": "Apache-2.0",
+            "attribution_required": true,
+            "huggingface_id": "example-org/example-model",
+            "revision": "0123456789abcdef0123456789abcdef01234567",
+            "commercial_use": "allowed",
+            "redistribution": "allowed",
+            "derivatives": "allowed",
+            "license_files": [
+              {
+                "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/example.detect-things-1.0.0/LICENSE",
+                "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+              }
+            ],
+            "notice_files": [
+              {
+                "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/example.detect-things-1.0.0/NOTICE",
+                "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+              }
+            ],
+            "verification": {
+              "status": "maintainer-declared"
+            },
+            "derivation": null,
+            "data_obligations": [
+              {
+                "dataset": "Example Corpus",
+                "kind": "training",
+                "obligation": "Attribute the corpus.",
+                "source_url": "https://example.org/corpus",
+                "spdx_expression": "CC BY 4.0"
+              }
+            ]
+          }
+        ]
+      },
+      "expect": "reject",
+      "expect_codes": [
+        "contract.invalid_licensing_spdx"
+      ]
+    },
+    {
+      "name": "data-obligations-blank-spdx",
+      "tier": "contract_decidable",
+      "evaluated_as": "newly_added",
+      "ai": {
+        "model_backed": true,
+        "models": [
+          {
+            "id": "example-model",
+            "spdx_expression": "Apache-2.0",
+            "attribution_required": true,
+            "huggingface_id": "example-org/example-model",
+            "revision": "0123456789abcdef0123456789abcdef01234567",
+            "commercial_use": "allowed",
+            "redistribution": "allowed",
+            "derivatives": "allowed",
+            "license_files": [
+              {
+                "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/example.detect-things-1.0.0/LICENSE",
+                "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+              }
+            ],
+            "notice_files": [
+              {
+                "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/example.detect-things-1.0.0/NOTICE",
+                "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+              }
+            ],
+            "verification": {
+              "status": "maintainer-declared"
+            },
+            "derivation": null,
+            "data_obligations": [
+              {
+                "dataset": "Example Corpus",
+                "kind": "training",
+                "obligation": "Attribute the corpus.",
+                "source_url": "https://example.org/corpus",
+                "spdx_expression": ""
+              }
+            ]
+          }
+        ]
+      },
+      "expect": "reject",
+      "expect_codes": [
+        "contract.invalid_model_data_obligations"
+      ]
+    },
+    {
+      "name": "rights-change-valid",
+      "tier": "contract_decidable",
+      "evaluated_as": "newly_added",
+      "ai": {
+        "model_backed": true,
+        "models": [
+          {
+            "id": "example-model",
+            "spdx_expression": "Apache-2.0",
+            "attribution_required": true,
+            "huggingface_id": "example-org/example-model",
+            "revision": "0123456789abcdef0123456789abcdef01234567",
+            "commercial_use": "allowed",
+            "redistribution": "allowed",
+            "derivatives": "allowed",
+            "license_files": [
+              {
+                "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/example.detect-things-1.0.0/LICENSE",
+                "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+              }
+            ],
+            "notice_files": [
+              {
+                "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/example.detect-things-1.0.0/NOTICE",
+                "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+              }
+            ],
+            "verification": {
+              "status": "maintainer-declared"
+            },
+            "derivation": null,
+            "rights_change": {
+              "reason": "Upstream relicensed",
+              "evidence_url": "https://example.org/relicense"
+            }
+          }
+        ]
+      },
+      "expect": "accept",
+      "expect_codes": []
+    },
+    {
+      "name": "rights-change-invalid",
+      "tier": "contract_decidable",
+      "evaluated_as": "newly_added",
+      "ai": {
+        "model_backed": true,
+        "models": [
+          {
+            "id": "example-model",
+            "spdx_expression": "Apache-2.0",
+            "attribution_required": true,
+            "huggingface_id": "example-org/example-model",
+            "revision": "0123456789abcdef0123456789abcdef01234567",
+            "commercial_use": "allowed",
+            "redistribution": "allowed",
+            "derivatives": "allowed",
+            "license_files": [
+              {
+                "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/example.detect-things-1.0.0/LICENSE",
+                "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+              }
+            ],
+            "notice_files": [
+              {
+                "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/example.detect-things-1.0.0/NOTICE",
+                "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+              }
+            ],
+            "verification": {
+              "status": "maintainer-declared"
+            },
+            "derivation": null,
+            "rights_change": {
+              "reason": "",
+              "evidence_url": "https://example.org/relicense"
+            }
+          }
+        ]
+      },
+      "expect": "reject",
+      "expect_codes": [
+        "contract.invalid_model_rights_change"
+      ]
+    },
+    {
+      "name": "ci-derivation-digest-unlisted",
+      "tier": "ci_only",
+      "evaluated_as": "newly_added",
+      "ai": {
+        "model_backed": true,
+        "models": [
+          {
+            "id": "example-model",
+            "spdx_expression": "Apache-2.0",
+            "attribution_required": true,
+            "huggingface_id": "example-org/example-model",
+            "revision": "0123456789abcdef0123456789abcdef01234567",
+            "commercial_use": "allowed",
+            "redistribution": "allowed",
+            "derivatives": "allowed",
+            "license_files": [
+              {
+                "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/example.detect-things-1.0.0/LICENSE",
+                "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+              }
+            ],
+            "notice_files": [
+              {
+                "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/example.detect-things-1.0.0/NOTICE",
+                "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+              }
+            ],
+            "verification": {
+              "status": "maintainer-declared"
+            },
+            "derivation": {
+              "transformations": [
+                "quantize"
+              ],
+              "description": "int8",
+              "converted_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            }
+          }
+        ]
+      },
+      "ci_context": {
+        "model_weight_digests": [],
+        "fetched_sha256": {
+          "https://github.com/traverse-framework/registry/releases/download/artifacts/example.detect-things-1.0.0/LICENSE": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "https://github.com/traverse-framework/registry/releases/download/artifacts/example.detect-things-1.0.0/NOTICE": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        }
+      },
+      "expect": "reject",
+      "expect_codes": [
+        "contract.model_derivation_digest_unlisted"
+      ]
+    },
+    {
+      "name": "ci-license-digest-mismatch",
+      "tier": "ci_only",
+      "evaluated_as": "newly_added",
+      "ai": {
+        "model_backed": true,
+        "models": [
+          {
+            "id": "example-model",
+            "spdx_expression": "Apache-2.0",
+            "attribution_required": true,
+            "huggingface_id": "example-org/example-model",
+            "revision": "0123456789abcdef0123456789abcdef01234567",
+            "commercial_use": "allowed",
+            "redistribution": "allowed",
+            "derivatives": "allowed",
+            "license_files": [
+              {
+                "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/example.detect-things-1.0.0/LICENSE",
+                "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+              }
+            ],
+            "notice_files": [
+              {
+                "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/example.detect-things-1.0.0/NOTICE",
+                "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+              }
+            ],
+            "verification": {
+              "status": "maintainer-declared"
+            },
+            "derivation": null
+          }
+        ]
+      },
+      "ci_context": {
+        "model_weight_digests": [],
+        "fetched_sha256": {
+          "https://github.com/traverse-framework/registry/releases/download/artifacts/example.detect-things-1.0.0/LICENSE": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "https://github.com/traverse-framework/registry/releases/download/artifacts/example.detect-things-1.0.0/NOTICE": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        }
+      },
+      "expect": "reject",
+      "expect_codes": [
+        "contract.model_rights_evidence_digest_mismatch"
+      ]
+    },
+    {
+      "name": "ci-license-unreachable",
+      "tier": "ci_only",
+      "evaluated_as": "newly_added",
+      "ai": {
+        "model_backed": true,
+        "models": [
+          {
+            "id": "example-model",
+            "spdx_expression": "Apache-2.0",
+            "attribution_required": true,
+            "huggingface_id": "example-org/example-model",
+            "revision": "0123456789abcdef0123456789abcdef01234567",
+            "commercial_use": "allowed",
+            "redistribution": "allowed",
+            "derivatives": "allowed",
+            "license_files": [
+              {
+                "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/example.detect-things-1.0.0/LICENSE",
+                "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+              }
+            ],
+            "notice_files": [
+              {
+                "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/example.detect-things-1.0.0/NOTICE",
+                "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+              }
+            ],
+            "verification": {
+              "status": "maintainer-declared"
+            },
+            "derivation": null
+          }
+        ]
+      },
+      "ci_context": {
+        "model_weight_digests": [],
+        "fetched_sha256": {
+          "https://github.com/traverse-framework/registry/releases/download/artifacts/example.detect-things-1.0.0/LICENSE": null,
+          "https://github.com/traverse-framework/registry/releases/download/artifacts/example.detect-things-1.0.0/NOTICE": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        }
+      },
+      "expect": "reject",
+      "expect_codes": [
+        "contract.model_rights_evidence_unreachable"
+      ]
+    },
+    {
+      "name": "ci-all-evidence-verified",
+      "tier": "ci_only",
+      "evaluated_as": "newly_added",
+      "ai": {
+        "model_backed": true,
+        "models": [
+          {
+            "id": "example-model",
+            "spdx_expression": "Apache-2.0",
+            "attribution_required": true,
+            "huggingface_id": "example-org/example-model",
+            "revision": "0123456789abcdef0123456789abcdef01234567",
+            "commercial_use": "allowed",
+            "redistribution": "allowed",
+            "derivatives": "allowed",
+            "license_files": [
+              {
+                "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/example.detect-things-1.0.0/LICENSE",
+                "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+              }
+            ],
+            "notice_files": [
+              {
+                "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/example.detect-things-1.0.0/NOTICE",
+                "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+              }
+            ],
+            "verification": {
+              "status": "maintainer-declared"
+            },
+            "derivation": null
+          }
+        ]
+      },
+      "ci_context": {
+        "model_weight_digests": [],
+        "fetched_sha256": {
+          "https://github.com/traverse-framework/registry/releases/download/artifacts/example.detect-things-1.0.0/LICENSE": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "https://github.com/traverse-framework/registry/releases/download/artifacts/example.detect-things-1.0.0/NOTICE": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        }
+      },
+      "expect": "accept",
+      "expect_codes": []
+    }
+  ]
+}
