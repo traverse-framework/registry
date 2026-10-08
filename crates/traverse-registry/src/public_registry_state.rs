@@ -373,8 +373,14 @@ pub fn load_synced_public_registry_state(
     Ok(state)
 }
 
-/// Resolves an exact active (neither deprecated nor revoked) public capability
-/// record from local state.
+/// Resolves an exact public capability record from local state, whatever its
+/// lifecycle status.
+///
+/// Spec 005 FR-004 and decision-log entry 127 Q11: an exact pin resolves even
+/// when the version is deprecated or revoked. The returned record carries its
+/// [`PublicRegistryCapabilityRecord::lifecycle_status`] and, when revoked, its
+/// `revocation`, so the consumer can fail closed (runtime enforcement is the
+/// consumer's). Only range resolution skips deprecated and revoked versions.
 ///
 /// # Errors
 ///
@@ -392,7 +398,6 @@ pub fn resolve_synced_public_registry_record(
         record.namespace == namespace
             && record.id == id
             && record.version == version
-            && record.is_active()
     }))
 }
 
@@ -1015,7 +1020,7 @@ mod tests {
     }
 
     #[test]
-    fn resolve_skips_deprecated_and_missing_public_records() {
+    fn exact_resolution_returns_deprecated_records_and_skips_missing_ones() {
         let workspace_root = unique_temp_dir();
         let mut index = valid_index();
         index.capabilities[0].deprecated = true;
@@ -1046,7 +1051,9 @@ mod tests {
         )
         .expect("lookup should read local state");
 
-        assert!(deprecated.is_none());
+        let deprecated = deprecated.expect("an exact pin resolves a deprecated record");
+        assert_eq!(deprecated.lifecycle_status(), PublicRecordStatus::Deprecated);
+        assert!(deprecated.revocation.is_none());
         assert!(missing.is_none());
     }
 
@@ -1127,7 +1134,7 @@ mod tests {
     }
 
     #[test]
-    fn resolution_never_selects_a_revoked_record() {
+    fn exact_pins_resolve_revoked_records_and_ranges_skip_them() {
         let workspace_root = unique_temp_dir();
         let mut index = valid_index();
         index.capabilities[0].status = Some(PublicRecordStatus::Revoked);
@@ -1168,7 +1175,13 @@ mod tests {
         )
         .expect_err("a revoked-only range must not resolve");
 
-        assert!(exact.is_none());
+        let exact = exact.expect("an exact pin resolves a revoked record");
+        assert_eq!(exact.lifecycle_status(), PublicRecordStatus::Revoked);
+        assert!(!exact.is_active());
+        assert_eq!(
+            exact.revocation.as_ref().map(|r| r.reason.as_str()),
+            Some("upstream takedown")
+        );
         assert_eq!(
             range.errors[0].code,
             PublicRegistryStateErrorCode::OnlyDeprecatedVersions
