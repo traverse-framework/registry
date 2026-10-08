@@ -1035,3 +1035,15 @@ This is the second of the downstream ideas from entry 110's "Five Engines, What 
    - `validate_spdx_expression` now rejects a dangling trailing operator with `contract.invalid_licensing_spdx`, fixing the parser bug rather than having the CLI copy it. This is a newly enforced rule for `licensing.spdx_expression` too. No published contract ends with an operator; this was checked before the change.
    - The corpus moves to 1.1.0 with 13 SPDX fixtures for these cases.
 
+
+131. **Exact pins resolve deprecated and revoked records; range resolution keeps skipping them (2026-10-08, registry#631)**: `resolve_synced_public_registry_record` had filtered on `is_active()`, so an exact pin to a deprecated or revoked version returned `None`. The test `resolution_never_selects_a_revoked_record` asserted this, and registry#624 carried the same claim. It contradicted three approved sources:
+   - spec 005 FR-004: "Exact-pin resolution ignores the flag entirely and always succeeds if the version exists";
+   - entry 127 Q11: "exact pins still resolve but carry a machine-readable do-not-run signal";
+   - spec 026's out-of-scope list (spec 005 SC-005 holds).
+
+   The code was out of step with the approved specs, so no spec change is needed.
+   - The exact resolver now returns the record whatever its lifecycle status. The record carries `lifecycle_status()` and, when revoked, `revocation`, so the consumer fails closed: runtime enforcement belongs to Traverse, per entry 127.
+   - `resolve_synced_public_registry_range` is unchanged: it skips deprecated and revoked versions, and reports `OnlyDeprecatedVersions`.
+   - Tests: `exact_resolution_returns_deprecated_records_and_skips_missing_ones` and `exact_pins_resolve_revoked_records_and_ranges_skip_them` replace the two `None` assertions.
+   - No caller in this repo or in traverse depends on the old filtering. traverse pins `=0.25.0` and has no exact-resolver call.
+   - **Version**: stays `0.27.0`. crates.io's newest version is `0.25.0`, and neither `0.26.0` nor `0.27.0` was tagged, so `0.27.0` is the first published version with the spec 026 types and this behaviour. Publishing rides the normal `v0.27.0` tag push (`010-crate-publish-pipeline`). Consumers move off `=0.25.0` in traverse#1598.
