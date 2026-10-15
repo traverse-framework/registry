@@ -1,0 +1,84 @@
+{
+  "description": "Known live catalog artifacts that exceed stock Traverse WasmExecutor defaults (32 MiB / 5_000_000 fuel). Newly ADDED contracts are never exempt; this list only softens the nightly whole-catalog scan so the gate can be required without blocking unrelated PRs (registry#635).",
+  "pin": {
+    "engine": "traverse-runtime WasmExecutor defaults",
+    "traverse_runtime_version": "0.15.0",
+    "fuel": 5000000,
+    "memory_bytes": 33554432,
+    "note": "Memory matches runtime.wasm nested default (32 MiB). Fuel is the stricter native WasmExecutor default (5e6 vs nested 1e7)."
+  },
+  "entries": [
+    {
+      "id": "core.consent-purpose-check",
+      "version": "1.0.0",
+      "tracking_issue": 635,
+      "reason": "~193 MiB initial memory (3089 pages)"
+    },
+    {
+      "id": "text.detect-entities",
+      "version": "1.0.0",
+      "tracking_issue": 635,
+      "reason": "~256 MiB DistilBERT arena"
+    },
+    {
+      "id": "text.detect-entities",
+      "version": "1.1.0",
+      "tracking_issue": 635,
+      "reason": "~256 MiB DistilBERT arena"
+    },
+    {
+      "id": "text.detect-entities",
+      "version": "1.1.1",
+      "tracking_issue": 635,
+      "reason": "~256 MiB DistilBERT arena"
+    },
+    {
+      "id": "text.redact-entities",
+      "version": "1.0.0",
+      "tracking_issue": 635,
+      "reason": "~256 MiB DistilBERT arena"
+    },
+    {
+      "id": "text.redact-entities",
+      "version": "1.1.0",
+      "tracking_issue": 635,
+      "reason": "~256 MiB DistilBERT arena"
+    },
+    {
+      "id": "text.redact-entities",
+      "version": "1.1.1",
+      "tracking_issue": 635,
+      "reason": "~256 MiB DistilBERT arena"
+    },
+    {
+      "id": "audio.detect-speech-segments",
+      "version": "1.0.0",
+      "tracking_issue": 635,
+      "reason": "~66 MiB Silero VAD arena"
+    },
+    {
+      "id": "audio.detect-speech-segments",
+      "version": "1.1.0",
+      "tracking_issue": 635,
+      "reason": "~66 MiB Silero VAD arena"
+    },
+    {
+      "id": "audio.transcribe-speech",
+      "version": "1.0.0",
+      "tracking_issue": 635,
+      "reason": "~232 MiB Whisper arena / extreme fuel"
+    },
+    {
+      "id": "audio.transcribe-speech",
+      "version": "1.1.0",
+      "tracking_issue": 635,
+      "reason": "~232 MiB Whisper arena / extreme fuel"
+    },
+    {
+      "id": "audio.transcribe-speech",
+      "version": "1.2.0",
+      "tracking_issue": 635,
+      "reason": "~232 MiB Whisper arena / extreme fuel"
+    }
+  ]
+}

@@ -66,6 +66,8 @@ The original `models: ["<id>", ...]` string-array shape is **grandfathered perma
 
 **Declare `licensing` for machine-readable reuse rights (required on newly added versions).** `specs/025-capability-licensing-metadata/spec.md`: add a flat `"licensing"` object with `spdx_expression`, `commercial_use` / `redistribution` (`allowed` | `forbidden` | `conditional` | `unknown`), `attribution_required`, and `verification.status: "maintainer-declared"`. This is **publisher-declared metadata**, signed with the contract — not a legal certification. It describes the capability implementation/artifact only and does **not** inherit to models, datasets, or other dependencies. Legacy contracts without the field index as `unknown`. `LicenseRef-*` requires `verification.evidence_url` or `license_files`. SPDX parsing uses pinned `license-expression==30.4.4`.
 
+**Required — fit stock Traverse host limits (registry#635).** The wasm32 execution gate runs your artifact at 32 MiB / 5_000_000 fuel (native `WasmExecutor` defaults). Over-limit artifacts fail as `capability.exceeds_host_limits`. See [CONTRIBUTING.md](../CONTRIBUTING.md#stock-host-resource-limits-required) and `catalog/host-limits-allowlist.json` (legacy over-limit entries only).
+
 **Required on newly added capability versions (activated 2026-09-16).** After FR-010 activation, a newly ADDED `contract.json` missing `licensing` fails CI (`contract.missing_licensing`). Already-published versions without the field remain valid and index as `unknown`.
 Never edit an already-merged `contract.json`; yank via `deprecated.json` and publish a new version instead.
 

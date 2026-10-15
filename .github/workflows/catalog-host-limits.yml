@@ -1,0 +1,26 @@
+# registry#635: nightly whole-catalog execution under stock Traverse host limits.
+name: catalog-host-limits
+
+on:
+  schedule:
+    # 06:15 UTC daily — after the typical US evening publish window.
+    - cron: "15 6 * * *"
+  workflow_dispatch:
+
+jobs:
+  catalog-host-limits:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Build limited wasm32 fixture runner
+        run: |
+          cargo build --manifest-path scripts/ci/wasm32_fixture_runner/Cargo.toml
+          echo "WASM32_FIXTURE_RUNNER_BIN=${{ github.workspace }}/scripts/ci/wasm32_fixture_runner/target/debug/wasm32-fixture-runner" >> "$GITHUB_ENV"
+
+      - name: Scan live catalog at stock host limits
+        run: python3 scripts/ci/capability_validation.py --catalog-host-limits
