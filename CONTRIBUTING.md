@@ -119,6 +119,35 @@ stdout containing `connector_unavailable`). Optional
 `use_cases[].connector_fixture` may declare exact response bodies; those
 bodies MUST NOT include host paths, credentials, or similar private keys.
 
+### Stock host resource limits (required)
+
+Every wasm32 fixture now runs under stock Traverse **native `WasmExecutor`
+defaults**: **32 MiB** linear memory and **5_000_000** fuel (pinned in
+`scripts/ci/wasm32_fixture_runner`, recorded as
+`host_limits_pin: traverse-runtime WasmExecutor defaults@0.15.0 …` in CI
+logs). Memory matches `runtime.wasm`'s nested ceiling; fuel is the stricter
+native default so a green gate fits both product hosts (registry#635 /
+decision-log entry 132).
+
+If your artifact's **initial** memory (WASM memory section min pages × 64 KiB)
+exceeds 32 MiB, or a happy fixture needs more than 5e6 fuel, CI fails with
+`capability.exceeds_host_limits` and prints required vs allowed numbers.
+There is no unlimited-wasmtime escape hatch on newly added contracts.
+
+**How to size before you open a PR**
+
+1. Build your wasm32 bin (`cargo build --release --target wasm32-unknown-unknown`).
+2. Inspect initial memory (e.g. `wasm-objdump -x` / `wasm-tools` memory section,
+   or run the fixture runner locally).
+3. Keep the arena ≤ 32 MiB, or shrink/quantize weights until it fits. Declared
+   contract resource requirements (when the Traverse amendment lands) must be
+   ≥ observed initial memory and cover happy-path fuel — still capped by this
+   registry-wide maximum.
+
+Known live over-limit catalog entries are listed in
+`catalog/host-limits-allowlist.json` for the nightly whole-catalog scan only;
+do **not** add new publishes to that list — fix the artifact instead.
+
 There is no attestation-only path — CI runs your test suite itself rather than trusting a
 self-reported percentage, the same reason `docs/decision-log.md` entry 61 stopped trusting
 `traverse-cli`'s own local-validation claim. If your organization can't contribute source

@@ -1700,6 +1700,13 @@ class CheckNewContractWasm32ExecutionTests(unittest.TestCase):
             "Result", (), {"returncode": returncode, "stdout": stdout, "stderr": stderr}
         )()
 
+    def _install_fake_runner(self, tmp: Path) -> Path:
+        """registry#635: every fixture run goes through the limited runner."""
+        runner = Path(tmp) / "fake-runner"
+        runner.write_text("#!/bin/sh\n")
+        runner.chmod(0o755)
+        return runner
+
     def test_missing_crate_directory_is_skipped(self):
         # check_new_contract_test_coverage already reports this; this check
         # must not double-report it.
@@ -1759,9 +1766,13 @@ class CheckNewContractWasm32ExecutionTests(unittest.TestCase):
                 os.chdir(tmp)
                 build_result = self._build_result(wasm_path)
                 run_result = self._wasmtime_result(stdout=json.dumps({"text": "hi"}))
+                runner = self._install_fake_runner(Path(tmp))
                 with patch(
                     "capability_validation.subprocess.run",
                     side_effect=[build_result, run_result],
+                ), patch(
+                    "capability_validation._wasm32_fixture_runner_bin",
+                    return_value=runner,
                 ):
                     capability_validation.check_new_contract_wasm32_execution(path, errors)
             finally:
@@ -1915,9 +1926,13 @@ class CheckNewContractWasm32ExecutionTests(unittest.TestCase):
                 os.chdir(tmp)
                 build_result = self._build_result(wasm_path)
                 run_result = self._wasmtime_result(returncode=1, stderr="panicked")
+                runner = self._install_fake_runner(Path(tmp))
                 with patch(
                     "capability_validation.subprocess.run",
                     side_effect=[build_result, run_result],
+                ), patch(
+                    "capability_validation._wasm32_fixture_runner_bin",
+                    return_value=runner,
                 ):
                     capability_validation.check_new_contract_wasm32_execution(path, errors)
             finally:
@@ -1948,9 +1963,13 @@ class CheckNewContractWasm32ExecutionTests(unittest.TestCase):
                 happy_run = self._wasmtime_result(stdout=json.dumps({"text": "hello…", "truncated": True}))
                 zero_run = self._wasmtime_result(stdout=json.dumps({"text": "", "truncated": True}))
                 oversized_run = self._wasmtime_result(stdout=json.dumps({"text": "", "truncated": True}))
+                runner = self._install_fake_runner(Path(tmp))
                 with patch(
                     "capability_validation.subprocess.run",
                     side_effect=[build_result, happy_run, zero_run, oversized_run],
+                ), patch(
+                    "capability_validation._wasm32_fixture_runner_bin",
+                    return_value=runner,
                 ):
                     capability_validation.check_new_contract_wasm32_execution(path, errors)
             finally:
@@ -1981,14 +2000,80 @@ class CheckNewContractWasm32ExecutionTests(unittest.TestCase):
                 oversized_run = self._wasmtime_result(
                     stdout=json.dumps({"text": "hello world", "truncated": False})
                 )
+                runner = self._install_fake_runner(Path(tmp))
                 with patch(
                     "capability_validation.subprocess.run",
                     side_effect=[build_result, happy_run, zero_run, oversized_run],
+                ), patch(
+                    "capability_validation._wasm32_fixture_runner_bin",
+                    return_value=runner,
                 ):
                     capability_validation.check_new_contract_wasm32_execution(path, errors)
             finally:
                 os.chdir(cwd)
             self.assertEqual(errors, [])
+
+    def test_host_limits_exceeded_is_rejected(self):
+        """registry#635: over-limit stderr maps to capability.exceeds_host_limits."""
+        with tempfile.TemporaryDirectory() as tmp:
+            use_cases = [{"happy": True, "input_example": {"text": "hi"}}]
+            path = self._write_contract(tmp, "example.new-capability", use_cases=use_cases)
+            self._write_crate(tmp, "example-new-capability")
+            wasm_path = Path(tmp) / "out.wasm"
+            wasm_path.write_bytes(b"\0asm")
+            errors: list = []
+            cwd = os.getcwd()
+            try:
+                os.chdir(tmp)
+                build_result = self._build_result(wasm_path)
+                run_result = self._wasmtime_result(
+                    returncode=3,
+                    stderr=(
+                        "capability.exceeds_host_limits: required_memory_bytes=38400000 "
+                        "allowed_memory_bytes=33554432 required_fuel=unknown "
+                        "allowed_fuel=5000000"
+                    ),
+                )
+                runner = self._install_fake_runner(Path(tmp))
+                with patch(
+                    "capability_validation.subprocess.run",
+                    side_effect=[build_result, run_result],
+                ), patch(
+                    "capability_validation._wasm32_fixture_runner_bin",
+                    return_value=runner,
+                ):
+                    capability_validation.check_new_contract_wasm32_execution(path, errors)
+            finally:
+                os.chdir(cwd)
+            codes = [e["code"] for e in errors]
+            self.assertIn("capability.exceeds_host_limits", codes)
+            self.assertTrue(any("33554432" in e["message"] for e in errors), errors)
+
+    def test_stderr_host_limits_helper(self):
+        self.assertTrue(
+            capability_validation._stderr_indicates_host_limits(
+                "capability.exceeds_host_limits: required_memory_bytes=1 "
+                "allowed_memory_bytes=1",
+                3,
+            )
+        )
+        self.assertFalse(
+            capability_validation._stderr_indicates_host_limits(
+                "panicked at src/main.rs", 1
+            )
+        )
+
+    def test_allowlist_keys_parse(self):
+        keys = capability_validation._allowlisted_host_limit_keys(
+            {
+                "entries": [
+                    {"id": "text.detect-entities", "version": "1.1.1"},
+                    {"id": "skip-me"},
+                ]
+            }
+        )
+        self.assertEqual(keys, {"text.detect-entities@1.1.1"})
+
 
 
 class ModelBackedWasm32ExecutionTests(unittest.TestCase):
@@ -2039,9 +2124,19 @@ class ModelBackedWasm32ExecutionTests(unittest.TestCase):
     def _check(self, tmp, path, run_side_effect=None, urlopen=None):
         errors: list = []
         cwd = os.getcwd()
+        runner = Path(tmp) / "fake-runner"
+        if not runner.is_file():
+            runner.write_text("#!/bin/sh\n")
+            runner.chmod(0o755)
         try:
             os.chdir(tmp)
-            with patch("capability_validation.subprocess.run", side_effect=run_side_effect or []) as run:
+            with patch(
+                "capability_validation.subprocess.run",
+                side_effect=run_side_effect or [],
+            ) as run, patch(
+                "capability_validation._wasm32_fixture_runner_bin",
+                return_value=runner,
+            ):
                 if urlopen is not None:
                     with patch("capability_validation.urllib.request.urlopen", urlopen):
                         capability_validation.check_new_contract_wasm32_execution(path, errors)

@@ -109,11 +109,19 @@ Also enforces registry#576 (decision-log entry 126): when a newly-ADDED
 contract declares non-empty connector_requirements (or its wasm imports
 traverse_host::connector_invoke), the wasm32 gate provisions a
 deterministic mediated connector_invoke mock via
-scripts/ci/wasm32_fixture_runner rather than bare `wasmtime run`, runs a
-positive activated fixture and a negative unbound (fail-closed) fixture,
-and accepts optional use_cases[].connector_fixture response bodies that
-MUST NOT carry host paths or credentials. Pure capabilities keep the
-wasmtime CLI path unchanged.
+scripts/ci/wasm32_fixture_runner, runs a positive activated fixture and a
+negative unbound (fail-closed) fixture, and accepts optional
+use_cases[].connector_fixture response bodies that MUST NOT carry host
+paths or credentials.
+
+Also enforces registry#635 (decision-log entry 132): every wasm32 fixture
+run (pure and connector-backed) executes under stock Traverse
+`WasmExecutor` defaults (32 MiB memory / 5_000_000 fuel, pinned in
+scripts/ci/wasm32_fixture_runner and catalog/host-limits-allowlist.json).
+Artifacts that only pass under unlimited wasmtime fail as
+`capability.exceeds_host_limits`. A closed allowlist covers known live
+over-limit catalog entries for the nightly whole-catalog scan; newly
+ADDED contracts are never exempt.
 
 Also enforces registry#510 (decision-log entry 113 Q5): a newly-ADDED
 contract.json's artifact.url must actually be fetchable and its bytes must
@@ -245,6 +253,19 @@ RISK_EFFECT_CLASSES = {"pure_read", "state_write", "external_effect", "irreversi
 RISK_DETERMINISM_CLASSES = {"deterministic", "externally_variable", "model_derived"}
 RISK_DATA_CLASSIFICATIONS = {"public", "internal", "confidential", "restricted"}
 RISK_RELIABILITY_FIELDS = ("idempotency_required", "retryable", "compensation_available")
+
+# registry#635: stock Traverse native WasmExecutor defaults (traverse-runtime
+# 0.15.0). Memory matches runtime.wasm nested default (32 MiB); fuel is the
+# stricter native default so an artifact that passes fits both stock hosts.
+HOST_LIMITS_FUEL = 5_000_000
+HOST_LIMITS_MEMORY_BYTES = 32 * 1024 * 1024
+HOST_LIMITS_PIN = (
+    "traverse-runtime WasmExecutor defaults@0.15.0 "
+    f"fuel={HOST_LIMITS_FUEL} memory_bytes={HOST_LIMITS_MEMORY_BYTES}"
+)
+HOST_LIMITS_ALLOWLIST_PATH = Path("catalog/host-limits-allowlist.json")
+# Runner exit code when the guest exceeds configured host limits.
+WASM32_EXIT_EXCEEDS_HOST_LIMITS = 3
 
 
 def fail(errors, code, path, message):
@@ -2393,47 +2414,85 @@ def _wasm32_fixture_runner_bin() -> Path:
     )
 
 
-def _run_wasm32_fixture(wasm_path: Path, fixture: dict, connector_fixture=None, timeout=30):
-    """Runs one JSON fixture through wasmtime (stdin in, stdout out -- the
-    wasi-capability-runtime ABI every capability-src/ crate shares). Returns
-    (returncode, stdout, stderr); returncode is None if the runner itself
-    could not be invoked.
+def _load_host_limits_allowlist() -> dict:
+    """Load catalog/host-limits-allowlist.json (registry#635). Missing file
+    means an empty allowlist -- newly required checks stay fail-closed."""
+    if not HOST_LIMITS_ALLOWLIST_PATH.is_file():
+        return {"pin": HOST_LIMITS_PIN, "entries": []}
+    try:
+        data = json.loads(HOST_LIMITS_ALLOWLIST_PATH.read_text())
+    except Exception:
+        return {"pin": HOST_LIMITS_PIN, "entries": []}
+    if not isinstance(data, dict):
+        return {"pin": HOST_LIMITS_PIN, "entries": []}
+    entries = data.get("entries")
+    if not isinstance(entries, list):
+        data["entries"] = []
+    return data
 
-    When connector_fixture is provided (registry#576), uses the mediated
-    connector_invoke mock host instead of bare `wasmtime run`.
+
+def _allowlisted_host_limit_keys(allowlist: dict) -> set:
+    keys = set()
+    for entry in allowlist.get("entries") or []:
+        if not isinstance(entry, dict):
+            continue
+        cap_id = entry.get("id")
+        version = entry.get("version")
+        if isinstance(cap_id, str) and isinstance(version, str):
+            keys.add(f"{cap_id}@{version}")
+    return keys
+
+
+def _stderr_indicates_host_limits(stderr: str, returncode) -> bool:
+    if not isinstance(stderr, str):
+        return False
+    if "capability.exceeds_host_limits" in stderr:
+        return True
+    if returncode == WASM32_EXIT_EXCEEDS_HOST_LIMITS:
+        return True
+    lower = stderr.lower()
+    return (
+        "resource limiter" in lower
+        or "all fuel consumed" in lower
+        or ("memory" in lower and ("grow" in lower or "limit" in lower))
+    )
+
+
+def _emit_host_limits_pin() -> None:
+    """Record the pinned stock-host limits in CI logs (registry#635 AC)."""
+    print(f"host_limits_pin: {HOST_LIMITS_PIN}", flush=True)
+
+
+def _run_wasm32_fixture(wasm_path: Path, fixture: dict, connector_fixture=None, timeout=30):
+    """Runs one JSON fixture through the limited wasm32 fixture runner (stdin
+    in, stdout out -- the wasi-capability-runtime ABI every capability-src/
+    crate shares). Returns (returncode, stdout, stderr); returncode is None
+    if the runner itself could not be invoked.
+
+    Always uses scripts/ci/wasm32_fixture_runner under stock Traverse
+    WasmExecutor fuel/memory defaults (registry#635). When
+    connector_fixture is provided (registry#576), also provisions the
+    mediated connector_invoke mock.
     """
     try:
-        if connector_fixture is None:
-            result = subprocess.run(
-                ["wasmtime", "run", str(wasm_path)],
-                input=json.dumps(fixture),
-                capture_output=True,
-                text=True,
-                timeout=timeout,
-            )
-            return result.returncode, result.stdout, result.stderr
-
         runner = _wasm32_fixture_runner_bin()
         if not runner.is_file():
             return (
                 None,
                 "",
-                f"connector-aware wasm32 fixture runner not found at {runner} "
+                f"wasm32 fixture runner not found at {runner} "
                 "(build scripts/ci/wasm32_fixture_runner or set "
                 "WASM32_FIXTURE_RUNNER_BIN)",
             )
 
+        cmd = [str(runner), "--wasm", str(wasm_path)]
         with tempfile.TemporaryDirectory() as tmp:
-            fixture_path = Path(tmp) / "connector-fixture.json"
-            fixture_path.write_text(json.dumps(connector_fixture))
+            if connector_fixture is not None:
+                fixture_path = Path(tmp) / "connector-fixture.json"
+                fixture_path.write_text(json.dumps(connector_fixture))
+                cmd.extend(["--connector-fixture", str(fixture_path)])
             result = subprocess.run(
-                [
-                    str(runner),
-                    "--wasm",
-                    str(wasm_path),
-                    "--connector-fixture",
-                    str(fixture_path),
-                ],
+                cmd,
                 input=json.dumps(fixture),
                 capture_output=True,
                 text=True,
@@ -2612,6 +2671,8 @@ def check_new_contract_wasm32_execution(path: Path, errors: list) -> None:
     if not isinstance(capability_id, str) or not capability_id.strip():
         return
 
+    _emit_host_limits_pin()
+
     crate_dir = Path("capability-src") / expected_capability_src_crate(capability_id)
     manifest_path = crate_dir / "Cargo.toml"
     if not manifest_path.is_file():
@@ -2776,14 +2837,23 @@ def check_new_contract_wasm32_execution(path: Path, errors: list) -> None:
             )
             continue
         if returncode != 0:
-            fail(
-                errors,
-                "capability.wasm32_execution_failed",
-                str(path),
-                f"wasm32 execution of '{capability_id}' panicked or exited "
-                f"non-zero (code {returncode}) on fixture '{label}' "
-                f"({json.dumps(fixture)}): {stderr.strip()[-2000:]}",
-            )
+            if _stderr_indicates_host_limits(stderr, returncode):
+                fail(
+                    errors,
+                    "capability.exceeds_host_limits",
+                    str(path),
+                    f"'{capability_id}' fixture '{label}' exceeds stock Traverse "
+                    f"host limits ({HOST_LIMITS_PIN}): {stderr.strip()[-2000:]}",
+                )
+            else:
+                fail(
+                    errors,
+                    "capability.wasm32_execution_failed",
+                    str(path),
+                    f"wasm32 execution of '{capability_id}' panicked or exited "
+                    f"non-zero (code {returncode}) on fixture '{label}' "
+                    f"({json.dumps(fixture)}): {stderr.strip()[-2000:]}",
+                )
             continue
 
         if label == "connector_unbound":
@@ -3628,11 +3698,166 @@ def run_event_product_validation(errors: list) -> None:
     )
 
 
+
+def _contract_is_lifecycle_inactive(contract_path: Path) -> bool:
+    """Skip deprecated/revoked versions in the nightly host-limits scan."""
+    version_dir = contract_path.parent
+    return (version_dir / "deprecated.json").is_file() or (
+        version_dir / "revoked.json"
+    ).is_file()
+
+
+def check_catalog_host_limits(errors: list, fetch: bool = True) -> None:
+    """registry#635: run every live catalog artifact under stock host limits.
+
+    Downloads each non-deprecated/non-revoked contract's artifact.url and
+    executes a single fixture through the limited wasm32 fixture runner.
+    Allowlisted over-limit entries are listed but do not fail the job; any
+    other over-limit entry fails as capability.exceeds_host_limits.
+    """
+    _emit_host_limits_pin()
+    allowlist = _load_host_limits_allowlist()
+    allowlisted = _allowlisted_host_limit_keys(allowlist)
+    print(
+        json.dumps(
+            {
+                "host_limits_allowlist_entries": sorted(allowlisted),
+                "host_limits_pin": HOST_LIMITS_PIN,
+            },
+            indent=2,
+        ),
+        flush=True,
+    )
+
+    runner = _wasm32_fixture_runner_bin()
+    if not runner.is_file():
+        fail(
+            errors,
+            "capability.wasm32_execution_failed",
+            "catalog/",
+            f"wasm32 fixture runner not found at {runner}",
+        )
+        return
+
+    observed_over_limit = []
+    capabilities_dir = Path("capabilities")
+    if not capabilities_dir.is_dir():
+        return
+
+    for contract_path in sorted(capabilities_dir.rglob("contract.json")):
+        if _contract_is_lifecycle_inactive(contract_path):
+            continue
+        try:
+            contract = json.loads(contract_path.read_text())
+        except Exception:
+            continue
+        capability_id = contract.get("id")
+        version = contract.get("version")
+        artifact = contract.get("artifact") if isinstance(contract.get("artifact"), dict) else {}
+        url = artifact.get("url") if isinstance(artifact, dict) else None
+        if not isinstance(capability_id, str) or not isinstance(version, str):
+            continue
+        if not isinstance(url, str) or not url.strip():
+            continue
+
+        key = f"{capability_id}@{version}"
+        happy = _happy_path_fixtures(contract)
+        fixture = happy[0] if happy else {}
+
+        with tempfile.TemporaryDirectory() as tmp:
+            wasm_path = Path(tmp) / "artifact.wasm"
+            if fetch:
+                request = urllib.request.Request(
+                    url, headers={"User-Agent": "traverse-registry-ci-host-limits"}
+                )
+                try:
+                    with urllib.request.urlopen(request, timeout=120) as response:
+                        wasm_path.write_bytes(response.read())
+                except (urllib.error.URLError, OSError, ValueError) as exc:
+                    fail(
+                        errors,
+                        "contract.artifact_url_unreachable",
+                        str(contract_path),
+                        f"nightly host-limits scan could not fetch {url}: {exc}",
+                    )
+                    continue
+            else:
+                # Unit tests inject bytes via a local path in artifact.url when
+                # fetch=False is not used; skip missing files.
+                continue
+
+            returncode, _stdout, stderr = _run_wasm32_fixture(
+                wasm_path, fixture, connector_fixture=None, timeout=120
+            )
+            if returncode is None:
+                fail(
+                    errors,
+                    "capability.wasm32_execution_failed",
+                    str(contract_path),
+                    f"unable to run host-limits check for {key}: {stderr}",
+                )
+                continue
+            if returncode == 0:
+                continue
+            if not _stderr_indicates_host_limits(stderr, returncode):
+                fail(
+                    errors,
+                    "capability.wasm32_execution_failed",
+                    str(contract_path),
+                    f"host-limits scan of {key} exited {returncode}: "
+                    f"{stderr.strip()[-1500:]}",
+                )
+                continue
+
+            observed_over_limit.append(key)
+            detail = stderr.strip()[-1500:]
+            print(
+                json.dumps(
+                    {
+                        "code": "capability.exceeds_host_limits",
+                        "id": capability_id,
+                        "version": version,
+                        "allowlisted": key in allowlisted,
+                        "message": detail,
+                    }
+                ),
+                flush=True,
+            )
+            if key not in allowlisted:
+                fail(
+                    errors,
+                    "capability.exceeds_host_limits",
+                    str(contract_path),
+                    f"{key} exceeds stock Traverse host limits "
+                    f"({HOST_LIMITS_PIN}) and is not on "
+                    f"{HOST_LIMITS_ALLOWLIST_PATH}: {detail}",
+                )
+
+    print(
+        json.dumps(
+            {
+                "host_limits_over_limit": sorted(observed_over_limit),
+                "host_limits_allowlisted_hit": sorted(
+                    k for k in observed_over_limit if k in allowlisted
+                ),
+            },
+            indent=2,
+        ),
+        flush=True,
+    )
+
+
 def main() -> int:
     errors: list = []
     capabilities_dir = Path("capabilities")
     workflows_dir = Path("workflows")
     personas_dir = Path("personas")
+
+    if len(sys.argv) >= 2 and sys.argv[1] == "--catalog-host-limits":
+        check_catalog_host_limits(errors)
+        status = "passed" if not errors else "failed"
+        print(json.dumps({"status": status, "failures": errors}, indent=2))
+        return 1 if errors else 0
 
     base_sha = None
     head_sha = None
