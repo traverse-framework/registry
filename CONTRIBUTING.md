@@ -41,6 +41,24 @@ If you're adding a new `personas/<id>/<version>/persona.json`, scaffold it with
 `scripts/scaffold/new-persona.sh` rather than hand-writing it — it prompts for every
 required field (including `distinguished_from`) and self-validates before you commit.
 
+### Artifact reuse marker (metadata-only successors)
+
+When your new contract version reuses an older `artifacts/<id>-<tag>` WASM
+(tag version ≠ `contract.version`), declare on the contract:
+
+```json
+"artifact_reuse": {
+  "kind": "metadata_only_successor",
+  "of": "<id>@<tag-version>",
+  "justification": "why reuse is safe"
+}
+```
+
+`of`'s digest must match, and execution-relevant fields must not drift versus
+the predecessor (registry#634 / spec 007 amendment). Already-published
+versions use an additive `artifact_reuse.json` sibling instead of editing
+immutable `contract.json`.
+
 ### Mirror-before-green: `artifact.url` must resolve from this repo
 
 A newly-added `contract.json`'s `artifact.url` must point at a GitHub Release

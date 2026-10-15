@@ -1,0 +1,5 @@
+{
+  "kind": "metadata_only_successor",
+  "of": "text.detect-entities@1.0.0",
+  "justification": "Metadata-only successor of text.detect-entities@1.0.0: contract version 1.1.0 reuses the byte-identical WASM artifact hosted under artifacts/text.detect-entities-1.0.0 (digest sha256:c3f1ab26fc20e9f81dc117e34073cde3960861798d67adad5eb73a361eceb788). Authoring/risk/lifecycle/catalog metadata may differ; artifact bytes do not."
+}

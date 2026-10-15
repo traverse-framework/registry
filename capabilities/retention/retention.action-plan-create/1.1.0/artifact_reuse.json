@@ -1,0 +1,5 @@
+{
+  "kind": "metadata_only_successor",
+  "of": "retention.action-plan-create@1.0.0",
+  "justification": "Metadata-only successor of retention.action-plan-create@1.0.0: contract version 1.1.0 reuses the byte-identical WASM artifact hosted under artifacts/retention.action-plan-create-1.0.0 (digest sha256:2b7bb94b4206bc7b58435d405bdf1245358507f04aeb969867f9a2fb72818241). Authoring/risk/lifecycle/catalog metadata may differ; artifact bytes do not."
+}

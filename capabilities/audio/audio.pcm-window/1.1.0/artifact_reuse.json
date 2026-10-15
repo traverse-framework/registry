@@ -1,0 +1,5 @@
+{
+  "kind": "metadata_only_successor",
+  "of": "audio.pcm-window@1.0.0",
+  "justification": "Metadata-only successor of audio.pcm-window@1.0.0: contract version 1.1.0 reuses the byte-identical WASM artifact hosted under artifacts/audio.pcm-window-1.0.0 (digest sha256:d0270d83f491ba8540fc4bef84445ac1dc39d3068a283aac72be1adb5b9cdbfd). Authoring/risk/lifecycle/catalog metadata may differ; artifact bytes do not."
+}

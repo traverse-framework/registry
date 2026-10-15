@@ -1,0 +1,5 @@
+{
+  "kind": "metadata_only_successor",
+  "of": "traverse-starter.validate@1.1.0",
+  "justification": "Metadata-only successor of traverse-starter.validate@1.1.0: contract version 1.2.2 reuses the byte-identical WASM artifact hosted under artifacts/traverse-starter.validate-1.1.0 (digest sha256:7b7f4e7cff89190f965ddfab8611c1a872c9636196a863884dee28d2335b7858). Authoring/risk/lifecycle/catalog metadata may differ; artifact bytes do not."
+}

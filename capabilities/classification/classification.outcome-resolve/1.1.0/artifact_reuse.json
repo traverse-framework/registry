@@ -1,0 +1,5 @@
+{
+  "kind": "metadata_only_successor",
+  "of": "classification.outcome-resolve@1.0.0",
+  "justification": "Metadata-only successor of classification.outcome-resolve@1.0.0: contract version 1.1.0 reuses the byte-identical WASM artifact hosted under artifacts/classification.outcome-resolve-1.0.0 (digest sha256:a3d2c6d6c203975ebee32bfd31f6353ba60dc1d2524df66caa87019fdbb54b42). Authoring/risk/lifecycle/catalog metadata may differ; artifact bytes do not."
+}

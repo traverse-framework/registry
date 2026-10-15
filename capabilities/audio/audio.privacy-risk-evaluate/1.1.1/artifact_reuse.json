@@ -1,0 +1,5 @@
+{
+  "kind": "metadata_only_successor",
+  "of": "audio.privacy-risk-evaluate@1.0.0",
+  "justification": "Metadata-only successor of audio.privacy-risk-evaluate@1.0.0: contract version 1.1.1 reuses the byte-identical WASM artifact hosted under artifacts/audio.privacy-risk-evaluate-1.0.0 (digest sha256:73354780a23443a42e6ff78e3e44c02f1d0d0726b739704aa97cecbe056208e0). Authoring/risk/lifecycle/catalog metadata may differ; artifact bytes do not."
+}

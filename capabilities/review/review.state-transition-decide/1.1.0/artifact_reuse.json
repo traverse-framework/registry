@@ -1,0 +1,5 @@
+{
+  "kind": "metadata_only_successor",
+  "of": "review.state-transition-decide@1.0.0",
+  "justification": "Metadata-only successor of review.state-transition-decide@1.0.0: contract version 1.1.0 reuses the byte-identical WASM artifact hosted under artifacts/review.state-transition-decide-1.0.0 (digest sha256:00ec99d9a2cc7a6ff14bf93c76b3c6c100fb829e35f53973caf2d82c342c26f8). Authoring/risk/lifecycle/catalog metadata may differ; artifact bytes do not."
+}

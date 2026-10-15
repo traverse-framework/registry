@@ -1,0 +1,5 @@
+{
+  "kind": "metadata_only_successor",
+  "of": "validation.normalize-phone-number@1.1.0",
+  "justification": "Metadata-only successor of validation.normalize-phone-number@1.1.0: contract version 1.2.0 reuses the byte-identical WASM artifact hosted under artifacts/validation.normalize-phone-number-1.0.0 (digest sha256:bdbb0e500120c40dc385088d5a3a9c1fd60f146cd73b4833b13e7abbad9147f2). Artifact tag version is 1.0.0; the tag version contract has no digest-bearing artifact, so of points at the earliest digest-matched version. Authoring/risk/lifecycle/catalog metadata may differ; artifact bytes do not."
+}

@@ -1,0 +1,5 @@
+{
+  "kind": "metadata_only_successor",
+  "of": "traverse-starter.summarize@1.1.0",
+  "justification": "Metadata-only successor of traverse-starter.summarize@1.1.0: contract version 1.2.1 reuses the byte-identical WASM artifact hosted under artifacts/traverse-starter.summarize-1.1.0 (digest sha256:0918755a5bff7fdb1e614003a610482c8b4482b3f08f630c86c9dbba4c437150). Authoring/risk/lifecycle/catalog metadata may differ; artifact bytes do not."
+}

@@ -1,0 +1,5 @@
+{
+  "kind": "metadata_only_successor",
+  "of": "doc-approval.recommend@1.1.0",
+  "justification": "Metadata-only successor of doc-approval.recommend@1.1.0: contract version 1.2.0 reuses the byte-identical WASM artifact hosted under artifacts/doc-approval.recommend-1.1.0 (digest sha256:bc2e822a9aeb1188f5f45862425cf785f9ddc0d562380031b24b5c37465ecada). Authoring/risk/lifecycle/catalog metadata may differ; artifact bytes do not."
+}

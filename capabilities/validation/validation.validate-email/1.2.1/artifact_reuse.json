@@ -1,0 +1,5 @@
+{
+  "kind": "metadata_only_successor",
+  "of": "validation.validate-email@1.1.0",
+  "justification": "Metadata-only successor of validation.validate-email@1.1.0: contract version 1.2.1 reuses the byte-identical WASM artifact hosted under artifacts/validation.validate-email-1.0.0 (digest sha256:9f90eac5245f10d4ae63f9dfcaa91f63a05e8230eafb6495467c58f4f231b78c). Artifact tag version is 1.0.0; the tag version contract has no digest-bearing artifact, so of points at the earliest digest-matched version. Authoring/risk/lifecycle/catalog metadata may differ; artifact bytes do not."
+}

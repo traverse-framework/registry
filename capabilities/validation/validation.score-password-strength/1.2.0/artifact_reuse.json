@@ -1,0 +1,5 @@
+{
+  "kind": "metadata_only_successor",
+  "of": "validation.score-password-strength@1.0.0",
+  "justification": "Metadata-only successor of validation.score-password-strength@1.0.0: contract version 1.2.0 reuses the byte-identical WASM artifact hosted under artifacts/validation.score-password-strength-1.0.0 (digest sha256:b0a46a0682fa866f96305e830cc8eef2d114249507700b6d4e42121585c02340). Authoring/risk/lifecycle/catalog metadata may differ; artifact bytes do not."
+}
