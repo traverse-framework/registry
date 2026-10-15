@@ -1,0 +1,5 @@
+{
+  "kind": "metadata_only_successor",
+  "of": "audio.wav-pcm16-decode@1.0.0",
+  "justification": "Metadata-only successor of audio.wav-pcm16-decode@1.0.0: contract version 1.1.1 reuses the byte-identical WASM artifact hosted under artifacts/audio.wav-pcm16-decode-1.0.0 (digest sha256:11c30f48f91265e439d05b8e29697cdaf03bdc7dfbf6ea56ab0fc4d9597c5c0e). Authoring/risk/lifecycle/catalog metadata may differ; artifact bytes do not."
+}

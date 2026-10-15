@@ -1,0 +1,5 @@
+{
+  "kind": "metadata_only_successor",
+  "of": "classifier.release-gate-evaluate@1.0.0",
+  "justification": "Metadata-only successor of classifier.release-gate-evaluate@1.0.0: contract version 1.1.0 reuses the byte-identical WASM artifact hosted under artifacts/classifier.release-gate-evaluate-1.0.0 (digest sha256:72f4ebda68fec383946c388b337fed1b698a192491f2eed38aa3ade9175a09dd). Authoring/risk/lifecycle/catalog metadata may differ; artifact bytes do not."
+}

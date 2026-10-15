@@ -1,0 +1,5 @@
+{
+  "kind": "metadata_only_successor",
+  "of": "meeting-notes.process@1.1.0",
+  "justification": "Metadata-only successor of meeting-notes.process@1.1.0: contract version 1.3.1 reuses the byte-identical WASM artifact hosted under artifacts/meeting-notes.process-1.1.0 (digest sha256:ec192a0c2104b08bee76418c5c6d44358036568d655d8465e506858d1aaadbf2). Authoring/risk/lifecycle/catalog metadata may differ; artifact bytes do not."
+}

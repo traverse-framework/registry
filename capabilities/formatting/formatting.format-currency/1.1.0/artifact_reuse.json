@@ -1,0 +1,5 @@
+{
+  "kind": "metadata_only_successor",
+  "of": "formatting.format-currency@1.0.0",
+  "justification": "Metadata-only successor of formatting.format-currency@1.0.0: contract version 1.1.0 reuses the byte-identical WASM artifact hosted under artifacts/formatting.format-currency-1.0.0 (digest sha256:e6bcb6bd6052ad65472b19dd52d464641279666179b8ac724bec11c7e56089fd). Authoring/risk/lifecycle/catalog metadata may differ; artifact bytes do not."
+}

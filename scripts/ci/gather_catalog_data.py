@@ -234,6 +234,18 @@ def gather_capabilities() -> list:
 
     for contract_path in sorted(capabilities_dir.rglob("contract.json")):
         contract = json.loads(contract_path.read_text())
+        # registry#634: project artifact_reuse from an additive sibling when
+        # the immutable contract predates the on-contract field.
+        if not isinstance(contract.get("artifact_reuse"), dict):
+            reuse_path = contract_path.parent / "artifact_reuse.json"
+            if reuse_path.is_file():
+                try:
+                    reuse = json.loads(reuse_path.read_text())
+                except Exception:
+                    reuse = None
+                if isinstance(reuse, dict):
+                    contract = dict(contract)
+                    contract["artifact_reuse"] = reuse
         deprecated = (contract_path.parent / "deprecated.json").is_file()
         # specs/026-model-rights-compliance FR-013: a revoked version keeps
         # its page (and full rights record) but is never presented as active.

@@ -1,0 +1,5 @@
+{
+  "kind": "metadata_only_successor",
+  "of": "audio.pcm-transform@1.0.0",
+  "justification": "Metadata-only successor of audio.pcm-transform@1.0.0: contract version 1.1.1 reuses the byte-identical WASM artifact hosted under artifacts/audio.pcm-transform-1.0.0 (digest sha256:6fb671992373f11707eae67903bf3de259d6cd8fffce5e6bb78408a6a5c7a8a0). Authoring/risk/lifecycle/catalog metadata may differ; artifact bytes do not."
+}

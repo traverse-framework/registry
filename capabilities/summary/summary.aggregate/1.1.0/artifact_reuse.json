@@ -1,0 +1,5 @@
+{
+  "kind": "metadata_only_successor",
+  "of": "summary.aggregate@1.0.0",
+  "justification": "Metadata-only successor of summary.aggregate@1.0.0: contract version 1.1.0 reuses the byte-identical WASM artifact hosted under artifacts/summary.aggregate-1.0.0 (digest sha256:0464da7ebe4784a3b24717b08d26c168b5e901f4d8d5b6efc9693c3323d1d5dd). Authoring/risk/lifecycle/catalog metadata may differ; artifact bytes do not."
+}

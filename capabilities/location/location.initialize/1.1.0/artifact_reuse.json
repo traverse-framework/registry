@@ -1,0 +1,5 @@
+{
+  "kind": "metadata_only_successor",
+  "of": "location.initialize@1.0.0",
+  "justification": "Metadata-only successor of location.initialize@1.0.0: contract version 1.1.0 reuses the byte-identical WASM artifact hosted under artifacts/location.initialize-1.0.0 (digest sha256:26f2c732df012844571409db6a2ac195b2d1f8a496520e82760a3c748eea8269). Authoring/risk/lifecycle/catalog metadata may differ; artifact bytes do not."
+}

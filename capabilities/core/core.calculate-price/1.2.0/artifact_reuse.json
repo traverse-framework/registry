@@ -1,0 +1,5 @@
+{
+  "kind": "metadata_only_successor",
+  "of": "core.calculate-price@1.1.0",
+  "justification": "Metadata-only successor of core.calculate-price@1.1.0: contract version 1.2.0 reuses the byte-identical WASM artifact hosted under artifacts/core.calculate-price-1.1.0 (digest sha256:a046e5d001ae78b8de339d40378e2c22f04384d601a1b801b52cf99a3e44f0b2). Authoring/risk/lifecycle/catalog metadata may differ; artifact bytes do not."
+}

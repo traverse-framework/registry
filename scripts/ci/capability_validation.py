@@ -2284,6 +2284,241 @@ def check_new_contracts_have_test_coverage(base_sha: str, head_sha: str, errors:
             check_new_contract_test_coverage(Path(path), errors)
 
 
+
+# registry#634 / specs/007-artifact-hosting amendment: when a contract's
+# artifact release tag version differs from the contract version, a
+# machine-readable metadata_only_successor marker is required (on the
+# contract as artifact_reuse, or as an additive artifact_reuse.json sibling
+# so already-published immutable contracts can be backfilled without edit).
+ARTIFACT_TAG_RE = re.compile(
+    r"/releases/download/artifacts/([^/]+)/[^/]+$"
+)
+ARTIFACT_REUSE_KINDS = {"metadata_only_successor"}
+# Top-level `entrypoint` is the FR-014 catalog boolean, not WASM execution shape
+# (`execution.entrypoint` is covered via the `execution` object).
+ARTIFACT_REUSE_EXECUTION_FIELDS = (
+    "execution",
+    "inputs",
+    "outputs",
+    "connector_requirements",
+    "state_schema",
+    "event_trigger",
+    "artifact_type",
+)
+ARTIFACT_REUSE_OF_RE = re.compile(
+    r"^(?P<id>[A-Za-z0-9][A-Za-z0-9._-]*)@(?P<version>[0-9]+\.[0-9]+\.[0-9]+(?:[-+][A-Za-z0-9.-]+)?)$"
+)
+
+
+def artifact_release_tag(url: str):
+    if not isinstance(url, str):
+        return None
+    match = ARTIFACT_TAG_RE.search(url)
+    return match.group(1) if match else None
+
+
+def artifact_tag_version(capability_id: str, url: str):
+    """Return the semver suffix of artifacts/<id>-<version> when it matches."""
+    tag = artifact_release_tag(url)
+    if not tag or not isinstance(capability_id, str):
+        return None
+    prefix = f"{capability_id}-"
+    if not tag.startswith(prefix):
+        return None
+    return tag[len(prefix):]
+
+
+def load_artifact_reuse_marker(contract_path: Path, contract: dict):
+    """Prefer contract.artifact_reuse; fall back to sibling artifact_reuse.json."""
+    marker = contract.get("artifact_reuse")
+    if isinstance(marker, dict):
+        return marker, "contract.artifact_reuse", False
+    sibling = contract_path.parent / "artifact_reuse.json"
+    if sibling.is_file():
+        try:
+            loaded = json.loads(sibling.read_text())
+        except Exception:
+            return None, str(sibling), True
+        if isinstance(loaded, dict):
+            return loaded, str(sibling), True
+    return None, None, False
+
+
+def find_capability_contract(root: Path, capability_id: str, version: str):
+    for path in (root / "capabilities").rglob("contract.json"):
+        if path.parent.name != version:
+            continue
+        if path.parent.parent.name != capability_id:
+            continue
+        return path
+    return None
+
+
+def check_artifact_reuse_marker(contract_path: Path, errors: list, root: Path = Path(".")) -> None:
+    """Whole-tree: tag/version mismatch requires a valid reuse marker."""
+    try:
+        contract = json.loads(contract_path.read_text())
+    except Exception:
+        return
+    artifact = contract.get("artifact")
+    if not isinstance(artifact, dict):
+        return
+    url = artifact.get("url")
+    capability_id = contract.get("id")
+    version = contract.get("version")
+    if not isinstance(capability_id, str) or not isinstance(version, str):
+        return
+    tag_version = artifact_tag_version(capability_id, url if isinstance(url, str) else "")
+    if tag_version is None or tag_version == version:
+        return
+
+    marker, source, from_sibling = load_artifact_reuse_marker(contract_path, contract)
+    if marker is None:
+        fail(
+            errors,
+            "contract.artifact_reuse_required",
+            str(contract_path),
+            f"artifact tag version '{tag_version}' != contract version '{version}'; "
+            "declare artifact_reuse (or sibling artifact_reuse.json) with "
+            "kind=metadata_only_successor (spec 007 amendment / registry#634)",
+        )
+        return
+
+    kind = marker.get("kind")
+    of_ref = marker.get("of")
+    justification = marker.get("justification")
+    if kind not in ARTIFACT_REUSE_KINDS:
+        fail(
+            errors,
+            "contract.invalid_artifact_reuse",
+            str(contract_path),
+            f"{source}: kind must be one of {sorted(ARTIFACT_REUSE_KINDS)}",
+        )
+        return
+    if not isinstance(of_ref, str) or not ARTIFACT_REUSE_OF_RE.match(of_ref):
+        fail(
+            errors,
+            "contract.invalid_artifact_reuse",
+            str(contract_path),
+            f"{source}: of must be '<id>@<semver>'",
+        )
+        return
+    if not isinstance(justification, str) or not justification.strip():
+        fail(
+            errors,
+            "contract.invalid_artifact_reuse",
+            str(contract_path),
+            f"{source}: justification must be a non-empty string",
+        )
+        return
+
+    match = ARTIFACT_REUSE_OF_RE.match(of_ref)
+    pred_id, pred_version = match.group("id"), match.group("version")
+    if pred_id != capability_id:
+        fail(
+            errors,
+            "contract.invalid_artifact_reuse",
+            str(contract_path),
+            f"{source}: of id '{pred_id}' must match contract id '{capability_id}'",
+        )
+        return
+
+    pred_path = find_capability_contract(root, pred_id, pred_version)
+    if pred_path is None:
+        fail(
+            errors,
+            "contract.artifact_reuse_predecessor_missing",
+            str(contract_path),
+            f"{source}: predecessor {of_ref} not found under capabilities/",
+        )
+        return
+    try:
+        predecessor = json.loads(pred_path.read_text())
+    except Exception as exc:
+        fail(
+            errors,
+            "contract.artifact_reuse_predecessor_unreadable",
+            str(contract_path),
+            f"unable to read predecessor {pred_path}: {exc}",
+        )
+        return
+
+    pred_artifact = predecessor.get("artifact") if isinstance(predecessor, dict) else None
+    pred_digest = pred_artifact.get("digest") if isinstance(pred_artifact, dict) else None
+    digest = artifact.get("digest")
+
+    tag_pred_path = find_capability_contract(root, capability_id, tag_version)
+    tag_pred = None
+    if tag_pred_path is not None:
+        try:
+            tag_pred = json.loads(tag_pred_path.read_text())
+        except Exception:
+            tag_pred = None
+    tag_has_digest = isinstance((tag_pred or {}).get("artifact"), dict) and isinstance(
+        ((tag_pred or {}).get("artifact") or {}).get("digest"), str
+    )
+
+    if pred_version != tag_version and tag_has_digest:
+        fail(
+            errors,
+            "contract.invalid_artifact_reuse",
+            str(contract_path),
+            f"{source}: of version '{pred_version}' must equal artifact tag "
+            f"version '{tag_version}' when that tag's contract has an artifact digest",
+        )
+        return
+
+    if not isinstance(pred_digest, str):
+        fail(
+            errors,
+            "contract.invalid_artifact_reuse",
+            str(contract_path),
+            f"{source}: predecessor {of_ref} has no artifact.digest; point of at "
+            "the earliest digest-bearing version that matches this digest",
+        )
+        return
+
+    if not isinstance(digest, str) or digest != pred_digest:
+        fail(
+            errors,
+            "contract.artifact_reuse_digest_mismatch",
+            str(contract_path),
+            f"artifact.digest does not equal predecessor {of_ref} digest "
+            f"(spec 007 amendment / registry#634)",
+        )
+        return
+
+    # Strict execution-shape equality applies to newly declared contract fields.
+    # Historical sibling backfills may predate schema float/integer churn; they
+    # still require digest equality above.
+    if from_sibling:
+        return
+
+    changed = [
+        field
+        for field in ARTIFACT_REUSE_EXECUTION_FIELDS
+        if predecessor.get(field) != contract.get(field)
+    ]
+    if changed:
+        fail(
+            errors,
+            "contract.artifact_reuse_execution_drift",
+            str(contract_path),
+            f"metadata_only_successor changes execution-relevant fields {changed} "
+            f"versus {of_ref}; publish a new artifact instead "
+            f"(spec 007 amendment / registry#634)",
+        )
+
+
+def check_artifact_reuse_markers(errors: list, root: Path = Path(".")) -> None:
+    """Whole-tree gate for registry#634."""
+    capabilities = root / "capabilities"
+    if not capabilities.is_dir():
+        return
+    for contract_path in sorted(capabilities.rglob("contract.json")):
+        check_artifact_reuse_marker(contract_path, errors, root=root)
+
+
 # registry#509 / decision-log entry 113: host-only `cargo llvm-cov` cannot see
 # wasm32-specific bugs -- `usize` is 32-bit there, not 64-bit, so arithmetic a
 # host build accepts silently misbehaves on wasm32. `text.truncate@1.0.0`
@@ -3893,6 +4128,8 @@ def main() -> int:
     run_event_product_validation(errors)
 
     check_ecca_capability_inventory_coverage(errors)
+
+    check_artifact_reuse_markers(errors)
 
     if base_sha and head_sha:
         try:

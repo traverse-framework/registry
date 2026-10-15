@@ -1,0 +1,5 @@
+{
+  "kind": "metadata_only_successor",
+  "of": "candidate.policy-evaluate@1.0.0",
+  "justification": "Metadata-only successor of candidate.policy-evaluate@1.0.0: contract version 1.1.0 reuses the byte-identical WASM artifact hosted under artifacts/candidate.policy-evaluate-1.0.0 (digest sha256:1979703915575498a8079792d4d9fc5abc65bdac705dd89255cd02810b1997f7). Authoring/risk/lifecycle/catalog metadata may differ; artifact bytes do not."
+}

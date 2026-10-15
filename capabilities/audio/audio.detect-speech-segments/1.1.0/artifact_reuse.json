@@ -1,0 +1,5 @@
+{
+  "kind": "metadata_only_successor",
+  "of": "audio.detect-speech-segments@1.0.0",
+  "justification": "Metadata-only successor of audio.detect-speech-segments@1.0.0: contract version 1.1.0 reuses the byte-identical WASM artifact hosted under artifacts/audio.detect-speech-segments-1.0.0 (digest sha256:9acfc67c0052014ce8be7a383a2f9022a2ae3e9f3c4244e89d7ec9c8ca155b86). Authoring/risk/lifecycle/catalog metadata may differ; artifact bytes do not."
+}

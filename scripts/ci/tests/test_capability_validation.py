@@ -3001,6 +3001,151 @@ class RevocationSpec026Tests(unittest.TestCase):
         self.assertEqual(errors, [])
 
 
+class ArtifactReuseMarkerTests(unittest.TestCase):
+    """registry#634 / spec 007 amendment: tag/version mismatch needs a marker."""
+
+    DIGEST = "sha256:" + "ab" * 32
+    OTHER = "sha256:" + "cd" * 32
+
+    def _tree(self, tmp, versions):
+        root = Path(tmp)
+        for version, contract in versions.items():
+            path = root / "capabilities" / "core" / "demo.cap" / version / "contract.json"
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(json.dumps(contract))
+        return root
+
+    def _contract(self, version, tag_version, digest=None, **extra):
+        digest = digest or self.DIGEST
+        return {
+            "id": "demo.cap",
+            "namespace": "core",
+            "owner": {"team": "platform"},
+            "version": version,
+            "artifact": {
+                "digest": digest,
+                "url": (
+                    "https://github.com/traverse-framework/registry/releases/download/"
+                    f"artifacts/demo.cap-{tag_version}/demo.wasm"
+                ),
+            },
+            **extra,
+        }
+
+    def test_unmarked_mismatch_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._tree(
+                tmp,
+                {
+                    "1.0.0": self._contract("1.0.0", "1.0.0"),
+                    "1.1.0": self._contract("1.1.0", "1.0.0"),
+                },
+            )
+            errors: list = []
+            capability_validation.check_artifact_reuse_markers(errors, root=root)
+            self.assertIn("contract.artifact_reuse_required", [e["code"] for e in errors])
+
+    def test_valid_marker_passes(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._tree(
+                tmp,
+                {
+                    "1.0.0": self._contract("1.0.0", "1.0.0"),
+                    "1.1.0": self._contract(
+                        "1.1.0",
+                        "1.0.0",
+                        artifact_reuse={
+                            "kind": "metadata_only_successor",
+                            "of": "demo.cap@1.0.0",
+                            "justification": "metadata-only successor",
+                        },
+                    ),
+                },
+            )
+            errors: list = []
+            capability_validation.check_artifact_reuse_markers(errors, root=root)
+            self.assertEqual(errors, [])
+
+    def test_digest_mismatch_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._tree(
+                tmp,
+                {
+                    "1.0.0": self._contract("1.0.0", "1.0.0"),
+                    "1.1.0": self._contract(
+                        "1.1.0",
+                        "1.0.0",
+                        digest=self.OTHER,
+                        artifact_reuse={
+                            "kind": "metadata_only_successor",
+                            "of": "demo.cap@1.0.0",
+                            "justification": "should fail digest",
+                        },
+                    ),
+                },
+            )
+            errors: list = []
+            capability_validation.check_artifact_reuse_markers(errors, root=root)
+            self.assertIn("contract.artifact_reuse_digest_mismatch", [e["code"] for e in errors])
+
+    def test_execution_drift_on_contract_marker_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._tree(
+                tmp,
+                {
+                    "1.0.0": self._contract(
+                        "1.0.0",
+                        "1.0.0",
+                        inputs={"schema": {"type": "object"}},
+                    ),
+                    "1.1.0": self._contract(
+                        "1.1.0",
+                        "1.0.0",
+                        inputs={"schema": {"type": "object", "required": ["x"]}},
+                        artifact_reuse={
+                            "kind": "metadata_only_successor",
+                            "of": "demo.cap@1.0.0",
+                            "justification": "should fail inputs drift",
+                        },
+                    ),
+                },
+            )
+            errors: list = []
+            capability_validation.check_artifact_reuse_markers(errors, root=root)
+            self.assertIn("contract.artifact_reuse_execution_drift", [e["code"] for e in errors])
+
+    def test_sibling_marker_skips_execution_drift(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._tree(
+                tmp,
+                {
+                    "1.0.0": self._contract(
+                        "1.0.0",
+                        "1.0.0",
+                        inputs={"schema": {"type": "object"}},
+                    ),
+                    "1.1.0": self._contract(
+                        "1.1.0",
+                        "1.0.0",
+                        inputs={"schema": {"type": "object", "required": ["x"]}},
+                    ),
+                },
+            )
+            sibling = root / "capabilities" / "core" / "demo.cap" / "1.1.0" / "artifact_reuse.json"
+            sibling.write_text(
+                json.dumps(
+                    {
+                        "kind": "metadata_only_successor",
+                        "of": "demo.cap@1.0.0",
+                        "justification": "historical sibling backfill",
+                    }
+                )
+            )
+            errors: list = []
+            capability_validation.check_artifact_reuse_markers(errors, root=root)
+            self.assertEqual(errors, [])
+
+
 class _Drop:
     pass
 
