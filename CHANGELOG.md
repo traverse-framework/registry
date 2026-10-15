@@ -4,6 +4,10 @@
 
 ### Added
 
+- **`model.execute@1.0.0` (registry#633).** Catalog capability over
+  `traverse.model-runtime` / Spec 138 exact-ref model execution. See
+  decision-log entry 133 and draft spec `027-catalog-model-execute`.
+
 - **Host-limits CI gate (registry#635).** Capability wasm32 fixtures execute
   under stock Traverse `WasmExecutor` defaults (32 MiB / 5_000_000 fuel) via
   `scripts/ci/wasm32_fixture_runner`. Over-limit artifacts fail as
