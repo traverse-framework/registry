@@ -4,6 +4,10 @@
 
 ### Added
 
+- **`model.execute@1.0.0` (registry#633).** Catalog capability over
+  `traverse.model-runtime` / Spec 138 exact-ref model execution. See
+  decision-log entry 133 and draft spec `027-catalog-model-execute`.
+
 - **Artifact reuse marker (registry#634).** Contracts whose artifact release
   tag version differs from `contract.version` must declare
   `artifact_reuse` (or sibling `artifact_reuse.json`). CI enforces digest

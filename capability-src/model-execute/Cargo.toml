@@ -1,0 +1,17 @@
+[workspace]
+
+[package]
+name = "model-execute-agent"
+version = "1.0.0"
+edition = "2015"
+publish = false
+description = "Catalog capability: governed model.execute over traverse.model-runtime (Spec 138)."
+
+[[bin]]
+name = "model-execute-agent"
+path = "src/main.rs"
+
+[profile.release]
+opt-level = "s"
+lto = true
+panic = "abort"

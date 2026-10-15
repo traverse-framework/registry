@@ -420,6 +420,18 @@
         "scripts/ci/build_index.py",
         "crates/traverse-registry/"
       ]
+    },
+    {
+      "id": "027-catalog-model-execute",
+      "version": "0.1.0",
+      "status": "draft",
+      "immutable": false,
+      "path": "specs/027-catalog-model-execute/spec.md",
+      "will_govern": [
+        "capabilities/model/model.execute/",
+        "capability-src/model-execute/",
+        "specs/027-catalog-model-execute/"
+      ]
     }
   ]
 }
