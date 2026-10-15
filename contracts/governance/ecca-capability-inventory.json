@@ -684,6 +684,15 @@
       "evidence": "active immutable successor; artifact byte-identical to signed 1.1.0 and digest-verified."
     },
     {
+      "capability_id": "model.execute",
+      "published_versions": [
+        "1.0.0"
+      ],
+      "path": "capabilities/model/model.execute/1.0.0/contract.json",
+      "classification": "no-event-required",
+      "evidence": "mediated connector shim over traverse.model-runtime model.execute; empty emits/consumes; host returns model_evidence or a fail-closed reason directly to the caller with no asynchronous domain event broadcast."
+    },
+    {
       "capability_id": "model.improve",
       "published_versions": [
         "1.0.0"
