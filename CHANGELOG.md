@@ -4,16 +4,14 @@
 
 ### Added
 
-<<<<<<< HEAD
 - **`model.execute@1.0.0` (registry#633).** Catalog capability over
   `traverse.model-runtime` / Spec 138 exact-ref model execution. See
   decision-log entry 133 and draft spec `027-catalog-model-execute`.
-=======
+
 - **Artifact reuse marker (registry#634).** Contracts whose artifact release
   tag version differs from `contract.version` must declare
   `artifact_reuse` (or sibling `artifact_reuse.json`). CI enforces digest
   equality; catalog pages surface the marker. See decision-log entry 134.
->>>>>>> origin/main
 
 - **Host-limits CI gate (registry#635).** Capability wasm32 fixtures execute
   under stock Traverse `WasmExecutor` defaults (32 MiB / 5_000_000 fuel) via
