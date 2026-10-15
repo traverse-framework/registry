@@ -9,4 +9,4 @@
   `scripts/ci/wasm32_fixture_runner`. Over-limit artifacts fail as
   `capability.exceeds_host_limits`. Nightly workflow
   `catalog-host-limits` scans the live catalog; known over-limit entries are
-  listed in `catalog/host-limits-allowlist.json`. See decision-log entry 132.
+  listed in `catalog/host-limits-allowlist.json`. See decision-log entry 132 and PR #638.
