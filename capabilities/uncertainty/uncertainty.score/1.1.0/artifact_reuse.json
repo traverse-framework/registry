@@ -1,0 +1,5 @@
+{
+  "kind": "metadata_only_successor",
+  "of": "uncertainty.score@1.0.0",
+  "justification": "Metadata-only successor of uncertainty.score@1.0.0: contract version 1.1.0 reuses the byte-identical WASM artifact hosted under artifacts/uncertainty.score-1.0.0 (digest sha256:f218262588e8889eaacf371fc9df17454be40f901f88f379514fcc27365b1a9b). Authoring/risk/lifecycle/catalog metadata may differ; artifact bytes do not."
+}

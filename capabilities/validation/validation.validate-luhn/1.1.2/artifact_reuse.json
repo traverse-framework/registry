@@ -1,0 +1,5 @@
+{
+  "kind": "metadata_only_successor",
+  "of": "validation.validate-luhn@1.0.0",
+  "justification": "Metadata-only successor of validation.validate-luhn@1.0.0: contract version 1.1.2 reuses the byte-identical WASM artifact hosted under artifacts/validation.validate-luhn-1.0.0 (digest sha256:b20b13054a5938a90b964855f9c8de94feb146045f85c04df7998cda81819133). Authoring/risk/lifecycle/catalog metadata may differ; artifact bytes do not."
+}

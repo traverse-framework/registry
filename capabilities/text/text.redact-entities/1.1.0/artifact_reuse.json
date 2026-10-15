@@ -1,0 +1,5 @@
+{
+  "kind": "metadata_only_successor",
+  "of": "text.redact-entities@1.0.0",
+  "justification": "Metadata-only successor of text.redact-entities@1.0.0: contract version 1.1.0 reuses the byte-identical WASM artifact hosted under artifacts/text.redact-entities-1.0.0 (digest sha256:cd6dc3d592c3f82e0e1887c6988868d3e5be202139d6af8ac66f2b6c44a1066f). Authoring/risk/lifecycle/catalog metadata may differ; artifact bytes do not."
+}

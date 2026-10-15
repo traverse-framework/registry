@@ -1,0 +1,5 @@
+{
+  "kind": "metadata_only_successor",
+  "of": "review.prepare@1.0.0",
+  "justification": "Metadata-only successor of review.prepare@1.0.0: contract version 1.1.0 reuses the byte-identical WASM artifact hosted under artifacts/review.prepare-1.0.0 (digest sha256:6e0a1cc1257f527b82fb6aa9bac1eedaf756c6654d59c241caa5bd7e3302aeb6). Authoring/risk/lifecycle/catalog metadata may differ; artifact bytes do not."
+}

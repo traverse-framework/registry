@@ -1,0 +1,5 @@
+{
+  "kind": "metadata_only_successor",
+  "of": "coverage.completeness-assess@1.0.0",
+  "justification": "Metadata-only successor of coverage.completeness-assess@1.0.0: contract version 1.1.0 reuses the byte-identical WASM artifact hosted under artifacts/coverage.completeness-assess-1.0.0 (digest sha256:13be80099798b689beab1d7f95623a0612f15b57aa71d5156d8a700dc155f7d0). Authoring/risk/lifecycle/catalog metadata may differ; artifact bytes do not."
+}

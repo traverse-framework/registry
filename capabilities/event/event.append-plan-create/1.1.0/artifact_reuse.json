@@ -1,0 +1,5 @@
+{
+  "kind": "metadata_only_successor",
+  "of": "event.append-plan-create@1.0.0",
+  "justification": "Metadata-only successor of event.append-plan-create@1.0.0: contract version 1.1.0 reuses the byte-identical WASM artifact hosted under artifacts/event.append-plan-create-1.0.0 (digest sha256:d9fd9f6ebc4bb47db33903a2111684133bef91060a110758fb16c572f1f7eca0). Authoring/risk/lifecycle/catalog metadata may differ; artifact bytes do not."
+}

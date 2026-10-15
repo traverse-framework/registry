@@ -30,6 +30,8 @@ Copy-paste sequence for a new capability version (manual path today; `traverse-c
    cannot upload to this repo's Releases yourself (a first-contributor / fork PR), the
    URL must still resolve *before this PR can go green*: ping a maintainer to mirror
    your artifact here first (see [CONTRIBUTING.md](../CONTRIBUTING.md#publishing-a-capability)).
+   If the release tag version differs from `contract.version`, also set `artifact_reuse` (registry#634).
+
 4. **Declare `authoring.method` on the contract** — `"human"` or `"llm-assisted"`
    (`specs/023-authoring-assurance/spec.md` FR-001). A newly added/changed contract
    missing it fails CI (`contract.missing_authoring_method`). If `"llm-assisted"`, also

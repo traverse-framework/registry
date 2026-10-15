@@ -4,6 +4,7 @@
 **Created**: 2026-07-06
 **Amended by**: registry#331 / registry#333 (artifact signature verification)
 **Status**: Approved
+**Amended by**: registry#634 (artifact_reuse marker)
 **Input**: Registry issue #19 — resolve `docs/cross-repo-context.md` open question 3 (seed content) and the gap `001-registry-foundation` FR-007 left open: WASM artifacts live "as GitHub Release assets," but no spec says *which* releases, under what tags, uploaded when, by whom. Full reasoning: `docs/decision-log.md` entry 22. Amended per `docs/decision-log.md` entry 74 (registry#331) — `traverse-runtime` requires a real cryptographic signature, not just a digest, to execute a `PublishedGoverned` capability; this repo has never produced one.
 
 ## Purpose
@@ -206,3 +207,49 @@ As a registry maintainer, I want a defined correction path for a bad published a
 Drafted by an agent from a live `/brainstorm` session (registry#331, decision-log entry 74) that resolved every open design question one at a time with the repo owner, then given explicit, standalone authorization in the same conversation to both write and approve this amendment directly — a distinct instruction from the co-brainstorm itself, satisfying this repo's no-self-approval-of-specs rule the same way a separate confirmation always has (see `specs/019-public-metadata-sync-extension`'s and `specs/020-public-execution-proxy`'s own Approval sections for the general pattern this repo follows).
 
 **Amendment approved 2026-08-28.** Version `1.0.0` → `1.1.0` (additive: new requirements layered on an unrelated-but-adjacent concern, no existing FR/SC changed or removed).
+
+## Amendment (registry#634): Metadata-Only Artifact Reuse Marker
+
+### Why this exists
+
+Many contract versions intentionally reuse an older release tag's WASM bytes
+(a metadata-only successor). Free-text `authoring.test_evidence` sometimes
+says so; nothing machine-readable did, and CI did not enforce it. Consumers
+could not tell deliberate reuse from a stale digest.
+
+### Marker shape
+
+When `artifact.url`'s release tag version differs from `contract.version`,
+the publish MUST declare:
+
+```json
+"artifact_reuse": {
+  "kind": "metadata_only_successor",
+  "of": "<id>@<version>",
+  "justification": "<why reuse is safe>"
+}
+```
+
+Already-published immutable contracts MAY instead carry an additive sibling
+`artifact_reuse.json` with the same object (same pattern as `signature.json` /
+`deprecated.json`). New publishes SHOULD put the field on `contract.json`.
+
+### Rules
+
+- **FR-013**: If the artifacts/`<id>-<tagVersion>` tag version ≠ `contract.version`,
+  a valid `metadata_only_successor` marker MUST be present (field or sibling).
+- **FR-014**: `of` MUST reference a published predecessor whose
+  `artifact.digest` equals this contract's digest. When the tag-version
+  contract itself has a digest, `of`'s version MUST equal that tag version.
+- **FR-015**: A newly ADDED contract that declares `artifact_reuse` on the
+  contract object MUST NOT change execution-relevant fields
+  (`execution`, `inputs`, `outputs`, `connector_requirements`, `state_schema`,
+  `event_trigger`, `artifact_type`) versus the predecessor. Historical sibling
+  backfills are digest-checked only (schemas may have drifted before this gate).
+- **FR-016**: Catalog pages MUST surface the marker when present.
+
+### Success criteria
+
+- Whole-tree CI reports 0 unmarked tag/version mismatches.
+- Fixtures cover missing marker, digest mismatch, and execution drift on a
+  contract-declared marker.

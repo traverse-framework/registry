@@ -582,6 +582,15 @@ def package_sidebar_html(
                     f'<a href="{esc(mirror_url)}">{esc(mirror_url)}</a>',
                 )
             )
+    reuse = contract.get("artifact_reuse")
+    if isinstance(reuse, dict) and reuse.get("kind") == "metadata_only_successor":
+        of_ref = esc(str(reuse.get("of") or ""))
+        rows.append(
+            sidebar_row(
+                "Artifact reuse",
+                f'metadata-only successor of <span class="t-mono">{of_ref}</span>',
+            )
+        )
     rows.append(sidebar_row("Permalink", f'<a href="{esc(permalink)}">{esc(permalink)}</a>'))
 
     return (
