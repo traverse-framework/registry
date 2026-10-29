@@ -1,0 +1,582 @@
+{
+  "kind": "capability_contract",
+  "schema_version": "1.0.0",
+  "id": "model.execute",
+  "namespace": "model",
+  "name": "execute",
+  "version": "1.1.0",
+  "lifecycle": "active",
+  "owner": {
+    "team": "traverse-core",
+    "contact": "https://github.com/enricopiovesan"
+  },
+  "summary": "Execute a signed exact-ref model package through traverse.model-runtime (Spec 138).",
+  "description": "Catalog-facing shim over the traverse.model-runtime connector operation model.execute. Consumers supply an exact-ref model pin (model_id, version, digest), a host-staged input_ref, app-declared model_usage (commercial|non_commercial), and a trust_root of allowed signer key ids. The capability validates those inputs, dispatches via mediated connector_invoke, and surfaces the host's verified model_evidence on success. Fail-closed Spec 138 reasons (digest_mismatch, key_untrusted, signature_invalid, rights_mismatch, rights_policy_denied, usage_undeclared, package_revoked, model_unavailable) pass through unchanged. It does not fetch Hugging Face, hold signing keys, or select a model \u2014 the pin is consumer-supplied. The reference package for catalog demos is traverse.digits-onnx@1.0.0 from Traverse fixtures. Normative model_evidence (registry#641) is a flat guest-visible subset of the host ModelRightsRecord: license_id, commercial_use, status, effective_usage, and optional derivation without source_url or other Spec 104 host-private strings. Forwarding the full nested ModelRightsRecord (with rights.source_url or https:// URLs) is non-conformant and will fail Spec 104 unauthorized_output on compliant hosts; bindings must emit this shape (traverse#1719). Input additionalProperties:false is enforced by runtimes that include traverse#1671; older runtimes may still accept undeclared fields such as prompt.",
+  "use_cases": [
+    {
+      "scenario": "As an inference operator, I want a signed exact-ref digits-onnx package executed with declared non_commercial usage so that the host returns verified model_evidence without embedding a model in this capability.",
+      "input_example": {
+        "model_ref": {
+          "model_id": "traverse.digits-onnx",
+          "version": "1.0.0",
+          "digest": "sha256:ecc32b909bd495c975e2c07a0f73ed85929026325bd8cf7865b9eec9293e03cb"
+        },
+        "input_ref": "host:input:digits-frame-1",
+        "policy_ref": "policy:default-wasm-cpu",
+        "data_classification": "public",
+        "input_schema_ref": "schema:traverse-digits-onnx-in",
+        "input_schema_version": "1.0.0",
+        "max_output_bytes": 56,
+        "model_usage": "non_commercial",
+        "trust_root": {
+          "allowed_signers": [
+            "traverse-test-model-signing"
+          ]
+        }
+      },
+      "output_example": {
+        "status": "ok",
+        "output_ref": "host:output:digits-1",
+        "output_schema_ref": "schema:traverse-digits-onnx-out",
+        "model_ref": {
+          "model_id": "traverse.digits-onnx",
+          "version": "1.0.0",
+          "digest": "sha256:ecc32b909bd495c975e2c07a0f73ed85929026325bd8cf7865b9eec9293e03cb"
+        },
+        "placement": "wasm-cpu",
+        "result_class": "ok",
+        "model_evidence": {
+          "license_id": "CC-BY-4.0",
+          "commercial_use": "allowed",
+          "status": "active",
+          "effective_usage": "non_commercial",
+          "derivation": {
+            "kind": "quantized-onnx"
+          }
+        }
+      },
+      "happy": true,
+      "persona_ref": "inference-operator"
+    },
+    {
+      "scenario": "As an inference operator, I want an omitted model_usage rejected with usage_undeclared so that undeclared commercial intent cannot silently proceed.",
+      "input_example": {
+        "model_ref": {
+          "model_id": "traverse.digits-onnx",
+          "version": "1.0.0",
+          "digest": "sha256:ecc32b909bd495c975e2c07a0f73ed85929026325bd8cf7865b9eec9293e03cb"
+        },
+        "input_ref": "host:input:digits-frame-1",
+        "policy_ref": "policy:default-wasm-cpu",
+        "data_classification": "public",
+        "input_schema_ref": "schema:traverse-digits-onnx-in",
+        "input_schema_version": "1.0.0",
+        "max_output_bytes": 56,
+        "trust_root": {
+          "allowed_signers": [
+            "traverse-test-model-signing"
+          ]
+        }
+      },
+      "output_example": {
+        "status": "error",
+        "output_ref": "",
+        "output_schema_ref": "",
+        "model_ref": {
+          "model_id": "",
+          "version": "",
+          "digest": ""
+        },
+        "placement": "",
+        "result_class": "error",
+        "reason": "usage_undeclared"
+      },
+      "happy": false,
+      "persona_ref": "inference-operator"
+    },
+    {
+      "scenario": "As an inference operator, I want an empty trust_root rejected with key_untrusted so that unsigned or untrusted packages cannot execute.",
+      "input_example": {
+        "model_ref": {
+          "model_id": "traverse.digits-onnx",
+          "version": "1.0.0",
+          "digest": "sha256:ecc32b909bd495c975e2c07a0f73ed85929026325bd8cf7865b9eec9293e03cb"
+        },
+        "input_ref": "host:input:digits-frame-1",
+        "policy_ref": "policy:default-wasm-cpu",
+        "data_classification": "public",
+        "input_schema_ref": "schema:traverse-digits-onnx-in",
+        "input_schema_version": "1.0.0",
+        "max_output_bytes": 56,
+        "model_usage": "commercial",
+        "trust_root": {
+          "allowed_signers": []
+        }
+      },
+      "output_example": {
+        "status": "error",
+        "output_ref": "",
+        "output_schema_ref": "",
+        "model_ref": {
+          "model_id": "",
+          "version": "",
+          "digest": ""
+        },
+        "placement": "",
+        "result_class": "error",
+        "reason": "key_untrusted"
+      },
+      "happy": false,
+      "persona_ref": "inference-operator"
+    },
+    {
+      "scenario": "As an inference operator, I want a tampered package digest reported as digest_mismatch so that integrity failures stay fail-closed across hosts.",
+      "input_example": {
+        "model_ref": {
+          "model_id": "traverse.digits-onnx",
+          "version": "1.0.0",
+          "digest": "sha256:ecc32b909bd495c975e2c07a0f73ed85929026325bd8cf7865b9eec9293e03cb"
+        },
+        "input_ref": "host:input:digits-frame-1",
+        "policy_ref": "policy:default-wasm-cpu",
+        "data_classification": "public",
+        "input_schema_ref": "schema:traverse-digits-onnx-in",
+        "input_schema_version": "1.0.0",
+        "max_output_bytes": 56,
+        "model_usage": "non_commercial",
+        "trust_root": {
+          "allowed_signers": [
+            "traverse-test-model-signing"
+          ]
+        }
+      },
+      "output_example": {
+        "status": "error",
+        "output_ref": "",
+        "output_schema_ref": "",
+        "model_ref": {
+          "model_id": "",
+          "version": "",
+          "digest": ""
+        },
+        "placement": "",
+        "result_class": "error",
+        "reason": "digest_mismatch"
+      },
+      "happy": false,
+      "persona_ref": "inference-operator",
+      "connector_fixture": {
+        "activated": true,
+        "responses": [
+          {
+            "connector_id": "traverse.model-runtime",
+            "operation": "model.execute",
+            "body": {
+              "abi_version": "1.0.0",
+              "result_class": "model_unavailable",
+              "payload": {
+                "status": "error",
+                "reason": "digest_mismatch"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "scenario": "As an inference operator, I want a rights pin mismatch reported as rights_mismatch so that package rights cannot drift from the declared pin.",
+      "input_example": {
+        "model_ref": {
+          "model_id": "traverse.digits-onnx",
+          "version": "1.0.0",
+          "digest": "sha256:ecc32b909bd495c975e2c07a0f73ed85929026325bd8cf7865b9eec9293e03cb"
+        },
+        "input_ref": "host:input:digits-frame-1",
+        "policy_ref": "policy:default-wasm-cpu",
+        "data_classification": "public",
+        "input_schema_ref": "schema:traverse-digits-onnx-in",
+        "input_schema_version": "1.0.0",
+        "max_output_bytes": 56,
+        "model_usage": "non_commercial",
+        "trust_root": {
+          "allowed_signers": [
+            "traverse-test-model-signing"
+          ]
+        }
+      },
+      "output_example": {
+        "status": "error",
+        "output_ref": "",
+        "output_schema_ref": "",
+        "model_ref": {
+          "model_id": "",
+          "version": "",
+          "digest": ""
+        },
+        "placement": "",
+        "result_class": "error",
+        "reason": "rights_mismatch"
+      },
+      "happy": false,
+      "persona_ref": "inference-operator",
+      "connector_fixture": {
+        "activated": true,
+        "responses": [
+          {
+            "connector_id": "traverse.model-runtime",
+            "operation": "model.execute",
+            "body": {
+              "abi_version": "1.0.0",
+              "result_class": "model_unavailable",
+              "payload": {
+                "status": "error",
+                "reason": "rights_mismatch"
+              }
+            }
+          }
+        ]
+      }
+    }
+  ],
+  "inputs": {
+    "schema": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "model_ref",
+        "input_ref",
+        "policy_ref",
+        "data_classification",
+        "input_schema_ref",
+        "input_schema_version",
+        "max_output_bytes",
+        "model_usage",
+        "trust_root"
+      ],
+      "properties": {
+        "model_ref": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "model_id",
+            "version",
+            "digest"
+          ],
+          "properties": {
+            "model_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "version": {
+              "type": "string",
+              "minLength": 1
+            },
+            "digest": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        "input_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "policy_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "data_classification": {
+          "type": "string",
+          "minLength": 1
+        },
+        "input_schema_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "input_schema_version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "max_output_bytes": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 16777216
+        },
+        "model_usage": {
+          "type": "string",
+          "enum": [
+            "commercial",
+            "non_commercial"
+          ]
+        },
+        "trust_root": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "allowed_signers"
+          ],
+          "properties": {
+            "allowed_signers": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "outputs": {
+    "schema": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "output_ref",
+        "output_schema_ref",
+        "model_ref",
+        "placement",
+        "result_class"
+      ],
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": [
+            "ok",
+            "error"
+          ]
+        },
+        "output_ref": {
+          "type": "string"
+        },
+        "output_schema_ref": {
+          "type": "string"
+        },
+        "model_ref": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "model_id",
+            "version",
+            "digest"
+          ],
+          "properties": {
+            "model_id": {
+              "type": "string"
+            },
+            "version": {
+              "type": "string"
+            },
+            "digest": {
+              "type": "string"
+            }
+          }
+        },
+        "placement": {
+          "type": "string"
+        },
+        "result_class": {
+          "type": "string"
+        },
+        "model_evidence": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "license_id",
+            "commercial_use",
+            "status",
+            "effective_usage"
+          ],
+          "description": "Guest-visible model rights evidence. MUST NOT include source_url, filepath, credential, or other Spec 104 host-private strings. Nested host ModelRightsRecord shapes are non-conformant.",
+          "properties": {
+            "license_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "commercial_use": {
+              "type": "string",
+              "enum": [
+                "allowed",
+                "prohibited",
+                "unknown"
+              ]
+            },
+            "redistribution": {
+              "type": "string",
+              "minLength": 1
+            },
+            "status": {
+              "type": "string",
+              "minLength": 1
+            },
+            "effective_usage": {
+              "type": "string",
+              "enum": [
+                "commercial",
+                "non_commercial"
+              ]
+            },
+            "derivation": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "kind"
+              ],
+              "properties": {
+                "kind": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "source_license_id": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          }
+        },
+        "reason": {
+          "type": "string"
+        }
+      }
+    }
+  },
+  "connector_requirements": [
+    {
+      "connector_id": "traverse.model-runtime",
+      "version": "2.3.0"
+    }
+  ],
+  "execution": {
+    "binary_format": "wasm",
+    "constraints": {
+      "filesystem_access": "none",
+      "host_api_access": "exception_required",
+      "network_access": "forbidden"
+    },
+    "entrypoint": {
+      "command": "run",
+      "kind": "wasi-command"
+    },
+    "preferred_targets": [
+      "local",
+      "browser",
+      "edge",
+      "device"
+    ]
+  },
+  "artifact": {
+    "digest": "sha256:5ccfa3721db61b42a598d703c2a110c57beaf57cde26e1c5cb7f9c5fbc8b4275",
+    "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/model.execute-1.0.0/model-execute-agent.wasm"
+  },
+  "authoring": {
+    "method": "llm-assisted",
+    "source_revision": "cursor/issue-641-model-evidence-shape",
+    "test_evidence": "capability-src/model-execute: unit tests cover normative model_evidence shape (license_id/commercial_use/status/effective_usage; rejects URL-bearing nested rights as non-conformant documentation); cargo llvm-cov functions=100% lines>=95% regions>=95%.",
+    "review": {
+      "decision": "pending-qualified-review",
+      "reviewer": "traverse-registry-maintainer"
+    }
+  },
+  "licensing": {
+    "spdx_expression": "MIT OR Apache-2.0",
+    "commercial_use": "allowed",
+    "redistribution": "allowed",
+    "attribution_required": true,
+    "verification": {
+      "status": "maintainer-declared"
+    },
+    "license_files": [
+      "LICENSE-MIT",
+      "LICENSE-APACHE"
+    ],
+    "source_url": "https://github.com/traverse-framework/registry"
+  },
+  "risk": {
+    "effect_class": "external_effect",
+    "determinism_class": "model_derived",
+    "data_flow": {
+      "accepted_data_classifications": [],
+      "produced_data_classifications": [],
+      "egress_policy": "denied"
+    },
+    "reliability": {
+      "idempotency_required": false,
+      "retryable": true,
+      "compensation_available": true
+    }
+  },
+  "permissions": [
+    {
+      "id": "model.execute.execute"
+    }
+  ],
+  "permitted_targets": [
+    "local",
+    "browser",
+    "edge",
+    "device"
+  ],
+  "policies": [
+    {
+      "id": "exact-ref-model-pin"
+    },
+    {
+      "id": "fail-closed-model-rights"
+    }
+  ],
+  "preconditions": [
+    {
+      "id": "exact-ref-present",
+      "description": "model_ref carries model_id, version, and digest."
+    },
+    {
+      "id": "model-usage-declared",
+      "description": "model_usage is commercial or non_commercial."
+    },
+    {
+      "id": "trust-root-present",
+      "description": "trust_root.allowed_signers is a non-empty array."
+    },
+    {
+      "id": "model-runtime-activated",
+      "description": "Host has activated traverse.model-runtime."
+    }
+  ],
+  "postconditions": [
+    {
+      "id": "evidence-or-reason",
+      "description": "Success carries model_evidence; failure carries a Spec 138 reason."
+    },
+    {
+      "id": "no-host-secret-leakage",
+      "description": "No signing keys, host paths, or credentials appear in output."
+    }
+  ],
+  "provenance": {
+    "author": "traverse-core",
+    "created_at": "2026-10-29T00:00:00Z",
+    "source": "greenfield",
+    "spec_ref": "138-governed-exact-model-execution",
+    "adr_refs": [],
+    "exception_refs": [
+      "mediated-connector-invoke"
+    ]
+  },
+  "service_type": "stateless",
+  "side_effects": [
+    {
+      "kind": "external_call",
+      "description": "Invokes traverse.model-runtime model.execute for the supplied exact-ref pin."
+    }
+  ],
+  "consumes": [],
+  "emits": [],
+  "dependencies": [],
+  "evidence": [],
+  "event_trigger": null,
+  "state_schema": null
+}

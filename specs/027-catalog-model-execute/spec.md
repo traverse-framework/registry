@@ -36,7 +36,11 @@ a fail-closed Spec 138 `reason`.
   `rights_policy_denied`, `usage_undeclared`, `package_revoked`,
   `model_unavailable`) MUST pass through unchanged on the capability output.
 - **FR-005**: Happy-path output MUST include `model_evidence` when the host
-  returns it.
+  returns it. From `model.execute@1.1.0` (registry#641), `model_evidence` MUST
+  be the normative flat guest-visible shape `{license_id, commercial_use,
+  status, effective_usage}` with optional `redistribution` and `derivation`
+  (no `source_url` / nested `rights` / Spec 104 host-private strings).
+  Forwarding the full host `ModelRightsRecord` is non-conformant.
 - **FR-006**: Connector schemas MUST NOT be forked into this repo; contracts
   reference Traverse connector + schema IDs only.
 - **FR-007**: At least one signed exact-ref package usable through the

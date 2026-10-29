@@ -13,6 +13,11 @@
 
 ### Added
 
+- **`model.execute@1.1.0` (registry#641).** Normative flat `model_evidence`
+  output schema (`license_id`, `commercial_use`, `status`, `effective_usage`;
+  optional `derivation` without URLs). Reuses the `1.0.0` WASM artifact.
+  Aligns catalog demos with Spec 104 (no host-private URLs in guest evidence).
+
 - **`model.execute@1.0.0` (registry#633).** Catalog capability over
   `traverse.model-runtime` / Spec 138 exact-ref model execution. See
   decision-log entry 133 and draft spec `027-catalog-model-execute`.
