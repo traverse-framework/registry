@@ -2049,6 +2049,31 @@ class CheckNewContractWasm32ExecutionTests(unittest.TestCase):
             self.assertIn("capability.exceeds_host_limits", codes)
             self.assertTrue(any("33554432" in e["message"] for e in errors), errors)
 
+    def test_metadata_only_successor_skips_wasm32_host_limits(self):
+        """registry#623: metadata_only_successor does not rebuild / re-gate arena size."""
+        with tempfile.TemporaryDirectory() as tmp:
+            use_cases = [{"happy": True, "input_example": {"text": "hi"}}]
+            path = self._write_contract(tmp, "example.new-capability", use_cases=use_cases)
+            (path.parent / "artifact_reuse.json").write_text(
+                json.dumps(
+                    {
+                        "kind": "metadata_only_successor",
+                        "of": "example.new-capability@1.0.0",
+                        "justification": "test",
+                    }
+                )
+            )
+            errors: list = []
+            cwd = os.getcwd()
+            try:
+                os.chdir(tmp)
+                with patch("capability_validation.subprocess.run") as run_mock:
+                    capability_validation.check_new_contract_wasm32_execution(path, errors)
+                    run_mock.assert_not_called()
+            finally:
+                os.chdir(cwd)
+            self.assertEqual(errors, [])
+
     def test_stderr_host_limits_helper(self):
         self.assertTrue(
             capability_validation._stderr_indicates_host_limits(

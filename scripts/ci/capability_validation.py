@@ -121,7 +121,12 @@ scripts/ci/wasm32_fixture_runner and catalog/host-limits-allowlist.json).
 Artifacts that only pass under unlimited wasmtime fail as
 `capability.exceeds_host_limits`. A closed allowlist covers known live
 over-limit catalog entries for the nightly whole-catalog scan; newly
-ADDED contracts are never exempt.
+ADDED contracts that publish a new artifact are never exempt. A newly
+ADDED contract that declares `artifact_reuse` /
+`artifact_reuse.json` with `kind=metadata_only_successor` skips the
+wasm32 rebuild + host-limits fixture run: the published bytes are the
+predecessor's (already gated or allowlisted), so Spec 026-style
+metadata-only MINOR republishes are not forced to re-prove arena size.
 
 Also enforces registry#510 (decision-log entry 113 Q5): a newly-ADDED
 contract.json's artifact.url must actually be fetchable and its bytes must
@@ -2897,6 +2902,11 @@ def check_new_contract_wasm32_execution(path: Path, errors: list) -> None:
     registry#576: when connector_requirements is non-empty, provision the
     mediated connector_invoke mock, run activated happy fixtures, and prove
     unbound activation fails closed.
+
+    registry#623 / spec 007 artifact_reuse: metadata_only_successor contracts
+    reuse a predecessor WASM byte-for-byte, so this gate skips the rebuild +
+    fixture run (including host-limits). Digest equality is enforced by
+    check_artifact_reuse_marker instead.
     """
     try:
         contract = json.loads(path.read_text())
@@ -2904,6 +2914,26 @@ def check_new_contract_wasm32_execution(path: Path, errors: list) -> None:
         return
     capability_id = contract.get("id")
     if not isinstance(capability_id, str) or not capability_id.strip():
+        return
+
+    reuse_marker, _source, _from_sibling = load_artifact_reuse_marker(path, contract)
+    if (
+        isinstance(reuse_marker, dict)
+        and reuse_marker.get("kind") == "metadata_only_successor"
+    ):
+        print(
+            json.dumps(
+                {
+                    "advisory": "wasm32_execution.skipped_metadata_only_successor",
+                    "path": str(path),
+                    "of": reuse_marker.get("of"),
+                    "note": "artifact_reuse metadata_only_successor reuses predecessor "
+                    "WASM bytes; host-limits / fixture rebuild is not re-run "
+                    "(registry#623 / spec 007 FR-013)",
+                }
+            ),
+            file=sys.stderr,
+        )
         return
 
     _emit_host_limits_pin()

@@ -19,6 +19,8 @@
   release assets, derivation, verification): `text.detect-entities@1.2.0`,
   `text.redact-entities@1.2.0`, `audio.detect-speech-segments@1.2.0`,
   `audio.transcribe-speech@1.3.0`, `report.translate-fr-semantic@1.2.0`.
+  PR wasm32/host-limits rebuild skips `metadata_only_successor` contracts
+  (decision-log entry 135); nightly allowlist updated for the new versions.
 
 - **`model.execute@1.1.0` (registry#641).** Normative flat `model_evidence`
   output schema (`license_id`, `commercial_use`, `status`, `effective_usage`;
