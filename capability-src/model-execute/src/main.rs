@@ -175,13 +175,19 @@ mod tests {
         let mut request = [0u8; 8192];
         let mut response = [0u8; 4096];
         let mut output = [0u8; 4096];
-        set_body(br#"{"abi_version":"1.0.0","result_class":"ok","payload":{"status":"ok","output_ref":"out:1","output_schema_ref":"schema:out","model_ref":{"model_id":"traverse.digits-onnx","version":"1.0.0","digest":"sha256:ecc32b909bd495c975e2c07a0f73ed85929026325bd8cf7865b9eec9293e03cb"},"placement":"wasm-cpu","result_class":"ok","model_evidence":{"license_id":"CC-BY-4.0","commercial_use":"allowed"}}}"#);
+        // Normative flat model_evidence (registry#641): license_id, commercial_use,
+        // status, effective_usage — no nested rights.source_url (Spec 104 rejects ://).
+        set_body(br#"{"abi_version":"1.0.0","result_class":"ok","payload":{"status":"ok","output_ref":"out:1","output_schema_ref":"schema:out","model_ref":{"model_id":"traverse.digits-onnx","version":"1.0.0","digest":"sha256:ecc32b909bd495c975e2c07a0f73ed85929026325bd8cf7865b9eec9293e03cb"},"placement":"wasm-cpu","result_class":"ok","model_evidence":{"license_id":"CC-BY-4.0","commercial_use":"allowed","status":"active","effective_usage":"non_commercial","derivation":{"kind":"quantized-onnx"}}}}"#);
         let input = br#"{"model_ref":{"model_id":"traverse.digits-onnx","version":"1.0.0","digest":"sha256:ecc32b909bd495c975e2c07a0f73ed85929026325bd8cf7865b9eec9293e03cb"},"input_ref":"in:1","policy_ref":"policy:default","data_classification":"public","input_schema_ref":"schema:in","input_schema_version":"1.0.0","max_output_bytes":56,"model_usage":"non_commercial","trust_root":{"allowed_signers":["test-key"]}}"#;
         let n = execute_model(input, &mut request, &mut response, &mut output);
         let text = core::str::from_utf8(&output[..n]).unwrap();
         assert!(text.contains("\"status\":\"ok\""));
         assert!(text.contains("model_evidence"));
         assert!(text.contains("CC-BY-4.0"));
+        assert!(text.contains("\"effective_usage\":\"non_commercial\""));
+        assert!(text.contains("\"status\":\"active\""));
+        assert!(!text.contains("source_url"));
+        assert!(!text.contains("https://"));
         assert!(core::str::from_utf8(&request[..])
             .unwrap()
             .contains("traverse.model-runtime"));
@@ -415,7 +421,7 @@ fn execute_model(
                 unsafe { &TEST_CONNECTOR_BODY[..TEST_CONNECTOR_BODY_LEN] }
             };
             let body = if body.is_empty() {
-                br#"{"abi_version":"1.0.0","result_class":"ok","payload":{"status":"ok","output_ref":"out:1","output_schema_ref":"schema:out","model_ref":{"model_id":"traverse.digits-onnx","version":"1.0.0","digest":"sha256:ecc32b909bd495c975e2c07a0f73ed85929026325bd8cf7865b9eec9293e03cb"},"placement":"wasm-cpu","result_class":"ok","model_evidence":{"license_id":"CC-BY-4.0","commercial_use":"allowed"}}}"#
+                br#"{"abi_version":"1.0.0","result_class":"ok","payload":{"status":"ok","output_ref":"out:1","output_schema_ref":"schema:out","model_ref":{"model_id":"traverse.digits-onnx","version":"1.0.0","digest":"sha256:ecc32b909bd495c975e2c07a0f73ed85929026325bd8cf7865b9eec9293e03cb"},"placement":"wasm-cpu","result_class":"ok","model_evidence":{"license_id":"CC-BY-4.0","commercial_use":"allowed","status":"active","effective_usage":"non_commercial","derivation":{"kind":"quantized-onnx"}}}}"#
             } else {
                 body
             };
