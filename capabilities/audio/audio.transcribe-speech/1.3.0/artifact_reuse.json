@@ -1,0 +1,5 @@
+{
+  "kind": "metadata_only_successor",
+  "of": "audio.transcribe-speech@1.1.0",
+  "justification": "Metadata-only successor of audio.transcribe-speech@1.1.0: contract version 1.3.0 reuses the byte-identical WASM artifact hosted under artifacts/audio.transcribe-speech-1.1.0 (digest sha256:cdddb1478534405d609785deeabedc5f7d90a480c9e98afaab7f505e72bc77f4). Adds Spec 026 model rights fields on ai.models; guest logic and artifact bytes are unchanged."
+}

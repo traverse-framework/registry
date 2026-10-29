@@ -1,0 +1,5 @@
+{
+  "kind": "metadata_only_successor",
+  "of": "text.redact-entities@1.1.1",
+  "justification": "Metadata-only successor of text.redact-entities@1.1.1: contract version 1.2.0 reuses the byte-identical WASM artifact hosted under artifacts/text.redact-entities-1.1.1 (digest sha256:9f6fcff01b9b9045bcb1dc54d331a8ca3b3e9c1c2e0508b2b78629f227f06191). Adds Spec 026 model rights fields on ai.models; guest logic and artifact bytes are unchanged."
+}

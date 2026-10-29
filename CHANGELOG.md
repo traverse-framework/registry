@@ -13,6 +13,13 @@
 
 ### Added
 
+- **Spec 026 model-rights backfill on the five agents (registry#623).** New
+  MINOR versions reuse predecessor WASM bytes and declare full ModelRef
+  rights (`commercial_use`/`redistribution`/`derivatives`, LICENSE/NOTICE
+  release assets, derivation, verification): `text.detect-entities@1.2.0`,
+  `text.redact-entities@1.2.0`, `audio.detect-speech-segments@1.2.0`,
+  `audio.transcribe-speech@1.3.0`, `report.translate-fr-semantic@1.2.0`.
+
 - **`model.execute@1.1.0` (registry#641).** Normative flat `model_evidence`
   output schema (`license_id`, `commercial_use`, `status`, `effective_usage`;
   optional `derivation` without URLs). Reuses the `1.0.0` WASM artifact.

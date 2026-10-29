@@ -1,0 +1,5 @@
+{
+  "kind": "metadata_only_successor",
+  "of": "report.translate-fr-semantic@1.0.0",
+  "justification": "Metadata-only successor of report.translate-fr-semantic@1.0.0: contract version 1.2.0 reuses the byte-identical WASM artifact hosted under artifacts/report.translate-fr-semantic-1.0.0 (digest sha256:d70164a8b8d458c49980f94a087cbf9ea3c1e2b9febf298ffd37885f0634989f). Adds Spec 026 model rights fields on ai.models; guest logic and artifact bytes are unchanged."
+}
