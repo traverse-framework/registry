@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### Changed
+
+- **`traverse-registry` 0.29.0 (registry#642).** Widen `traverse-contracts` to
+  `>=0.8.1, <0.17.0` so Traverse v0.16.0 can unify on `traverse-contracts@0.16.x`
+  without pulling a second incompatible contracts crate (same pattern as #636).
+
 ### Fixed
 
 - **Embed approved-specs registry at compile time (registry#628).**
