@@ -1,0 +1,5 @@
+{
+  "kind": "metadata_only_successor",
+  "of": "text.detect-entities@1.1.1",
+  "justification": "Metadata-only successor of text.detect-entities@1.1.1: contract version 1.2.0 reuses the byte-identical WASM artifact hosted under artifacts/text.detect-entities-1.1.1 (digest sha256:f11f230260f0896d558051ee844de780cde9e5392f4d5219f9a9a84e6b15f6ec). Adds Spec 026 model rights fields on ai.models; guest logic and artifact bytes are unchanged."
+}

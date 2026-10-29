@@ -1,5 +1,5 @@
 {
-  "description": "Known live catalog artifacts that exceed stock Traverse WasmExecutor defaults (32 MiB / 5_000_000 fuel). Newly ADDED contracts are never exempt; this list only softens the nightly whole-catalog scan so the gate can be required without blocking unrelated PRs (registry#635).",
+  "description": "Known live catalog artifacts that exceed stock Traverse WasmExecutor defaults (32 MiB / 5_000_000 fuel). Newly ADDED contracts that publish a new artifact are never exempt; metadata_only_successor republishes skip the PR wasm32/host-limits rebuild (registry#623). This list softens the nightly whole-catalog scan so the gate can be required without blocking unrelated PRs (registry#635).",
   "pin": {
     "engine": "traverse-runtime WasmExecutor defaults",
     "traverse_runtime_version": "0.15.0",
@@ -33,6 +33,12 @@
       "reason": "~256 MiB DistilBERT arena"
     },
     {
+      "id": "text.detect-entities",
+      "version": "1.2.0",
+      "tracking_issue": 623,
+      "reason": "~256 MiB DistilBERT arena (metadata-only Spec 026 rights successor of 1.1.1)"
+    },
+    {
       "id": "text.redact-entities",
       "version": "1.0.0",
       "tracking_issue": 635,
@@ -51,16 +57,28 @@
       "reason": "~256 MiB DistilBERT arena"
     },
     {
+      "id": "text.redact-entities",
+      "version": "1.2.0",
+      "tracking_issue": 623,
+      "reason": "~256 MiB DistilBERT arena (metadata-only Spec 026 rights successor of 1.1.1)"
+    },
+    {
       "id": "audio.detect-speech-segments",
       "version": "1.0.0",
       "tracking_issue": 635,
-      "reason": "~66 MiB Silero VAD arena"
+      "reason": "~194 MiB Silero VAD arena"
     },
     {
       "id": "audio.detect-speech-segments",
       "version": "1.1.0",
       "tracking_issue": 635,
-      "reason": "~66 MiB Silero VAD arena"
+      "reason": "~194 MiB Silero VAD arena"
+    },
+    {
+      "id": "audio.detect-speech-segments",
+      "version": "1.2.0",
+      "tracking_issue": 623,
+      "reason": "~194 MiB Silero VAD arena (metadata-only Spec 026 rights successor of 1.0.0)"
     },
     {
       "id": "audio.transcribe-speech",
@@ -79,6 +97,30 @@
       "version": "1.2.0",
       "tracking_issue": 635,
       "reason": "~232 MiB Whisper arena / extreme fuel"
+    },
+    {
+      "id": "audio.transcribe-speech",
+      "version": "1.3.0",
+      "tracking_issue": 623,
+      "reason": "~232 MiB Whisper arena (metadata-only Spec 026 rights successor of 1.1.0)"
+    },
+    {
+      "id": "report.translate-fr-semantic",
+      "version": "1.0.0",
+      "tracking_issue": 635,
+      "reason": "~210 MiB MiniLM arena"
+    },
+    {
+      "id": "report.translate-fr-semantic",
+      "version": "1.1.0",
+      "tracking_issue": 635,
+      "reason": "~210 MiB MiniLM arena"
+    },
+    {
+      "id": "report.translate-fr-semantic",
+      "version": "1.2.0",
+      "tracking_issue": 623,
+      "reason": "~210 MiB MiniLM arena (metadata-only Spec 026 rights successor of 1.0.0)"
     }
   ]
 }
