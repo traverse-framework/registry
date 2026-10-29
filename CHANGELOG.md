@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+### Fixed
+
+- **Embed approved-specs registry at compile time (registry#628).**
+  `is_governed_artifact_path` / approved-spec checks no longer `fs::read`
+  an absolute `CARGO_MANIFEST_DIR` path at runtime (which failed open for
+  governed-path classification on every shipped host). The registry is
+  now `include_str!`-embedded; classification is deterministic and
+  portable to iOS/Android/wasm32/installed CLI.
+
 ### Added
 
 - **`model.execute@1.0.0` (registry#633).** Catalog capability over
