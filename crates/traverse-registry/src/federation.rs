@@ -16,19 +16,25 @@ use crate::{
 };
 use serde_json::Value;
 use std::collections::{BTreeMap, BTreeSet};
-use std::fs;
 use std::sync::OnceLock;
 use traverse_contracts::{ErrorSeverity, Lifecycle};
 
-// Bundled inside the crate (not read from `../../specs/governance/` in the
-// enclosing workspace) so governing-spec validation works identically for an
-// in-repo build and for this crate downloaded as an external dependency --
-// `CARGO_MANIFEST_DIR` for the latter points at wherever cargo unpacked the
-// published package, which has no sibling `specs/` directory at all. Keep
+// Embedded at compile time (registry#628) so governing-spec validation and
+// governed-path classification work on every shipped host — iOS/Android
+// staticlibs, installed traverse-cli, wasm32 embedders — without reading an
+// absolute build-machine path at runtime. Keep
 // `crates/traverse-registry/governance/approved-specs.json` in sync with the
 // workspace's `specs/governance/approved-specs.json`; the
-// `bundled_approved_specs_matches_workspace_source` test enforces that
-// in-repo.
+// `bundled_approved_specs_matches_workspace_source_when_present` test
+// enforces that in-repo. A unit test also asserts this embedded JSON parses
+// to a non-empty registry (malformed content fails CI, never silently
+// empties the OnceLocks).
+const APPROVED_SPECS_JSON: &str = include_str!("../governance/approved-specs.json");
+
+/// On-disk path of the bundled copy — used only by the sync test that
+/// compares it to the workspace source of truth. Runtime loaders do not
+/// read this path (see `APPROVED_SPECS_JSON`).
+#[cfg(test)]
 const APPROVED_SPECS_REGISTRY_PATH: &str = concat!(
     env!("CARGO_MANIFEST_DIR"),
     "/governance/approved-specs.json"
@@ -1300,15 +1306,7 @@ fn approved_spec_registry_contains(spec_id: &str) -> bool {
 }
 
 fn load_approved_spec_ids() -> BTreeSet<String> {
-    load_approved_spec_ids_from_path(APPROVED_SPECS_REGISTRY_PATH)
-}
-
-fn load_approved_spec_ids_from_path(path: &str) -> BTreeSet<String> {
-    let Ok(contents) = fs::read_to_string(path) else {
-        return BTreeSet::new();
-    };
-
-    parse_approved_spec_ids(&contents)
+    parse_approved_spec_ids(APPROVED_SPECS_JSON)
 }
 
 /// Returns true when `path` is governed per spec 030-security-identity-model
@@ -1317,6 +1315,10 @@ fn load_approved_spec_ids_from_path(path: &str) -> BTreeSet<String> {
 /// every path each approved spec declares in its `governs` list (which
 /// already includes `contracts/` itself), not by pattern-matching the path
 /// string for substrings like `"specs"` or `"approved"`.
+///
+/// Classification depends only on `path` and the compile-time embedded
+/// approved-specs registry (registry#628) — never on whether a build-machine
+/// filesystem path exists at runtime.
 #[must_use]
 pub fn is_governed_artifact_path(path: &str) -> bool {
     let normalized = path.replace('\\', "/");
@@ -1336,17 +1338,8 @@ fn governs_path(governed: &str, path: &str) -> bool {
 }
 
 fn load_governed_path_prefixes() -> Vec<String> {
-    load_governed_path_prefixes_from_path(APPROVED_SPECS_REGISTRY_PATH)
+    parse_governed_path_prefixes(APPROVED_SPECS_JSON)
 }
-
-fn load_governed_path_prefixes_from_path(path: &str) -> Vec<String> {
-    let Ok(contents) = fs::read_to_string(path) else {
-        return Vec::new();
-    };
-
-    parse_governed_path_prefixes(&contents)
-}
-
 fn parse_governed_path_prefixes(contents: &str) -> Vec<String> {
     let Ok(payload) = serde_json::from_str::<Value>(contents) else {
         return Vec::new();
@@ -1482,6 +1475,7 @@ mod tests {
         WorkflowNodeOutput, WorkflowRegistration, WorkflowRegistry, export_peer_state,
     };
     use serde_json::json;
+    use std::fs;
     use traverse_contracts::{
         CapabilityContract, Entrypoint, EntrypointKind, EventClassification, EventContract,
         EventPayload, EventProvenance, EventProvenanceSource, EventReference, EventType, Lifecycle,
@@ -2100,12 +2094,12 @@ mod tests {
     #[test]
     fn bundled_approved_specs_matches_workspace_source_when_present() {
         // The crate ships its own copy of approved-specs.json (see
-        // APPROVED_SPECS_REGISTRY_PATH's doc comment) so governing-spec
-        // validation works for an externally-consumed published package,
-        // which has no sibling `specs/` directory to read at runtime. That
-        // sibling directory only exists for an in-repo build -- when it's
-        // present, assert the bundled copy hasn't drifted from the
-        // workspace's own source of truth.
+        // APPROVED_SPECS_JSON's doc comment) so governing-spec validation
+        // works for an externally-consumed published package. The sibling
+        // workspace `specs/` directory only exists for an in-repo build --
+        // when it's present, assert the bundled copy hasn't drifted from
+        // the workspace's own source of truth, and that include_str! sees
+        // the same bytes.
         let workspace_source = concat!(
             env!("CARGO_MANIFEST_DIR"),
             "/../../specs/governance/approved-specs.json"
@@ -2120,23 +2114,58 @@ mod tests {
             "crates/traverse-registry/governance/approved-specs.json has drifted from \
              specs/governance/approved-specs.json -- keep the bundled copy in sync"
         );
+        assert_eq!(
+            APPROVED_SPECS_JSON,
+            bundled_contents.as_str(),
+            "include_str! embedded registry must match the on-disk bundled copy"
+        );
     }
 
     #[test]
-    fn approved_spec_loader_returns_empty_for_missing_or_invalid_inputs() {
+    fn embedded_approved_specs_parses_non_empty() {
+        // registry#628: malformed embedded JSON must fail CI, never silently
+        // empty the OnceLocks (empty governed prefixes fail open).
+        let ids = parse_approved_spec_ids(APPROVED_SPECS_JSON);
+        let prefixes = parse_governed_path_prefixes(APPROVED_SPECS_JSON);
         assert!(
-            load_approved_spec_ids_from_path("/definitely-missing/approved-specs.json").is_empty()
+            !ids.is_empty(),
+            "embedded approved-specs.json must declare at least one spec id"
         );
+        assert!(
+            !prefixes.is_empty(),
+            "embedded approved-specs.json must declare at least one governs prefix"
+        );
+        assert!(ids.contains("001-registry-foundation"));
+        assert!(
+            prefixes
+                .iter()
+                .any(|p| p == "contracts/" || p.starts_with("contracts")),
+            "expected contracts/ among governed prefixes, got {prefixes:?}"
+        );
+    }
+
+    #[test]
+    fn approved_spec_parser_returns_empty_for_invalid_json() {
         assert!(parse_approved_spec_ids("{not-json").is_empty());
     }
 
     #[test]
-    fn governed_path_loader_returns_empty_for_missing_or_invalid_inputs() {
-        assert!(
-            load_governed_path_prefixes_from_path("/definitely-missing/approved-specs.json")
-                .is_empty()
-        );
+    fn governed_path_parser_returns_empty_for_invalid_json() {
         assert!(parse_governed_path_prefixes("{not-json").is_empty());
+    }
+
+    #[test]
+    fn governed_path_classification_does_not_require_runtime_filesystem() {
+        // Proves the public API works from the embedded registry alone —
+        // the same code path shipped hosts use when CARGO_MANIFEST_DIR is
+        // absent at runtime.
+        assert!(is_governed_artifact_path(
+            "contracts/approved/comment-draft.json"
+        ));
+        assert!(approved_spec_registry_contains("001-registry-foundation"));
+        assert!(!approved_spec_registry_contains(
+            "definitely-not-an-approved-spec-id"
+        ));
     }
 
     #[test]
