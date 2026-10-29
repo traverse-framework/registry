@@ -1,0 +1,9 @@
+{
+  "scheme": "ed25519",
+  "public_key_hex": "39d1745be4d54e30be1180454661e5d8826075692d86b86fb042d19d96cb8522",
+  "signature_hex": "6a5892430eabf63ee8d0653e54977875fb8616a8b03ce2baa3d40413841f51965e70d2bc0f4641eee613017bfc6f0fe0d85e41a9f163a9eed1f51618277bec01",
+  "contract_sha256": "a96db38bb2c012b66a322e61a01d7407e5bd961396809207a447ce51279aef1c",
+  "contract_signature_hex": "94a4d3c6bffa851cca5d86c43335e84a4796adeeb007a883102f91ba3d8cf3398bded413f874eaf1c5d9e68965f05bfb744f3e669068daef5bc3046e7bcfd20b",
+  "sigstore_bundle_ref": null,
+  "signed_at": "2026-10-29T15:20:14Z"
+}
