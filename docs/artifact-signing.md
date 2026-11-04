@@ -18,7 +18,8 @@ digest verification alone proves integrity, not authenticity.
     signature yet. This is the registry#335 backfill, and a self-healing net.
   - `--dry-run` — report targets, write nothing, need no key.
 - **`.github/workflows/ci.yml` → `sign-artifacts` job** — `push` to `main` only,
-  `continue-on-error: true`, commits the siblings back with `[skip ci]`.
+  `continue-on-error: true`, opens an auto-merge follow-up PR with the siblings
+  (see step 3).
 - **`scripts/ci/capability_validation.py`** — validates the shape of any
   `signature.json` that exists and forbids modifying one once written.
 
@@ -78,27 +79,33 @@ gh secret set ARTIFACT_SIGNING_ED25519_SECRET_KEY \
   --body '<64-hex-char secret from step 1>'
 ```
 
-### 3. Landing new `signature.json` files after a publish — the standing manual step
+### 3. Landing new `signature.json` files after a publish — automatic follow-up PR
 
-On merge to `main`, the `sign-artifacts` job signs any newly published capability
-and tries to commit the `signature.json` back directly. That direct push needs
-`github-actions[bot]` past the `traverse-governance-*` rules on `main`, which it
-does not have — so the job logs a warning, still succeeds (`continue-on-error`),
-and uploads the signed files as the `artifact-signatures` workflow artifact.
+On merge to `main`, the `sign-artifacts` job signs any newly published capability.
+`main` is protected by the `traverse-governance-*` rulesets, so the job never pushes
+to `main` directly (adding `github-actions[bot]` to the bypass list is rejected at
+any stage, decision-log entries 85/113). Instead it **opens a follow-up PR** from
+`chore/signatures-<sha>` containing only the `signature.json` siblings (and
+`catalog/signing-key.pub`) and queues `gh pr merge --squash --auto`. The PR runs the
+normal required checks, `capability-validation` included.
 
-**The maintainer then opens a normal PR with that artifact's contents. This is the
-chosen approach, not a stopgap** — decided in `docs/decision-log.md` entry 85
-(`/brainstorm 341 355 365`, registry#341):
+Opening a PR that triggers CI needs a token other than `GITHUB_TOKEN` (GitHub does
+not start workflows from it). **One-time owner setup** (registry#341, decision-log
+entry 113 option 1):
 
-- A bot PAT / GitHub App token that pushes (or opens a CI-triggering PR)
-  automatically is the right answer *eventually*, but not now — it adds a secret
-  to rotate for a step that runs only on new-capability publishes, which are
-  infrequent.
-- Adding `github-actions[bot]` to the `traverse-governance-*` bypass list is
-  rejected at any stage: it weakens a governance ruleset and broadens bot write
-  access to `main` well beyond signatures.
+```bash
+# fine-grained PAT (or GitHub App token) scoped to traverse-framework/registry
+# with Contents: read/write and Pull requests: read/write
+gh secret set SIGNATURE_PR_TOKEN \
+  --repo traverse-framework/registry --body '<token>'
+```
 
-To recover the signatures after such a merge:
+Rotate it like any other secret. The signer uses it only to push the
+`chore/signatures-*` branch and open/auto-merge that PR.
+
+**Fallback (also the behaviour while the secret is unset):** the job logs a warning,
+still succeeds (`continue-on-error`), and uploads the signed files as the
+`artifact-signatures` workflow artifact. A maintainer then opens a normal PR by hand:
 
 ```bash
 run_id=$(gh run list --repo traverse-framework/registry --workflow CI \
@@ -109,9 +116,8 @@ git add capabilities catalog/signing-key.pub
 git commit -m "chore(signing): add signature.json for <capability> <version>"
 ```
 
-**Revisit trigger:** move to the bot PAT / App token (registry#341) once
-new-capability publishes sustain more than ~1 per week and the manual PR becomes a
-real drag. Until then, registry#341 stays open as the tracking vehicle.
+Merging a signature PR does not loop: `--since-merge` only signs newly *added*
+`contract.json` files, and a signature-only PR adds none.
 
 ### 4. Backfill existing capabilities (registry#335)
 

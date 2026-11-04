@@ -319,12 +319,13 @@ jobs:
     runs-on: ubuntu-latest
     continue-on-error: true
     permissions:
-      contents: write
+      contents: read
     steps:
       - name: Checkout
         uses: actions/checkout@v7
         with:
           fetch-depth: 0
+          persist-credentials: false
 
       - name: Set up Python
         uses: actions/setup-python@v7
@@ -365,24 +366,69 @@ jobs:
             catalog/signing-key.pub
           if-no-files-found: ignore
 
-      # Direct commit back to main, attempted only on merge-to-main (the
-      # ongoing per-publish case). Requires the github-actions[bot] actor to be
-      # allowed to push to main; when it is not, this step logs and the run
-      # still succeeds (continue-on-error) -- the signed files remain available
-      # as the artifact above for a maintainer to PR.
-      - name: Commit signature siblings
+      # Opens a follow-up PR with the new signature siblings (registry#341,
+      # decision-log entry 113: option 1). A direct push to main is rejected
+      # by the traverse-governance-* rulesets and `GITHUB_TOKEN` PRs do not
+      # trigger the required checks, so this needs SIGNATURE_PR_TOKEN: a
+      # fine-grained PAT or GitHub App token with contents + pull-requests
+      # write on this repo. Unset (or any failure) -> a warning only and the
+      # `artifact-signatures` artifact above stays the manual fallback
+      # (docs/artifact-signing.md step 3). Not [skip ci]: the PR must run
+      # capability-validation. Re-merging the PR is a no-op for this job
+      # (--since-merge only signs newly ADDED contract.json files).
+      - name: Open signature PR
         if: github.event_name == 'push'
+        env:
+          GH_TOKEN: ${{ secrets.SIGNATURE_PR_TOKEN }}
+          REPO: ${{ github.repository }}
+          AFTER_SHA: ${{ github.sha }}
         run: |
           if [ -z "$(git status --porcelain -- capabilities catalog/signing-key.pub)" ]; then
             echo "No new signatures to commit."
             exit 0
           fi
+          if [ -z "$GH_TOKEN" ]; then
+            echo "::warning::SIGNATURE_PR_TOKEN is not set; download the 'artifact-signatures' artifact and open a PR instead (docs/artifact-signing.md step 3)."
+            exit 0
+          fi
+          branch="chore/signatures-${AFTER_SHA:0:12}"
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -b "$branch"
           git add -- capabilities catalog/signing-key.pub
-          git commit -m "chore(signing): Ed25519 signature siblings for newly-merged artifacts [skip ci]"
-          git push origin HEAD:main || \
-            echo "::warning::Direct push to main not permitted; download the 'artifact-signatures' artifact and open a PR instead."
+          signed="$(git diff --cached --name-only -- capabilities | grep 'signature.json$' | sed 's#^capabilities/[^/]*/##; s#/signature.json$##' | paste -sd, - | sed 's/,/, /g')"
+          git commit -m "chore(signing): Ed25519 signature siblings for ${AFTER_SHA:0:12}"
+          body_file="$(mktemp)"
+          {
+            echo "## Summary"
+            echo
+            echo "- Auto-opened by the \`sign-artifacts\` job after ${AFTER_SHA:0:12} merged: Ed25519 signature siblings for ${signed:-newly merged artifacts} (registry#341)."
+            echo
+            echo "## Governing Spec"
+            echo
+            echo "- 001-registry-foundation"
+            echo "- 007-artifact-hosting"
+            echo
+            echo "## Project Item"
+            echo
+            echo "- https://github.com/${REPO}/issues/341"
+            echo
+            echo "## Definition of Done"
+            echo
+            echo "- [x] signature.json siblings added (contract.json untouched)"
+            echo
+            echo "## Validation"
+            echo
+            echo "- Produced by scripts/ci/sign_artifacts.py --since-merge; capability-validation runs on this PR."
+          } > "$body_file"
+          if git push "https://x-access-token:${GH_TOKEN}@github.com/${REPO}.git" "$branch" \
+            && pr_url="$(gh pr create --repo "$REPO" --base main --head "$branch" \
+              --title "chore(signing): signature siblings for ${AFTER_SHA:0:12}" --body-file "$body_file")" \
+            && gh pr merge "$pr_url" --repo "$REPO" --squash --auto; then
+            echo "Opened $pr_url with auto-merge queued."
+          else
+            echo "::warning::Could not open the signature PR; download the 'artifact-signatures' artifact and open a PR instead (docs/artifact-signing.md step 3)."
+          fi
 
   # Discovery catalog build (registry#103/#105/#106). Regenerates
   # catalog/catalog.json from whatever is currently published, same
