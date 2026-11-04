@@ -4,6 +4,11 @@
 
 ### Changed
 
+- **`traverse-registry` 0.30.0 (registry#649).** Widen `traverse-contracts` to
+  `>=0.8.1, <0.18.0` so a Traverse 0.17 workspace can unify on a single
+  `traverse-contracts` line (Traverse #1775 had to cut v0.16.1 instead of
+  v0.17.0 because 0.29.0's `<0.17.0` cap dual-resolved contracts). Same
+  pattern as #636/#642.
 - **`traverse-registry` 0.29.0 (registry#642).** Widen `traverse-contracts` to
   `>=0.8.1, <0.17.0` so Traverse v0.16.0 can unify on `traverse-contracts@0.16.x`
   without pulling a second incompatible contracts crate (same pattern as #636).
