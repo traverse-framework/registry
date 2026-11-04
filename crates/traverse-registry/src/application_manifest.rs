@@ -51,10 +51,21 @@ pub struct ApplicationState {
     pub transitions: Vec<ApplicationStateTransition>,
 }
 
+/// Exact-one state-machine invoke union (Traverse spec 1773): either a
+/// capability invoke (`capability_id`, optional `input_from`) or a
+/// host-connector invoke (`host_connector`). Serializes to the same field
+/// names as the manifest form.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
-pub struct ApplicationStateInvoke {
-    pub capability_id: String,
-    pub input_from: String,
+#[serde(untagged)]
+pub enum ApplicationStateInvoke {
+    Capability {
+        capability_id: String,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        input_from: Option<String>,
+    },
+    HostConnector {
+        host_connector: String,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -608,15 +619,9 @@ struct ApplicationStateMachineSerde {
 struct ApplicationStateSerde {
     id: String,
     #[serde(default)]
-    invoke: Option<ApplicationStateInvokeSerde>,
+    invoke: Option<Value>,
     #[serde(default)]
     transitions: Vec<ApplicationStateTransitionSerde>,
-}
-
-#[derive(Debug, Deserialize)]
-struct ApplicationStateInvokeSerde {
-    capability_id: String,
-    input_from: String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -1409,31 +1414,95 @@ fn materialize_state_machine_state(
     state: &ApplicationStateSerde,
     component_capabilities: &BTreeSet<String>,
 ) -> Result<ApplicationState, ApplicationManifestFailure> {
-    if let Some(invoke) = &state.invoke
-        && !component_capabilities.contains(&invoke.capability_id)
-    {
-        return Err(single_error(
-            ApplicationManifestErrorCode::AppStateMachineUndefinedCapability,
-            format!("state_machine.states.{}.invoke", state.id),
-            format!(
-                "invoke capability '{}' is not declared in app components",
-                invoke.capability_id
-            ),
-        ));
-    }
+    let invoke = state
+        .invoke
+        .as_ref()
+        .map(|raw| materialize_state_invoke(&state.id, raw, component_capabilities))
+        .transpose()?;
 
     Ok(ApplicationState {
         id: state.id.clone(),
-        invoke: state.invoke.as_ref().map(|invoke| ApplicationStateInvoke {
-            capability_id: invoke.capability_id.clone(),
-            input_from: invoke.input_from.clone(),
-        }),
+        invoke,
         transitions: state
             .transitions
             .iter()
             .map(|transition| materialize_state_machine_transition(&state.id, transition))
             .collect::<Result<Vec<_>, _>>()?,
     })
+}
+
+/// Validates a raw `invoke` object as exactly one of the capability or
+/// host-connector variants. Diagnostics are fixed strings: they never echo
+/// manifest-supplied field names or values.
+fn materialize_state_invoke(
+    state_id: &str,
+    raw: &Value,
+    component_capabilities: &BTreeSet<String>,
+) -> Result<ApplicationStateInvoke, ApplicationManifestFailure> {
+    let path = format!("state_machine.states.{state_id}.invoke");
+    let invalid = |message: &str| {
+        single_error(
+            ApplicationManifestErrorCode::AppStateMachineInvalid,
+            path.clone(),
+            message.to_string(),
+        )
+    };
+    let Some(object) = raw.as_object() else {
+        return Err(invalid("invoke must be an object"));
+    };
+    if object.keys().any(|key| {
+        !matches!(
+            key.as_str(),
+            "capability_id" | "input_from" | "host_connector"
+        )
+    }) {
+        return Err(invalid("invoke contains an unsupported field"));
+    }
+    let identifier = |key: &str| -> Result<Option<String>, ApplicationManifestFailure> {
+        match object.get(key) {
+            None => Ok(None),
+            Some(Value::String(text)) if !text.trim().is_empty() => Ok(Some(text.clone())),
+            Some(_) => Err(invalid("invoke identifiers must be non-empty strings")),
+        }
+    };
+    let capability_id = identifier("capability_id")?;
+    let host_connector = identifier("host_connector")?;
+    match (capability_id, host_connector) {
+        (Some(capability_id), None) => {
+            let input_from = match object.get("input_from") {
+                None => None,
+                Some(Value::String(text)) => Some(text.clone()),
+                Some(_) => return Err(invalid("invoke input_from must be a string")),
+            };
+            if !component_capabilities.contains(&capability_id) {
+                return Err(single_error(
+                    ApplicationManifestErrorCode::AppStateMachineUndefinedCapability,
+                    path.clone(),
+                    format!(
+                        "invoke capability '{capability_id}' is not declared in app components"
+                    ),
+                ));
+            }
+            Ok(ApplicationStateInvoke::Capability {
+                capability_id,
+                input_from,
+            })
+        }
+        (None, Some(host_connector)) => {
+            if object.contains_key("input_from") {
+                return Err(invalid(
+                    "invoke input_from is only valid with capability_id",
+                ));
+            }
+            Ok(ApplicationStateInvoke::HostConnector { host_connector })
+        }
+        (None, None) => Err(invalid(
+            "invoke requires exactly one of capability_id or host_connector",
+        )),
+        (Some(_), Some(_)) => Err(invalid(
+            "invoke must not declare both capability_id and host_connector",
+        )),
+    }
 }
 
 fn materialize_state_machine_transition(
