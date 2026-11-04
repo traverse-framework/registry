@@ -4,6 +4,16 @@
 
 ### Changed
 
+- **`traverse-registry` 0.31.0 (registry#650) — breaking public API.**
+  `ApplicationStateInvoke` is now an exact-one union (Traverse spec
+  `1773-host-connector-invoke-union`): `Capability { capability_id,
+  input_from: Option<String> }` or `HostConnector { host_connector }`.
+  Manifests with `invoke: {"host_connector": "..."}` now load instead of
+  failing on a missing `capability_id`; capability-only manifests parse and
+  serialize unchanged (`input_from` is now optional). Neither/both/empty/
+  non-string/unknown-field/`input_from`-with-connector invokes fail with
+  `AppStateMachineInvalid` and a fixed message that never echoes manifest
+  values. Resolves against `traverse-contracts` 0.16 (range widened in 0.30.0).
 - **`traverse-registry` 0.30.0 (registry#649).** Widen `traverse-contracts` to
   `>=0.8.1, <0.18.0` so a Traverse 0.17 workspace can unify on a single
   `traverse-contracts` line (Traverse #1775 had to cut v0.16.1 instead of

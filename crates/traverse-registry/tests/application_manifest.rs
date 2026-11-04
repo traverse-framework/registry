@@ -10,12 +10,13 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use traverse_contracts::{ExecutionTarget, parse_contract, parse_event_contract};
 use traverse_registry::{
     ApplicationManifestErrorCode, ApplicationRegistrationErrorCode, ApplicationRegistrationRequest,
-    ApplicationRegistrationStatus, ApplicationRegistry, ApplicationStateTransitionConditionOp,
-    CapabilityRegistry, EventRegistration, EventRegistry, LookupScope, ModelCandidateRejectionCode,
-    ModelResolutionEvidence, ModelResolutionPhase, RegistryComponentResolver, RegistryReference,
-    RegistryScope, ResolvedRegistryComponent, SelectedModelCandidate, WorkflowRegistry,
-    application_selected_references, application_selected_references_from_manifest_path,
-    load_application_bundle_manifest, load_application_bundle_manifest_with_resolver,
+    ApplicationRegistrationStatus, ApplicationRegistry, ApplicationStateInvoke,
+    ApplicationStateTransitionConditionOp, CapabilityRegistry, EventRegistration, EventRegistry,
+    LookupScope, ModelCandidateRejectionCode, ModelResolutionEvidence, ModelResolutionPhase,
+    RegistryComponentResolver, RegistryReference, RegistryScope, ResolvedRegistryComponent,
+    SelectedModelCandidate, WorkflowRegistry, application_selected_references,
+    application_selected_references_from_manifest_path, load_application_bundle_manifest,
+    load_application_bundle_manifest_with_resolver,
 };
 
 struct StaticRegistryResolver {
@@ -46,10 +47,7 @@ fn loads_application_manifest_with_generated_component_artifact() {
         bundle.components[0].manifest.component_id,
         "hello.world.say-hello-component"
     );
-    assert_eq!(
-        bundle.components[0].contract.id,
-        "hello.world.say-hello"
-    );
+    assert_eq!(bundle.components[0].contract.id, "hello.world.say-hello");
     assert!(bundle.components[0].verified_wasm_digest.is_some());
 }
 
@@ -827,12 +825,18 @@ fn loads_valid_application_state_machine() {
     );
     assert_eq!(state_machine.states.len(), 2);
     assert_eq!(
-        state_machine.states[0]
-            .invoke
-            .as_ref()
-            .expect("draft state should invoke capability")
-            .capability_id,
-        "expedition.planning.validate-team-readiness"
+        state_machine.states[0].invoke,
+        Some(ApplicationStateInvoke::Capability {
+            capability_id: "expedition.planning.validate-team-readiness".to_string(),
+            input_from: Some("$.team".to_string()),
+        })
+    );
+    assert_eq!(
+        serde_json::to_value(&state_machine.states[0].invoke).expect("invoke serializes"),
+        json!({
+            "capability_id": "expedition.planning.validate-team-readiness",
+            "input_from": "$.team"
+        })
     );
     assert!(state_machine.states[0].transitions[0].with_last_payload);
 }
@@ -1062,6 +1066,91 @@ fn rejects_invalid_application_state_machine_shapes() {
             .expect_err("invalid state machine should fail");
 
         assert_eq!(failure.errors[0].code, expected_code);
+    }
+}
+
+#[test]
+fn loads_host_connector_state_invoke_without_capability_id() {
+    let fixture = AppFixture::new("state-machine-host-connector");
+    fixture.write_app_manifest_with_state_machine(
+        &json!([]),
+        &json!({
+            "initial_state": "permission",
+            "states": [{
+                "id": "permission",
+                "invoke": {"host_connector": "audio.permission.request"},
+                "transitions": []
+            }]
+        }),
+    );
+
+    let bundle = load_application_bundle_manifest(&fixture.app_manifest_path())
+        .expect("host-connector invoke should validate");
+    let invoke = bundle.state_machine.expect("state machine").states[0]
+        .invoke
+        .clone();
+
+    assert_eq!(
+        invoke,
+        Some(ApplicationStateInvoke::HostConnector {
+            host_connector: "audio.permission.request".to_string()
+        })
+    );
+    assert_eq!(
+        serde_json::to_value(&invoke).expect("invoke serializes"),
+        json!({"host_connector": "audio.permission.request"})
+    );
+}
+
+#[test]
+fn rejects_malformed_state_invoke_unions_with_redacted_diagnostics() {
+    let secret = "SECRET-PRIVATE-VALUE";
+    let cases = [
+        ("neither", json!({})),
+        (
+            "both",
+            json!({"capability_id": secret, "host_connector": secret}),
+        ),
+        ("empty-connector", json!({"host_connector": ""})),
+        ("blank-capability", json!({"capability_id": "  "})),
+        ("non-string-connector", json!({"host_connector": 7})),
+        (
+            "unknown-field",
+            json!({"host_connector": "audio.permission.request", secret: secret}),
+        ),
+        (
+            "connector-with-input-from",
+            json!({"host_connector": "audio.permission.request", "input_from": secret}),
+        ),
+        ("not-an-object", json!(secret)),
+    ];
+
+    for (name, invoke) in cases {
+        let fixture = AppFixture::new(&format!("state-invoke-{name}"));
+        fixture.write_app_manifest_with_state_machine(
+            &json!([]),
+            &json!({
+                "initial_state": "draft",
+                "states": [{"id": "draft", "invoke": invoke, "transitions": []}]
+            }),
+        );
+
+        let failure = load_application_bundle_manifest(&fixture.app_manifest_path())
+            .expect_err("malformed invoke should fail");
+
+        assert_eq!(
+            failure.errors[0].code,
+            ApplicationManifestErrorCode::AppStateMachineInvalid,
+            "{name}"
+        );
+        assert_eq!(
+            failure.errors[0].path, "state_machine.states.draft.invoke",
+            "{name}"
+        );
+        assert!(
+            !failure.errors[0].message.contains(secret),
+            "{name} diagnostic must not echo manifest values"
+        );
     }
 }
 
@@ -3094,10 +3183,7 @@ impl AppFixture {
         });
         app.as_object_mut()
             .expect("app manifest should be an object")
-            .insert(
-                "connector_bindings".to_string(),
-                connector_bindings.clone(),
-            );
+            .insert("connector_bindings".to_string(), connector_bindings.clone());
         fs::write(self.app_manifest_path(), app.to_string()).expect("app manifest should write");
     }
 
