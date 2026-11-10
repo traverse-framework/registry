@@ -1,6 +1,6 @@
 # LLM-Assisted Authoring Evaluation
 
-**Status: methodology fixed; results drafted, awaiting owner sign-off.**
+**Status: complete. Bar not met; the low-risk tier stays `experimental` (decision-log entry 139).**
 
 This document is the retrospective evaluation of LLM-assisted capability
 authoring that [`specs/023-authoring-assurance`](../specs/023-authoring-assurance/spec.md)
@@ -161,9 +161,9 @@ with the reason.
 
 ## Results
 
-**Draft. Awaiting the owner's row-by-row sign-off.** The totals, the bar
-outcome, and the promotion decision are filled in only after every row below
-is confirmed or changed in the review of this PR.
+**Owner sign-off: 2026-11-10.** The owner confirmed every row below as
+proposed, including flags A–F. No rows were changed. Totals were computed only
+after that sign-off.
 
 ### Collection
 
@@ -190,7 +190,7 @@ is confirmed or changed in the review of this PR.
 ### Flags for the owner
 
 Rows marked with a flag are calls the evidence rules do not settle on their
-own. Each has a proposed call, but the owner's decision is what counts.
+own. The owner accepted every proposed call below.
 
 - **A. `text.truncate@1.0.0`.** The methodology names #492 as an example of a
   behaviour escape, but its rules require the version to have been "fixed or
@@ -332,15 +332,29 @@ pre-registered metric counts every code, so they are reported as they are.
 
 ### Totals and bar
 
-*Pending owner sign-off on every row above.*
+First-pass CI is "passed / versions whose first push could be determined"
+(flag F rows are left out of the denominator).
 
 | bucket | n | escapes | escape rate | first-pass CI |
 |---|---|---|---|---|
-| promotion | | | | |
-| model-backed | | | | |
-| other risk classes | | | | |
-| unclassified | | | | |
+| **promotion** | **25** | **7** | **28%** | 15 / 23 (65%) |
+| model-backed | 8 | 8 | 100% | 8 / 8 (100%) |
+| other risk classes | 16 | 4 | 25% | 4 / 16 (25%) |
+| unclassified | 12 | 0 | 0% | 1 / 12 (8%) |
 
-Bar outcome: *pending.*
+Bar outcome for the promotion bucket: **not met.**
 
-Rows changed by the owner: *none yet.*
+1. n ≥ 20: **met** (n = 25).
+2. Escape rate ≤ 10%: **not met** (7 / 25 = 28%). Without flag A it would be
+   6 / 25 = 24%, which still fails.
+3. Every escape's root cause gated: **not met.** Six escapes (all #656 parse
+   failures) are now caught by the `traverse-contracts` parse gate (entry 137).
+   The `text.truncate@1.0.0` root cause (wasm32 `usize` width, invisible to
+   64-bit host tests) is caught by no current gate.
+
+Six of the seven promotion-bucket escapes are a single failure class: contract
+values (lifecycle `experimental`, provenance `derived`, the missing `schema`
+wrapper) that the registry's own CI accepted but Traverse's parser rejected.
+That gate now exists. One escape is a behaviour defect.
+
+Rows changed by the owner: **none.**
