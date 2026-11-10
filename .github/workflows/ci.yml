@@ -94,6 +94,11 @@ jobs:
       - name: Build event-product validator
         run: cargo build --locked -p traverse-registry --bin validate_event_products
 
+      # registry#656 / traverse decision 130: the publish gate parses records
+      # with the same `traverse-contracts` parser Traverse consumers use.
+      - name: Build traverse-contracts parse gate
+        run: cargo build --locked -p traverse-registry --bin validate_capability_contracts
+
       - name: Install SPDX license-expression pin
         run: pip install "license-expression==30.4.4"
 
@@ -124,6 +129,7 @@ jobs:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
           VALIDATE_EVENT_PRODUCTS_BIN: ${{ github.workspace }}/target/debug/validate_event_products
+          VALIDATE_CAPABILITY_CONTRACTS_BIN: ${{ github.workspace }}/target/debug/validate_capability_contracts
         run: |
           if [ "${{ github.event_name }}" = "pull_request" ]; then
             python3 scripts/ci/capability_validation.py "$BASE_SHA" "$HEAD_SHA"

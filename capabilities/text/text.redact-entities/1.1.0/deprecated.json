@@ -1,0 +1,6 @@
+{
+  "deprecated": true,
+  "reason": "traverse-contracts cannot parse text.redact-entities@1.1.0: provenance.source 'derived' is not a Spec 002 value. Superseded by 1.1.2, the parseable successor of 1.1.1 (1.1.0's existing NER-fragmentation bug-fix patch); 1.1.1 is taken, so no same-behaviour 1.1.0 patch can be published (registry#656).",
+  "deprecated_at": "2026-11-10T00:00:00Z",
+  "superseded_by": "1.1.2"
+}

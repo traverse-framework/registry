@@ -8,6 +8,7 @@ mod async_api_export;
 mod bundle;
 pub mod capability_risk;
 mod connector_activation;
+mod contract_parse_tree;
 pub mod dependency_resolver;
 mod event_products;
 mod event_product_tree;
@@ -30,6 +31,7 @@ pub use async_api::*;
 pub use async_api_export::*;
 pub use bundle::*;
 pub use connector_activation::*;
+pub use contract_parse_tree::*;
 pub use dependency_resolver::{
     DigestMismatch, MAX_TRANSITIVE_DEPTH, ResolutionError, ResolvedDependencyLock,
     lookup_lock_record, resolve_dependencies, verify_lock_digests,

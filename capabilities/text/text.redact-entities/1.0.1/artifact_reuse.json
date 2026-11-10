@@ -1,0 +1,5 @@
+{
+  "kind": "metadata_only_successor",
+  "of": "text.redact-entities@1.0.0",
+  "justification": "Metadata-only successor of text.redact-entities@1.0.0: contract version 1.0.1 reuses the byte-identical WASM artifact (digest sha256:cd6dc3d592c3f82e0e1887c6988868d3e5be202139d6af8ac66f2b6c44a1066f). Only change: provenance.source changed from 'derived' to 'ai-assisted' (traverse decision 130); every other field unchanged. Guest logic and artifact bytes are unchanged (registry#656)."
+}

@@ -1,0 +1,5 @@
+{
+  "kind": "metadata_only_successor",
+  "of": "text.detect-language@1.0.0",
+  "justification": "Metadata-only successor of text.detect-language@1.0.0: contract version 1.0.1 reuses the byte-identical WASM artifact (digest sha256:d07e00440588288cf3895635cc0cc4331129a88cde8f372035c243eebe93bc29). Only change: provenance.source changed from 'derived' to 'ai-assisted' (traverse decision 130); every other field unchanged. Guest logic and artifact bytes are unchanged (registry#656)."
+}

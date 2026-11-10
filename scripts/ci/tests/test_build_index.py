@@ -123,6 +123,27 @@ class BuildIndexContractMetadataTests(unittest.TestCase):
             self.assertTrue(entry["deprecated"])
             self.assertIsNotNone(entry["contract_digest"])
             self.assertIsNotNone(entry["contract_url"])
+            self.assertNotIn("superseded_by", entry)
+
+    def test_deprecated_entry_names_its_successor(self):
+        # registry#656 / traverse decision 130.
+        with tempfile.TemporaryDirectory() as tmp:
+            path = write_contract(tmp, valid_contract())
+            (path.parent / "deprecated.json").write_text(
+                json.dumps({"deprecated": True, "reason": "test", "superseded_by": "1.2.4"})
+            )
+
+            entry = self._run_in(tmp, 0, "deadbeef")["capabilities"][0]
+            self.assertTrue(entry["deprecated"])
+            self.assertEqual(entry["superseded_by"], "1.2.4")
+
+    def test_unreadable_deprecation_record_fails_the_build(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = write_contract(tmp, valid_contract())
+            (path.parent / "deprecated.json").write_text("{not json")
+
+            with self.assertRaises(build_index_module.IndexBuildError):
+                self._run_in(tmp, 0, "deadbeef")
 
     def test_contract_digest_independently_verifiable(self):
         with tempfile.TemporaryDirectory() as tmp:

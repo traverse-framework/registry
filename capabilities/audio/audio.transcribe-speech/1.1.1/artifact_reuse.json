@@ -1,0 +1,5 @@
+{
+  "kind": "metadata_only_successor",
+  "of": "audio.transcribe-speech@1.1.0",
+  "justification": "Metadata-only successor of audio.transcribe-speech@1.1.0: contract version 1.1.1 reuses the byte-identical WASM artifact (digest sha256:cdddb1478534405d609785deeabedc5f7d90a480c9e98afaab7f505e72bc77f4). Only change: provenance.source changed from 'derived' to 'ai-assisted' (traverse decision 130); every other field unchanged. Guest logic and artifact bytes are unchanged (registry#656)."
+}

@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+### Added
+
+- **`validate_capability_contract_parse_tree` + `validate_capability_contracts`
+  bin (registry#656, traverse decision 130).** The publish gate now parses every
+  active capability record, and every new or changed one, with
+  `traverse_contracts::parse_contract` (the parser Traverse consumers use)
+  instead of trusting a Python copy of Spec 002. Additive API; no behaviour
+  change for existing callers.
+
 ### Changed
 
 - **`traverse-registry` 0.31.0 (registry#650) — breaking public API.**
