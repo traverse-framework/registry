@@ -3178,5 +3178,38 @@ class _Drop:
 _DROP = _Drop()
 
 
+
+class CapabilityContractParseGateTests(unittest.TestCase):
+    """registry#656 / traverse decision 130: the publish gate delegates Spec
+    002 parsing to the Rust traverse-contracts parser."""
+
+    def _run(self, returncode, stderr="", changed=None):
+        errors = []
+        completed = capability_validation.subprocess.CompletedProcess([], returncode, "", stderr)
+        with tempfile.TemporaryDirectory() as tmp, patch.dict(
+            os.environ, {"VALIDATE_CAPABILITY_CONTRACTS_BIN": "/bin/gate"}
+        ), patch.object(capability_validation.subprocess, "run", return_value=completed) as run:
+            cwd = os.getcwd()
+            os.chdir(tmp)
+            try:
+                Path("capabilities").mkdir()
+                capability_validation.run_capability_contract_parse_validation(errors, changed)
+            finally:
+                os.chdir(cwd)
+        return errors, run
+
+    def test_passes_changed_records_to_the_rust_gate(self):
+        errors, run = self._run(0, changed=["capabilities/a/a.b/1.0.1/contract.json"])
+        self.assertEqual(errors, [])
+        cmd = run.call_args[0][0]
+        self.assertEqual(cmd[0], "/bin/gate")
+        self.assertEqual(cmd[-1], "capabilities/a/a.b/1.0.1/contract.json")
+
+    def test_parse_failure_fails_the_gate(self):
+        errors, _ = self._run(1, stderr="unknown variant `derived`")
+        self.assertEqual(len(errors), 1)
+        self.assertEqual(errors[0]["code"], "contract.traverse_contracts_parse_failed")
+        self.assertIn("derived", errors[0]["message"])
+
 if __name__ == "__main__":
     unittest.main()

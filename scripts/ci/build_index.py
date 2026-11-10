@@ -262,6 +262,21 @@ def build_index(previous_index_version: int, source_commit: str, repo_slug: str 
                         f"Unable to read/parse revoked.json: {exc}",
                     )
 
+            if deprecated:
+                # registry#656 / traverse decision 130: a deprecated entry
+                # names its successor (spec 005 `superseded_by`), when the
+                # yank record declares one, so consumers can move to it.
+                try:
+                    superseded_by = json.loads(deprecated_path.read_text()).get("superseded_by")
+                except Exception as exc:
+                    raise IndexBuildError(
+                        "index.deprecation_unreadable",
+                        str(deprecated_path),
+                        f"Unable to read/parse deprecated.json: {exc}",
+                    )
+                if isinstance(superseded_by, str):
+                    entry["superseded_by"] = superseded_by
+
             # specs/025-capability-licensing-metadata FR-009: normalized rights
             # for index filters. Missing block → unknown (never allowed).
             licensing = contract.get("licensing")

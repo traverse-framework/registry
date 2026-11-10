@@ -1,0 +1,5 @@
+{
+  "kind": "metadata_only_successor",
+  "of": "inference.ensemble-reconcile@1.0.0",
+  "justification": "Metadata-only successor of inference.ensemble-reconcile@1.0.0 (the version hosting the artifact): contract version 1.0.1, the Spec 002 fix of inference.ensemble-reconcile@1.0.0, reuses the byte-identical WASM artifact (digest sha256:36d533e1aaec6ff7d3c23e98e94c703cc5e281f7885c309165afa186fefe88dd). Only change: lifecycle set to 'draft' (registry#656); every other field unchanged. Guest logic and artifact bytes are unchanged (registry#656)."
+}

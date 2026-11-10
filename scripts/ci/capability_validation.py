@@ -3964,6 +3964,72 @@ def run_event_product_validation(errors: list) -> None:
 
 
 
+def pr_changed_contract_paths(base_sha: str, head_sha: str) -> list:
+    """contract.json paths ADDED or MODIFIED in this PR's diff -- the records
+    run_capability_contract_parse_validation parses even when deprecated."""
+    diff = subprocess.check_output(
+        ["git", "diff", "--name-status", f"{base_sha}...{head_sha}", "--", "capabilities/"],
+        text=True,
+    )
+    changed = []
+    for line in diff.splitlines():
+        parts = line.split("\t")
+        if len(parts) >= 2 and parts[0][:1] in ("A", "M", "R", "C") and parts[-1].endswith("contract.json"):
+            changed.append(parts[-1])
+    return sorted(changed)
+
+
+def run_capability_contract_parse_validation(errors: list, changed_paths: list = None) -> None:
+    """registry#656 / traverse decision 130: parse every active capability
+    record, plus every new or changed one, with the Rust `traverse-contracts`
+    parser Traverse consumers use -- never a Python copy of Spec 002, which is
+    how `provenance.source: derived` reached the index. Honors
+    VALIDATE_CAPABILITY_CONTRACTS_BIN when set (CI installs a built binary);
+    otherwise `cargo run`s the bin target.
+    """
+    if not Path("capabilities").is_dir():
+        return
+
+    env_bin = os.environ.get("VALIDATE_CAPABILITY_CONTRACTS_BIN")
+    if env_bin:
+        cmd = [env_bin]
+    else:
+        cmd = [
+            "cargo",
+            "run",
+            "--quiet",
+            "--locked",
+            "-p",
+            "traverse-registry",
+            "--bin",
+            "validate_capability_contracts",
+            "--",
+        ]
+    cmd += ["--root", str(Path.cwd()), *(changed_paths or [])]
+
+    try:
+        result = subprocess.run(cmd, capture_output=True, text=True, check=False)
+    except FileNotFoundError as exc:
+        fail(
+            errors,
+            "contract.parser_unavailable",
+            "capabilities/",
+            f"Unable to invoke traverse-contracts parse gate ({exc})",
+        )
+        return
+
+    if result.returncode == 0:
+        return
+
+    detail = (result.stderr or result.stdout or "").strip()
+    fail(
+        errors,
+        "contract.traverse_contracts_parse_failed",
+        "capabilities/",
+        detail or f"validate_capability_contracts exited {result.returncode}",
+    )
+
+
 def _contract_is_lifecycle_inactive(contract_path: Path) -> bool:
     """Skip deprecated/revoked versions in the nightly host-limits scan."""
     version_dir = contract_path.parent
@@ -4130,9 +4196,11 @@ def main() -> int:
         base_sha, head_sha = sys.argv[1], sys.argv[2]
 
     pr_added_dirs: set = set()
+    pr_changed_contracts: list = []
     if base_sha and head_sha:
         try:
             pr_added_dirs = pr_added_contract_version_dirs(base_sha, head_sha)
+            pr_changed_contracts = pr_changed_contract_paths(base_sha, head_sha)
         except subprocess.CalledProcessError as exc:
             fail(errors, "git.diff_failed", "capabilities/", f"Unable to compute diff: {exc}")
 
@@ -4156,6 +4224,8 @@ def main() -> int:
         check_workflow_capability_references(errors)
 
     run_event_product_validation(errors)
+
+    run_capability_contract_parse_validation(errors, pr_changed_contracts)
 
     check_ecca_capability_inventory_coverage(errors)
 

@@ -19,6 +19,10 @@ name = "validate_event_products"
 path = "src/bin/validate_event_products.rs"
 
 [[bin]]
+name = "validate_capability_contracts"
+path = "src/bin/validate_capability_contracts.rs"
+
+[[bin]]
 name = "export_async_api"
 path = "src/bin/export_async_api.rs"
 

@@ -1,0 +1,6 @@
+{
+  "deprecated": true,
+  "reason": "traverse-contracts cannot parse audio.detect-speech-segments@1.1.0: provenance.source 'derived' is not a Spec 002 value. Superseded by 1.1.1, which keeps the same behaviour and artifact (registry#656).",
+  "deprecated_at": "2026-11-10T00:00:00Z",
+  "superseded_by": "1.1.1"
+}

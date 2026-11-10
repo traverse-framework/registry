@@ -1,0 +1,6 @@
+{
+  "deprecated": true,
+  "reason": "traverse-contracts cannot parse core.consent-purpose-check@1.0.0: inputs/outputs lack the Spec 002 'schema' wrapper and the required preconditions/postconditions are missing. Superseded by 1.1.0, which keeps the same behaviour and artifact (registry#656).",
+  "deprecated_at": "2026-11-10T00:00:00Z",
+  "superseded_by": "1.1.0"
+}
