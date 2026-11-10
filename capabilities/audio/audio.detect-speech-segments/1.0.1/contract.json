@@ -3423,7 +3423,41 @@
   "ai": {
     "model_backed": true,
     "models": [
-      "snakers4/silero-vad"
+      {
+        "id": "snakers4/silero-vad",
+        "spdx_expression": "MIT",
+        "attribution_required": true,
+        "copyright": "Copyright (c) Silero Team",
+        "revision": "debc3a0002a266fe690fda265a0685f5e0184bd9",
+        "source_url": "https://github.com/snakers4/silero-vad/blob/debc3a0002a266fe690fda265a0685f5e0184bd9/src/silero_vad/data/silero_vad_16k_op15.onnx",
+        "commercial_use": "allowed",
+        "redistribution": "allowed",
+        "derivatives": "allowed",
+        "license_files": [
+          {
+            "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/model-rights-026-backfill/snakers4-silero-vad.LICENSE",
+            "sha256": "2e63e9a38b6e8fc0c7bc37ce174caca1862870856c6daf5697cfb785e925520b"
+          }
+        ],
+        "notice_files": [
+          {
+            "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/model-rights-026-backfill/snakers4-silero-vad.NOTICE",
+            "sha256": "e907bf4b5f372f4fe1f7264f15492e7ade8c2b24645f7005695e4c28a1486dfe"
+          }
+        ],
+        "derivation": {
+          "transformations": [
+            "format-convert"
+          ],
+          "description": "Float32 weight tensors extracted from silero_vad_16k_op15.onnx initializers into a flat little-endian .bin (no quantization; LSTM quantization was measured to break recurrent output).",
+          "tool_url": "https://github.com/traverse-framework/registry/blob/main/capability-src/audio-detect-speech-segments/data/README.md",
+          "converted_sha256": "0688f0fadaeba187dc827d90228ea7bb2eda887829e8d9524d0b9535557668fe"
+        },
+        "verification": {
+          "status": "maintainer-declared",
+          "evidence_url": "https://github.com/snakers4/silero-vad/blob/debc3a0002a266fe690fda265a0685f5e0184bd9/LICENSE"
+        }
+      }
     ]
   },
   "authoring": {

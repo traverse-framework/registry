@@ -1,5 +1,5 @@
 {
   "kind": "metadata_only_successor",
   "of": "audio.activity-interval-classify@1.0.0",
-  "justification": "Metadata-only successor of audio.activity-interval-classify@1.0.0: contract version 1.0.1 reuses the byte-identical WASM artifact (digest sha256:946cf616601fc19f706aaee603367fa4c3be9fac5f7ab8367b5f00e2f1cdb084). Only change: lifecycle set to 'draft' (registry#656); every other field unchanged. Guest logic and artifact bytes are unchanged (registry#656)."
+  "justification": "Metadata-only successor of audio.activity-interval-classify@1.0.0 (the version hosting the artifact): contract version 1.0.1, the Spec 002 fix of audio.activity-interval-classify@1.0.0, reuses the byte-identical WASM artifact (digest sha256:946cf616601fc19f706aaee603367fa4c3be9fac5f7ab8367b5f00e2f1cdb084). Only change: lifecycle set to 'draft' (registry#656); every other field unchanged. Guest logic and artifact bytes are unchanged (registry#656)."
 }

@@ -1,5 +1,5 @@
 {
   "kind": "metadata_only_successor",
   "of": "audio.signal-quality-evaluate@1.0.0",
-  "justification": "Metadata-only successor of audio.signal-quality-evaluate@1.0.0: contract version 1.0.1 reuses the byte-identical WASM artifact (digest sha256:9b15887c90f8bb93a2bbdfc87c5ea89f5e03f8c9de3e1c3dd5c2071dcd0236af). Only change: lifecycle set to 'draft' (registry#656); every other field unchanged. Guest logic and artifact bytes are unchanged (registry#656)."
+  "justification": "Metadata-only successor of audio.signal-quality-evaluate@1.0.0 (the version hosting the artifact): contract version 1.0.1, the Spec 002 fix of audio.signal-quality-evaluate@1.0.0, reuses the byte-identical WASM artifact (digest sha256:9b15887c90f8bb93a2bbdfc87c5ea89f5e03f8c9de3e1c3dd5c2071dcd0236af). Only change: lifecycle set to 'draft' (registry#656); every other field unchanged. Guest logic and artifact bytes are unchanged (registry#656)."
 }

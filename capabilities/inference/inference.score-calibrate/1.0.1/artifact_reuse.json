@@ -1,5 +1,5 @@
 {
   "kind": "metadata_only_successor",
   "of": "inference.score-calibrate@1.0.0",
-  "justification": "Metadata-only successor of inference.score-calibrate@1.0.0: contract version 1.0.1 reuses the byte-identical WASM artifact (digest sha256:42f7817e369a811b3761315dd574f31b2020e5a9e2dab0307c24c59ae3b28539). Only change: lifecycle set to 'draft' (registry#656); every other field unchanged. Guest logic and artifact bytes are unchanged (registry#656)."
+  "justification": "Metadata-only successor of inference.score-calibrate@1.0.0 (the version hosting the artifact): contract version 1.0.1, the Spec 002 fix of inference.score-calibrate@1.0.0, reuses the byte-identical WASM artifact (digest sha256:42f7817e369a811b3761315dd574f31b2020e5a9e2dab0307c24c59ae3b28539). Only change: lifecycle set to 'draft' (registry#656); every other field unchanged. Guest logic and artifact bytes are unchanged (registry#656)."
 }

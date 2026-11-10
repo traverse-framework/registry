@@ -203,7 +203,42 @@
   "ai": {
     "model_backed": true,
     "models": [
-      "sentence-transformers/paraphrase-MiniLM-L3-v2"
+      {
+        "id": "sentence-transformers/paraphrase-MiniLM-L3-v2",
+        "spdx_expression": "Apache-2.0",
+        "attribution_required": true,
+        "copyright": "Copyright holders of sentence-transformers/paraphrase-MiniLM-L3-v2 (Apache-2.0)",
+        "huggingface_id": "sentence-transformers/paraphrase-MiniLM-L3-v2",
+        "revision": "4ca70771034acceecb2e72475f72050fcdde4ddc",
+        "commercial_use": "allowed",
+        "redistribution": "allowed",
+        "derivatives": "allowed",
+        "license_files": [
+          {
+            "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/model-rights-026-backfill/paraphrase-MiniLM-L3-v2.LICENSE",
+            "sha256": "9825422b749bf6a6ccaf89c5f7dc79c8214428620ac35a688b77871220e66b5c"
+          }
+        ],
+        "notice_files": [
+          {
+            "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/model-rights-026-backfill/paraphrase-MiniLM-L3-v2.NOTICE",
+            "sha256": "87acebfb32d1cf222f6f2edef24d94c7dd7e860b4a91afa01a5f0749b2536696"
+          }
+        ],
+        "derivation": {
+          "transformations": [
+            "quantize",
+            "format-convert"
+          ],
+          "description": "Per-tensor symmetric int8 of paraphrase-MiniLM-L3-v2 safetensors Linear weights; biases, LayerNorm, and token_type embeddings stay float32; packed into minilm-l3-fr-semantic-int8.bin.",
+          "tool_url": "https://github.com/traverse-framework/registry/blob/main/capability-src/report-translate-fr-semantic/data/README.md",
+          "converted_sha256": "8ae804ef04a1ae3b90e2e07036f6df6d9885d3406133b3a18b519e118a02f900"
+        },
+        "verification": {
+          "status": "maintainer-declared",
+          "evidence_url": "https://huggingface.co/sentence-transformers/paraphrase-MiniLM-L3-v2/blob/4ca70771034acceecb2e72475f72050fcdde4ddc/README.md"
+        }
+      }
     ]
   },
   "authoring": {

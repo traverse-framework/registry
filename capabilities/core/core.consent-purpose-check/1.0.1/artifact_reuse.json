@@ -1,5 +1,0 @@
-{
-  "kind": "metadata_only_successor",
-  "of": "core.consent-purpose-check@1.0.0",
-  "justification": "Metadata-only successor of core.consent-purpose-check@1.0.0: contract version 1.0.1 reuses the byte-identical WASM artifact (digest sha256:b18b637900e0e1100c3e99e27ab8475b0fe7800e37e5970ee1f04516bc67e59b). Only change: inputs/outputs wrapped as {\"schema\": ...} and the required preconditions/postconditions declared as empty lists (registry#656); the schemas themselves are unchanged. Guest logic and artifact bytes are unchanged (registry#656)."
-}

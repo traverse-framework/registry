@@ -254,7 +254,35 @@
         "attribution_required": true,
         "copyright": "Copyright holders of dslim/distilbert-NER (Apache-2.0)",
         "huggingface_id": "dslim/distilbert-NER",
-        "revision": "dfa2838a127384aabb82ed7719e16dab84c42a2a"
+        "revision": "dfa2838a127384aabb82ed7719e16dab84c42a2a",
+        "commercial_use": "allowed",
+        "redistribution": "allowed",
+        "derivatives": "allowed",
+        "license_files": [
+          {
+            "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/model-rights-026-backfill/dslim-distilbert-NER.LICENSE",
+            "sha256": "9825422b749bf6a6ccaf89c5f7dc79c8214428620ac35a688b77871220e66b5c"
+          }
+        ],
+        "notice_files": [
+          {
+            "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/model-rights-026-backfill/dslim-distilbert-NER.NOTICE",
+            "sha256": "6e32951997dcf92187f6e3330c9a274f6a5d088449bdb506b4eac55d227e2d2f"
+          }
+        ],
+        "derivation": {
+          "transformations": [
+            "quantize",
+            "format-convert"
+          ],
+          "description": "Per-tensor symmetric int8 on every Linear weight matrix from dslim/distilbert-NER onnx/model.onnx; biases and LayerNorm stay float32; packed into a flat little-endian .bin.",
+          "tool_url": "https://github.com/traverse-framework/registry/blob/main/capability-src/text-detect-entities/data/README.md",
+          "converted_sha256": "12891d6c53ff7808d2dd6edfe78235cf7ad8d17a8ebdbd5d14f31a9b6998e120"
+        },
+        "verification": {
+          "status": "maintainer-declared",
+          "evidence_url": "https://huggingface.co/dslim/distilbert-NER/blob/dfa2838a127384aabb82ed7719e16dab84c42a2a/README.md"
+        }
       }
     ]
   },

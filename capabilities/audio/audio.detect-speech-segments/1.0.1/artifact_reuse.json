@@ -1,5 +1,5 @@
 {
   "kind": "metadata_only_successor",
   "of": "audio.detect-speech-segments@1.0.0",
-  "justification": "Metadata-only successor of audio.detect-speech-segments@1.0.0: contract version 1.0.1 reuses the byte-identical WASM artifact (digest sha256:9acfc67c0052014ce8be7a383a2f9022a2ae3e9f3c4244e89d7ec9c8ca155b86). Only change: provenance.source changed from 'derived' to 'ai-assisted' (traverse decision 130); every other field unchanged. Guest logic and artifact bytes are unchanged (registry#656)."
+  "justification": "Metadata-only successor of audio.detect-speech-segments@1.0.0 (the version hosting the artifact): contract version 1.0.1, the Spec 002 fix of audio.detect-speech-segments@1.0.0, reuses the byte-identical WASM artifact (digest sha256:9acfc67c0052014ce8be7a383a2f9022a2ae3e9f3c4244e89d7ec9c8ca155b86). Only change: provenance.source changed from 'derived' to 'ai-assisted' (traverse decision 130), and each ai.models entry replaced by the Spec 026 rights record already published for the same model and revision in the #623 backfill (spec 026 requires rights on every new contract); every other field unchanged. Guest logic and artifact bytes are unchanged (registry#656)."
 }

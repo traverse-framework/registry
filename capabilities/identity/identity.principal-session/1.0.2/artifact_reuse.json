@@ -1,5 +1,5 @@
 {
   "kind": "metadata_only_successor",
   "of": "identity.principal-session@1.0.1",
-  "justification": "Metadata-only successor of identity.principal-session@1.0.1: contract version 1.0.2 reuses the byte-identical WASM artifact (digest sha256:318665450ceda0c4e439285e1dcab9cc15e5f75a245bd508aa73df677aa9ace6). Only change: provenance.source set to 'ai-assisted' and author/created_at added from the original record's git history (traverse decision 130); every other field unchanged. Guest logic and artifact bytes are unchanged (registry#656)."
+  "justification": "Metadata-only successor of identity.principal-session@1.0.1 (the version hosting the artifact): contract version 1.0.2, the Spec 002 fix of identity.principal-session@1.0.1, reuses the byte-identical WASM artifact (digest sha256:318665450ceda0c4e439285e1dcab9cc15e5f75a245bd508aa73df677aa9ace6). Only change: provenance.source set to 'ai-assisted' and author/created_at added from the original record's git history (traverse decision 130); every other field unchanged. Guest logic and artifact bytes are unchanged (registry#656)."
 }

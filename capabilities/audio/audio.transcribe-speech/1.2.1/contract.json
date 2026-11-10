@@ -33806,14 +33806,74 @@
         "attribution_required": true,
         "copyright": "Copyright (c) 2022 OpenAI",
         "huggingface_id": "Xenova/whisper-tiny",
-        "revision": "5332fcc35e32a33b86612b9a57a89be7906102b1"
+        "revision": "5332fcc35e32a33b86612b9a57a89be7906102b1",
+        "commercial_use": "allowed",
+        "redistribution": "allowed",
+        "derivatives": "allowed",
+        "license_files": [
+          {
+            "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/model-rights-026-backfill/openai-whisper-tiny.LICENSE-MIT",
+            "sha256": "b5d65a59060e68c4ff940e1eddfa6f94b2d68fdf58ed7f4dd57721c997e35e9d"
+          },
+          {
+            "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/model-rights-026-backfill/openai-whisper-tiny.LICENSE-Apache-2.0",
+            "sha256": "9825422b749bf6a6ccaf89c5f7dc79c8214428620ac35a688b77871220e66b5c"
+          }
+        ],
+        "notice_files": [
+          {
+            "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/model-rights-026-backfill/openai-whisper-tiny.NOTICE",
+            "sha256": "0e8fd3e9794986303f29e242f5e1d32ef1382e032929a2bac87127ce13c41f1f"
+          }
+        ],
+        "derivation": {
+          "transformations": [
+            "quantize",
+            "format-convert"
+          ],
+          "description": "Per-tensor symmetric int8 of Xenova/whisper-tiny ONNX encoder/decoder Linear weights plus mel filters and tiktoken vocab, packed into whisper-tiny-int8.bin.",
+          "tool_url": "https://github.com/traverse-framework/registry/blob/main/capability-src/audio-transcribe-speech/data/README.md",
+          "converted_sha256": "3963e45908f17009ffcb6b16647991f021210b86baea0f558d53c96dcf86460e"
+        },
+        "verification": {
+          "status": "maintainer-declared",
+          "evidence_url": "https://huggingface.co/openai/whisper-tiny"
+        }
       },
       {
         "id": "snakers4/silero-vad",
         "spdx_expression": "MIT",
         "attribution_required": true,
         "copyright": "Copyright (c) Silero Team",
-        "source_url": "https://github.com/snakers4/silero-vad/blob/debc3a0002a266fe690fda265a0685f5e0184bd9/src/silero_vad/data/silero_vad_16k_op15.onnx"
+        "revision": "debc3a0002a266fe690fda265a0685f5e0184bd9",
+        "source_url": "https://github.com/snakers4/silero-vad/blob/debc3a0002a266fe690fda265a0685f5e0184bd9/src/silero_vad/data/silero_vad_16k_op15.onnx",
+        "commercial_use": "allowed",
+        "redistribution": "allowed",
+        "derivatives": "allowed",
+        "license_files": [
+          {
+            "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/model-rights-026-backfill/snakers4-silero-vad.LICENSE",
+            "sha256": "2e63e9a38b6e8fc0c7bc37ce174caca1862870856c6daf5697cfb785e925520b"
+          }
+        ],
+        "notice_files": [
+          {
+            "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/model-rights-026-backfill/snakers4-silero-vad.NOTICE",
+            "sha256": "e907bf4b5f372f4fe1f7264f15492e7ade8c2b24645f7005695e4c28a1486dfe"
+          }
+        ],
+        "derivation": {
+          "transformations": [
+            "format-convert"
+          ],
+          "description": "Float32 weight tensors extracted from silero_vad_16k_op15.onnx initializers into a flat little-endian .bin (no quantization; LSTM quantization was measured to break recurrent output).",
+          "tool_url": "https://github.com/traverse-framework/registry/blob/main/capability-src/audio-detect-speech-segments/data/README.md",
+          "converted_sha256": "0688f0fadaeba187dc827d90228ea7bb2eda887829e8d9524d0b9535557668fe"
+        },
+        "verification": {
+          "status": "maintainer-declared",
+          "evidence_url": "https://github.com/snakers4/silero-vad/blob/debc3a0002a266fe690fda265a0685f5e0184bd9/LICENSE"
+        }
       }
     ]
   },
