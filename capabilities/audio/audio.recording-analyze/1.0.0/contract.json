@@ -1,0 +1,387 @@
+{
+  "kind": "capability_contract",
+  "schema_version": "1.0.0",
+  "id": "audio.recording-analyze",
+  "namespace": "audio",
+  "name": "recording-analyze",
+  "version": "1.0.0",
+  "lifecycle": "active",
+  "owner": {
+    "team": "traverse-core",
+    "contact": "enrico.piovesan10@gmail.com"
+  },
+  "summary": "Deterministic quality and activity analysis of one WAV PCM16 recording, for an app state machine's analyzing state.",
+  "description": "Analyzes one recording passed as {\"artifact_base64\": ...}, the exact input Traverse spec 139 FR-020 gives a state invoked with input_from host_connector_result.<artifact_ref>. The recording must be RIFF/WAVE 16-bit PCM, mono or stereo, 8-192 kHz, at most 8 MiB. It is cut into fixed 250 ms windows; each window is scored with audio.signal-quality-evaluate's metrics and the windows are merged into activity intervals by audio.activity-interval-classify (both reused as libraries, as is audio.wav-pcm16-decode's base64 and container validation). The result reports duration, format, overall RMS/peak/clipping (per mille of full scale), a quality_verdict and the intervals. A silent or clipped recording is a successful result with a verdict. Failures exit non-zero so the state machine takes capability_failed: status 10 analysis.unsupported_format, 11 analysis.input_limit_exceeded, 12 analysis.corrupt_input (Traverse's nested runtime keeps only the exit status, not stdout). Window size and thresholds are fixed and versioned as policy_version recording-analyze-1. Fuel: about 166 Traverse nested-runtime fuel units per input byte (1.86e9 for an 8 MiB recording); the stock 10M nested budget covers roughly 1.4 s of 16 kHz mono, so hosts analyzing real recordings must raise the nested fuel limit (#1656). Design: registry#594, decision-log entry 141.",
+  "service_type": "stateless",
+  "inputs": {
+    "schema": {
+      "type": "object",
+      "required": [
+        "artifact_base64"
+      ],
+      "properties": {
+        "artifact_base64": {
+          "type": "string",
+          "minLength": 4,
+          "maxLength": 11184812,
+          "contentEncoding": "base64",
+          "contentMediaType": "audio/wav",
+          "description": "Strict padded base64 of one RIFF/WAVE PCM16 recording (mono or stereo, 8-192 kHz, at most 8 MiB)."
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "outputs": {
+    "schema": {
+      "type": "object",
+      "required": [
+        "policy_version",
+        "duration_ms",
+        "sample_rate_hz",
+        "channel_count",
+        "rms_milli",
+        "peak_milli",
+        "clipping_ratio_milli",
+        "quality_verdict",
+        "window_ms",
+        "window_count",
+        "intervals"
+      ],
+      "properties": {
+        "policy_version": {
+          "const": "recording-analyze-1"
+        },
+        "duration_ms": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "sample_rate_hz": {
+          "type": "integer",
+          "minimum": 8000,
+          "maximum": 192000
+        },
+        "channel_count": {
+          "type": "integer",
+          "enum": [
+            1,
+            2
+          ]
+        },
+        "rms_milli": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000
+        },
+        "peak_milli": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000
+        },
+        "clipping_ratio_milli": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000
+        },
+        "quality_verdict": {
+          "type": "string",
+          "enum": [
+            "usable",
+            "silent",
+            "clipped",
+            "low_signal"
+          ]
+        },
+        "window_ms": {
+          "const": 250
+        },
+        "window_count": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 2100
+        },
+        "intervals": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "required": [
+              "start_ms",
+              "end_ms",
+              "activity",
+              "window_count"
+            ],
+            "properties": {
+              "start_ms": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "end_ms": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "activity": {
+                "type": "string",
+                "enum": [
+                  "silence",
+                  "possible-event",
+                  "clipped"
+                ]
+              },
+              "window_count": {
+                "type": "integer",
+                "minimum": 1
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "preconditions": [
+    {
+      "id": "wav-pcm16-recording",
+      "description": "artifact_base64 is strict padded base64 of a RIFF/WAVE 16-bit PCM recording, mono or stereo, 8-192 kHz, at most 8 MiB. Other formats fail with exit status 10 (analysis.unsupported_format); larger recordings with 11 (analysis.input_limit_exceeded); malformed base64 or containers with 12 (analysis.corrupt_input)."
+    },
+    {
+      "id": "nested-fuel-budget",
+      "description": "The host's nested fuel budget covers the recording: about 166 fuel per input byte, up to 1.86e9 for 8 MiB. The stock 10M budget covers roughly 1.4 s of 16 kHz mono; beyond it the run fails as capability_failed with 'all fuel consumed'. Memory stays under the 32 MiB nested ceiling at the 8 MiB cap."
+    }
+  ],
+  "postconditions": [
+    {
+      "id": "deterministic",
+      "description": "Identical recordings produce identical output under policy recording-analyze-1."
+    },
+    {
+      "id": "verdict-policy",
+      "description": "quality_verdict is silent when every 250 ms window is quiet (rms under 5 per mille), clipped when at least half of the windows are clipped (10 per mille of samples at or above 32760), low_signal when under 10% of windows are active, and usable otherwise."
+    },
+    {
+      "id": "intervals-cover-recording",
+      "description": "Intervals are contiguous, merge adjacent windows of the same activity, start at 0 and end at duration_ms."
+    },
+    {
+      "id": "failure-exit-status",
+      "description": "Every failure writes {\"error\": \"analysis.<class>\"} and exits non-zero: 10 analysis.unsupported_format, 11 analysis.input_limit_exceeded, 12 analysis.corrupt_input, so an invoking state machine takes capability_failed."
+    },
+    {
+      "id": "lossless-source",
+      "description": "The recording is read but never modified or persisted."
+    }
+  ],
+  "side_effects": [
+    {
+      "kind": "memory_only",
+      "description": "Pure calculation over the supplied recording."
+    }
+  ],
+  "emits": [],
+  "consumes": [],
+  "dependencies": [],
+  "permissions": [
+    {
+      "id": "audio.recording-analyze.execute"
+    }
+  ],
+  "policies": [
+    {
+      "id": "bounded-recording-analysis"
+    }
+  ],
+  "execution": {
+    "binary_format": "wasm",
+    "entrypoint": {
+      "kind": "wasi-command",
+      "command": "run"
+    },
+    "preferred_targets": [
+      "local",
+      "browser",
+      "edge",
+      "device"
+    ],
+    "constraints": {
+      "filesystem_access": "none",
+      "host_api_access": "none",
+      "network_access": "forbidden"
+    }
+  },
+  "permitted_targets": [
+    "local",
+    "browser",
+    "edge",
+    "device"
+  ],
+  "artifact_type": "native",
+  "artifact": {
+    "digest": "sha256:47c613bf8382001ee811d51746d3949a36e4454bd094f4912ed67af48b074ce2",
+    "url": "https://github.com/traverse-framework/registry/releases/download/artifacts/audio.recording-analyze-1.0.0/recording-analyze.wasm"
+  },
+  "risk": {
+    "effect_class": "pure_read",
+    "determinism_class": "deterministic",
+    "data_flow": {
+      "accepted_data_classifications": [],
+      "produced_data_classifications": [],
+      "egress_policy": "denied"
+    },
+    "reliability": {
+      "idempotency_required": false,
+      "retryable": true,
+      "compensation_available": true
+    }
+  },
+  "authoring": {
+    "method": "llm-assisted",
+    "source_revision": "claude/issue-594-recording-analyze",
+    "test_evidence": "capability-src/audio-recording-analyze: 8 #[test] cases (every verdict, partial final window, stereo, 44.1/22.05 kHz boundaries, exact 8 MiB cap at 2098 windows and 8 MiB + 1 byte, every failure class and exit status); cargo llvm-cov functions=100%, lines=98.87%, regions=99.1%. wasm32 artifact under wasmtime with a 32 MiB memory cap: both 8 MiB extremes (8 kHz mono, 48 kHz stereo) succeed; exit statuses 10/11/12 verified. Traverse nested executor (execute_nested_capability_with_limits): exit statuses surface as 'Exited with i32 exit status N'; minimum fuel 7.1M for 1 s at 16 kHz mono, 1.83e9-1.86e9 at 8 MiB. Reused crates split lib/bin: their wasm32 builds give byte-identical stdout and exit status to the pre-split builds on 184 generated inputs. Every use_case output_example was produced by the built artifact.",
+    "review": {
+      "decision": "pending-qualified-review",
+      "reviewer": "traverse-registry-maintainer"
+    }
+  },
+  "provenance": {
+    "source": "ai-assisted",
+    "author": "enricopiovesan",
+    "created_at": "2026-11-11T00:00:00Z",
+    "spec_ref": "registry#594, decision-log entry 141 (/brainstorm 594): one composite capability for Callweave's analyzing state, invoked via Traverse spec 139 invoke.capability_id with FR-020 artifact_base64 input.",
+    "adr_refs": [],
+    "exception_refs": []
+  },
+  "licensing": {
+    "spdx_expression": "Apache-2.0",
+    "commercial_use": "allowed",
+    "redistribution": "allowed",
+    "attribution_required": true,
+    "verification": {
+      "status": "maintainer-declared"
+    },
+    "license_files": [
+      "LICENSE"
+    ],
+    "source_url": "https://github.com/traverse-framework/registry/blob/main/LICENSE"
+  },
+  "evidence": [],
+  "use_cases": [
+    {
+      "scenario": "As a Callweave runtime, I want to analyze a decodable recording into quality facts and activity intervals, so that the analyzing state moves to results without UI-side heuristics.",
+      "input_example": {
+        "artifact_base64": "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"
+      },
+      "output_example": {
+        "policy_version": "recording-analyze-1",
+        "duration_ms": 100,
+        "sample_rate_hz": 8000,
+        "channel_count": 1,
+        "rms_milli": 172,
+        "peak_milli": 244,
+        "clipping_ratio_milli": 0,
+        "quality_verdict": "usable",
+        "window_ms": 250,
+        "window_count": 1,
+        "intervals": [
+          {
+            "start_ms": 0,
+            "end_ms": 100,
+            "activity": "possible-event",
+            "window_count": 1
+          }
+        ]
+      },
+      "happy": true,
+      "persona_ref": "callweave-runtime"
+    },
+    {
+      "scenario": "As an audio-processing consumer, I want to get a successful silent verdict for a silent recording, so that the user sees why it is unusable and can record again.",
+      "input_example": {
+        "artifact_base64": "UklGRmQGAABXQVZFZm10IBAAAAABAAEAQB8AAIA+AAACABAAZGF0YUAGAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+      },
+      "output_example": {
+        "policy_version": "recording-analyze-1",
+        "duration_ms": 100,
+        "sample_rate_hz": 8000,
+        "channel_count": 1,
+        "rms_milli": 0,
+        "peak_milli": 0,
+        "clipping_ratio_milli": 0,
+        "quality_verdict": "silent",
+        "window_ms": 250,
+        "window_count": 1,
+        "intervals": [
+          {
+            "start_ms": 0,
+            "end_ms": 100,
+            "activity": "silence",
+            "window_count": 1
+          }
+        ]
+      },
+      "happy": true,
+      "persona_ref": "audio-processing-consumer"
+    },
+    {
+      "scenario": "As an audio-processing consumer, I want to get a successful clipped verdict for a clipped recording, so that distortion is visible instead of silently analyzed.",
+      "input_example": {
+        "artifact_base64": "UklGRmQGAABXQVZFZm10IBAAAAABAAEAQB8AAIA+AAACABAAZGF0YUAGAAD/f/9//3//fwCAAIAAgACA/3//f/9//38AgACAAIAAgP9//3//f/9/AIAAgACAAID/f/9//3//fwCAAIAAgACA/3//f/9//38AgACAAIAAgP9//3//f/9/AIAAgACAAID/f/9//3//fwCAAIAAgACA/3//f/9//38AgACAAIAAgP9//3//f/9/AIAAgACAAID/f/9//3//fwCAAIAAgACA/3//f/9//38AgACAAIAAgP9//3//f/9/AIAAgACAAID/f/9//3//fwCAAIAAgACA/3//f/9//38AgACAAIAAgP9//3//f/9/AIAAgACAAID/f/9//3//fwCAAIAAgACA/3//f/9//38AgACAAIAAgP9//3//f/9/AIAAgACAAID/f/9//3//fwCAAIAAgACA/3//f/9//38AgACAAIAAgP9//3//f/9/AIAAgACAAID/f/9//3//fwCAAIAAgACA/3//f/9//38AgACAAIAAgP9//3//f/9/AIAAgACAAID/f/9//3//fwCAAIAAgACA/3//f/9//38AgACAAIAAgP9//3//f/9/AIAAgACAAID/f/9//3//fwCAAIAAgACA/3//f/9//38AgACAAIAAgP9//3//f/9/AIAAgACAAID/f/9//3//fwCAAIAAgACA/3//f/9//38AgACAAIAAgP9//3//f/9/AIAAgACAAID/f/9//3//fwCAAIAAgACA/3//f/9//38AgACAAIAAgP9//3//f/9/AIAAgACAAID/f/9//3//fwCAAIAAgACA/3//f/9//38AgACAAIAAgP9//3//f/9/AIAAgACAAID/f/9//3//fwCAAIAAgACA/3//f/9//38AgACAAIAAgP9//3//f/9/AIAAgACAAID/f/9//3//fwCAAIAAgACA/3//f/9//38AgACAAIAAgP9//3//f/9/AIAAgACAAID/f/9//3//fwCAAIAAgACA/3//f/9//38AgACAAIAAgP9//3//f/9/AIAAgACAAID/f/9//3//fwCAAIAAgACA/3//f/9//38AgACAAIAAgP9//3//f/9/AIAAgACAAID/f/9//3//fwCAAIAAgACA/3//f/9//38AgACAAIAAgP9//3//f/9/AIAAgACAAID/f/9//3//fwCAAIAAgACA/3//f/9//38AgACAAIAAgP9//3//f/9/AIAAgACAAID/f/9//3//fwCAAIAAgACA/3//f/9//38AgACAAIAAgP9//3//f/9/AIAAgACAAID/f/9//3//fwCAAIAAgACA/3//f/9//38AgACAAIAAgP9//3//f/9/AIAAgACAAID/f/9//3//fwCAAIAAgACA/3//f/9//38AgACAAIAAgP9//3//f/9/AIAAgACAAID/f/9//3//fwCAAIAAgACA/3//f/9//38AgACAAIAAgP9//3//f/9/AIAAgACAAID/f/9//3//fwCAAIAAgACA/3//f/9//38AgACAAIAAgP9//3//f/9/AIAAgACAAID/f/9//3//fwCAAIAAgACA/3//f/9//38AgACAAIAAgP9//3//f/9/AIAAgACAAID/f/9//3//fwCAAIAAgACA/3//f/9//38AgACAAIAAgP9//3//f/9/AIAAgACAAID/f/9//3//fwCAAIAAgACA/3//f/9//38AgACAAIAAgP9//3//f/9/AIAAgACAAID/f/9//3//fwCAAIAAgACA/3//f/9//38AgACAAIAAgP9//3//f/9/AIAAgACAAID/f/9//3//fwCAAIAAgACA/3//f/9//38AgACAAIAAgP9//3//f/9/AIAAgACAAID/f/9//3//fwCAAIAAgACA/3//f/9//38AgACAAIAAgP9//3//f/9/AIAAgACAAID/f/9//3//fwCAAIAAgACA/3//f/9//38AgACAAIAAgP9//3//f/9/AIAAgACAAID/f/9//3//fwCAAIAAgACA/3//f/9//38AgACAAIAAgP9//3//f/9/AIAAgACAAID/f/9//3//fwCAAIAAgACA/3//f/9//38AgACAAIAAgP9//3//f/9/AIAAgACAAID/f/9//3//fwCAAIAAgACA"
+      },
+      "output_example": {
+        "policy_version": "recording-analyze-1",
+        "duration_ms": 100,
+        "sample_rate_hz": 8000,
+        "channel_count": 1,
+        "rms_milli": 999,
+        "peak_milli": 1000,
+        "clipping_ratio_milli": 1000,
+        "quality_verdict": "clipped",
+        "window_ms": 250,
+        "window_count": 1,
+        "intervals": [
+          {
+            "start_ms": 0,
+            "end_ms": 100,
+            "activity": "clipped",
+            "window_count": 1
+          }
+        ]
+      },
+      "happy": true,
+      "persona_ref": "audio-processing-consumer"
+    },
+    {
+      "scenario": "As a Callweave runtime, I want to reject a non-PCM16 recording with exit status 10, so that the state machine routes to failed with an unsupported-format class.",
+      "input_example": {
+        "artifact_base64": "UklGRjQAAABXQVZFZm10IBAAAAADAAEAQB8AAIA+AAACABAAZGF0YRAAAAAAAAAAAAAAAAAAAAAAAAAA"
+      },
+      "output_example": {
+        "error": "analysis.unsupported_format"
+      },
+      "happy": false,
+      "persona_ref": "callweave-runtime"
+    },
+    {
+      "scenario": "As a Callweave runtime, I want to reject a truncated or malformed container with exit status 12, so that corrupt input never produces fabricated metrics.",
+      "input_example": {
+        "artifact_base64": "UklGRgQAAABXQVZF"
+      },
+      "output_example": {
+        "error": "analysis.corrupt_input"
+      },
+      "happy": false,
+      "persona_ref": "callweave-runtime"
+    },
+    {
+      "scenario": "As a Callweave runtime, I want to reject a recording over 8 MiB with exit status 11, so that oversized input fails closed inside the 32 MiB nested ceiling (input_example abbreviated: the real value exceeds 11,184,812 base64 characters).",
+      "input_example": {
+        "artifact_base64": "UklGR..."
+      },
+      "output_example": {
+        "error": "analysis.input_limit_exceeded"
+      },
+      "happy": false,
+      "persona_ref": "callweave-runtime"
+    }
+  ]
+}

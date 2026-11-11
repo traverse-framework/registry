@@ -1,0 +1,25 @@
+[workspace]
+
+[package]
+name = "audio-recording-analyze"
+version = "1.0.0"
+edition = "2021"
+publish = false
+description = "Quality and activity analysis of one WAV PCM16 recording for audio.recording-analyze. See registry#594 and decision-log entry 141."
+
+[[bin]]
+name = "audio-recording-analyze"
+path = "src/main.rs"
+
+[dependencies]
+# The published audio crates, reused through their lib/bin splits rather than
+# copied (decision-log entry 141 Q2): base64 + RIFF/WAVE validation, the
+# per-window signal metrics, and the window-to-interval merge.
+wav-pcm16-decode = { package = "audio-wav-pcm16-decode", path = "../audio-wav-pcm16-decode" }
+signal-quality-evaluate = { package = "audio-signal-quality-evaluate", path = "../audio-signal-quality-evaluate" }
+activity-interval-classify = { package = "audio-activity-interval-classify", path = "../audio-activity-interval-classify" }
+
+[profile.release]
+opt-level = "s"
+lto = true
+panic = "abort"
