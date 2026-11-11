@@ -4,6 +4,16 @@
 
 ### Added
 
+- **`audio.recording-analyze@1.0.0` (registry#594, decision-log entry 141).**
+  Quality and activity analysis of one WAV PCM16 recording, for an app state
+  machine's `analyzing` state (Traverse spec 139 `invoke.capability_id`,
+  `{"artifact_base64"}` input). Fixed 250 ms windows, a `quality_verdict`,
+  and activity intervals; failures exit 10/11/12 so the state machine takes
+  `capability_failed`. `audio.wav-pcm16-decode`,
+  `audio.signal-quality-evaluate` and `audio.activity-interval-classify`
+  gain lib/bin splits so it reuses their code; their published artifacts are
+  unchanged.
+
 - **`validate_capability_contract_parse_tree` + `validate_capability_contracts`
   bin (registry#656, traverse decision 130).** The publish gate now parses every
   active capability record, and every new or changed one, with

@@ -6,6 +6,10 @@ version = "1.0.0"
 edition = "2021"
 publish = false
 
+[lib]
+name = "signal_quality_evaluate"
+path = "src/lib.rs"
+
 [[bin]]
 name = "audio-signal-quality-evaluate"
 path = "src/main.rs"

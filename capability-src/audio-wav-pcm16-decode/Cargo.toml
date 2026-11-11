@@ -7,6 +7,10 @@ edition = "2021"
 publish = false
 description = "Bounded deterministic PCM16 WAV decoding."
 
+[lib]
+name = "wav_pcm16_decode"
+path = "src/lib.rs"
+
 [[bin]]
 name = "audio-wav-pcm16-decode"
 path = "src/main.rs"

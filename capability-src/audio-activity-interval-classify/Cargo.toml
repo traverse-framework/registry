@@ -4,6 +4,9 @@ name = "audio-activity-interval-classify"
 version = "1.0.0"
 edition = "2021"
 publish = false
+[lib]
+name = "activity_interval_classify"
+path = "src/lib.rs"
 [[bin]]
 name = "audio-activity-interval-classify"
 path = "src/main.rs"
