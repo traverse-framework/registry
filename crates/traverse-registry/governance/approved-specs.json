@@ -407,31 +407,30 @@
         "crates/traverse-registry/",
         "specs/997-application-selected-preparation/"
       ]
-    }
-  ],
-  "draft_specs": [
+    },
     {
       "id": "019-public-metadata-sync-extension",
-      "version": "0.2.0",
-      "status": "draft",
-      "immutable": false,
+      "version": "1.0.0",
+      "status": "approved",
+      "immutable": true,
       "path": "specs/019-public-metadata-sync-extension/spec.md",
-      "will_govern": [
+      "governs": [
         "scripts/ci/build_index.py",
         "crates/traverse-registry/"
       ]
     },
     {
       "id": "027-catalog-model-execute",
-      "version": "0.1.0",
-      "status": "draft",
-      "immutable": false,
+      "version": "1.0.0",
+      "status": "approved",
+      "immutable": true,
       "path": "specs/027-catalog-model-execute/spec.md",
-      "will_govern": [
+      "governs": [
         "capabilities/model/model.execute/",
         "capability-src/model-execute/",
         "specs/027-catalog-model-execute/"
       ]
     }
-  ]
+  ],
+  "draft_specs": []
 }
