@@ -2,9 +2,9 @@
 
 **Feature Branch**: `codex/issue-633-model-execute`
 **Created**: 2026-10-15
-**Status**: Draft
+**Status**: Approved (2026-11-10, v1.0.0)
 **Canonical governing ID**: `027-catalog-model-execute`
-**Version**: 0.1.0
+**Version**: 1.0.0
 **Extends**: `001-registry-foundation`, `007-artifact-hosting`, `026-model-rights-compliance`;
 aligned with Traverse Spec `138-governed-exact-model-execution` and connector
 `traverse.model-runtime` (pinned at publish time).

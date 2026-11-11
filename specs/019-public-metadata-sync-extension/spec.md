@@ -3,7 +3,7 @@
 **Feature Branch**: `claude/issue-312-public-metadata-projection`
 **Amended by**: `claude/issue-318-search-projection-fields`
 **Created**: 2026-08-25
-**Status**: Draft
+**Status**: Approved (2026-11-10, v1.0.0)
 **Input**: Registry ticket #312 — supply the verified, public-only input for
 `traverse-framework/traverse` spec `116-verified-public-contract-metadata-cache`
 (Approved 2026-08-24) FR-003. Amended for registry ticket #318 — supply the
