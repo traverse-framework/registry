@@ -9,32 +9,32 @@ const MAX_SAMPLES: usize = 480_000;
 const MAX_WINDOWS: usize = 64;
 
 #[repr(C)]
-#[cfg(target_arch = "wasm32")]
+#[cfg(all(target_arch = "wasm32", not(test)))]
 struct Iovec {
     buffer: *const u8,
     length: usize,
 }
 #[repr(C)]
-#[cfg(target_arch = "wasm32")]
+#[cfg(all(target_arch = "wasm32", not(test)))]
 struct IovecMut {
     buffer: *mut u8,
     length: usize,
 }
 #[link(wasm_import_module = "wasi_snapshot_preview1")]
-#[cfg(target_arch = "wasm32")]
+#[cfg(all(target_arch = "wasm32", not(test)))]
 unsafe extern "C" {
     fn fd_read(fd: u32, vectors: *const IovecMut, count: usize, read: *mut usize) -> u32;
     fn fd_write(fd: u32, vectors: *const Iovec, count: usize, written: *mut usize) -> u32;
 }
 
-#[cfg(target_arch = "wasm32")]
+#[cfg(all(target_arch = "wasm32", not(test)))]
 static mut INPUT: [u8; MAX_INPUT_BYTES + 1] = [0; MAX_INPUT_BYTES + 1];
-#[cfg(target_arch = "wasm32")]
+#[cfg(all(target_arch = "wasm32", not(test)))]
 static mut OUTPUT: [u8; MAX_OUTPUT_BYTES] = [0; MAX_OUTPUT_BYTES];
-#[cfg(target_arch = "wasm32")]
+#[cfg(all(target_arch = "wasm32", not(test)))]
 static mut SAMPLES: [i16; MAX_SAMPLES] = [0; MAX_SAMPLES];
 
-#[cfg(target_arch = "wasm32")]
+#[cfg(all(target_arch = "wasm32", not(test)))]
 #[unsafe(no_mangle)]
 pub extern "C" fn _start() {
     unsafe {
@@ -315,7 +315,7 @@ impl Writer<'_> {
         }
     }
 }
-#[cfg(target_arch = "wasm32")]
+#[cfg(all(target_arch = "wasm32", not(test)))]
 #[panic_handler]
 fn panic(_: &core::panic::PanicInfo<'_>) -> ! {
     loop {}

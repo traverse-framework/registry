@@ -9,6 +9,8 @@ import hashlib
 import importlib.util
 import json
 import os
+import shutil
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -2099,6 +2101,227 @@ class CheckNewContractWasm32ExecutionTests(unittest.TestCase):
         )
         self.assertEqual(keys, {"text.detect-entities@1.1.1"})
 
+
+def _wasm32_unit_test_toolchain_available() -> bool:
+    if not (shutil.which("cargo") and shutil.which("rustc") and shutil.which("wasmtime")):
+        return False
+    try:
+        sysroot = subprocess.check_output(["rustc", "--print", "sysroot"], text=True).strip()
+    except Exception:
+        return False
+    return (Path(sysroot) / "lib" / "rustlib" / capability_validation.WASM32_UNIT_TEST_TARGET).is_dir()
+
+
+# A crate shaped like every capability-src/ crate (cfg_attr no_std/no_main,
+# wasi-capability-runtime dependency, cfg(not(test)) _start), whose budget
+# parser reproduces the text.truncate@1.0.0 (#487/#492) bug class: reject
+# anything above usize::MAX and fall back to 0. Host usize is 64-bit, so the
+# unit test passes there; on wasm32 1e10 > u32::MAX and it fails.
+WASM32_WIDTH_PROBE_SOURCE = """\
+#![cfg_attr(not(test), no_std)]
+#![cfg_attr(not(test), no_main)]
+
+extern crate alloc;
+
+use wasi_capability_runtime::Value;
+
+#[cfg_attr(not(test), allow(dead_code))]
+fn budget(value: f64) -> usize {
+    if value > usize::MAX as f64 { %s } else { value as usize }
+}
+
+fn handle(input: Value) -> Value {
+    input
+}
+
+#[cfg(not(test))]
+#[unsafe(no_mangle)]
+pub extern "C" fn _start() {
+    wasi_capability_runtime::run_capability(handle);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn schema_legal_large_budget_is_not_zero() {
+        assert_ne!(budget(1e10), 0);
+    }
+
+    #[test]
+    fn handle_echoes_input() {
+        assert_eq!(handle(Value::Null), Value::Null);
+    }
+}
+"""
+
+
+class CheckNewContractWasm32UnitTestsTests(unittest.TestCase):
+    """registry#668: newly-published crates' unit tests also run on a 32-bit
+    wasm target, not only on the 64-bit host spec 018 measures."""
+
+    def _write_contract(self, tmp, capability_id: str) -> Path:
+        path = Path(tmp) / "capabilities" / "example" / capability_id / "1.0.0" / "contract.json"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps({"id": capability_id}))
+        return path
+
+    def _write_crate(self, tmp, crate_name: str) -> Path:
+        crate_dir = Path(tmp) / "capability-src" / crate_name
+        crate_dir.mkdir(parents=True, exist_ok=True)
+        (crate_dir / "Cargo.toml").write_text("[package]\nname = \"x\"\n")
+        return crate_dir
+
+    def _run(self, tmp, path: Path, **patch_kwargs):
+        errors: list = []
+        cwd = os.getcwd()
+        try:
+            os.chdir(tmp)
+            with patch("capability_validation.subprocess.run", **patch_kwargs) as run_mock:
+                capability_validation.check_new_contract_wasm32_unit_tests(path, errors)
+        finally:
+            os.chdir(cwd)
+        return errors, run_mock
+
+    def _result(self, returncode=0, stdout="", stderr=""):
+        return type("Result", (), {"returncode": returncode, "stdout": stdout, "stderr": stderr})()
+
+    def test_missing_crate_is_left_to_coverage_check(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = self._write_contract(tmp, "example.new-capability")
+            errors, run_mock = self._run(tmp, path)
+            run_mock.assert_not_called()
+            self.assertEqual(errors, [])
+
+    def test_unparseable_contract_or_missing_id_is_skipped(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = self._write_contract(tmp, "example.new-capability")
+            path.write_text("{not json")
+            errors, run_mock = self._run(tmp, path)
+            run_mock.assert_not_called()
+            path.write_text(json.dumps({"id": " "}))
+            errors2, run_mock2 = self._run(tmp, path)
+            run_mock2.assert_not_called()
+            self.assertEqual(errors + errors2, [])
+
+    def test_metadata_only_successor_is_skipped(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = self._write_contract(tmp, "example.new-capability")
+            self._write_crate(tmp, "example-new-capability")
+            (path.parent / "artifact_reuse.json").write_text(
+                json.dumps(
+                    {
+                        "kind": "metadata_only_successor",
+                        "of": "example.new-capability@1.0.0",
+                        "justification": "test",
+                    }
+                )
+            )
+            errors, run_mock = self._run(tmp, path)
+            run_mock.assert_not_called()
+            self.assertEqual(errors, [])
+
+    def test_passing_tests_record_nothing_and_use_wasmtime_runner(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = self._write_contract(tmp, "example.new-capability")
+            self._write_crate(tmp, "example-new-capability")
+            with patch.dict(os.environ, {}, clear=False):
+                os.environ.pop(capability_validation.WASM32_UNIT_TEST_RUNNER_ENV, None)
+                errors, run_mock = self._run(tmp, path, return_value=self._result())
+            self.assertEqual(errors, [])
+            args, kwargs = run_mock.call_args
+            self.assertEqual(
+                args[0],
+                [
+                    "cargo",
+                    "test",
+                    "--target",
+                    "wasm32-wasip1",
+                    "--manifest-path",
+                    str(Path("capability-src") / "example-new-capability" / "Cargo.toml"),
+                ],
+            )
+            self.assertEqual(kwargs["env"][capability_validation.WASM32_UNIT_TEST_RUNNER_ENV], "wasmtime")
+
+    def test_failing_tests_are_rejected(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = self._write_contract(tmp, "example.new-capability")
+            self._write_crate(tmp, "example-new-capability")
+            result = self._result(returncode=101, stdout="test budget ... FAILED")
+            errors, _ = self._run(tmp, path, return_value=result)
+            self.assertEqual([e["code"] for e in errors], ["capability.wasm32_unit_tests_failed"])
+            self.assertIn("FAILED", errors[0]["message"])
+            self.assertNotIn("not(test)", errors[0]["message"])
+
+    def test_wasi_glue_lang_item_clash_gets_cfg_hint(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = self._write_contract(tmp, "example.new-capability")
+            self._write_crate(tmp, "example-new-capability")
+            for stderr in ("error[E0152]: found duplicate lang item `panic_impl`", "rust-lld: error: duplicate symbol: _start"):
+                errors, _ = self._run(tmp, path, return_value=self._result(returncode=101, stderr=stderr))
+                self.assertEqual([e["code"] for e in errors], ["capability.wasm32_unit_tests_failed"])
+                self.assertIn("not(test)", errors[0]["message"])
+
+    def test_runner_exception_is_rejected(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = self._write_contract(tmp, "example.new-capability")
+            self._write_crate(tmp, "example-new-capability")
+            errors, _ = self._run(tmp, path, side_effect=FileNotFoundError("cargo"))
+            self.assertEqual([e["code"] for e in errors], ["capability.wasm32_unit_tests_failed"])
+
+    def test_diff_wrapper_only_checks_added_contracts(self):
+        diff = (
+            "A\tcapabilities/example/a/1.0.0/contract.json\n"
+            "M\tcapabilities/example/b/1.0.0/contract.json\n"
+            "A\tcapabilities/example/a/1.0.0/signature.json\n"
+        )
+        with patch("capability_validation.subprocess.check_output", return_value=diff), patch(
+            "capability_validation.check_new_contract_wasm32_unit_tests"
+        ) as check_mock:
+            capability_validation.check_new_contracts_have_wasm32_unit_tests("base", "head", [])
+        check_mock.assert_called_once_with(Path("capabilities/example/a/1.0.0/contract.json"), [])
+
+    @unittest.skipUnless(
+        _wasm32_unit_test_toolchain_available() or os.environ.get("CI"),
+        "needs cargo, wasmtime and the wasm32-wasip1 target (always required in CI)",
+    )
+    def test_real_width_bug_fails_on_wasm32_and_clean_crate_passes(self):
+        """DoD regression proof: host `cargo test` passes for both crates;
+        only the wasm32 run tells the #492 bug class apart."""
+        runtime = Path(__file__).resolve().parents[3] / "capability-src" / "wasi-capability-runtime"
+        for fallback, expect_failure in (("0", True), ("usize::MAX", False)):
+            with self.subTest(fallback=fallback), tempfile.TemporaryDirectory() as tmp:
+                path = self._write_contract(tmp, "example.width-probe")
+                crate_dir = self._write_crate(tmp, "example-width-probe")
+                (crate_dir / "Cargo.toml").write_text(
+                    "[workspace]\n\n[package]\nname = \"example-width-probe\"\n"
+                    "version = \"0.1.0\"\nedition = \"2021\"\npublish = false\n\n"
+                    f"[dependencies]\nwasi-capability-runtime = {{ path = {json.dumps(str(runtime))} }}\n"
+                )
+                (crate_dir / "src").mkdir()
+                (crate_dir / "src" / "main.rs").write_text(WASM32_WIDTH_PROBE_SOURCE % fallback)
+
+                host = subprocess.run(
+                    ["cargo", "test", "--quiet", "--manifest-path", str(crate_dir / "Cargo.toml")],
+                    capture_output=True,
+                    text=True,
+                )
+                self.assertEqual(host.returncode, 0, host.stderr[-2000:])
+
+                errors: list = []
+                cwd = os.getcwd()
+                try:
+                    os.chdir(tmp)
+                    capability_validation.check_new_contract_wasm32_unit_tests(path, errors)
+                finally:
+                    os.chdir(cwd)
+                codes = [e["code"] for e in errors]
+                if expect_failure:
+                    self.assertEqual(codes, ["capability.wasm32_unit_tests_failed"])
+                    self.assertIn("schema_legal_large_budget_is_not_zero", errors[0]["message"])
+                else:
+                    self.assertEqual(errors, [])
 
 
 class ModelBackedWasm32ExecutionTests(unittest.TestCase):

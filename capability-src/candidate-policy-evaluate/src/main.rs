@@ -4,29 +4,29 @@
 extern crate std;
 
 #[repr(C)]
-#[cfg(target_arch = "wasm32")]
+#[cfg(all(target_arch = "wasm32", not(test)))]
 struct Iovec {
     buffer: *const u8,
     length: usize,
 }
 #[repr(C)]
-#[cfg(target_arch = "wasm32")]
+#[cfg(all(target_arch = "wasm32", not(test)))]
 struct IovecMut {
     buffer: *mut u8,
     length: usize,
 }
 #[link(wasm_import_module = "wasi_snapshot_preview1")]
-#[cfg(target_arch = "wasm32")]
+#[cfg(all(target_arch = "wasm32", not(test)))]
 unsafe extern "C" {
     fn fd_read(fd: u32, vectors: *const IovecMut, count: usize, read: *mut usize) -> u32;
     fn fd_write(fd: u32, vectors: *const Iovec, count: usize, written: *mut usize) -> u32;
 }
-#[cfg(target_arch = "wasm32")]
+#[cfg(all(target_arch = "wasm32", not(test)))]
 static mut INPUT: [u8; 8193] = [0; 8193];
-#[cfg(target_arch = "wasm32")]
+#[cfg(all(target_arch = "wasm32", not(test)))]
 static mut OUTPUT: [u8; 2048] = [0; 2048];
 
-#[cfg(target_arch = "wasm32")]
+#[cfg(all(target_arch = "wasm32", not(test)))]
 #[unsafe(no_mangle)]
 pub extern "C" fn _start() {
     unsafe {
@@ -284,7 +284,7 @@ impl Writer<'_> {
         self.bytes(value);
     }
 }
-#[cfg(target_arch = "wasm32")]
+#[cfg(all(target_arch = "wasm32", not(test)))]
 #[panic_handler]
 fn panic(_: &core::panic::PanicInfo<'_>) -> ! {
     loop {}

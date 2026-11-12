@@ -99,6 +99,26 @@ literal 100% on lines/regions exists because genuinely unreachable defensive bra
 (e.g. an `unwrap_or` fallback a prior validation already rules out) are real in Rust —
 functions have no such exception: every function you ship must be exercised by a test.
 
+### Your unit tests also run on wasm32
+
+CI runs the same unit tests a second time on a 32-bit wasm target
+(registry#668), because `usize` is 32-bit there and 64-bit on the host:
+`text.truncate@1.0.0` (#492) passed every host test and still emptied its
+output on wasm32. Run it locally before opening the PR:
+
+```bash
+rustup target add wasm32-wasip1
+CARGO_TARGET_WASM32_WASIP1_RUNNER=wasmtime \
+  cargo test --target wasm32-wasip1 --manifest-path capability-src/<crate>/Cargo.toml
+```
+
+If it fails with `E0152` (duplicate `panic_impl`) or `duplicate symbol:
+_start`, your crate's own WASI glue (`_start`, `#[panic_handler]`,
+`#[global_allocator]`, `wasi_snapshot_preview1` imports) is gated with bare
+`#[cfg(target_arch = "wasm32")]`. Gate it with
+`#[cfg(all(target_arch = "wasm32", not(test)))]` instead; the release
+`wasm32-unknown-unknown` build is unchanged.
+
 ### Effectful / connector-backed capabilities
 
 Capabilities that import `traverse_host::*` (including Spec 104

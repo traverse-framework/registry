@@ -59,12 +59,14 @@ jobs:
       # cargo-llvm-cov added for specs/018-capability-test-coverage's new
       # per-capability coverage gate (mirrors build-catalog's existing recipe).
       # wasm32-unknown-unknown target added for registry#509's wasm32
-      # execution gate (check_new_contracts_have_wasm32_execution).
+      # execution gate (check_new_contracts_have_wasm32_execution);
+      # wasm32-wasip1 for registry#668's wasm32 unit-test gate
+      # (check_new_contracts_have_wasm32_unit_tests, run under wasmtime).
       - name: Set up Rust
         uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: "1.94.0"
-          targets: wasm32-unknown-unknown
+          targets: wasm32-unknown-unknown, wasm32-wasip1
           components: llvm-tools-preview
 
       - name: Cache cargo
