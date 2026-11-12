@@ -198,8 +198,11 @@ own. The owner accepted every proposed call below.
   fixed or deprecated, and it is labeled `good first issue`, not `bug`.
   Proposed: **escape**, because the defect is confirmed in review and
   excluding it only because no fix has landed yet would reward an unfixed
-  defect. If the owner agrees, its root cause (wasm32 `usize` width, invisible
-  to 64-bit host tests) is not caught by any current gate.
+  defect. Its root cause (wasm32 `usize` width, invisible to 64-bit host
+  tests) has been gated since #509 (#551, merged 2026-09-16), which runs each
+  new contract's wasm32 artifact with a `2^32` fixture for unbounded
+  length/count integer fields. (Corrected 2026-11-10, decision-log entry 142:
+  the results first said no gate caught it.)
 - **B. `report.{enrich-insights,summarize,translate-fr}@1.0.0`.** Superseded
   by 1.1.0 so that the chain plans in `browserLocalPlan` (#441). The planner
   composes only linear chains. Its own bug was traverse#1338. Proposed:
@@ -251,7 +254,7 @@ own. The owner accepted every proposed call below.
 | `report.translate-fr@1.1.0` | 2026-09-10 | [#452](https://github.com/traverse-framework/registry/pull/452) | yes | no escape | no deprecation, `bug` issue, or fixing successor found | n/a |
 | `retention.action-plan-create@1.0.0` | 2026-09-15 | [#523](https://github.com/traverse-framework/registry/pull/523) | no | no escape | no deprecation, `bug` issue, or fixing successor found | n/a |
 | `text.detect-language@1.0.0` | 2026-09-11 | [#470](https://github.com/traverse-framework/registry/pull/470) | yes | escape | contract: `deprecated.json` names a `traverse-contracts` parse failure ([#656](https://github.com/traverse-framework/registry/issues/656)); provenance.source `derived` | `traverse-contracts` parse gate (entry 137) |
-| `text.truncate@1.0.0` | 2026-09-14 | [#487](https://github.com/traverse-framework/registry/pull/487) | unclear (flag F) | escape (flag A) | behaviour: [#492](https://github.com/traverse-framework/registry/issues/492), schema-legal `max_length` wipes text on wasm32; open, not yet fixed or deprecated, not labeled `bug` | none: host `cargo test` is 64-bit; no gate exercises wasm32 `usize` width |
+| `text.truncate@1.0.0` | 2026-09-14 | [#487](https://github.com/traverse-framework/registry/pull/487) | unclear (flag F) | escape (flag A) | behaviour: [#492](https://github.com/traverse-framework/registry/issues/492), schema-legal `max_length` wipes text on wasm32; open, not yet fixed or deprecated, not labeled `bug` | wasm32 execution gate, #509 / [#551](https://github.com/traverse-framework/registry/pull/551) (merged 2026-09-16): the `max_length=2^32` fixture returns `"text":""`, failing `capability.wasm32_budget_wipe_regression` |
 
 #### model-backed (8)
 
@@ -347,10 +350,17 @@ Bar outcome for the promotion bucket: **not met.**
 1. n ≥ 20: **met** (n = 25).
 2. Escape rate ≤ 10%: **not met** (7 / 25 = 28%). Without flag A it would be
    6 / 25 = 24%, which still fails.
-3. Every escape's root cause gated: **not met.** Six escapes (all #656 parse
+3. Every escape's root cause gated: **met.** Six escapes (all #656 parse
    failures) are now caught by the `traverse-contracts` parse gate (entry 137).
    The `text.truncate@1.0.0` root cause (wasm32 `usize` width, invisible to
-   64-bit host tests) is caught by no current gate.
+   64-bit host tests) is caught by the wasm32 execution gate (#509, #551,
+   merged 2026-09-16): run against the 1.0.0 artifact, its `max_length=2^32`
+   fixture returns `{"text":"","truncated":true}` where the happy path returns
+   `{"text":"hello…","truncated":true}`. That gate is a heuristic (name-matched
+   integer fields, emptied strings only); generalising it is tracked
+   separately. Corrected 2026-11-10 (decision-log entry 142); the results
+   first reported this condition as not met. The bar outcome is unchanged,
+   because condition 2 fails.
 
 Six of the seven promotion-bucket escapes are a single failure class: contract
 values (lifecycle `experimental`, provenance `derived`, the missing `schema`
