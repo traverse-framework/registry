@@ -3188,6 +3188,112 @@ def check_new_contracts_have_wasm32_execution(base_sha: str, head_sha: str, erro
             check_new_contract_wasm32_execution(Path(path), errors)
 
 
+# registry#668: check_new_contract_wasm32_execution (registry#509) only sees
+# what its synthesized fixtures reach -- happy-path inputs plus 0/2^32 for
+# name-matched budget integers, flagged only when a string empties. A crate's
+# own unit tests usually already cover its edge values, but spec 018 measures
+# them on the 64-bit host, where `usize` is never 32-bit. Running the same
+# tests on a 32-bit wasm target closes that gap without guessing fixtures.
+# wasm32-wasip1 (not wasm32-unknown-unknown) because the libtest harness needs
+# std; wasi-capability-runtime's #[panic_handler]/#[global_allocator] are
+# gated to target_os != "wasi" for exactly this.
+WASM32_UNIT_TEST_TARGET = "wasm32-wasip1"
+WASM32_UNIT_TEST_RUNNER_ENV = "CARGO_TARGET_WASM32_WASIP1_RUNNER"
+WASM32_UNIT_TEST_TIMEOUT_SECONDS = 600
+
+
+def check_new_contract_wasm32_unit_tests(path: Path, errors: list) -> None:
+    """registry#668: run the newly-published capability's crate unit tests
+    under a 32-bit wasm target (wasm32-wasip1 + wasmtime), in addition to the
+    host run spec 018 measures coverage on. See WASM32_UNIT_TEST_TARGET's
+    comment for why. Model-backed crates run their default-feature tests --
+    the same set host `cargo llvm-cov` measures -- so no weights are fetched.
+    Like check_new_contract_wasm32_execution, a missing crate is left to
+    check_new_contract_test_coverage, and metadata_only_successor contracts
+    (byte-identical predecessor WASM, registry#623) are skipped."""
+    try:
+        contract = json.loads(path.read_text())
+    except Exception:
+        return
+    capability_id = contract.get("id")
+    if not isinstance(capability_id, str) or not capability_id.strip():
+        return
+
+    reuse_marker, _source, _from_sibling = load_artifact_reuse_marker(path, contract)
+    if (
+        isinstance(reuse_marker, dict)
+        and reuse_marker.get("kind") == "metadata_only_successor"
+    ):
+        return
+
+    manifest_path = Path("capability-src") / expected_capability_src_crate(capability_id) / "Cargo.toml"
+    if not manifest_path.is_file():
+        return
+
+    env = dict(os.environ)
+    env.setdefault(WASM32_UNIT_TEST_RUNNER_ENV, "wasmtime")
+    try:
+        result = subprocess.run(
+            [
+                "cargo",
+                "test",
+                "--target",
+                WASM32_UNIT_TEST_TARGET,
+                "--manifest-path",
+                str(manifest_path),
+            ],
+            capture_output=True,
+            text=True,
+            timeout=WASM32_UNIT_TEST_TIMEOUT_SECONDS,
+            env=env,
+        )
+    except Exception as exc:
+        fail(
+            errors,
+            "capability.wasm32_unit_tests_failed",
+            str(path),
+            f"unable to run 'cargo test --target {WASM32_UNIT_TEST_TARGET}' "
+            f"for '{capability_id}': {exc}",
+        )
+        return
+
+    if result.returncode != 0:
+        output_tail = (result.stdout + result.stderr).strip()[-2000:]
+        hint = ""
+        if "E0152" in result.stderr or "duplicate symbol: _start" in result.stderr:
+            hint = (
+                " — gate the crate's own WASI glue (_start, #[panic_handler], "
+                "#[global_allocator], wasi_snapshot_preview1 imports) with "
+                '#[cfg(all(target_arch = "wasm32", not(test)))], not bare '
+                '#[cfg(target_arch = "wasm32")], so the std test harness can '
+                "link on wasm32"
+            )
+        fail(
+            errors,
+            "capability.wasm32_unit_tests_failed",
+            str(path),
+            f"'{capability_id}' unit tests fail on {WASM32_UNIT_TEST_TARGET} "
+            f"({manifest_path}) although spec 018's host run may pass -- "
+            f"usize/isize are 32-bit here: {output_tail}{hint}",
+        )
+
+
+def check_new_contracts_have_wasm32_unit_tests(base_sha: str, head_sha: str, errors: list) -> None:
+    """Only validates newly-ADDED contract.json files in this PR's diff --
+    see check_new_contract_test_coverage's docstring for why."""
+    diff = subprocess.check_output(
+        ["git", "diff", "--name-status", f"{base_sha}...{head_sha}", "--", "capabilities/"],
+        text=True,
+    )
+    for line in diff.splitlines():
+        if not line.strip():
+            continue
+        parts = line.split("\t")
+        status, path = parts[0], parts[-1]
+        if status == "A" and path.endswith("contract.json"):
+            check_new_contract_wasm32_unit_tests(Path(path), errors)
+
+
 def real_workflow_paths(workflows_dir: Path):
     """Real, published workflow.json files only -- excludes
     workflows/examples/, which holds demo/fixture content
@@ -4290,6 +4396,10 @@ def main() -> int:
             fail(errors, "git.diff_failed", "capabilities/", f"Unable to compute diff: {exc}")
         try:
             check_new_contracts_have_wasm32_execution(base_sha, head_sha, errors)
+        except subprocess.CalledProcessError as exc:
+            fail(errors, "git.diff_failed", "capabilities/", f"Unable to compute diff: {exc}")
+        try:
+            check_new_contracts_have_wasm32_unit_tests(base_sha, head_sha, errors)
         except subprocess.CalledProcessError as exc:
             fail(errors, "git.diff_failed", "capabilities/", f"Unable to compute diff: {exc}")
 

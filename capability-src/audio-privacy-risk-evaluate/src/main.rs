@@ -6,29 +6,29 @@ extern crate std;
 const MAX_INPUT: usize = 8192;
 const MAX_OUTPUT: usize = 2048;
 #[repr(C)]
-#[cfg(target_arch = "wasm32")]
+#[cfg(all(target_arch = "wasm32", not(test)))]
 struct Iovec {
     buffer: *const u8,
     length: usize,
 }
 #[repr(C)]
-#[cfg(target_arch = "wasm32")]
+#[cfg(all(target_arch = "wasm32", not(test)))]
 struct IovecMut {
     buffer: *mut u8,
     length: usize,
 }
 #[link(wasm_import_module = "wasi_snapshot_preview1")]
-#[cfg(target_arch = "wasm32")]
+#[cfg(all(target_arch = "wasm32", not(test)))]
 unsafe extern "C" {
     fn fd_read(fd: u32, vectors: *const IovecMut, count: usize, read: *mut usize) -> u32;
     fn fd_write(fd: u32, vectors: *const Iovec, count: usize, written: *mut usize) -> u32;
 }
-#[cfg(target_arch = "wasm32")]
+#[cfg(all(target_arch = "wasm32", not(test)))]
 static mut INPUT: [u8; MAX_INPUT + 1] = [0; MAX_INPUT + 1];
-#[cfg(target_arch = "wasm32")]
+#[cfg(all(target_arch = "wasm32", not(test)))]
 static mut OUTPUT: [u8; MAX_OUTPUT] = [0; MAX_OUTPUT];
 
-#[cfg(target_arch = "wasm32")]
+#[cfg(all(target_arch = "wasm32", not(test)))]
 #[unsafe(no_mangle)]
 pub extern "C" fn _start() {
     unsafe {
@@ -272,7 +272,7 @@ impl Writer<'_> {
         }
     }
 }
-#[cfg(target_arch = "wasm32")]
+#[cfg(all(target_arch = "wasm32", not(test)))]
 #[panic_handler]
 fn panic(_: &core::panic::PanicInfo<'_>) -> ! {
     loop {}

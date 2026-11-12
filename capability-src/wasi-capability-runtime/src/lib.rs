@@ -10,8 +10,8 @@
 //! `environ_get`/`environ_sizes_get`, which that whitelist rejects).
 //!
 //! `#[global_allocator]` and `#[panic_handler]` are only defined for real
-//! `wasm32` builds (`cfg(not(test))`) so `cargo test` on the host still runs
-//! against ordinary `std`, without a duplicate-lang-item conflict.
+//! `wasm32-unknown-unknown` builds so `cargo test` on the host and on `wasm32-wasip1` (registry#668)
+//! still runs against ordinary `std`, without a duplicate-lang-item conflict.
 
 #![cfg_attr(not(test), no_std)]
 
@@ -20,7 +20,7 @@ extern crate alloc;
 mod json;
 pub use json::{array_of_strings, object, parse as parse_json, write as write_json, Value};
 
-#[cfg(all(target_arch = "wasm32", not(test)))]
+#[cfg(all(target_arch = "wasm32", not(target_os = "wasi"), not(test)))]
 mod allocator {
     use core::alloc::{GlobalAlloc, Layout};
     use core::cell::UnsafeCell;
@@ -102,7 +102,7 @@ mod allocator {
     };
 }
 
-#[cfg(all(target_arch = "wasm32", not(test)))]
+#[cfg(all(target_arch = "wasm32", not(target_os = "wasi"), not(test)))]
 #[panic_handler]
 fn panic(_info: &core::panic::PanicInfo) -> ! {
     // No unwinding machinery is linked in (no_std, panic = "abort"); exit

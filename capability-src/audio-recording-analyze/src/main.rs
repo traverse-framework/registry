@@ -275,7 +275,7 @@ impl<'a> Writer<'a> {
     }
 }
 
-#[cfg(target_arch = "wasm32")]
+#[cfg(all(target_arch = "wasm32", not(test)))]
 mod wasi {
     use super::*;
 

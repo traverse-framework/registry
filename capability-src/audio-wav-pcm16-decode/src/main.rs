@@ -4,35 +4,35 @@
 #![cfg_attr(not(test), no_std)]
 #![cfg_attr(not(test), no_main)]
 
-#[cfg(target_arch = "wasm32")]
+#[cfg(all(target_arch = "wasm32", not(test)))]
 use wav_pcm16_decode::{decode, MAX_INPUT, MAX_OUTPUT, MAX_WAV};
 
 #[repr(C)]
-#[cfg(target_arch = "wasm32")]
+#[cfg(all(target_arch = "wasm32", not(test)))]
 struct Iovec {
     buffer: *const u8,
     length: usize,
 }
 #[repr(C)]
-#[cfg(target_arch = "wasm32")]
+#[cfg(all(target_arch = "wasm32", not(test)))]
 struct IovecMut {
     buffer: *mut u8,
     length: usize,
 }
 #[link(wasm_import_module = "wasi_snapshot_preview1")]
-#[cfg(target_arch = "wasm32")]
+#[cfg(all(target_arch = "wasm32", not(test)))]
 unsafe extern "C" {
     fn fd_read(fd: u32, vectors: *const IovecMut, count: usize, read: *mut usize) -> u32;
     fn fd_write(fd: u32, vectors: *const Iovec, count: usize, written: *mut usize) -> u32;
 }
-#[cfg(target_arch = "wasm32")]
+#[cfg(all(target_arch = "wasm32", not(test)))]
 static mut INPUT: [u8; MAX_INPUT + 1] = [0; MAX_INPUT + 1];
-#[cfg(target_arch = "wasm32")]
+#[cfg(all(target_arch = "wasm32", not(test)))]
 static mut WAV: [u8; MAX_WAV] = [0; MAX_WAV];
-#[cfg(target_arch = "wasm32")]
+#[cfg(all(target_arch = "wasm32", not(test)))]
 static mut OUTPUT: [u8; MAX_OUTPUT] = [0; MAX_OUTPUT];
 
-#[cfg(target_arch = "wasm32")]
+#[cfg(all(target_arch = "wasm32", not(test)))]
 #[unsafe(no_mangle)]
 pub extern "C" fn _start() {
     unsafe {
@@ -65,7 +65,7 @@ pub extern "C" fn _start() {
         let _ = fd_write(1, &vector, 1, &mut written);
     }
 }
-#[cfg(target_arch = "wasm32")]
+#[cfg(all(target_arch = "wasm32", not(test)))]
 #[panic_handler]
 fn panic(_: &core::panic::PanicInfo<'_>) -> ! {
     loop {}
