@@ -802,6 +802,7 @@ mod tests {
             status: None,
             model_usage: Vec::new(),
             revocation: None,
+            superseded_by: None,
         }
     }
 

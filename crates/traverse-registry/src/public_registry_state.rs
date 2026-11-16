@@ -87,6 +87,13 @@ pub struct PublicRegistryCapabilityRecord {
     /// specs/026 FR-013: why a revoked version was revoked; `None` otherwise.
     #[serde(default)]
     pub revocation: Option<PublicRevocation>,
+    /// The version that replaces a deprecated one (spec 005
+    /// `superseded_by`), as the index publishes it from `deprecated.json`.
+    /// `None` when the record is not deprecated or its yank record names no
+    /// successor. Omitted from output when `None`, so a record without it
+    /// round-trips unchanged (registry#672).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub superseded_by: Option<String>,
 }
 
 impl PublicRegistryCapabilityRecord {
@@ -584,7 +591,7 @@ fn state_json_value(state: &SyncedPublicRegistryState) -> Value {
 }
 
 fn capability_json_value(record: &PublicRegistryCapabilityRecord) -> Value {
-    serde_json::json!({
+    let mut value = serde_json::json!({
         "namespace": record.namespace,
         "id": record.id,
         "version": record.version,
@@ -608,7 +615,16 @@ fn capability_json_value(record: &PublicRegistryCapabilityRecord) -> Value {
         "status": record.status,
         "model_usage": record.model_usage,
         "revocation": record.revocation,
-    })
+    });
+    // Written only when the index declared it, so a record without a
+    // successor keeps the shape it had before registry#672.
+    if let (Some(successor), Some(object)) = (&record.superseded_by, value.as_object_mut()) {
+        object.insert(
+            "superseded_by".to_string(),
+            Value::String(successor.clone()),
+        );
+    }
+    value
 }
 
 fn single_error(
@@ -1404,6 +1420,7 @@ mod tests {
                 status: None,
                 model_usage: Vec::new(),
                 revocation: None,
+                superseded_by: None,
             }],
             events: Vec::new(),
         }
@@ -1418,6 +1435,52 @@ mod tests {
             product_url: "https://raw.githubusercontent.com/traverse-framework/registry/abc123/events/core/core.status-transitioned/1.0.0/product.json".to_string(),
             deprecated: false,
         }
+    }
+
+    #[test]
+    fn superseded_by_survives_sync_and_is_omitted_when_absent() {
+        let workspace_root = unique_temp_dir();
+        let mut index = valid_index();
+        let mut deprecated = index.capabilities[0].clone();
+        deprecated.version = "0.9.0".to_string();
+        deprecated.deprecated = true;
+        deprecated.superseded_by = Some("1.0.0".to_string());
+        index.capabilities.push(deprecated);
+
+        // The published index shape: the key is present only on a
+        // deprecated record that names a successor.
+        let published = serde_json::to_value(&index).expect("index json");
+        assert_eq!(published["capabilities"][0].get("superseded_by"), None);
+        assert_eq!(published["capabilities"][1]["superseded_by"], "1.0.0");
+        let parsed: PublicRegistryIndex = serde_json::from_value(published).expect("index parses");
+        assert_eq!(parsed, index);
+
+        write_synced_public_registry_state(
+            &workspace_root,
+            "local",
+            "traverse-framework/registry",
+            "index-v7",
+            "2026-07-06T00:00:00Z",
+            index,
+        )
+        .expect("write should succeed");
+        let reloaded = load_synced_public_registry_state(&workspace_root, "local")
+            .expect("reload should succeed");
+        // The synced state file has the same shape as the index.
+        let written: Value = serde_json::from_slice(
+            &fs::read(synced_public_registry_state_path(&workspace_root, "local"))
+                .expect("state file"),
+        )
+        .expect("state json");
+        assert_eq!(written["capabilities"][0].get("superseded_by"), None);
+        assert_eq!(written["capabilities"][1]["superseded_by"], "1.0.0");
+        let successors: Vec<Option<&str>> = reloaded
+            .capabilities
+            .iter()
+            .map(|record| record.superseded_by.as_deref())
+            .collect();
+        assert!(successors.contains(&Some("1.0.0")));
+        assert!(successors.contains(&None));
     }
 
     #[test]
