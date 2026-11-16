@@ -23,6 +23,15 @@
 
 ### Changed
 
+- **`traverse-registry` 0.32.0 (registry#672) — new public field.**
+  `PublicRegistryCapabilityRecord` carries `superseded_by: Option<String>`,
+  the successor the index already publishes for a deprecated version (spec
+  005; `text.detect-entities@1.2.0` → `1.2.1`). The crate used to drop it
+  twice: on parse (no field) and in the synced state file (hand-built JSON).
+  It now survives parse, `write_synced_public_registry_state` and reload.
+  The key is omitted when absent, so records without a successor keep
+  their shape. Code that builds the record with a struct literal must add
+  `superseded_by: None`. Requested by traverse#1848 (Traverse decision 132).
 - **`traverse-registry` 0.31.0 (registry#650) — breaking public API.**
   `ApplicationStateInvoke` is now an exact-one union (Traverse spec
   `1773-host-connector-invoke-union`): `Capability { capability_id,
