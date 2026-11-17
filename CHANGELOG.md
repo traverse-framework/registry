@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+### Changed
+
+- **HF NER example pins `text.detect-entities@1.1.2` (registry#669).**
+  `examples/hub-client-first-ner` pointed at deprecated 1.1.1. 1.1.2 keeps
+  the same artifact digest and signature host path; only the contract pin
+  moves to the Spec 002-parseable successor.
+
 ### Added
 
 - **`audio.recording-analyze@1.0.0` (registry#594, decision-log entry 141).**
