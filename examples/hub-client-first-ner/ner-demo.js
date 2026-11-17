@@ -1,4 +1,4 @@
-// Verify-then-run core for text.detect-entities@1.1.1, shared unchanged by
+// Verify-then-run core for text.detect-entities@1.1.2, shared unchanged by
 // index.html (browser) and cli.js (Node >= 22). Same code, same signed bytes,
 // both places: the point of the demo (registry#577 Track 2).
 //
@@ -14,8 +14,8 @@
 
 export const CAPABILITY = {
   id: "text.detect-entities",
-  version: "1.1.1",
-  path: "capabilities/text/text.detect-entities/1.1.1",
+  version: "1.1.2",
+  path: "capabilities/text/text.detect-entities/1.1.2",
 };
 
 // catalog/signing-key.pub
