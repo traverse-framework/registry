@@ -4,8 +4,8 @@
 
 ### Cross-tool review warning mode (`#675`)
 
-- Pin `.governance-version` to `v1.3.0` and run the warning-mode review-record
-  check. Add `pr_change_classification.sh` so docs-only PRs share the full-CI
+- Pin `.governance-version` to `v1.3.1` and run the warning-mode review-record
+  check (v1.3.1 only accepts a record whose header opens the comment). Add `pr_change_classification.sh` so docs-only PRs share the full-CI
   signal. Ops skills gain Review Queue and Merge Gate sections (Decision 133).
 
 ### Changed
