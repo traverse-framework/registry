@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+### One source for agent skills (`traverse-framework/.github#58`)
+
+- `.agents/skills/` is the only skill source. `scripts/agent/sync_skills.sh`
+  (vendored from governance v1.5.0) generates the committed `.claude/skills/`
+  and `.cursor/skills/` copies, replacing the hand-written Claude pointer
+  files. The governance workflow's drift check fails when a copy differs.
+- `registry-ops` and `ship` claim with `scripts/agent/claim.sh`. `ship` no
+  longer hard-codes a `claude/` branch prefix. `capability-review` now has
+  Claude Code and Cursor copies.
+
 ### Shared claim and release scripts (`traverse-framework/.github#57`)
 
 - `scripts/agent/claim.sh`, `release.sh` and `claim_lib.sh` are vendored

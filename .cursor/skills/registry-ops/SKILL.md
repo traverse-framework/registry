@@ -1,9 +1,9 @@
-<!-- Cursor copy of registry-ops; Review Queue and Merge Gate must match .agents and .claude. -->
-
 ---
 name: "registry-ops"
 description: "Start or resume the standard traverse-framework/registry operating model when the user says REGISTRY OPS, asks to start registry ops/dev work, asks for the ready-ticket worker, PR finisher, or backlog gardener, or wants an agent to pick ready Project 3 work and run the registry coordination process."
 ---
+
+<!-- GENERATED from .agents/skills by scripts/agent/sync_skills.sh. Edit the source, then re-run the script. -->
 
 # Registry Ops
 
@@ -34,13 +34,13 @@ only the repo owner can make).
 3. Inspect current GitHub and Project 3 state.
 4. Prefer finishing existing open PRs before claiming new Ready work.
 5. If no active PR needs attention, pick one Ready Project 3 issue.
-6. Before work on an issue, run the pre-flight checks from `AGENTS.md`:
-   - issue must not carry another agent's label (`agent:claude` / `agent:codex`)
-   - no remote branch may exist for this issue under another agent's prefix
-7. If pre-flight passes, claim the issue:
-   - add your agent label (`agent:claude` or `agent:codex`)
-   - set Project 3 `Status` to `In Progress` (Project 3 has no separate `Agent` field -- unlike `traverse`'s Project 1 -- so the label alone signals ownership)
-8. Use a dedicated `<agent>/issue-NNN-*` branch (e.g. `claude/issue-12-*`).
+6. Before work on an issue, run `scripts/agent/claim.sh <N> <tool> --dry-run`
+   (`<tool>` is `claude`, `codex` or `cursor`). It checks that the issue is
+   Ready on Project 3, carries no `agent:*` label, and has no `*/issue-<N>-*`
+   branch or open PR from any tool. If it refuses, pick another issue.
+7. Claim with `scripts/agent/claim.sh <N> <tool>`. That adds `agent:<tool>`,
+   sets Project 3 to In Progress, and posts the audit comment.
+8. Use the branch it prints (`<tool>/issue-<N>-*`).
 9. Keep work scoped to the claimed issue and governing spec.
 10. Open a dedicated PR using the org body superset (`## Summary`, `## Governing Spec`, `## Project Item`, `## Definition of Done`, `## Validation`), declaring **every** approved spec whose `governs` prefix matches a changed file (not just the one most relevant to the PR's narrative -- cross-check `specs/governance/approved-specs.json` directly), then for full-CI PRs follow **Merge Gate** (add `needs-review`, wait for a passing review record) before squash-merge. Do not poll checks in a tight loop -- move on to the next issue -- but before starting the *next* claim, or at the very start of a resumed pass, check every PR opened this run (`gh pr checks <N>`; `gh pr view <N> --json state,mergeStateStatus`). A `BLOCKED` merge state on a real failing required check (`spec-alignment` and `capability-validation` are both required as of the #39 fix, 2026-07-29) will never resolve on its own -- fix it (see Gates & Failure Playbook) and re-push rather than leaving it queued and assuming auto-merge will sort it out.
 11. Loop: go back to step 3. Keep claiming the next open PR needing attention or next Ready issue until none remain and every opened PR is confirmed `MERGED`.
