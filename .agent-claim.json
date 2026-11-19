@@ -1,0 +1,11 @@
+{
+  "repo": "traverse-framework/registry",
+  "project_id": "PVT_kwDOEbiBt84BcZQJ",
+  "status_field_id": "PVTSSF_lADOEbiBt84BcZQJzhXCa-8",
+  "status_options": {
+    "Ready": "f75ad846",
+    "In Progress": "47fc9ee4",
+    "Blocked": "24e8d58c",
+    "Done": "98236657"
+  }
+}
