@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### Shared claim and release scripts (`traverse-framework/.github#57`)
+
+- `scripts/agent/claim.sh`, `release.sh` and `claim_lib.sh` are vendored
+  unchanged from governance v1.4.0. `.agent-claim.json` holds the Project 3
+  ids. `AGENTS.md` points at the scripts.
+
 ### Cross-tool review warning mode (`#675`)
 
 - Pin `.governance-version` to `v1.3.1` and run the warning-mode review-record
