@@ -4,8 +4,8 @@ Canonical agent instructions live in [CLAUDE.md](CLAUDE.md). Org-wide rules (cod
 
 ## Claim and release
 
-Use the shared scripts, which are vendored from `traverse-framework/.github`
-v1.4.0. The Project 3 ids live in `.agent-claim.json`.
+Use the shared scripts, vendored from `traverse-framework/.github` at the
+version in `.governance-version`. The Project 3 ids live in `.agent-claim.json`.
 
 ```bash
 scripts/agent/claim.sh <issue> <claude|codex|cursor> --dry-run   # check only

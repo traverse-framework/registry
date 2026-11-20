@@ -7,7 +7,7 @@ Thanks for contributing to the Traverse Registry.
 Please read:
 
 - [specs/001-registry-foundation/spec.md](specs/001-registry-foundation/spec.md) — this repo's foundational spec
-- [traverse-framework/.github](https://github.com/traverse-framework/.github) — constitution, quality standards, antipatterns, compatibility policy, exception process, CLA (this repo has adopted governance version 1.0.0)
+- [traverse-framework/.github](https://github.com/traverse-framework/.github) — constitution, quality standards, antipatterns, compatibility policy, exception process, CLA (the adopted release is in `.governance-version`)
 - [docs/decision-log.md](docs/decision-log.md) — why this repo's design is what it is
 
 ## First contributions

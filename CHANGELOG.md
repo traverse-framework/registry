@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+### Governance drift fixes (`traverse-framework/.github#59`)
+
+- `CLAUDE.md` trimmed from 8.4 KB to 5.3 KB, under the 6 KB cap: history
+  notes and repeated commands removed, every rule kept.
+- `AGENTS.md`, `CONTRIBUTING.md` and the constitution pointer no longer write
+  a governance version in prose; they point at `.governance-version`.
+
 ### One source for agent skills (`traverse-framework/.github#58`)
 
 - `.agents/skills/` is the only skill source. `scripts/agent/sync_skills.sh`
