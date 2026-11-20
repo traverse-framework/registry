@@ -14,9 +14,9 @@ continuous backlog loop across many tickets — this skill exists for the
 ## Workflow
 
 1. **Check existing state first.** `gh issue view <n>`, `gh pr list --search "<n>" --state all`, and the Project 3 board status field. If a PR already exists or the issue is already closed, report that and stop — do not duplicate work. Project 3's `Status` field can lag a merged/closed issue; a closed GitHub issue is more authoritative than a stale board column.
-2. **Pre-flight before claiming**: the issue must not carry another agent's label (`agent:claude` / `agent:codex` / `agent:cursor`), and no remote branch may exist for it under another agent's prefix. If either is true, stop and report — do not claim work already owned by another agent.
-3. **Claim**: add your agent label to the issue, set its Project 3 `Status` to `In Progress`.
-4. Branch: `claude/issue-<n>-<slug>` off latest `origin/main`.
+2. **Pre-flight before claiming**: `scripts/agent/claim.sh <n> <tool> --dry-run` (`<tool>` is `claude`, `codex` or `cursor`). If it refuses (not Ready, already labelled, or another tool's branch or PR exists), stop and report — do not claim work already owned by another agent.
+3. **Claim**: `scripts/agent/claim.sh <n> <tool>` adds `agent:<tool>`, sets Project 3 to In Progress, and comments.
+4. Branch: the one `claim.sh` prints (`<tool>/issue-<n>-*`), off latest `origin/main`.
 5. Implement, scoped to the issue and its governing spec. If unsure how much to build, apply the Minimality Ladder in `.agents/skills/registry-ops/SKILL.md`.
 6. **Before pushing**, run and fix failures — this mirrors CI exactly, so a clean local pass means no CI round-trip:
    ```bash
