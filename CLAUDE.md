@@ -18,10 +18,8 @@ docs/decision-log.md                                     # why this repo's desig
 scripts/ci/                                              # CI gate scripts (vendored from traverse-framework/.github)
 ```
 
-`capability-src/` was named `agents/` until 2026-07-29 (decision-log entry 41) — "agent" is
-now a reserved term for a future capability whose implementation genuinely involves
-AI/model-backed reasoning; every capability published in this registry today is pure,
-deterministic business logic, so none of them qualify.
+"Agent" is reserved for a capability that genuinely uses model-backed reasoning; every
+capability here today is deterministic business logic (decision-log entry 41).
 
 ## Commands
 
@@ -35,41 +33,20 @@ cargo test -p traverse-registry --locked                  # crate unit + integra
 cargo clippy -p traverse-registry --all-targets --locked -- -D warnings  # crate lint gate (matches CI exactly)
 ```
 
-The `traverse-registry` crate extraction (`traverse` spec 051) has landed — see
-`docs/decision-log.md` entries 26/29/30 — but every capability under `capability-src/`
-already had real, tested, buildable Rust source before and independent of that; this repo
-has not been executable-code-free since decision-log entry 38.
+Before pushing a `crates/traverse-registry` change, run its `cargo test` and `cargo clippy`
+lines above; they are exactly what CI runs.
 
-### Before pushing any `crates/traverse-registry` change
-
-Run, in order, and fix failures before pushing — this is exactly what CI runs, so a clean
-local pass means no CI round-trip:
-
-```bash
-cargo test -p traverse-registry --locked
-cargo clippy -p traverse-registry --all-targets --locked -- -D warnings
-bash scripts/ci/pre_pr_check.sh <pr-body-file>   # only if capabilities/ or personas/ changed
-```
-
-### Before opening any PR that touches `capabilities/` or `personas/`
-
-Run `bash scripts/ci/pre_pr_check.sh <path-to-draft-pr-body>` — it runs the exact two
-required CI gates (`capability-validation`, `spec-alignment`) with `BASE_SHA`/`HEAD_SHA`
-wired the same way CI wires them. Do not run `capability_validation.py` bare (no args) as
-your only check — that silently skips every diff-based rule (persona `persona_ref`,
-immutability, scenario format) because `main()` only enables them when both SHAs are
-passed. This is not hypothetical: registry `#278` failed CI on exactly the checks a bare
-run would have missed, despite `traverse-cli capability publish`'s own local validation
-reporting success — see `docs/decision-log.md` entry 61. New `personas/` records should
-be scaffolded with `scripts/scaffold/new-persona.sh`, not hand-written — it enforces
-`description`/`distinguished_from` and self-validates.
+Before any PR touching `capabilities/` or `personas/`, run `scripts/ci/pre_pr_check.sh`.
+A bare `capability_validation.py` silently skips the diff-based rules (`persona_ref`,
+immutability, scenario format), which is how `#278` failed CI (decision-log entry 61).
+Scaffold new `personas/` records with `scripts/scaffold/new-persona.sh`.
 
 ## Git & PR Workflow
 
-- **Check existing state before starting any ticket.** Run `gh issue view <n>`, `gh pr list --search "<n>"` (or `--search "<n>" --state all`), and check the Project 3 board status field before writing any code. If a PR already exists or the issue is already closed, report that instead of duplicating work — Project 3's `Status` field is sometimes stale (doesn't always auto-sync on merge), so a closed GitHub issue is more authoritative than a board column that still says `In Progress`.
-- **Every PR body must include a `## Governing Spec` section** listing the approved spec ID(s) (bare `- <spec-id>` bullets, e.g. `- 037-semver-range-resolution`) whose `governs` prefix in `specs/governance/approved-specs.json` matches at least one changed file. This isn't optional style — `spec-alignment` is a required CI check and fails the PR without it. Cross-check `specs/governance/approved-specs.json` directly rather than guessing. `capability-src/` is governed by `018-capability-test-coverage` (plus `024`/`027` for `catalog-builder/` and `model-execute/`), so a PR touching it must declare `018` (#664 failed spec-alignment until it did); `CLAUDE.md` and `.agents/` are ungoverned, so any approved spec such as `001-registry-foundation` satisfies the section for them.
-- **`spec-alignment` reads the PR body from the triggering push/sync event**, not the live PR state — editing the body with `gh pr edit` alone does not re-run the check. Push a new commit (`git commit --allow-empty` is fine) after fixing the body to force a fresh event.
-- This repo has no pre-push git hook — pushing a brand-new branch works normally with a plain `git push -u origin <branch>`.
+- **Check existing state before starting a ticket** (`gh issue view <n>`, `gh pr list --search "<n>" --state all`). A closed issue beats a stale Project 3 `Status`.
+- **Every PR body needs `## Governing Spec`** with bare `- <spec-id>` bullets whose `governs` prefix in `specs/governance/approved-specs.json` matches a changed file (required `spec-alignment` check). `capability-src/` needs `018-capability-test-coverage` (plus `024`/`027` for `catalog-builder/`, `model-execute/`); for ungoverned files like `CLAUDE.md` or `.agents/`, any approved spec such as `001-registry-foundation` works.
+- `spec-alignment` reads the body from the triggering push, so after editing the body push a new commit (`--allow-empty` is fine).
+- No pre-push hook here; a plain `git push -u origin <branch>` works.
 
 ## Code Style
 
@@ -84,10 +61,7 @@ Inherited from `traverse-framework/.github`'s `docs/ai-agent-hardening.md`: no `
 
 ## Working Style
 
-When operating autonomously (registry-ops loops, unattended ticket work), do not stop to ask for reversible, low-stakes choices — pick the sensible default, proceed, and note the assumption in the PR description if it's non-obvious. Reserve actual questions for irreversible actions, public API/security-posture changes, or genuine ambiguity a human must resolve (see the registry-ops skill's own guardrails on spec approval and cross-repo actions for the hard stops that always apply).
-
-When gathering repo state, batch independent read-only commands into a single Bash call (e.g. `git status --short && git log --oneline -5 && gh pr list --limit 5`) instead of one call each — split them only when one command's output determines the next.
-
-If something in the request contradicts what the code, specs, or a live check actually show, stop and surface the evidence (file paths, line numbers, command output) before implementing — don't silently implement the contradicted assumption and don't silently drop the request either. If the disagreement doesn't resolve from that evidence alone, record it as a `docs/decision-log.md` entry (or a tracking issue) rather than letting it evaporate at the end of the conversation.
-
-For open-ended investigation across this repo (gap analysis, audits), prefer parallel subagents per subsystem, then verify each finding against source before reporting it — collapse anything you can't point to a file:line for. Reserve serial, single-threaded work for anything that ships (implementation, PRs, merges), where collisions with parallel work are the actual risk.
+- Unattended, don't ask about reversible low-stakes choices: pick the sensible default and note it in the PR. Ask only for irreversible actions, public API/security changes, or real ambiguity (the registry-ops skill lists the hard stops).
+- Batch independent read-only commands into one shell call.
+- If the request contradicts the code, specs or a live check, surface the evidence (file:line, output) before implementing; if it stays unresolved, record it in `docs/decision-log.md` or an issue.
+- For audits, fan out per subsystem, then verify every finding against source before reporting it. Keep shipping work (PRs, merges) serial.
